@@ -1,0 +1,17 @@
+# File types to be ignored:
+
+*.DS_Store
+*.log
+*.msh
+*.pyc
+*.pvd
+*.pvtu
+*.vtu
+
+# Directories to be ignored:
+
+
+
+# Files to be ignored:
+
+
