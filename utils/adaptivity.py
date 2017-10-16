@@ -4,7 +4,7 @@ from numpy import linalg as la
 from scipy import linalg as sla
 
 
-def construct_hessian(mesh, V, sol, method='dL2'):
+def constructHessian(mesh, V, sol, method='dL2'):
     """
     Reconstructs the hessian of a scalar solution field with respect to the current mesh. The code for the integration 
     by parts reconstruction approach is based on the Monge-Amp\`ere tutorial provided in the Firedrake website 
@@ -59,7 +59,7 @@ def construct_hessian(mesh, V, sol, method='dL2'):
     return H
 
 
-def compute_steady_metric(mesh, V, H, sol, h_min=0.005, h_max=0.1, a=100., normalise='lp', p=2, num=1000., ieps=1000.):
+def computeSteadyMetric(mesh, V, H, sol, h_min=0.005, h_max=0.1, a=100., normalise='lp', p=2, num=1000., ieps=1000.):
     """
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``computeSteadyMetric``, from 
     ``adapt.py``, 2016.
@@ -155,7 +155,7 @@ def compute_steady_metric(mesh, V, H, sol, h_min=0.005, h_max=0.1, a=100., norma
     return M
 
 
-def local_metric_intersection(M1, M2):
+def localMetricIntersection(M1, M2):
     """
     Intersect two metrics (i.e. two 2x2 matrices).
 
@@ -171,7 +171,7 @@ def local_metric_intersection(M1, M2):
     return np.transpose(sla.sqrtm(M1)) * M * sla.sqrtm(M1)
 
 
-def metric_gradation(mesh, metric, beta=1.4, isotropic=False):
+def metricGradation(mesh, metric, beta=1.4, isotropic=False):
     """
     Perform anisotropic metric gradation in the method described in Alauzet 2010, using linear interpolation. Python
     code based on Nicolas Barral's function ``DMPlexMetricGradation2d_Internal`` in ``plex-metGradation.c``, 2017.
@@ -239,8 +239,8 @@ def metric_gradation(mesh, metric, beta=1.4, isotropic=False):
                     redMet1[j, j] = eta2_12 * met2[j, j]
                     redMet2[j, j] = eta2_21 * met1[j, j]
             else:
-                edgLen1 = symmetric_product(met1, v12)
-                edgLen2 = symmetric_product(met2, v21)
+                edgLen1 = symmetricProduct(met1, v12)
+                edgLen2 = symmetricProduct(met2, v21)
                 eta2_12 = 1. / pow(1 + edgLen1 * ln_beta, 2)
                 eta2_21 = 1. / pow(1 + edgLen2 * ln_beta, 2)
 
@@ -281,7 +281,7 @@ def metric_gradation(mesh, metric, beta=1.4, isotropic=False):
     metric.dat.data[:] = M
 
 
-def metric_intersection(mesh, V, M1, M2, bdy=False):
+def metricIntersection(mesh, V, M1, M2, bdy=False):
     """
     Intersect two metric fields.
 
@@ -309,7 +309,7 @@ def metric_intersection(mesh, V, M1, M2, bdy=False):
     return M12
 
 
-def symmetric_product(A, b):
+def symmetricProduct(A, b):
     """
     :param A: symmetric, 2x2 matrix.
     :param b: 2-vector.
