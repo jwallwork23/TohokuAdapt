@@ -6,11 +6,12 @@
 *.pyc
 *.pvd
 *.pvtu
+*.shp
 *.vtu
 
 # Directories to be ignored:
 
-
+/plots/
 
 # Files to be ignored:
 
