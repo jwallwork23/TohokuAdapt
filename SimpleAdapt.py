@@ -9,6 +9,7 @@ import utils.adaptivity as adap
 import utils.conversion as conv
 import utils.domain as dom
 import utils.interpolation as inte
+import utils.options as opt
 import utils.storage as stor
 
 
@@ -20,36 +21,35 @@ mesh, eta0, b = dom.TohokuDomain(int(input('coarseness (Integer in range 1-5, de
 N1 = len(mesh.coordinates.dat.data)     # Minimum number of vertices
 N2 = N1                                 # Maximum number of vertices
 SumN = N1                               # Sum over vertex counts
-print('...... mesh loaded. Initial number of vertices : ', N1, 'More options...')
+print('...... mesh loaded. Initial number of vertices : ', N1)
 
-# Set physical parameters:
-g = 9.81                        # Gravitational acceleration (m s^{-2})
-
-numVer = float(input('Target vertex count as a proportion of the initial number? (default 0.85): ') or 0.85) * N1
-hmin = float(input('Minimum element size in km (default 0.5)?: ') or 0.5) * 1e3
-hmax = float(input('Maximum element size in km (default 10000)?: ') or 10000.) * 1e3
+# Get default adaptivity parameter values:
+numVer = opt.Options.vscale * N1
+hmin = opt.Options.hmin
+hmax = opt.Options.hmax
 hmin2 = pow(hmin, 2)      # Square minimal side-length
 hmax2 = pow(hmax, 2)      # Square maximal side-length
-ntype = input('Normalisation type? (lp/manual, default lp): ') or 'lp'
-mtype = input('Adapt with respect to speed, free surface or both? (s/f/b, default b): ') or 'b'
-if mtype not in ('s', 'f', 'b'):
-    raise ValueError('Field selection not recognised. lease try again, choosing s, f or b.')
-mat_out = bool(input('Hit any key to output Hessian and metric: ')) or False
-iso = bool(input('Hit anything but enter to use isotropic, rather than anisotropic: ')) or False
+ntype = opt.Options.ntype
+mtype = opt.Options.mtype
+mat_out = opt.Options.matOut
+iso = opt.Options.iso
 if not iso:
-    hess_meth = input('Integration by parts or double L2 projection? (parts/dL2, default dL2): ') or 'dL2'
+    hess_meth = opt.Options.hessMeth
 
-# Courant number adjusted timestepping parameters:
-T = float(input('Simulation duration in minutes (default 25)?: ') or 25.) * 60.
-dt = float(input('Specify timestep in seconds (default 1): ') or 1.)
+# Get Courant number adjusted timestepping parameters:
+T = opt.Options.T
+dt = opt.Options.dt
 Dt = Constant(dt)
 cdt = hmin / np.sqrt(g * max(b.dat.data))
 if dt > cdt:
     print ('WARNING: chosen timestep dt =', dt, 'exceeds recommended value of', cdt)
     if bool(input('Hit anything except enter if happy to proceed.')) or False:
         exit(23)
-ndump = int(15. / dt)           # Timesteps per data dump
-rm = int(input('Timesteps per re-mesh (default 30)?: ') or 30)
+ndump = opt.Options.ndump
+rm = opt.Options.rm
+
+# Get physical parameters:
+g = opt.Options.g
 
 # Convert gauge locations to UTM coordinates:
 glatlon = {'P02': (38.5002, 142.5016), 'P06': (38.6340, 142.5838),
@@ -89,15 +89,15 @@ mn = 0
 u.rename('Fluid velocity')
 eta.rename('Free surface displacement')
 if iso:
-    q_file = File('plots/isotropic_outputs/tsunami.pvd')
+    q_file = File('plots/simpleAdapt/isotropic.pvd')
     if mat_out:
-        m_file = File('plots/isotropic_outputs/tsunami_metric.pvd')
-        h_file = File('plots/isotropic_outputs/tsunami_hessian.pvd')
+        m_file = File('plots/simpleAdapt/isotropicMetric.pvd')
+        h_file = File('plots/simpleAdapt/isotropicHessian.pvd')
 else:
-    q_file = File('plots/anisotropic_outputs/tsunami.pvd')
+    q_file = File('plots/simpleAdapt/anisotropic.pvd')
     if mat_out:
-        m_file = File('plots/anisotropic_outputs/tsunami_metric.pvd')
-        h_file = File('plots/anisotropic_outputs/tsunami_hessian.pvd')
+        m_file = File('plots/simpleAdapt/anisotropicMetric.pvd')
+        h_file = File('plots/simpleAdapt/anisotropicHessian.pvd')
 q_file.write(u, eta, time=0)
 gauge_dat = [eta.at(gcoord)]
 print('\nEntering outer timeloop!')

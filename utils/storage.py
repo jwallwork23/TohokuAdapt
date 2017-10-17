@@ -11,7 +11,7 @@ def gauge_timeseries(gauge, dat):
     :param dat: a list of data values of this gauge.
     :return: a file containing the timeseries data.
     """
-    name = raw_input('Enter a name for this time series (e.g. xcoarse): ')
+    name = input('Enter a name for this time series (e.g. xcoarse): ')
     outfile = open('timeseries/{y1}_{y2}.txt'.format(y1=gauge, y2=name), 'w+')
     for i in range(len(dat)):
         outfile.write(str(dat[i]) + '\n')
