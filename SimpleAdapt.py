@@ -6,7 +6,6 @@ import math
 import sys
 
 import utils.adaptivity as adap
-import utils.conversion as conv
 import utils.domain as dom
 import utils.interpolation as inte
 import utils.options as opt
@@ -24,51 +23,38 @@ SumN = N1                               # Sum over vertex counts
 print('...... mesh loaded. Initial number of vertices : ', N1)
 
 # Get default adaptivity parameter values:
-numVer = opt.Options.vscale * N1
-hmin = opt.Options.hmin
-hmax = opt.Options.hmax
+op = opt.Options()
+numVer = op.vscale * N1
+hmin = op.hmin
+hmax = op.hmax
 hmin2 = pow(hmin, 2)      # Square minimal side-length
 hmax2 = pow(hmax, 2)      # Square maximal side-length
-ntype = opt.Options.ntype
-mtype = opt.Options.mtype
-mat_out = opt.Options.matOut
-iso = opt.Options.iso
+ntype = op.ntype
+mtype = op.mtype
+iso = op.iso
 if not iso:
-    hess_meth = opt.Options.hessMeth
+    hess_meth = op.hessMeth
+
+# Get physical parameters:
+g = op.g
 
 # Get Courant number adjusted timestepping parameters:
-T = opt.Options.T
-dt = opt.Options.dt
+T = op.T
+dt = op.dt
 Dt = Constant(dt)
 cdt = hmin / np.sqrt(g * max(b.dat.data))
 if dt > cdt:
-    print ('WARNING: chosen timestep dt =', dt, 'exceeds recommended value of', cdt)
+    print('WARNING: chosen timestep dt = %.2fs exceeds recommended value of %.2fs' % (dt, cdt))
     if bool(input('Hit anything except enter if happy to proceed.')) or False:
         exit(23)
-ndump = opt.Options.ndump
-rm = opt.Options.rm
-
-# Get physical parameters:
-g = opt.Options.g
-
-# Convert gauge locations to UTM coordinates:
-glatlon = {'P02': (38.5002, 142.5016), 'P06': (38.6340, 142.5838),
-           '801': (38.2, 141.7), '802': (39.3, 142.1), '803': (38.9, 141.8), '804': (39.7, 142.2), '806': (37.0, 141.2)}
-gloc = {}
-for key in glatlon:
-    east, north, zn, zl = conv.from_latlon(glatlon[key][0], glatlon[key][1], force_zone_number=54)
-    gloc[key] = (east, north)
-
-# Set gauge arrays:
-gtype = input('Pressure or tide gauge? (p/t, default p): ') or 'p'
-if gtype == 'p':
-    gauge = input('Gauge P02 or P06? (default P02): ') or 'P02'
-    gcoord = gloc[gauge]
-elif gtype == 't':
-    gauge = input('Gauge 801, 802, 803, 804 or 806? (default 801): ') or '801'
-    gcoord = gloc[gauge]
 else:
-    ValueError('Gauge type not recognised. Please choose p or t.')
+    print('Using Courant number adjusted timestep dt = %.2fs' % dt)
+ndump = op.ndump
+rm = op.rm
+
+# Get gauge coordinates:
+gauge = op.gauge
+gcoord = op.gaugeCoord()
 
 # Establish mixed function space and initial conditions:
 W = VectorFunctionSpace(mesh, 'CG', 2) * FunctionSpace(mesh, 'CG', 1)
@@ -81,25 +67,20 @@ eta_.assign(eta0)
 q = Function(W)
 q.assign(q_)
 u, eta = q.split()
+u.rename('Fluid velocity')
+eta.rename('Free surface displacement')
 
 # Initialise counters, files and gauge data measurements:
 t = 0.
 dumpn = 0
 mn = 0
-u.rename('Fluid velocity')
-eta.rename('Free surface displacement')
-if iso:
-    q_file = File('plots/simpleAdapt/isotropic.pvd')
-    if mat_out:
-        m_file = File('plots/simpleAdapt/isotropicMetric.pvd')
-        h_file = File('plots/simpleAdapt/isotropicHessian.pvd')
-else:
-    q_file = File('plots/simpleAdapt/anisotropic.pvd')
-    if mat_out:
-        m_file = File('plots/simpleAdapt/anisotropicMetric.pvd')
-        h_file = File('plots/simpleAdapt/anisotropicHessian.pvd')
-q_file.write(u, eta, time=0)
-gauge_dat = [eta.at(gcoord)]
+dir = 'plots/simpleAdapt/'
+if not iso:
+    dir += 'an'
+outfile = File(dir + 'isotropic.pvd')
+outfile.write(u, eta, time=0)
+gaugeData = [eta.at(gcoord)]
+
 print('\nEntering outer timeloop!')
 tic1 = clock()
 while t < T - 0.5 * dt:
@@ -162,14 +143,9 @@ while t < T - 0.5 * dt:
 
     # Set up the variational problem
     L = (ze * (eta - eta_) - Dt * inner(b * uh, grad(ze)) + inner(u - u_, v) + Dt * g * (inner(grad(etah), v))) * dx
-    q_prob = NonlinearVariationalProblem(L, q)
-    q_solv = NonlinearVariationalSolver(q_prob, solver_parameters={'mat_type': 'matfree',
-                                                                   'snes_type': 'ksponly',
-                                                                   'pc_type': 'python',
-                                                                   'pc_python_type': 'firedrake.AssembledPC',
-                                                                   'assembled_pc_type': 'lu',
-                                                                   'snes_lag_preconditioner': -1,
-                                                                   'snes_lag_preconditioner_persists': True})
+    varProb = NonlinearVariationalProblem(L, q)
+    solver = NonlinearVariationalSolver(varProb, solver_parameters=op.params)
+
     # Split to access data and relabel functions:
     u_, eta_ = q_.split()
     u, eta = q.split()
@@ -180,19 +156,14 @@ while t < T - 0.5 * dt:
     for j in range(rm):
         t += dt
         dumpn += 1
-        q_solv.solve()  # Solve problem
+        solver.solve()  # Solve problem
         q_.assign(q)    # Update variables
 
         # Store data:
-        gauge_dat.append(eta.at(gcoord))
+        gaugeData.append(eta.at(gcoord))
         if dumpn == ndump:
             dumpn -= ndump
-            q_file.write(u, eta, time=t)
-            if mat_out:
-                H.rename('Hessian')
-                M.rename('Metric')
-                h_file.write(H, time=t)
-                m_file.write(M, time=t)
+            outfile.write(u, eta, time=t)
     toc2 = clock()
 
     # Print to screen:
@@ -207,4 +178,4 @@ toc1 = clock()
 print('Elapsed time for adaptive solver: %1.1fs (%1.2f mins)' % (toc1 - tic1, (toc1 - tic1) / 60))
 
 # Store gauge timeseries data to file:
-stor.gauge_timeseries(gauge, gauge_dat)
+stor.gaugeTimeseries(gauge, gaugeData)

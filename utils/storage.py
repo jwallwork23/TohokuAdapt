@@ -3,7 +3,7 @@ import scipy.interpolate as si
 import matplotlib.pyplot as plt
 
 
-def gauge_timeseries(gauge, dat):
+def gaugeTimeseries(gauge, dat):
     """
     Store timeseries data for a particular gauge.
     
@@ -18,7 +18,7 @@ def gauge_timeseries(gauge, dat):
     outfile.close()
 
 
-def plot_gauges(gauge, prob='comparison', log=False, error=False):
+def plotGauges(gauge, prob='comparison', log=False, error=False):
     """
     Plot timeseries data on a single axis.
     
@@ -155,4 +155,4 @@ def plot_gauges(gauge, prob='comparison', log=False, error=False):
     filename += '_gauge_timeseries_{y1}_{y2}'.format(y1=gauge, y2=prob)
     if error:
         filename += '_error'
-    plt.savefig(filename + 'TEST.pdf', bbox_inches='tight')
+    plt.savefig(filename + '.pdf', bbox_inches='tight')
