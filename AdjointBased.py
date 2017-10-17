@@ -6,7 +6,6 @@ import math
 import sys
 
 import utils.adaptivity as adap
-import utils.conversion as conv
 import utils.domain as dom
 import utils.interpolation as inte
 import utils.options as opt
