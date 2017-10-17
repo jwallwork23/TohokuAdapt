@@ -18,7 +18,7 @@ def TohokuDomain(res=3):
     if res == 1:
         mesh = Mesh('resources/meshes/TohokuXFine.msh')     # 226,967 vertices, ~45 seconds per timestep
         print('WARNING: chosen mesh resolution can be extremely computationally intensive')
-        if raw_input('Are you happy to proceed? (y/n)') == 'n':
+        if input('Are you happy to proceed? (y/n)') == 'n':
             exit(23)
     elif res == 2:
         mesh = Mesh('resources/meshes/TohokuFine.msh')      # 97,343 vertices, ~1 second per timestep
@@ -30,7 +30,7 @@ def TohokuDomain(res=3):
         mesh = Mesh('resources/meshes/TohokuXCoarse.msh')   # 3,126 vertices, ~0.03 seconds per timestep
     else:
         raise ValueError('Please try again, choosing an integer in the range 1-5.')
-    mesh_coords = mesh.coordinates.dat.data
+    meshCoords = mesh.coordinates.dat.data
     P1 = FunctionSpace(mesh, 'CG', 1)
     eta0 = Function(P1, name='Initial free surface displacement')
     b = Function(P1, name='Bathymetry profile')
@@ -41,9 +41,9 @@ def TohokuDomain(res=3):
     lat1 = nc1.variables['y'][:]
     x1, y1 = conversion.vectorlonlat2utm(lat1, lon1, force_zone_number=54)      # Our mesh mainly resides in UTM zone 54
     elev1 = nc1.variables['z'][:, :]
-    interpolator_surf = si.RectBivariateSpline(y1, x1, elev1)
+    interpolatorSurf = si.RectBivariateSpline(y1, x1, elev1)
     eta0vec = eta0.dat.data
-    assert mesh_coords.shape[0] == eta0vec.shape[0]
+    assert meshCoords.shape[0] == eta0vec.shape[0]
 
     # Read and interpolate bathymetry data (courtesy of GEBCO):
     nc2 = NetCDFFile('resources/bathymetry/tohoku.nc', mmap=False)
@@ -51,14 +51,14 @@ def TohokuDomain(res=3):
     lat2 = nc2.variables['lat'][:-1]
     x2, y2 = conversion.vectorlonlat2utm(lat2, lon2, force_zone_number=54)
     elev2 = nc2.variables['elevation'][:-1, :]
-    interpolator_bath = si.RectBivariateSpline(y2, x2, elev2)
+    interpolatorBath = si.RectBivariateSpline(y2, x2, elev2)
     b_vec = b.dat.data
-    assert mesh_coords.shape[0] == b_vec.shape[0]
+    assert meshCoords.shape[0] == b_vec.shape[0]
 
     # Interpolate data onto initial surface and bathymetry profiles:
-    for i, p in enumerate(mesh_coords):
-        eta0vec[i] = interpolator_surf(p[1], p[0])
-        b_vec[i] = - interpolator_surf(p[1], p[0]) - interpolator_bath(p[1], p[0])
+    for i, p in enumerate(meshCoords):
+        eta0vec[i] = interpolatorSurf(p[1], p[0])
+        b_vec[i] = - interpolatorSurf(p[1], p[0]) - interpolatorBath(p[1], p[0])
 
     # Post-process the bathymetry to have a minimum depth of 30m:
     b.assign(conditional(lt(30, b), b, 30))

@@ -115,9 +115,11 @@ def plotGauges(gauge, prob='comparison', log=False, error=False):
         else:
             T = 60
         if log:
-            plt.semilogy(np.linspace(0, T, len(val)), val, label=labels[key], marker=styles[key], markevery=60, linewidth=0.5)
+            plt.semilogy(np.linspace(0, T, len(val)), val, label=labels[key], marker=styles[key], markevery=60,
+                         linewidth=0.5)
         else:
-            plt.plot(np.linspace(0, T, len(val)), val, label=labels[key], marker=styles[key], markevery=60, linewidth=0.5)
+            plt.plot(np.linspace(0, T, len(val)), val, label=labels[key], marker=styles[key], markevery=60,
+                     linewidth=0.5)
 
         if prob == 'comparison':
             plt.xlim([0, 25])
