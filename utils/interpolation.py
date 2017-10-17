@@ -65,7 +65,7 @@ def interp(mesh, *fields):
     return fields_new
 
 
-def interp_Taylor_Hood(mesh, u, u_, eta, eta_, b):
+def interpTaylorHood(mesh, u, u_, eta, eta_, b):
     """
     Transfer a mixed shallow water Taylor-Hood solution pair from the old mesh to the new mesh. Based around the
     function ``transfer_solution`` by Nicolas Barral, 2017.

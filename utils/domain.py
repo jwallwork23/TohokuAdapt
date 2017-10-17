@@ -7,8 +7,8 @@ from . import conversion
 
 def TohokuDomain(res=3):
     """
-    Set up a mesh of the 2D ocean domain as in the Tohoku tsunami problem, along with the associated initial condition 
-    and bathymetry profile.
+    Set up a mesh of the 2D ocean domain as in the Tohoku tsunami problem (courtesy of QMESH), along with the associated 
+    initial condition and bathymetry profile.
     
     :param res: mesh resolution value, ranging from 'extra coarse' (1) to extra fine (5).
     :return: associated mesh and bathymetry field. 
