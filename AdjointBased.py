@@ -9,6 +9,7 @@ import utils.adaptivity as adap
 import utils.conversion as conv
 import utils.domain as dom
 import utils.interpolation as inte
+import utils.options as opt
 import utils.storage as stor
 
 
@@ -23,67 +24,44 @@ W0 = VectorFunctionSpace(mesh0, 'CG', 1) * FunctionSpace(mesh0, 'CG', 1)    # P1
 N1 = len(mesh.coordinates.dat.data)                                         # Minimum number of vertices
 N2 = N1                                                                     # Maximum number of vertices
 SumN = N1                                                                   # Sum over vertex counts
-print('...... mesh loaded. Initial number of vertices : ', N1, '\nMore options...')
+print('...... mesh loaded. Initial number of vertices : ', N1)
+gauge = input('Gauge choice from {P02, P06, 801, 802 803, 804, 806}? (default P02): ') or 'P02'
 
-# Set up adaptivity parameters:
-numVer = float(input('Target vertex count as a proportion of the initial number? (default 0.2): ') or 0.2) * N1
-hmin = float(input('Minimum element size in km (default 0.5)?: ') or 0.5) * 1e3
-hmax = float(input('Maximum element size in km (default 10000)?: ') or 10000.) * 1e3
+# Get default adaptivity parameter values:
+op = opt.Options(vscale=0.2, mtype='f', rm=60, gauge=gauge)
+numVer = op.vscale * N1
+hmin = op.hmin
+hmax = op.hmax
 hmin2 = pow(hmin, 2)      # Square minimal side-length
 hmax2 = pow(hmax, 2)      # Square maximal side-length
-ntype = input('Normalisation type? (lp/manual): ') or 'lp'
-mat_out = bool(input('Hit anything but enter to output Hessian and metric: ')) or False
-beta = float(input('Metric gradation scaling parameter (default 1.4): ') or 1.4)
-iso = bool(input('Hit anything but enter to use isotropic, rather than anisotropic: ')) or False
+ntype = op.ntype
+mtype = op.mtype
+beta = op.beta
+iso = op.iso
 if not iso:
-    hess_meth = input('Integration by parts or double L2 projection? (parts/dL2, default dL2): ') or 'dL2'
-    mtype = input('Adapt with respect to speed, free surface or both? (s/f/b, default f): ') or 'f'
-    if mtype not in ('s', 'f', 'b'):
-        raise ValueError('Field selection not recognised. Please try again, choosing s, f or b.')
+    hessMeth = op.hessMeth
 
-# Specify parameters:
-T = float(input('Simulation duration in minutes (default 25)?: ') or 25.) * 60.
-Ts = 5. * 60.                   # Time range lower limit (s), during which we can assume the wave won't reach the shore
-g = 9.81                        # Gravitational acceleration (m s^{-2})
-dt = float(input('Specify timestep in seconds (default 1): ') or 1.)
+# Get physical parameters:
+g = op.g
+
+# Get solver parameters:
+T = op.T
+Ts = op.Ts
+dt = op.dt
 Dt = Constant(dt)
 cdt = hmin / np.sqrt(g * max(b.dat.data))
 if dt > cdt:
-    print('WARNING: chosen timestep dt =', dt, 'exceeds recommended value of', cdt)
+    print('WARNING: chosen timestep dt = %.2fs exceeds recommended value of %.2fs' % (dt, cdt))
     if bool(input('Hit anything except enter if happy to proceed.')) or False:
         exit(23)
-ndump = int(15. / dt)           # Timesteps per data dump
-rm = int(input('Timesteps per re-mesh (default 60)?: ') or 60)
+else:
+    print('Using Courant number adjusted timestep dt = %.2fs' % dt)
+ndump = op.ndump
+rm = op.rm
 stored = bool(input('Hit anything but enter if adjoint data is already stored: ')) or False
 
-# Convert gauge locations to UTM coordinates:
-glatlon = {'P02': (38.5002, 142.5016), 'P06': (38.6340, 142.5838),
-           '801': (38.2, 141.7), '802': (39.3, 142.1), '803': (38.9, 141.8), '804': (39.7, 142.2), '806': (37.0, 141.2)}
-
-gloc = {}
-for key in glatlon:
-    east, north, zn, zl = conv.from_latlon(glatlon[key][0], glatlon[key][1], force_zone_number=54)
-    gloc[key] = (east, north)
-
-# Set gauge arrays:
-gtype = input('Pressure or tide gauge? (p/t, default p): ') or 'p'
-if gtype == 'p':
-    gauge = input('Gauge P02 or P06? (default P02): ') or 'P02'
-    gcoord = gloc[gauge]
-elif gtype == 't':
-    gauge = input('Gauge 801, 802, 803, 804 or 806? (default 801): ') or '801'
-    gcoord = gloc[gauge]
-else:
-    ValueError('Gauge type not recognised. Please choose p or t.')
-
-# Specify solver parameters:
-params = {'mat_type': 'matfree',
-          'snes_type': 'ksponly',
-          'pc_type': 'python',
-          'pc_python_type': 'firedrake.AssembledPC',
-          'assembled_pc_type': 'lu',
-          'snes_lag_preconditioner': -1,
-          'snes_lag_preconditioner_persists': True}
+# Get gauge coordinates:
+gCoord = op.gaugeCoord()
 
 # Initalise counters:
 t = T
@@ -123,11 +101,11 @@ if not stored:
     # Interpolate velocity onto P1 space and store final time data to HDF5 and PVD:
     lu_P1 = Function(VectorFunctionSpace(mesh, 'CG', 1), name='P1 adjoint velocity')
     lu_P1.interpolate(lu)
-    with DumbCheckpoint('data_dumps/tsunami/adjoint_soln_{y}'.format(y=i), mode=FILE_CREATE) as chk:
+    with DumbCheckpoint('data/adjointSolution_{y}'.format(y=i), mode=FILE_CREATE) as chk:
         chk.store(lu_P1)
         chk.store(le)
-    lam_file = File('plots/goal-based_outputs/tsunami_adjoint.pvd')
-    lam_file.write(lu, le, time=T)
+    adjointFile = File('plots/adjointBased/adjoint.pvd')
+    adjointFile.write(lu, le, time=T)
 
     # Establish test functions and midpoint averages:
     w, xi = TestFunctions(W)
@@ -139,8 +117,8 @@ if not stored:
     # Set up the variational problem:
     La = ((le - le_) * xi - Dt * g * inner(luh, grad(xi)) - coeff * f * xi
           + inner(lu - lu_, w) + Dt * (b * inner(grad(leh), w) + leh * inner(grad(b), w))) * dx
-    lam_prob = NonlinearVariationalProblem(La, lam)
-    lam_solv = NonlinearVariationalSolver(lam_prob, solver_parameters=params)
+    adjointProblem = NonlinearVariationalProblem(La, lam)
+    adjointSolver = NonlinearVariationalSolver(adjointProblem, solver_parameters=op.params)
 
     # Split to access data:
     lu, le = lam.split()
@@ -164,13 +142,13 @@ while t > 0.5 * dt:
 
     # Solve the problem and update:
     if not stored:
-        lam_solv.solve()
+        adjointSolver.solve()
         lam_.assign(lam)
 
         # Dump to vtu:
         if dumpn == 0:
             dumpn += ndump
-            lam_file.write(lu, le, time=t)
+            adjointFile.write(lu, le, time=t)
 
         # Dump to HDF5:
         if meshn == 0:
@@ -198,19 +176,13 @@ eta.rename('Free surface displacement')
 
 # Intialise files:
 if iso:
-    q_file = File('plots/goal-based_outputs/tsunami_forward_iso.pvd')
-    sig_file = File('plots/goal-based_outputs/tsunami_significance_iso.pvd')
-    if mat_out:
-        m_file = File('plots/goal-based_outputs/tsunami_metric_iso.pvd')
-        h_file = File('plots/goal-based_outputs/tsunami_hessian_iso.pvd')
+    forwardFile = File('plots/adjointBased/isotropicForward.pvd')
+    significanceFile = File('plots/adjointBased/isotropicSignificance.pvd')
 else:
-    q_file = File('plots/goal-based_outputs/tsunami_forward.pvd')
-    sig_file = File('plots/goal-based_outputs/tsunami_significance.pvd')
-    if mat_out:
-        m_file = File('plots/goal-based_outputs/tsunami_metric.pvd')
-        h_file = File('plots/goal-based_outputs/tsunami_hessian.pvd')
-q_file.write(u, eta, time=0)
-gauge_dat = [eta.at(gcoord)]
+    forwardFile = File('plots/adjointBased/anisotropicForward.pvd')
+    significanceFile = File('plots/adjointBased/anisotropicSignificance.pvd')
+forwardFile.write(u, eta, time=0)
+gaugeData = [eta.at(gcoord)]
 
 # Initialise counters:
 t = 0.
@@ -246,7 +218,7 @@ while t < T - 0.5 * dt:
     for j in range(max(i, int((Ts - T) / (dt * ndump))), 0):
 
         # Read in saved data from .h5:
-        with DumbCheckpoint('data_dumps/tsunami/adjoint_soln_{y}'.format(y=i), mode=FILE_READ) as chk:
+        with DumbCheckpoint('data/adjointSolution_{y}'.format(y=i), mode=FILE_READ) as chk:
             lu_P1 = Function(W0.sub(0), name='P1 adjoint velocity')
             le = Function(W0.sub(1), name='Adjoint free surface')
             chk.load(lu_P1)
@@ -254,13 +226,13 @@ while t < T - 0.5 * dt:
 
         # Interpolate saved data onto new mesh:
         if mn != 1:
-            print('    #### Interpolation step', j - max(i, int((Ts - T) / (dt * ndump))) + 1, '/', \
-                len(range(max(i, int((Ts - T) / (dt * ndump))), 0)))
+            print('    #### Interpolation step %d / %d'
+                  % (j - max(i, int((Ts - T) / (dt * ndump))) + 1, len(range(max(i, int((Ts - T) / (dt * ndump))), 0))))
             lu_P1, le = interp(mesh, lu_P1, le)
 
         # Multiply fields together:
-        ip.dat.data[:] = lu_P1.dat.data[:, 0] * vel.dat.data[:, 0] + lu_P1.dat.data[:, 1] * vel.dat.data[:, 1] \
-                         + le.dat.data * eta.dat.data
+        ip.dat.data[:] = lu_P1.dat.data[:, 0] * vel.dat.data[:, 0] + lu_P1.dat.data[:, 1] * vel.dat.data[:, 1]
+        ip.dat.data[:] += le.dat.data * eta.dat.data
 
         # Extract (pointwise) maximal values:
         if j == 0:
@@ -269,7 +241,7 @@ while t < T - 0.5 * dt:
             for k in range(len(ip.dat.data)):
                 if np.abs(ip.dat.data[k]) > np.abs(significance.dat.data[k]):
                     significance.dat.data[k] = ip.dat.data[k]
-    sig_file.write(significance, time=t)
+    significanceFile.write(significance, time=t)
 
     # Interpolate initial mesh size onto new mesh and build associated metric:
     fields = inte.interp(mesh, h)
@@ -293,9 +265,9 @@ while t < T - 0.5 * dt:
         if mtype == 's':
             spd = Function(W.sub(1))
             spd.interpolate(sqrt(dot(u, u)))
-            H = adap.constructHessian(mesh, V, spd, method=hess_meth)
+            H = adap.constructHessian(mesh, V, spd, method=hessMeth)
         elif mtype == 'f':
-            H = adap.constructHessian(mesh, V, eta, method=hess_meth)
+            H = adap.constructHessian(mesh, V, eta, method=hessMeth)
         else:
             raise NotImplementedError('Cannot currently perform goal-based adaption with respect to two fields.')
         for k in range(mesh.topology.num_vertices()):
@@ -327,8 +299,8 @@ while t < T - 0.5 * dt:
 
     # Set up the variational problem:
     Lf = (ze * (eta - eta_) - Dt * inner(b * uh, grad(ze)) + inner(u - u_, v) + Dt * g * (inner(grad(etah), v))) * dx
-    q_prob = NonlinearVariationalProblem(Lf, q)
-    q_solv = NonlinearVariationalSolver(q_prob, solver_parameters=params)
+    forwardProblem = NonlinearVariationalProblem(Lf, q)
+    forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
     # Split to access data and relabel functions:
     u, eta = q.split()
@@ -342,19 +314,14 @@ while t < T - 0.5 * dt:
         dumpn += 1
 
         # Solve the problem and update:
-        q_solv.solve()
+        forwardSolver.solve()
         q_.assign(q)
 
         # Store data:
-        gauge_dat.append(eta.at(gcoord))
+        gaugeData.append(eta.at(gcoord))
         if dumpn == ndump:
             dumpn -= ndump
-            q_file.write(u, eta, time=t)
-            if mat_out:
-                H.rename('Hessian')
-                M.rename('Metric')
-                h_file.write(H, time=t)
-                m_file.write(M, time=t)
+            forwardFile.write(u, eta, time=t)
     toc2 = clock()
 
     print('\n************ Adaption step %d **************' % mn)
@@ -368,4 +335,4 @@ toc1 = clock()
 print('Elapsed time for adaptive solver: %1.1fs (%1.2f mins)' % (toc1 - tic1, (toc1 - tic1) / 60))
 
 # Store gauge timeseries data to file:
-stor.gauge_timeseries(gauge, gauge_dat)
+stor.gaugeTimeseries(gauge, gaugeData)

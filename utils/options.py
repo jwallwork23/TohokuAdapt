@@ -10,11 +10,12 @@ class Options:
                  mtype='b',
                  iso=False,
                  hessMeth='dL2',
+                 beta=1.4,
                  T=1500.,
                  dt=1.,
                  ndump=15,
                  rm=30,
-                 g=9.81,
+                 Ts=300.,
                  gauge='P02'):
         """
         :param vscale: Scaling parameter for target number of vertices.
@@ -24,11 +25,12 @@ class Options:
         :param mtype: Adapt w.r.t 's'peed, 'f'ree surface or 'b'oth.
         :param iso: Toggle isotropic / anisotropic algorithm.
         :param hessMeth: Method of Hessian reconstruction: 'dL2' or 'parts'.
+        :param beta: Metric gradation scaling parameter.
         :param T: Simulation duration (s).
         :param dt: Timestep (s).
         :param ndump: Timesteps per data dump.
         :param rm: Timesteps per remesh.
-        :param g: Gravitational acceleration (m s^{-2}).
+        :param Ts: Lower time range limit (s), before which we can assume the wave won't reach the shore.
         :param gauge: Chosen pressure / tide gauge from {P02, P06, 801, 802, 803, 804, 806}.
         """
 
@@ -40,15 +42,17 @@ class Options:
         self.mtype = mtype
         self.iso = iso
         self.hessMeth = hessMeth
+        self.beta = beta
+
+        # Physical parameters:
+        self.g = 9.81           # Gravitational acceleration (m s^{-2})
 
         # Solver parameters:
         self.T = T
         self.dt = dt
         self.ndump = ndump
         self.rm = rm
-
-        # Physical parameters:
-        self.g = g
+        self.Ts = Ts
 
         # Gauge parameters:
         self.gauge = gauge
@@ -57,7 +61,7 @@ class Options:
         self.params = {'mat_type': 'matfree',
                        'snes_type': 'ksponly',
                        'pc_type': 'python',
-                       'pc_python_type': 'AssembledPC',
+                       'pc_python_type': 'firedrake.AssembledPC',
                        'assembled_pc_type': 'lu',
                        'snes_lag_preconditioner': -1,
                        'snes_lag_preconditioner_persists': True}

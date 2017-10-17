@@ -21,9 +21,10 @@ N1 = len(mesh.coordinates.dat.data)     # Minimum number of vertices
 N2 = N1                                 # Maximum number of vertices
 SumN = N1                               # Sum over vertex counts
 print('...... mesh loaded. Initial number of vertices : ', N1)
+gauge = input('Gauge choice from {P02, P06, 801, 802 803, 804, 806}? (default P02): ') or 'P02'
 
 # Get default adaptivity parameter values:
-op = opt.Options()
+op = opt.Options(gauge=gauge)
 numVer = op.vscale * N1
 hmin = op.hmin
 hmax = op.hmax
@@ -53,8 +54,7 @@ ndump = op.ndump
 rm = op.rm
 
 # Get gauge coordinates:
-gauge = op.gauge
-gcoord = op.gaugeCoord()
+gCoord = op.gaugeCoord()
 
 # Establish mixed function space and initial conditions:
 W = VectorFunctionSpace(mesh, 'CG', 2) * FunctionSpace(mesh, 'CG', 1)
@@ -74,12 +74,12 @@ eta.rename('Free surface displacement')
 t = 0.
 dumpn = 0
 mn = 0
-dir = 'plots/simpleAdapt/'
+filename = 'plots/simpleAdapt/'
 if not iso:
-    dir += 'an'
-outfile = File(dir + 'isotropic.pvd')
+    filename += 'an'
+outfile = File(filename + 'isotropic.pvd')
 outfile.write(u, eta, time=0)
-gaugeData = [eta.at(gcoord)]
+gaugeData = [eta.at(gCoord)]
 
 print('\nEntering outer timeloop!')
 tic1 = clock()
@@ -145,6 +145,10 @@ while t < T - 0.5 * dt:
     L = (ze * (eta - eta_) - Dt * inner(b * uh, grad(ze)) + inner(u - u_, v) + Dt * g * (inner(grad(etah), v))) * dx
     varProb = NonlinearVariationalProblem(L, q)
     solver = NonlinearVariationalSolver(varProb, solver_parameters=op.params)
+    # a = (eta * ze + inner(u, v) + Dt * (g * inner(grad(eta), v) - inner(b * u, grad(ze))) / 2) * dx
+    # F = (eta_ * ze + inner(u_, v) + Dt * (inner(b * u_, grad(ze)) - g * inner(grad(eta_), v)) / 2) * dx
+    # varProb = LinearVariationalProblem(a, F, q)
+    # solver = LinearVariationalSolver(varProb, solver_parameters=op.params)
 
     # Split to access data and relabel functions:
     u_, eta_ = q_.split()
@@ -160,7 +164,7 @@ while t < T - 0.5 * dt:
         q_.assign(q)    # Update variables
 
         # Store data:
-        gaugeData.append(eta.at(gcoord))
+        gaugeData.append(eta.at(gCoord))
         if dumpn == ndump:
             dumpn -= ndump
             outfile.write(u, eta, time=t)
