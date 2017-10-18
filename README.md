@@ -1,6 +1,7 @@
 ## TohokuAdapt : anisotropic mesh adaptivity applied to the 2011 Tohoku tsunami ##
 
-In this code, anisotropic mesh adaptivity is applied to solving the linearised shallow water equations in Firedrake.
+In this code, anisotropic mesh adaptivity is applied to solving the linearised shallow water equations in
+[Firedrake][1], using the [PRAgMaTIc][2] toolbox.
 
 Here you will find:
 * A ``utils`` directory, containing the necessary functions for implementation of isotropic and anisotropic mesh
@@ -20,3 +21,6 @@ tsunami, which struck the Japanese coast at Fukushima and caused much destructio
     * ``adjointBased``, which solve the problem as guided by adjoint problem solution data.
 
 For feedback, comments and questions, please email j.wallwork16@imperial.ac.uk.
+
+[1]: http://firedrakeproject.org/ "Firedrake"
+[2]: https://github.com/meshadaptation/pragmatic "PRAgMaTIc"
