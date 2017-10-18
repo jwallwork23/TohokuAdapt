@@ -1,7 +1,9 @@
 ## TohokuAdapt : anisotropic mesh adaptivity applied to the 2011 Tohoku tsunami ##
 
 In this code, anisotropic mesh adaptivity is applied to solving the linearised shallow water equations in
-[Firedrake][1], using the [PRAgMaTIc][2] toolbox.
+[Firedrake][1], using the [PRAgMaTIc][2] toolbox. Code here is based on my [MRes project][3] at the Mathematics of
+Planet Earth Centre for Doctoral Training [MPE CDT][4] at Imperial College London and University of Reading, and
+integrates that work into the coastal, estuarine and ocean modelling solver provided by [Thetis][5].
 
 Here you will find:
 * A ``utils`` directory, containing the necessary functions for implementation of isotropic and anisotropic mesh
@@ -24,3 +26,6 @@ For feedback, comments and questions, please email j.wallwork16@imperial.ac.uk.
 
 [1]: http://firedrakeproject.org/ "Firedrake"
 [2]: https://github.com/meshadaptation/pragmatic "PRAgMaTIc"
+[3]: https://github.com/jwallwork23/MResProject "MRes project"
+[4]: http://mpecdt.org "MPE CDT"
+[5]: http://thetisproject.org/index.html "Thetis"
