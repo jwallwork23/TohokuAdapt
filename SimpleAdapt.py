@@ -56,6 +56,8 @@ rm = op.rm
 # Get gauge coordinates:
 gCoord = op.gaugeCoord()
 
+# --------------------------------------- Here Thetis will take over --------------------------------------- #
+
 # Establish mixed function space and initial conditions:
 W = VectorFunctionSpace(mesh, 'CG', 2) * FunctionSpace(mesh, 'CG', 1)
 q_ = Function(W)

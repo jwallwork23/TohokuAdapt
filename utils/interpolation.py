@@ -27,8 +27,14 @@ def interp(mesh, *fields):
             interp_coordinates = Function(C)
             interp_coordinates.interpolate(mesh.coordinates)
             coords = interp_coordinates.dat.data                                    # Node coords (NOT just vertices)
+        elif f.ufl_element().family() == 'Discontinuous Lagrange':
+            degree = f.ufl_element().degree()
+            C = VectorFunctionSpace(mesh, 'DG', degree)
+            interp_coordinates = Function(C)
+            interp_coordinates.interpolate(mesh.coordinates)
+            coords = interp_coordinates.dat.data
         else:
-            raise NotImplementedError('Can only interpolate CG fields')
+            raise NotImplementedError('Interpolation not currently supported on requested field type.')
 
         try:
             f_new.dat.data[:] = f.at(coords)
