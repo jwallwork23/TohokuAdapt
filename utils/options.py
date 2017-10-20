@@ -7,7 +7,7 @@ class Options:
                  hmin=500.,
                  hmax=1e7,
                  ntype='lp',
-                 mtype='b',
+                 mtype='f',
                  iso=False,
                  hessMeth='dL2',
                  beta=1.4,
