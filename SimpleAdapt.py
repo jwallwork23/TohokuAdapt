@@ -11,12 +11,12 @@ import utils.options as opt
 
 
 print('******************************** ANISOTROPIC ADAPTIVE TSUNAMI SIMULATION ********************************\n')
-print('Mesh adaptive solver initially defined on a mesh of',)
 
 # Define initial mesh:
+print('Mesh adaptive solver initially defined on a mesh of',)
 mesh, eta0, b = dom.TohokuDomain(int(input('coarseness (Integer in range 1-5, default 5): ') or 5))
 N = [len(mesh.coordinates.dat.data), len(mesh.coordinates.dat.data)]    # Min/max number of vertices
-SumN = N[0]                                                             # Sum over vertex counts
+Sn = N[0]   # Sum over #Vertices
 print('...... mesh loaded. Initial number of vertices : ', N[0])
 
 # Get default adaptivity parameter values:
@@ -46,42 +46,40 @@ if dt > cdt:
 ndump = op.ndump
 rm = op.rm
 
-# Initialise counters and filename:
+# Initialise counters and output directory:
 t = 0.
 dumpn = 0
 mn = 0
-filename = 'plots/simpleAdapt/'
+index = int(rm / ndump)
+if index in range(1, 5):
+    index = '0000' + str(index)
+elif index in range(5, 50):
+    index = '000' + str(index)
+elif index in range(50, 500):
+    index = '00' + str(index)
+elif index in range(500, 5000):
+    index = '0' + str(index)
+dirName = 'plots/simpleAdapt/'
 
 tic1 = clock()
 while t < T - 0.5 * dt:
-    index = int(mn * rm / ndump)
     mn += 1
     tic2 = clock()
 
     # Define discontinuous spaces on the new mesh:
-    W1 = FunctionSpace(mesh, 'DG', 1)
-    W2 = VectorFunctionSpace(mesh, 'DG', 1)
+    elev_2d = Function(FunctionSpace(mesh, 'DG', 1))
+    uv_2d = Function(VectorFunctionSpace(mesh, 'DG', 1))
     if mn == 1:
         # Enforce initial conditions on discontinuous space:
-        elev_2d = Function(W1)
         elev_2d.interpolate(eta0)
-        uv_2d = Function(W2)
         uv_2d.interpolate(Expression((0, 0)))
-    # Load variables from disk:
-    elif mn < 5:
-        with DumbCheckpoint(filename+'hdf5/Elevation2d_0000{}'.format(index), mode=FILE_READ) as el:
-            elev_2d = Function(W1)
-            el.load(elev_2d)
-        with DumbCheckpoint(filename+'hdf5/Velocity2d_0000{}'.format(index), mode=FILE_READ) as uv:
-            uv_2d = Function(W2)
-            uv.load(uv_2d)
     else:
-        with DumbCheckpoint(filename + 'hdf5/Elevation2d_000{}'.format(index), mode=FILE_READ) as el:
-            elev_2d = Function(W1)
-            el.load(elev_2d)
-        with DumbCheckpoint(filename + 'hdf5/Velocity2d_000{}'.format(index), mode=FILE_READ) as uv:
-            uv_2d = Function(W2)
-            uv.load(uv_2d)
+        # Load variables from disk:
+        # print('#### DEBUG: Attempting to load ', dirName + 'hdf5/Elevation2d_' + index)
+        with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + index, mode=FILE_READ) as el:
+            el.load(elev_2d, name='elev_2d')
+        with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + index, mode=FILE_READ) as uv:
+            uv.load(uv_2d, name='uv_2d')
 
     # Compute Hessian and metric:
     V = TensorFunctionSpace(mesh, 'CG', 1)
@@ -102,7 +100,7 @@ while t < T - 0.5 * dt:
 
     # Mesh resolution analysis:
     n = len(mesh.coordinates.dat.data)
-    SumN += n
+    Sn += n
     N = [min(n, N[0]), max(n, N[1])]
 
     # Get solver parameter values and construct solver:     TODO: different FE space options
@@ -114,14 +112,12 @@ while t < T - 0.5 * dt:
     options.timestep = dt
 
     # Specify outfile directory and HDF5 checkpointing:
-    options.output_directory = filename
+    options.output_directory = dirName
     options.export_diagnostics = True
     options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
 
-    # Apply initial conditions:
+    # Apply initial conditions and time integrate:
     solver_obj.assign_initial_conditions(elev=elev_2d)
-
-    # Time integrate:
     solver_obj.iterate()
     toc2 = clock()
 
@@ -130,8 +126,7 @@ while t < T - 0.5 * dt:
     print('Time = %1.2f mins / %1.1f mins' % (t / 60., T / 60.))
     print('#Vertices after adaption step %d: %d' % (mn, n))
     print('Min/max #Vertices:', N)
-    print('Mean #Vertices: %d' % (float(SumN) / mn))
+    print('Mean #Vertices: %d' % (float(Sn) / mn))
     print('Elapsed time for this step: %1.2fs \n' % (toc2 - tic2))
-print('\a')
 toc1 = clock()
 print('Elapsed time for adaptive solver: %1.1fs (%1.2f mins)' % (toc1 - tic1, (toc1 - tic1) / 60))
