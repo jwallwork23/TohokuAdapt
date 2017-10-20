@@ -103,13 +103,17 @@ while t < T - 0.5 * dt:
     Sn += n
     N = [min(n, N[0]), max(n, N[1])]
 
-    # Get solver parameter values and construct solver:     TODO: different FE space options
+    # Get solver parameter values and construct solver:     TODO: different FE space options?
     solver_obj = solver2d.FlowSolver2d(mesh, b)
     options = solver_obj.options
     options.simulation_export_time = dt * ndump
     options.simulation_end_time = dt * rm
     options.timestepper_type = 'CrankNicolson'
     options.timestep = dt
+
+    # TODO: Thetis: Manage exports using a ExportManager object. Put `next_export_ix = index`
+    # TODO: OR:
+    # TODO: Firedrake: There is a function defined on the DumbCheckpoint, `set_timestep(t, idx=index)`
 
     # Specify outfile directory and HDF5 checkpointing:
     options.output_directory = dirName
