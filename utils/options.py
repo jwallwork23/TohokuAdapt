@@ -15,8 +15,7 @@ class Options:
                  dt=1.,
                  ndump=15,
                  rm=30,
-                 Ts=300.,
-                 gauge='P02'):
+                 Ts=300.):
         """
         :param vscale: Scaling parameter for target number of vertices.
         :param hmin: Minimal tolerated element size (m).
@@ -31,7 +30,6 @@ class Options:
         :param ndump: Timesteps per data dump.
         :param rm: Timesteps per remesh. (Should be an integer multiple of ndump.)
         :param Ts: Lower time range limit (s), before which we can assume the wave won't reach the shore.
-        :param gauge: Chosen pressure / tide gauge from {P02, P06, 801, 802, 803, 804, 806}.
         """
 
         # Adaptivity parameters:
@@ -54,9 +52,6 @@ class Options:
         self.rm = rm
         self.Ts = Ts
 
-        # Gauge parameters:
-        self.gauge = gauge
-
         # Specify solver parameters:
         self.params = {'mat_type': 'matfree',
                        'snes_type': 'ksponly',
@@ -66,12 +61,13 @@ class Options:
                        'snes_lag_preconditioner': -1,
                        'snes_lag_preconditioner_persists': True}
 
-    def gaugeCoord(self):
-        """
-        :return: UTM coordinate for chosen gauge. 
-        """
-        # Gauge locations in lat-lon coordinates:
-        glatlon = {'P02': (38.5002, 142.5016), 'P06': (38.6340, 142.5838), '801': (38.2, 141.7), '802': (39.3, 142.1),
-                   '803': (38.9, 141.8), '804': (39.7, 142.2), '806': (37.0, 141.2)}
-        E, N, zn, zl = conversion.from_latlon(glatlon[self.gauge][0], glatlon[self.gauge][1], force_zone_number=54)
-        return E, N
+    # TODO: reimplement this elsewhere...
+    # def gaugeCoord(self):
+    #     """
+    #     :return: UTM coordinate for chosen gauge.
+    #     """
+    #     # Gauge locations in lat-lon coordinates:
+    #     glatlon = {'P02': (38.5002, 142.5016), 'P06': (38.6340, 142.5838), '801': (38.2, 141.7), '802': (39.3, 142.1),
+    #                '803': (38.9, 141.8), '804': (39.7, 142.2), '806': (37.0, 141.2)}
+    #     E, N, zn, zl = conversion.from_latlon(glatlon[self.gauge][0], glatlon[self.gauge][1], force_zone_number=54)
+    #     return E, N

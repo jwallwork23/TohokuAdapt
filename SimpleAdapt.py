@@ -8,7 +8,6 @@ import utils.adaptivity as adap
 import utils.domain as dom
 import utils.interpolation as inte
 import utils.options as opt
-import utils.storage as stor
 
 
 print('******************************** ANISOTROPIC ADAPTIVE TSUNAMI SIMULATION ********************************\n')
@@ -20,10 +19,9 @@ N1 = len(mesh.coordinates.dat.data)     # Minimum number of vertices
 N2 = N1                                 # Maximum number of vertices
 SumN = N1                               # Sum over vertex counts
 print('...... mesh loaded. Initial number of vertices : ', N1)
-gauge = input('Gauge choice from {P02, P06, 801, 802 803, 804, 806}? (default P02): ') or 'P02'
 
 # Get default adaptivity parameter values:
-op = opt.Options(gauge=gauge)
+op = opt.Options()
 numVer = op.vscale * N1
 hmin = op.hmin
 hmax = op.hmax
@@ -33,7 +31,7 @@ ntype = op.ntype
 mtype = op.mtype
 iso = op.iso
 if not iso:
-    hess_meth = op.hessMeth
+    hessMeth = op.hessMeth
 
 # Get physical parameters:
 g = op.g
@@ -41,19 +39,13 @@ g = op.g
 # Get Courant number adjusted timestepping parameters:
 T = op.T
 dt = op.dt
-Dt = Constant(dt)
 cdt = hmin / np.sqrt(g * max(b.dat.data))
 if dt > cdt:
     print('WARNING: chosen timestep dt = %.2fs exceeds recommended value of %.2fs' % (dt, cdt))
     if bool(input('Hit anything except enter if happy to proceed.')) or False:
         exit(23)
-else:
-    print('Using Courant number adjusted timestep dt = %.2fs' % dt)
 ndump = op.ndump
 rm = op.rm
-
-# Get gauge coordinates:
-gCoord = op.gaugeCoord()
 
 # Initialise counters, files and gauge data measurements:
 t = 0.
@@ -61,7 +53,6 @@ dumpn = 0
 mn = 0
 filename = 'plots/simpleAdapt/'
 
-print('\nEntering outer timeloop!')
 tic1 = clock()
 while t < T - 0.5 * dt:
     mn += 1
@@ -76,17 +67,17 @@ while t < T - 0.5 * dt:
         uv_2d = Function(W2)
         uv_2d.interpolate(Expression((0, 0)))
     elif mn < 5:
-        with DumbCheckpoint(filename+'hdf5/Elevation2d_0000{}.h5'.format(mn*2), mode=FILE_READ) as el:
+        with DumbCheckpoint(filename+'hdf5/Elevation2d_0000{}'.format(mn * 2), mode=FILE_READ) as el:
             elev_2d = Function(W1)
             el.load(elev_2d)
-        with DumbCheckpoint(filename+'hdf5/Velocity2d_0000{}.h5'.format(mn*2), mode=FILE_READ) as uv:
+        with DumbCheckpoint(filename+'hdf5/Velocity2d_0000{}'.format(mn * 2), mode=FILE_READ) as uv:
             uv_2d = Function(W2)
             uv.load(uv_2d)
-    elif mn < 50:
-        with DumbCheckpoint(filename + 'hdf5/Elevation2d_000{}.h5'.format(mn * 2), mode=FILE_READ) as el:
+    else:
+        with DumbCheckpoint(filename + 'hdf5/Elevation2d_000{}'.format(mn * 2), mode=FILE_READ) as el:
             elev_2d = Function(W1)
             el.load(elev_2d)
-        with DumbCheckpoint(filename + 'hdf5/Velocity2d_000{}.h5'.format(mn * 2), mode=FILE_READ) as uv:
+        with DumbCheckpoint(filename + 'hdf5/Velocity2d_000{}'.format(mn * 2), mode=FILE_READ) as uv:
             uv_2d = Function(W2)
             uv.load(uv_2d)
 
@@ -121,7 +112,7 @@ while t < T - 0.5 * dt:
     mesh = adaptor.adapted_mesh
 
     # Interpolate variables onto new mesh:
-    elev_2d, uv_2d = inte.interp(mesh, elev_2d, uv_2d)
+    elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
 
     # Mesh resolution analysis:
     n = len(mesh.coordinates.dat.data)
@@ -134,10 +125,10 @@ while t < T - 0.5 * dt:
     # Get solver parameter values and construct solver:     TODO: different FE space options
     solver_obj = solver2d.FlowSolver2d(mesh, b)
     options = solver_obj.options
-    options.simulation_export_time = op.dt * op.ndump
-    options.simulation_end_time = op.T
+    options.simulation_export_time = dt * ndump
+    options.simulation_end_time = dt * rm
     options.timestepper_type = 'CrankNicolson'
-    options.timestep = op.dt
+    options.timestep = dt
 
     # Specify outfile directory and HDF5 checkpointing:
     options.output_directory = filename
@@ -145,7 +136,7 @@ while t < T - 0.5 * dt:
     options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
 
     # Apply ICs:
-    solver_obj.assign_initial_conditions(elev=eta0)
+    solver_obj.assign_initial_conditions(elev=elev_2d)
 
     # Run the model:
     solver_obj.iterate()
