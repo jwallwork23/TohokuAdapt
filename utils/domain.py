@@ -11,7 +11,7 @@ def TohokuDomain(res=3):
     initial condition and bathymetry profile.
     
     :param res: mesh resolution value, ranging from 'extra coarse' (1) to extra fine (5).
-    :return: associated mesh and bathymetry field. 
+    :return: associated mesh, initial condition and bathymetry field. 
     """
 
     # Define mesh and an associated elevation function space and establish initial condition and bathymetry functions:

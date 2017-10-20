@@ -56,8 +56,6 @@ rm = op.rm
 # Get gauge coordinates:
 gCoord = op.gaugeCoord()
 
-# --------------------------------------- Here Thetis will take over --------------------------------------- #
-
 # Establish mixed function space and initial conditions:
 W = VectorFunctionSpace(mesh, 'CG', 2) * FunctionSpace(mesh, 'CG', 1)
 q_ = Function(W)
@@ -71,8 +69,6 @@ q.assign(q_)
 u, eta = q.split()
 u.rename('Fluid velocity')
 eta.rename('Free surface displacement')
-
-# ---------------------------------------  To here --------------------------------------- #
 
 # Initialise counters, files and gauge data measurements:
 t = 0.
@@ -138,8 +134,6 @@ while t < T - 0.5 * dt:
     elif n > N2:
         N2 = n
 
-    # --------------------------------------- Here Thetis will take over --------------------------------------- #
-
     # Set up functions of weak problem:
     v, ze = TestFunctions(W)
     u, eta = split(q)
@@ -161,8 +155,6 @@ while t < T - 0.5 * dt:
     u, eta = q.split()
     u.rename('Fluid velocity')
     eta.rename('Free surface displacement')
-
-    # ---------------------------------------  To here --------------------------------------- #
 
     # Inner timeloop:
     for j in range(rm):
