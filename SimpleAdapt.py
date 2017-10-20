@@ -1,6 +1,5 @@
-from firedrake import *
+from thetis import *
 import numpy as np
-import matplotlib.pyplot as plt
 from time import clock
 import math
 import sys
@@ -61,9 +60,6 @@ t = 0.
 dumpn = 0
 mn = 0
 filename = 'plots/simpleAdapt/'
-if not iso:
-    filename += 'an'
-filename += 'isotropic'
 
 print('\nEntering outer timeloop!')
 tic1 = clock()
@@ -71,7 +67,28 @@ while t < T - 0.5 * dt:
     mn += 1
     tic2 = clock()
 
-    ### GET / LOAD VARIABLES
+    # Load variables from disk      TODO: make this process more general. 2 = rm / ndump
+    W1 = FunctionSpace(mesh, 'DG', 1)
+    W2 = VectorFunctionSpace(mesh, 'DG', 1)
+    if mn == 1:
+        elev_2d = Function(W1)
+        elev_2d.interpolate(eta0)
+        uv_2d = Function(W2)
+        uv_2d.interpolate(Expression((0, 0)))
+    elif mn < 5:
+        with DumbCheckpoint(filename+'hdf5/Elevation2d_0000{}.h5'.format(mn*2), mode=FILE_READ) as el:
+            elev_2d = Function(W1)
+            el.load(elev_2d)
+        with DumbCheckpoint(filename+'hdf5/Velocity2d_0000{}.h5'.format(mn*2), mode=FILE_READ) as uv:
+            uv_2d = Function(W2)
+            uv.load(uv_2d)
+    elif mn < 50:
+        with DumbCheckpoint(filename + 'hdf5/Elevation2d_000{}.h5'.format(mn * 2), mode=FILE_READ) as el:
+            elev_2d = Function(W1)
+            el.load(elev_2d)
+        with DumbCheckpoint(filename + 'hdf5/Velocity2d_000{}.h5'.format(mn * 2), mode=FILE_READ) as uv:
+            uv_2d = Function(W2)
+            uv.load(uv_2d)
 
     # Compute Hessian and metric:
     V = TensorFunctionSpace(mesh, 'CG', 1)
@@ -81,7 +98,7 @@ while t < T - 0.5 * dt:
             raise NotImplementedError('Adaption w.r.t. speed not yet implemented.')
         elif mtype == 'f':
             for i in range(len(M.dat.data)):
-                ieta2 = 1. / max(hmin2, min(pow(eta.dat.data[i], 2), hmax2))
+                ielev2 = 1. / max(hmin2, min(pow(elev_2d.dat.data[i], 2), hmax2))
                 M.dat.data[i][0, 0] = ieta2
                 M.dat.data[i][1, 1] = ieta2
         else:
@@ -91,8 +108,8 @@ while t < T - 0.5 * dt:
         if mtype != 'f':
             raise NotImplementedError('Adaption w.r.t. speed not yet implemented.')
         if mtype != 's':
-            H = adap.constructHessian(mesh, V, eta, method=hessMeth)
-            M2 = adap.computeSteadyMetric(mesh, V, H, eta, h_min=hmin, h_max=hmax, num=numVer, normalise=ntype)
+            H = adap.constructHessian(mesh, V, elev_2d, method=hessMeth)
+            M2 = adap.computeSteadyMetric(mesh, V, H, elev_2d, h_min=hmin, h_max=hmax, num=numVer, normalise=ntype)
         if mtype == 'b':
             raise NotImplementedError('Adaption w.r.t. two fields not yet implemented.')
         else:
@@ -103,7 +120,8 @@ while t < T - 0.5 * dt:
     adaptor = AnisotropicAdaptation(mesh, M)
     mesh = adaptor.adapted_mesh
 
-    ### INTERPOLATE
+    # Interpolate variables onto new mesh:
+    elev_2d, uv_2d = inte.interp(mesh, elev_2d, uv_2d)
 
     # Mesh resolution analysis:
     n = len(mesh.coordinates.dat.data)
@@ -113,6 +131,24 @@ while t < T - 0.5 * dt:
     elif n > N2:
         N2 = n
 
+    # Get solver parameter values and construct solver:     TODO: different FE space options
+    solver_obj = solver2d.FlowSolver2d(mesh, b)
+    options = solver_obj.options
+    options.simulation_export_time = op.dt * op.ndump
+    options.simulation_end_time = op.T
+    options.timestepper_type = 'CrankNicolson'
+    options.timestep = op.dt
+
+    # Specify outfile directory and HDF5 checkpointing:
+    options.output_directory = filename
+    options.export_diagnostics = True
+    options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+
+    # Apply ICs:
+    solver_obj.assign_initial_conditions(elev=eta0)
+
+    # Run the model:
+    solver_obj.iterate()
 
     toc2 = clock()
 

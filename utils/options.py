@@ -29,7 +29,7 @@ class Options:
         :param T: Simulation duration (s).
         :param dt: Timestep (s).
         :param ndump: Timesteps per data dump.
-        :param rm: Timesteps per remesh. (Should be an integer multiple of 15.)
+        :param rm: Timesteps per remesh. (Should be an integer multiple of ndump.)
         :param Ts: Lower time range limit (s), before which we can assume the wave won't reach the shore.
         :param gauge: Chosen pressure / tide gauge from {P02, P06, 801, 802, 803, 804, 806}.
         """
