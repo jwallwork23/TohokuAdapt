@@ -12,7 +12,10 @@
 # Directories to be ignored:
 
 /plots/
+/data/
 
 # Files to be ignored:
 
-
+.README.md.swp
+BurgersTest.py
+adaptTest.py

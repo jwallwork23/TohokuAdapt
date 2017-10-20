@@ -10,14 +10,19 @@ print('\n******************************** FIXED MESH TSUNAMI SIMULATION ********
 mesh, eta0, b = dom.TohokuDomain(res=int(input('Mesh coarseness (integer in range 1-5, default 4)?: ') or 4))
 print('...... mesh loaded. Number of vertices : ', len(mesh.coordinates.dat.data))
 
-# Get solver parameter values and construct solver:
+# Get solver parameter values and construct solver, with default dg1-dg1 space:
+op = opt.Options()
 solver_obj = solver2d.FlowSolver2d(mesh, b)
 options = solver_obj.options
 options.simulation_export_time = op.dt * op.ndump
 options.simulation_end_time = op.T
 options.timestepper_type = 'CrankNicolson'
 options.timestep = op.dt
+
+# Specify outfile directory and HDF5 checkpointing:
 options.output_directory = 'plots/fixedMesh'
+options.export_diagnostics = True
+options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
 
 # Apply ICs:
 solver_obj.assign_initial_conditions(elev=eta0)

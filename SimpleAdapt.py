@@ -72,6 +72,8 @@ u, eta = q.split()
 u.rename('Fluid velocity')
 eta.rename('Free surface displacement')
 
+# ---------------------------------------  To here --------------------------------------- #
+
 # Initialise counters, files and gauge data measurements:
 t = 0.
 dumpn = 0
@@ -136,6 +138,8 @@ while t < T - 0.5 * dt:
     elif n > N2:
         N2 = n
 
+    # --------------------------------------- Here Thetis will take over --------------------------------------- #
+
     # Set up functions of weak problem:
     v, ze = TestFunctions(W)
     u, eta = split(q)
@@ -157,6 +161,8 @@ while t < T - 0.5 * dt:
     u, eta = q.split()
     u.rename('Fluid velocity')
     eta.rename('Free surface displacement')
+
+    # ---------------------------------------  To here --------------------------------------- #
 
     # Inner timeloop:
     for j in range(rm):
