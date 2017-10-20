@@ -1,0 +1,35 @@
+Meshes in this directory have the following inner and outer resolutions and gradations:
+
+	TohokuXCoarse.msh
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    	Fukushima:	7500m, 25000m, 1 deg. gradation
+	Else:		10000m, 25000m, 0.5 deg. gradation
+	(3,126 nodes)
+	
+	TohokuCoarse.msh
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    	Fukushima:	5000m,  15000m, 1 deg. gradation
+	Else:		10000m, 15000m, 0.5 deg. gradation
+	(7,194 nodes)
+
+	TohokuMedium.msh
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	Fukushima:	3000m, 10000m,  1 deg. gradation
+	Else:		6000m, 10000m, 1 deg. gradation
+	(17,086 nodes)
+
+    	TohokuFine.msh
+    	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	Fukushima: 	1000m, 4000m, 1 deg. gradation
+	Else:		3000m, 8000m, 1 deg. gradation
+	(97,343 nodes)
+
+    	TohokuXFine.msh
+    	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	Fukushima: 	1000m, 2500m, 1 deg. gradation
+	Else:		2500m, 5000m, 1 deg. gradation
+	(226,967 nodes)
+
+
+NOTE: mesh files are not included in Github public repository, for copyrighting reasons. However they can be provided
+upon request, subject to permission from the QMESH authors.
