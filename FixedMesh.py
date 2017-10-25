@@ -8,7 +8,12 @@ print('\n******************************** FIXED MESH TSUNAMI SIMULATION ********
 
 # Set up mesh, initialise variables and specify parameters:
 mesh, eta0, b = dom.TohokuDomain(res=int(input('Mesh coarseness (integer in range 1-5, default 4)?: ') or 4))
-print('...... mesh loaded. Number of vertices : ', len(mesh.coordinates.dat.data))
+plex = mesh._plex
+eStart, eEnd = plex.getHeightStratum(0)
+vStart, vEnd = plex.getDepthStratum(0)
+nEle = eEnd - eStart
+nVer = vEnd - vStart
+print('...... mesh loaded. #Vertices : %d. #Elements : %d. \n' % (nVer, nEle))
 
 # Get solver parameter values and construct solver, with default dg1-dg1 space:
 op = opt.Options()

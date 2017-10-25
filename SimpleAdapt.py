@@ -14,16 +14,24 @@ import utils.options as opt
 
 print('*********************** ANISOTROPIC ADAPTIVE TSUNAMI SIMULATION ***********************\n')
 
-# Define initial mesh:
+# Define initial mesh and mesh statistics placeholders:
 print('Mesh adaptive solver initially defined on a mesh of',)
 mesh, eta0, b = dom.TohokuDomain(int(input('coarseness (Integer in range 1-5, default 5): ') or 5))
-N = [len(mesh.coordinates.dat.data), len(mesh.coordinates.dat.data)]    # Min/max number of vertices
-Sn = N[0]   # Sum over #Vertices
-print('...... mesh loaded. Initial number of vertices : ', N[0])
+plex = mesh._plex
+eStart, eEnd = plex.getHeightStratum(0)
+vStart, vEnd = plex.getDepthStratum(0)
+nEle = eEnd - eStart
+nVer = vEnd - vStart
+N = [nEle, nEle]    # Min/max #Elements
+print('...... mesh loaded. Initial #Vertices : %d. Initial #Elements : %d. \n' % (nVer, nEle))
+# TODO: build in functionality for loading a previous state. NOTE this may involve saving the mesh to disk...
+# resume = input('Hit anything except enter to resume a previous simulation.')
+# if resume:
+#     iStart = int(input('Simulation starting index (default i = 0)?: ')) or 0
 
 # Get default adaptivity parameter values:
 op = opt.Options()
-numVer = op.vscale * N[0]
+numVer = op.vscale * nVer
 hmin = op.hmin
 hmax = op.hmax
 hmin2 = pow(hmin, 2)      # Square minimal side-length
@@ -49,12 +57,14 @@ ndump = op.ndump
 rm = op.rm
 
 # Initialise counters:
-t = 0.
-dumpn = 0
-mn = 0
+dumpn = 0   # Dump counter
+mn = 0      # Mesh number
+Sn = 0      # Sum over #Elements
+# if resume:
+#     mn += int(iStart * ndump / rm)
 
 tic1 = clock()
-while t < T - 0.5 * dt:
+while mn < np.ceil(T / (dt * rm)):
     tic2 = clock()
 
     # Define discontinuous spaces on the new mesh:
@@ -72,6 +82,7 @@ while t < T - 0.5 * dt:
     elif index in range(1000, 10000):
         indexStr = '0' + str(index)
     dirName = 'plots/simpleAdapt/'
+
     if mn == 0:
         elev_2d.interpolate(eta0)
         uv_2d.interpolate(Expression((0, 0)))
@@ -96,12 +107,9 @@ while t < T - 0.5 * dt:
     # Adapt mesh with respect to computed metric field and interpolate functions onto new mesh:
     adaptor = AnisotropicAdaptation(mesh, M)
     mesh = adaptor.adapted_mesh
+    plex = mesh._plex
+    eStart, eEnd = plex.getHeightStratum(0)
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
-
-    # Mesh resolution analysis:
-    n = len(mesh.coordinates.dat.data)
-    Sn += n
-    N = [min(n, N[0]), max(n, N[1])]
 
     # Get solver parameter values and construct solver:     TODO: different FE space options?
     solver_obj = solver2d.FlowSolver2d(mesh, b)
@@ -144,11 +152,14 @@ while t < T - 0.5 * dt:
     toc2 = clock()
 
     # Print to screen:
+    nEle = eEnd - eStart
+    N = [min(nEle, N[0]), max(nEle, N[1])]
+    Sn += nEle
     mn += 1
     print('\n************************** Adaption step %d ****************************' % mn)
     print('Time = %1.2f mins / %1.1f mins' % (mn * rm * dt / 60., T / 60.))
-    print('#Vertices after adaption step %d: %d' % (mn, n))
-    print('Min/max #Vertices:', N, '. Mean #Vertices: %d' % (Sn / mn))
+    print('#Elements after adaption step %d: %d' % (mn, nEle))
+    print('Min/max #Elements:', N, ' Mean #Elements: %d' % (Sn / mn))
     print('Elapsed time for this step: %1.2fs \n' % (toc2 - tic2))
 toc1 = clock()
 print('Elapsed time for adaptive solver: %1.1fs (%1.2f mins)' % (toc1 - tic1, (toc1 - tic1) / 60))
