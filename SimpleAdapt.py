@@ -63,7 +63,7 @@ while t < T - 0.5 * dt:
 
     # Enforce initial conditions on discontinuous space / load variables from disk:
     index = mn * int(rm / ndump)
-    if index in range(1, 10):
+    if index in range(0, 10):
         indexStr = '0000' + str(index)
     elif index in range(10, 100):
         indexStr = '000' + str(index)
@@ -115,8 +115,6 @@ while t < T - 0.5 * dt:
     options.output_directory = dirName
     options.export_diagnostics = True
     options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-
-    # Load state:
     field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
     e = exporter.ExportManager(dirName + 'hdf5',
                                ['elev_2d', 'uv_2d'],
@@ -127,9 +125,9 @@ while t < T - 0.5 * dt:
 
     # Timestepper bookkeeping for export time step
     solver_obj.i_export = index
-    solver_obj.next_export_t = (mn + 1) * dt * rm
-    solver_obj.iteration = (mn + 1) * rm
-    solver_obj.simulation_time = mn * rm * dt
+    solver_obj.next_export_t = solver_obj.i_export * options.simulation_export_time
+    solver_obj.iteration = int(np.ceil(solver_obj.next_export_t / dt))
+    solver_obj.simulation_time = solver_obj.iteration * dt
 
     # For next export
     solver_obj.export_initial_state = (dirName != options.output_directory)
