@@ -12,7 +12,7 @@ import utils.interpolation as inte
 import utils.options as opt
 
 
-print('******************************** ANISOTROPIC ADAPTIVE TSUNAMI SIMULATION ********************************\n')
+print('*********************** ANISOTROPIC ADAPTIVE TSUNAMI SIMULATION ***********************\n')
 
 # Define initial mesh:
 print('Mesh adaptive solver initially defined on a mesh of',)
@@ -48,7 +48,7 @@ if dt > cdt:
 ndump = op.ndump
 rm = op.rm
 
-# Initialise counters and output directory:
+# Initialise counters:
 t = 0.
 dumpn = 0
 mn = 0
@@ -57,27 +57,25 @@ tic1 = clock()
 while t < T - 0.5 * dt:
     tic2 = clock()
 
-    index = mn * int(rm / ndump)
-    if index in range(1, 5):
-        indexStr = '0000' + str(index)
-    elif index in range(5, 50):
-        indexStr = '000' + str(index)
-    elif index in range(50, 500):
-        indexStr = '00' + str(index)
-    elif index in range(500, 5000):
-        indexStr = '0' + str(index)
-    dirName = 'plots/simpleAdapt/'
-
     # Define discontinuous spaces on the new mesh:
     elev_2d = Function(FunctionSpace(mesh, 'DG', 1))
     uv_2d = Function(VectorFunctionSpace(mesh, 'DG', 1))
+
+    # Enforce initial conditions on discontinuous space / load variables from disk:
+    index = mn * int(rm / ndump)
+    if index in range(1, 10):
+        indexStr = '0000' + str(index)
+    elif index in range(10, 100):
+        indexStr = '000' + str(index)
+    elif index in range(100, 1000):
+        indexStr = '00' + str(index)
+    elif index in range(1000, 10000):
+        indexStr = '0' + str(index)
+    dirName = 'plots/simpleAdapt/'
     if mn == 0:
-        # Enforce initial conditions on discontinuous space:
         elev_2d.interpolate(eta0)
         uv_2d.interpolate(Expression((0, 0)))
     else:
-        # Load variables from disk:
-        # print('#### DEBUG: Attempting to load ', dirName + 'hdf5/Elevation2d_' + indexStr)
         with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as el:
             el.load(elev_2d, name='elev_2d')
         with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as ve:
@@ -128,10 +126,10 @@ while t < T - 0.5 * dt:
     solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
 
     # Timestepper bookkeeping for export time step
-    solver_obj.i_export = index * mn
-    solver_obj.next_export_t = (mn + 1) * dt * ndump
-    solver_obj.iteration = int(np.ceil(solver_obj.next_export_t / dt))
-    solver_obj.simulation_time = mn * rm
+    solver_obj.i_export = index
+    solver_obj.next_export_t = (mn + 1) * dt * rm
+    solver_obj.iteration = (mn + 1) * rm
+    solver_obj.simulation_time = mn * rm * dt
 
     # For next export
     solver_obj.export_initial_state = (dirName != options.output_directory)
@@ -149,10 +147,10 @@ while t < T - 0.5 * dt:
 
     # Print to screen:
     mn += 1
-    print('\n************************ Adaption step %d **************************' % mn)
-    print('Time = %1.2f mins / %1.1f mins' % (mn * dt * ndump / 60., T / 60.))
+    print('\n************************** Adaption step %d ****************************' % mn)
+    print('Time = %1.2f mins / %1.1f mins' % (mn * rm * dt / 60., T / 60.))
     print('#Vertices after adaption step %d: %d' % (mn, n))
-    print('Min/max #Vertices: %d. Mean #Vertices: %d' % (N, float(Sn) / mn))
+    print('Min/max #Vertices:', N, '. Mean #Vertices: %d' % (Sn / mn))
     print('Elapsed time for this step: %1.2fs \n' % (toc2 - tic2))
 toc1 = clock()
 print('Elapsed time for adaptive solver: %1.1fs (%1.2f mins)' % (toc1 - tic1, (toc1 - tic1) / 60))
