@@ -1,20 +1,47 @@
+from firedrake import *
 import numpy as np
 import scipy.interpolate as si
 import matplotlib.pyplot as plt
 
+from . import options
 
-def gaugeTimeseries(gauge, dat):
+
+def indexString(index):
+    """
+    :param index: integer form of index.
+    :return: five-digit string form of index.
+    """
+    if index in range(0, 10):
+        indexStr = '0000' + str(index)
+    elif index in range(10, 100):
+        indexStr = '000' + str(index)
+    elif index in range(100, 1000):
+        indexStr = '00' + str(index)
+    elif index in range(1000, 10000):
+        indexStr = '0' + str(index)
+    return indexStr
+
+
+def gaugeTimeseries(gauge, dirName, iEnd):
     """
     Store timeseries data for a particular gauge.
     
     :param gauge: gauge name string, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
-    :param dat: a list of data values of this gauge.
+    :param dirName: name of directory for locating HDF5 files, from the set {'fixedMesh', 'simpleAdapt', 'adjointBased'}
+    :param iEnd: final HDF5 name string index.
     :return: a file containing the timeseries data.
     """
-    name = input('Enter a name for this time series (e.g. xcoarse): ')
+    op = options.Options()
+
+    name = input("Enter a name for this time series (e.g. 'meanEle=5767'): ")
+    dirName = 'plots/' + dirName + '/hdf5'
     outfile = open('timeseries/{y1}_{y2}.txt'.format(y1=gauge, y2=name), 'w+')
-    for i in range(len(dat)):
-        outfile.write(str(dat[i]) + '\n')
+    for i in range(iEnd + 1):
+        # TODO: how to define a function space if we do not know the mesh?
+        with DumbCheckpoint(dirName + '/Elevation2d_' + indexString(i), mode=FILE_READ) as el:
+            el.load(elev_2d, name='elev_2d')
+        data = elev_2d.at(op.gaugeCoord(gauge))
+        outfile.write(str(data) + '\n')
     outfile.close()
 
 

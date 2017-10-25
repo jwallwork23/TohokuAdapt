@@ -32,7 +32,7 @@ class Options:
         :param Ts: Lower time range limit (s), before which we can assume the wave won't reach the shore.
         """
 
-        # Adaptivity parameters:
+        # Adaptivity parameters
         self.vscale = vscale
         self.hmin = hmin
         self.hmax = hmax
@@ -42,17 +42,18 @@ class Options:
         self.hessMeth = hessMeth
         self.beta = beta
 
-        # Physical parameters:
+        # Physical parameters
         self.g = 9.81           # Gravitational acceleration (m s^{-2})
 
-        # Solver parameters:
+        # Timestepping parameters
         self.T = T
         self.dt = dt
         self.ndump = ndump
         self.rm = rm
         self.Ts = Ts
+        self.timestepper = 'CrankNicolson'
 
-        # Specify solver parameters:
+        # Solver parameters
         self.params = {'mat_type': 'matfree',
                        'snes_type': 'ksponly',
                        'pc_type': 'python',
@@ -61,13 +62,14 @@ class Options:
                        'snes_lag_preconditioner': -1,
                        'snes_lag_preconditioner_persists': True}
 
-    # TODO: reimplement this elsewhere...
-    # def gaugeCoord(self):
-    #     """
-    #     :return: UTM coordinate for chosen gauge.
-    #     """
-    #     # Gauge locations in lat-lon coordinates:
-    #     glatlon = {'P02': (38.5002, 142.5016), 'P06': (38.6340, 142.5838), '801': (38.2, 141.7), '802': (39.3, 142.1),
-    #                '803': (38.9, 141.8), '804': (39.7, 142.2), '806': (37.0, 141.2)}
-    #     E, N, zn, zl = conversion.from_latlon(glatlon[self.gauge][0], glatlon[self.gauge][1], force_zone_number=54)
-    #     return E, N
+        # Gauge locations in latitude-longitude coordinates
+        self.glatlon = {'P02': (38.5002, 142.5016), 'P06': (38.6340, 142.5838), '801': (38.2, 141.7),
+                        '802': (39.3, 142.1), '803': (38.9, 141.8), '804': (39.7, 142.2), '806': (37.0, 141.2)}
+
+    def gaugeCoord(self, gauge):
+        """
+        :param gauge: Tide / pressure gauge name, from {P02, P06, 801, 802, 803, 804, 806}.
+        :return: UTM coordinate for chosen gauge.
+        """
+        E, N, zn, zl = conversion.from_latlon(self.glatlon[gauge][0], self.glatlon[gauge][1], force_zone_number=54)
+        return E, N

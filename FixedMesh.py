@@ -21,7 +21,7 @@ solver_obj = solver2d.FlowSolver2d(mesh, b)
 options = solver_obj.options
 options.simulation_export_time = op.dt * op.ndump
 options.simulation_end_time = op.T
-options.timestepper_type = 'CrankNicolson'
+options.timestepper_type = op.timestepper
 options.timestep = op.dt
 
 # Specify outfile directory and HDF5 checkpointing:
@@ -29,8 +29,6 @@ options.output_directory = 'plots/fixedMesh'
 options.export_diagnostics = True
 options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
 
-# Apply ICs:
+# Apply ICs and time integrate:
 solver_obj.assign_initial_conditions(elev=eta0)
-
-# Run the model:
 solver_obj.iterate()

@@ -10,6 +10,7 @@ import utils.adaptivity as adap
 import utils.domain as dom
 import utils.interpolation as inte
 import utils.options as opt
+import utils.storage as stor
 
 
 print('*********************** ANISOTROPIC ADAPTIVE TSUNAMI SIMULATION ***********************\n')
@@ -73,14 +74,7 @@ while mn < np.ceil(T / (dt * rm)):
 
     # Enforce initial conditions on discontinuous space / load variables from disk:
     index = mn * int(rm / ndump)
-    if index in range(0, 10):
-        indexStr = '0000' + str(index)
-    elif index in range(10, 100):
-        indexStr = '000' + str(index)
-    elif index in range(100, 1000):
-        indexStr = '00' + str(index)
-    elif index in range(1000, 10000):
-        indexStr = '0' + str(index)
+    indexStr = stor.indexString(index)
     dirName = 'plots/simpleAdapt/'
 
     if mn == 0:
@@ -116,7 +110,7 @@ while mn < np.ceil(T / (dt * rm)):
     options = solver_obj.options
     options.simulation_export_time = dt * ndump
     options.simulation_end_time = (mn + 1) * dt * rm
-    options.timestepper_type = 'CrankNicolson'
+    options.timestepper_type = op.timestepper
     options.timestep = dt
 
     # Specify outfile directory and HDF5 checkpointing:
