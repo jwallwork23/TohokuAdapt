@@ -1,4 +1,6 @@
 from thetis import *
+from thetis.field_defs import field_metadata
+
 import numpy as np
 from time import clock
 import math
@@ -50,36 +52,36 @@ rm = op.rm
 t = 0.
 dumpn = 0
 mn = 0
-index = int(rm / ndump)
-if index in range(1, 5):
-    index = '0000' + str(index)
-elif index in range(5, 50):
-    index = '000' + str(index)
-elif index in range(50, 500):
-    index = '00' + str(index)
-elif index in range(500, 5000):
-    index = '0' + str(index)
-dirName = 'plots/simpleAdapt/'
 
 tic1 = clock()
 while t < T - 0.5 * dt:
-    mn += 1
     tic2 = clock()
+
+    index = mn * int(rm / ndump)
+    if index in range(1, 5):
+        indexStr = '0000' + str(index)
+    elif index in range(5, 50):
+        indexStr = '000' + str(index)
+    elif index in range(50, 500):
+        indexStr = '00' + str(index)
+    elif index in range(500, 5000):
+        indexStr = '0' + str(index)
+    dirName = 'plots/simpleAdapt/'
 
     # Define discontinuous spaces on the new mesh:
     elev_2d = Function(FunctionSpace(mesh, 'DG', 1))
     uv_2d = Function(VectorFunctionSpace(mesh, 'DG', 1))
-    if mn == 1:
+    if mn == 0:
         # Enforce initial conditions on discontinuous space:
         elev_2d.interpolate(eta0)
         uv_2d.interpolate(Expression((0, 0)))
     else:
         # Load variables from disk:
-        # print('#### DEBUG: Attempting to load ', dirName + 'hdf5/Elevation2d_' + index)
-        with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + index, mode=FILE_READ) as el:
+        # print('#### DEBUG: Attempting to load ', dirName + 'hdf5/Elevation2d_' + indexStr)
+        with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as el:
             el.load(elev_2d, name='elev_2d')
-        with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + index, mode=FILE_READ) as uv:
-            uv.load(uv_2d, name='uv_2d')
+        with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as ve:
+            ve.load(uv_2d, name='uv_2d')
 
     # Compute Hessian and metric:
     V = TensorFunctionSpace(mesh, 'CG', 1)
@@ -107,30 +109,50 @@ while t < T - 0.5 * dt:
     solver_obj = solver2d.FlowSolver2d(mesh, b)
     options = solver_obj.options
     options.simulation_export_time = dt * ndump
-    options.simulation_end_time = dt * rm
+    options.simulation_end_time = (mn + 1) * dt * rm
     options.timestepper_type = 'CrankNicolson'
     options.timestep = dt
-
-    # TODO: Thetis: Manage exports using a ExportManager object. Put `next_export_ix = index`
-    # TODO: OR:
-    # TODO: Firedrake: There is a function defined on the DumbCheckpoint, `set_timestep(t, idx=index)`
 
     # Specify outfile directory and HDF5 checkpointing:
     options.output_directory = dirName
     options.export_diagnostics = True
     options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
 
-    # Apply initial conditions and time integrate:
-    solver_obj.assign_initial_conditions(elev=elev_2d)
+    # Load state:
+    field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
+    e = exporter.ExportManager(dirName + 'hdf5',
+                               ['elev_2d', 'uv_2d'],
+                               field_dict,
+                               field_metadata,
+                               export_type='hdf5')
+    solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
+
+    # Timestepper bookkeeping for export time step
+    solver_obj.i_export = index * mn
+    solver_obj.next_export_t = (mn + 1) * dt * ndump
+    solver_obj.iteration = int(np.ceil(solver_obj.next_export_t / dt))
+    solver_obj.simulation_time = mn * rm
+
+    # For next export
+    solver_obj.export_initial_state = (dirName != options.output_directory)
+    if solver_obj.export_initial_state:
+        offset = 0
+    else:
+        offset = 1
+    solver_obj.next_export_t += options.simulation_export_time
+    for e in solver_obj.exporters.values():
+        e.set_next_export_ix(solver_obj.i_export + offset)
+
+    # Time integrate
     solver_obj.iterate()
     toc2 = clock()
 
     # Print to screen:
-    print('\n************ Adaption step %d **************' % mn)
-    print('Time = %1.2f mins / %1.1f mins' % (t / 60., T / 60.))
+    mn += 1
+    print('\n************************ Adaption step %d **************************' % mn)
+    print('Time = %1.2f mins / %1.1f mins' % (mn * dt * ndump / 60., T / 60.))
     print('#Vertices after adaption step %d: %d' % (mn, n))
-    print('Min/max #Vertices:', N)
-    print('Mean #Vertices: %d' % (float(Sn) / mn))
+    print('Min/max #Vertices: %d. Mean #Vertices: %d' % (N, float(Sn) / mn))
     print('Elapsed time for this step: %1.2fs \n' % (toc2 - tic2))
 toc1 = clock()
 print('Elapsed time for adaptive solver: %1.1fs (%1.2f mins)' % (toc1 - tic1, (toc1 - tic1) / 60))
