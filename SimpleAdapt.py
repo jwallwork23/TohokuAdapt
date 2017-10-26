@@ -13,16 +13,12 @@ import utils.options as opt
 import utils.storage as stor
 
 
-print('*********************** ANISOTROPIC ADAPTIVE TSUNAMI SIMULATION ***********************\n')
+print('*************** ANISOTROPIC ADAPTIVE TSUNAMI SIMULATION ***************\n')
 
 # Define initial mesh and mesh statistics placeholders:
-print('Mesh adaptive solver initially defined on a mesh of',)
+print('MESH ADAPTIVE solver initially defined on a mesh of')
 mesh, eta0, b = dom.TohokuDomain(int(input('coarseness (Integer in range 1-5, default 5): ') or 5))
-plex = mesh._plex
-eStart, eEnd = plex.getHeightStratum(0)
-vStart, vEnd = plex.getDepthStratum(0)
-nEle = eEnd - eStart
-nVer = vEnd - vStart
+nEle, nVer = adap.meshStats(mesh)
 N = [nEle, nEle]    # Min/max #Elements
 print('...... mesh loaded. Initial #Vertices : %d. Initial #Elements : %d. \n' % (nVer, nEle))
 # TODO: build in functionality for loading a previous state. NOTE this may involve saving the mesh to disk...
@@ -61,10 +57,10 @@ rm = op.rm
 dumpn = 0   # Dump counter
 mn = 0      # Mesh number
 Sn = 0      # Sum over #Elements
+tic1 = clock()
 # if resume:
 #     mn += int(iStart * ndump / rm)
 
-tic1 = clock()
 while mn < np.ceil(T / (dt * rm)):
     tic2 = clock()
 
@@ -83,8 +79,10 @@ while mn < np.ceil(T / (dt * rm)):
     else:
         with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as el:
             el.load(elev_2d, name='elev_2d')
+            el.close()
         with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as ve:
             ve.load(uv_2d, name='uv_2d')
+            ve.close()
 
     # Compute Hessian and metric:
     V = TensorFunctionSpace(mesh, 'CG', 1)
@@ -101,11 +99,9 @@ while mn < np.ceil(T / (dt * rm)):
     # Adapt mesh with respect to computed metric field and interpolate functions onto new mesh:
     adaptor = AnisotropicAdaptation(mesh, M)
     mesh = adaptor.adapted_mesh
-    plex = mesh._plex
-    eStart, eEnd = plex.getHeightStratum(0)
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
 
-    # Get solver parameter values and construct solver:     TODO: different FE space options?
+    # Get solver parameter values and construct solver:
     solver_obj = solver2d.FlowSolver2d(mesh, b)
     options = solver_obj.options
     options.simulation_export_time = dt * ndump
@@ -146,7 +142,7 @@ while mn < np.ceil(T / (dt * rm)):
     toc2 = clock()
 
     # Print to screen:
-    nEle = eEnd - eStart
+    nEle, nVer = adap.meshStats(mesh)
     N = [min(nEle, N[0]), max(nEle, N[1])]
     Sn += nEle
     mn += 1

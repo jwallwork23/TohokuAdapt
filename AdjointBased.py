@@ -11,24 +11,20 @@ import utils.interpolation as inte
 import utils.options as opt
 import utils.storage as stor
 
-
-print('\n******************************** GOAL-BASED ADAPTIVE TSUNAMI SIMULATION ********************************\n')
-print('GOAL-BASED, mesh adaptive solver initially defined on a mesh of')
-tic1 = clock()
+print('************** ADJOINT-BASED ADAPTIVE TSUNAMI SIMULATION **************\n')
 
 # Define initial mesh:
+print('ADJOINT-GUIDED mesh adaptive solver initially defined on a mesh of')
 mesh, eta0, b = dom.TohokuDomain(int(input('coarseness (Integer in range 1-5, default 4): ') or 4))
+nEle, nVer = adap.meshStats(mesh)
+N = [nEle, nEle]    # Min/max #Elements
 mesh0 = mesh
-W0 = VectorFunctionSpace(mesh0, 'CG', 1) * FunctionSpace(mesh0, 'CG', 1)    # P1-P1 space for interpolating velocity
-N1 = len(mesh.coordinates.dat.data)                                         # Minimum number of vertices
-N2 = N1                                                                     # Maximum number of vertices
-SumN = N1                                                                   # Sum over vertex counts
-print('...... mesh loaded. Initial number of vertices : ', N1)
+print('...... mesh loaded. Initial #Vertices : %d. Initial #Elements : %d. \n' % (nVer, nEle))
 gauge = input('Gauge choice from {P02, P06, 801, 802 803, 804, 806}? (default P02): ') or 'P02'
 
 # Get default adaptivity parameter values:
 op = opt.Options(vscale=0.2, mtype='f', rm=60, gauge=gauge)
-numVer = op.vscale * N1
+numVer = op.vscale * nVer
 hmin = op.hmin
 hmax = op.hmax
 hmin2 = pow(hmin, 2)      # Square minimal side-length
@@ -59,18 +55,18 @@ ndump = op.ndump
 rm = op.rm
 stored = bool(input('Hit anything but enter if adjoint data is already stored: ')) or False
 
-# Get gauge coordinates:
-gCoord = op.gaugeCoord()
-
 # Initalise counters:
 t = T
 i = -1
 dumpn = ndump
 meshn = rm
+tic1 = clock()
 
 # Forcing switch:
 coeff = Constant(1.)
 switch = True
+
+# TODO: how to consider the adjoint equations in Thetis?...
 
 # Establish mixed function spaces and associated initial conditions:
 W = VectorFunctionSpace(mesh, 'CG', 2) * FunctionSpace(mesh, 'CG', 1)
@@ -332,6 +328,3 @@ while t < T - 0.5 * dt:
 print('\a')
 toc1 = clock()
 print('Elapsed time for adaptive solver: %1.1fs (%1.2f mins)' % (toc1 - tic1, (toc1 - tic1) / 60))
-
-# Store gauge timeseries data to file:
-stor.gaugeTimeseries(gauge, gaugeData)

@@ -4,7 +4,7 @@ import numpy as np
 import utils.domain as dom
 import utils.options as opt
 
-print('\n******************************** FIXED MESH TSUNAMI SIMULATION ********************************\nOptions...')
+print('******************** FIXED MESH TSUNAMI SIMULATION ********************\nOptions...')
 
 # Set up mesh, initialise variables and specify parameters:
 mesh, eta0, b = dom.TohokuDomain(res=int(input('Mesh coarseness (integer in range 1-5, default 4)?: ') or 4))
