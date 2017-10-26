@@ -4,7 +4,6 @@ from thetis.field_defs import field_metadata
 import numpy as np
 from time import clock
 import math
-import sys
 
 import utils.adaptivity as adap
 import utils.domain as dom
@@ -53,10 +52,13 @@ if dt > cdt:
 ndump = op.ndump
 rm = op.rm
 
-# Initialise counters:
+# Initialise counters and filenames:
 dumpn = 0   # Dump counter
 mn = 0      # Mesh number
 Sn = 0      # Sum over #Elements
+dirName = 'plots/simpleAdapt/'
+if iso:
+    dirName += 'isotropic/'
 tic1 = clock()
 # if resume:
 #     mn += int(iStart * ndump / rm)
@@ -71,7 +73,6 @@ while mn < np.ceil(T / (dt * rm)):
     # Enforce initial conditions on discontinuous space / load variables from disk:
     index = mn * int(rm / ndump)
     indexStr = stor.indexString(index)
-    dirName = 'plots/simpleAdapt/'
     if mn == 0:
         elev_2d.interpolate(eta0)
         uv_2d.interpolate(Expression((0, 0)))

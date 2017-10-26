@@ -1,9 +1,10 @@
 from firedrake import *
+from thetis import *
+from thetis.field_defs import field_metadata
+
 import numpy as np
-import matplotlib.pyplot as plt
 from time import clock
 import math
-import sys
 
 import utils.adaptivity as adap
 import utils.domain as dom
@@ -11,9 +12,10 @@ import utils.interpolation as inte
 import utils.options as opt
 import utils.storage as stor
 
+
 print('************** ADJOINT-BASED ADAPTIVE TSUNAMI SIMULATION **************\n')
 
-# Define initial mesh:
+# Define initial mesh and mesh statistics placeholders:
 print('ADJOINT-GUIDED mesh adaptive solver initially defined on a mesh of')
 mesh, eta0, b = dom.TohokuDomain(int(input('coarseness (Integer in range 1-5, default 4): ') or 4))
 nEle, nVer = adap.meshStats(mesh)
@@ -53,25 +55,33 @@ ndump = op.ndump
 rm = op.rm
 stored = bool(input('Hit anything but enter if adjoint data is already stored: ')) or False
 
+# Establish filename:
+dirName = 'plots/adjointBased/'
+if iso:
+    dirName += 'isotropic/'
+
 if not stored:
-    tic1 = clock()
     # Initalise counters:
     t = T
     i = -1
     dumpn = ndump
     meshn = rm
+    tic1 = clock()
 
     # Forcing switch:
     coeff = Constant(1.)
     switch = True
-
-    # TODO: how to consider the adjoint equations in Thetis?...
 
     # Establish adjoint variables and apply initial conditions:
     lam_ = Function(W0)
     lu_, le_ = lam_.split()
     lu_.interpolate(Expression([0, 0]))
     le_.interpolate(Expression(0))
+    lam = Function(W0)
+    lam.assign(lam_)
+    lu, le = lam.split()
+    lu.rename('Adjoint velocity')
+    le.rename('Adjoint free surface')
 
     # Establish smoothened indicator function for adjoint equations:
     f = Function(W0.sub(1), name='Forcing term')
@@ -79,19 +89,12 @@ if not stored:
                              'exp(1. / (pow(x[0] - 565e3, 2) - pow(75e3, 2))) * ' +
                              'exp(1. / (pow(x[1] - 4260e3, 2) - pow(100e3, 2))) : 0.'))
 
-    # Set up dependent variables of the adjoint problem:
-    lam = Function(W0)
-    lam.assign(lam_)
-    lu, le = lam.split()
-    lu.rename('Adjoint velocity')
-    le.rename('Adjoint free surface')
-
     # Store final time data to HDF5 and PVD:
     with DumbCheckpoint('data/adjointSolution_{y}'.format(y=i), mode=FILE_CREATE) as chk:
         chk.store(lu)
         chk.store(le)
         chk.close()
-    adjointFile = File('plots/adjointBased/adjoint.pvd')
+    adjointFile = File(dirName + 'adjoint.pvd')
     adjointFile.write(lu, le, time=T)
 
     # Establish test functions and midpoint averages:
@@ -102,9 +105,9 @@ if not stored:
     leh = 0.5 * (le + le_)
 
     # Set up the variational problem:
-    La = ((le - le_) * xi - Dt * g * inner(luh, grad(xi)) - coeff * f * xi
+    L = ((le - le_) * xi - Dt * g * inner(luh, grad(xi)) - coeff * f * xi
           + inner(lu - lu_, w) + Dt * (b * inner(grad(leh), w) + leh * inner(grad(b), w))) * dx
-    adjointProblem = NonlinearVariationalProblem(La, lam)
+    adjointProblem = NonlinearVariationalProblem(L, lam)
     adjointSolver = NonlinearVariationalSolver(adjointProblem, solver_parameters=op.params)
 
     # Split to access data:
@@ -178,7 +181,6 @@ while mn < np.ceil(T / (dt * rm)):
     # Enforce initial conditions on discontinuous space / load variables from disk:
     index = mn * int(rm / ndump)
     indexStr = stor.indexString(index)
-    dirName = 'plots/adjointBased/'
     if mn == 0:
         elev_2d.interpolate(eta0)
         uv_2d.interpolate(Expression((0, 0)))
