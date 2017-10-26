@@ -72,7 +72,6 @@ while mn < np.ceil(T / (dt * rm)):
     index = mn * int(rm / ndump)
     indexStr = stor.indexString(index)
     dirName = 'plots/simpleAdapt/'
-
     if mn == 0:
         elev_2d.interpolate(eta0)
         uv_2d.interpolate(Expression((0, 0)))

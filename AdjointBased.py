@@ -21,7 +21,6 @@ N = [nEle, nEle]    # Min/max #Elements
 mesh0 = mesh
 W0 = VectorFunctionSpace(mesh0, 'DG', 1) * FunctionSpace(mesh0, 'DG', 1)
 print('...... mesh loaded. Initial #Vertices : %d. Initial #Elements : %d. \n' % (nVer, nEle))
-gauge = input('Gauge choice from {P02, P06, 801, 802 803, 804, 806}? (default P02): ') or 'P02'
 
 # Get default adaptivity parameter values:
 op = opt.Options(vscale=0.2, mtype='f', rm=60, gauge=gauge)
@@ -50,15 +49,12 @@ if dt > cdt:
     print('WARNING: chosen timestep dt = %.2fs exceeds recommended value of %.2fs' % (dt, cdt))
     if bool(input('Hit anything except enter if happy to proceed.')) or False:
         exit(23)
-else:
-    print('Using Courant number adjusted timestep dt = %.2fs' % dt)
 ndump = op.ndump
 rm = op.rm
 stored = bool(input('Hit anything but enter if adjoint data is already stored: ')) or False
 
-tic1 = clock()
-
 if not stored:
+    tic1 = clock()
     # Initalise counters:
     t = T
     i = -1
@@ -116,7 +112,6 @@ if not stored:
     lu_, le_ = lam_.split()
 
     print('\nStarting fixed resolution adjoint run...')
-    tic2 = clock()
     while t > 0.5 * dt:
 
         # Increment counters:
@@ -152,13 +147,14 @@ if not stored:
                     chk.store(le)
                     chk.close()
 
-    toc2 = clock()
-    print('... done! Elapsed time for adjoint solver: %1.2fs' % (toc2 - tic2))
+    toc1 = clock()
+    print('... done! Elapsed time for adjoint solver: %1.2fs' % (toc1 - tic1))
 
 # Initialise counters:
 dumpn = 0   # Dump counter
 mn = 0      # Mesh number
 Sn = 0      # Sum over #Elements
+tic1 = clock()
 
 # Approximate isotropic metric at boundaries of initial mesh using circumradius:
 h = Function(W.sub(1))
@@ -172,16 +168,17 @@ for j in DirichletBC(W.sub(1), 0, 'on_boundary').nodes:
 print('\nStarting mesh adaptive forward run...')
 while mn < np.ceil(T / (dt * rm)):
     tic2 = clock()
+    i += 1
 
     # Define discontinuous spaces on the new mesh:
-    elev_2d = Function(FunctionSpace(mesh, 'DG', 1))
-    uv_2d = Function(VectorFunctionSpace(mesh, 'DG', 1))
+    mixedDG1 = VectorFunctionSpace(mesh, 'DG', 1) * FunctionSpace(mesh, 'DG', 1)
+    uv_2d = Function(mixedDG1.sub(0))
+    elev_2d = Function(mixedDG1.sub(1))
 
     # Enforce initial conditions on discontinuous space / load variables from disk:
     index = mn * int(rm / ndump)
     indexStr = stor.indexString(index)
     dirName = 'plots/adjointBased/'
-
     if mn == 0:
         elev_2d.interpolate(eta0)
         uv_2d.interpolate(Expression((0, 0)))
@@ -194,9 +191,8 @@ while mn < np.ceil(T / (dt * rm)):
             ve.close()
 
     # Create functions to hold inner product and significance data:
-    DG1 = FunctionSpace(mesh, 'DG', 1)
-    ip = Function(DG1, name='Inner product')
-    significance = Function(DG1, name='Significant regions')
+    ip = Function(mixedDG1.sub(1), name='Inner product')
+    significance = Function(mixedDG1.sub(1), name='Significant regions')
 
     # Take maximal L2 inner product as most significant:
     for j in range(max(i, int((Ts - T) / (dt * ndump))), 0):
@@ -209,7 +205,7 @@ while mn < np.ceil(T / (dt * rm)):
             chk.load(le)
 
         # Interpolate saved data onto new mesh:
-        if mn != 1:
+        if mn != 0:
             print('    #### Interpolation step %d / %d'
                   % (j - max(i, int((Ts - T) / (dt * ndump))) + 1, len(range(max(i, int((Ts - T) / (dt * ndump))), 0))))
             lu, le = interp(mesh, lu, le)
@@ -225,13 +221,10 @@ while mn < np.ceil(T / (dt * rm)):
             for k in range(len(ip.dat.data)):
                 if np.abs(ip.dat.data[k]) > np.abs(significance.dat.data[k]):
                     significance.dat.data[k] = ip.dat.data[k]
-    significanceFile.write(significance, time=t)
 
     # Interpolate initial mesh size onto new mesh and build associated metric:
     V = TensorFunctionSpace(mesh, 'CG', 1)
-    fields = inte.interp(mesh, h)
-    h = Function(W.sub(1))
-    h.dat.data[:] = fields[0].dat.data[:]
+    h = inte.interp(mesh, h)[0]
     M_ = Function(V)
     for j in DirichletBC(W.sub(1), 0, 'on_boundary').nodes:
         h2 = pow(h.dat.data[j], 2)
@@ -254,7 +247,7 @@ while mn < np.ceil(T / (dt * rm)):
         elif mtype == 'f':
             H = adap.constructHessian(mesh, V, eta, method=hessMeth)
         else:
-            raise NotImplementedError('Cannot currently perform goal-based adaption with respect to two fields.')
+            raise NotImplementedError('Cannot currently perform adjoint-based adaption with respect to two fields.')
         for k in range(mesh.topology.num_vertices()):
             H.dat.data[k] *= significance.dat.data[k]
         M = adap.computeSteadyMetric(mesh, V, H, eta, h_min=hmin, h_max=hmax, normalise=ntype, num=numVer)
@@ -264,58 +257,59 @@ while mn < np.ceil(T / (dt * rm)):
     adap.metricGradation(mesh, M, beta, isotropic=iso)
     adaptor = AnisotropicAdaptation(mesh, M)
     mesh = adaptor.adapted_mesh
-    u, u_, eta, eta_, q, q_, b, W = inte.interpTaylorHood(mesh, u, u_, eta, eta_, b)
-    i += 1
+    elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
 
-    # Mesh resolution analysis:
-    n = len(mesh.coordinates.dat.data)
-    SumN += n
-    if n < N1:
-        N1 = n
-    elif n > N2:
-        N2 = n
+    # Get solver parameter values and construct solver:
+    solver_obj = solver2d.FlowSolver2d(mesh, b)
+    options = solver_obj.options
+    options.simulation_export_time = dt * ndump
+    options.simulation_end_time = (mn + 1) * dt * rm
+    options.timestepper_type = op.timestepper
+    options.timestep = dt
 
-    # Establish test functions and midpoint averages:
-    v, ze = TestFunctions(W)
-    u, eta = split(q)
-    u_, eta_ = split(q_)
-    uh = 0.5 * (u + u_)
-    etah = 0.5 * (eta + eta_)
+    # Specify outfile directory and HDF5 checkpointing:
+    options.output_directory = dirName
+    options.export_diagnostics = True
+    options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+    field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
+    e = exporter.ExportManager(dirName + 'hdf5',
+                               ['elev_2d', 'uv_2d'],
+                               field_dict,
+                               field_metadata,
+                               export_type='hdf5')
+    solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
 
-    # Set up the variational problem:
-    Lf = (ze * (eta - eta_) - Dt * inner(b * uh, grad(ze)) + inner(u - u_, v) + Dt * g * (inner(grad(etah), v))) * dx
-    forwardProblem = NonlinearVariationalProblem(Lf, q)
-    forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
+    # Timestepper bookkeeping for export time step
+    solver_obj.i_export = index
+    solver_obj.next_export_t = solver_obj.i_export * options.simulation_export_time
+    solver_obj.iteration = int(np.ceil(solver_obj.next_export_t / dt))
+    solver_obj.simulation_time = solver_obj.iteration * dt
+    significanceFile.write(significance, time=solver_obj.simulation_time)
 
-    # Split to access data and relabel functions:
-    u, eta = q.split()
-    u_, eta_ = q_.split()
-    u.rename('Fluid velocity')
-    eta.rename('Free surface displacement')
+    # For next export
+    solver_obj.export_initial_state = (dirName != options.output_directory)
+    if solver_obj.export_initial_state:
+        offset = 0
+    else:
+        offset = 1
+    solver_obj.next_export_t += options.simulation_export_time
+    for e in solver_obj.exporters.values():
+        e.set_next_export_ix(solver_obj.i_export + offset)
 
-    # Inner timeloop:
-    for k in range(rm):
-        t += dt
-        dumpn += 1
-
-        # Solve the problem and update:
-        forwardSolver.solve()
-        q_.assign(q)
-
-        # Store data:
-        gaugeData.append(eta.at(gcoord))
-        if dumpn == ndump:
-            dumpn -= ndump
-            forwardFile.write(u, eta, time=t)
+    # Time integrate
+    solver_obj.iterate()
     toc2 = clock()
 
+    # Print to screen:
+    nEle, nVer = adap.meshStats(mesh)
+    N = [min(nEle, N[0]), max(nEle, N[1])]
+    Sn += nEle
     mn += 1
     print('\n************ Adaption step %d **************' % mn)
-    print('Time = %1.2f mins / %1.1f mins' % (t / 60., T / 60.))
-    print('Number of vertices after adaption step %d: ' % mn, n)
-    print('Min/max vertex counts: %d, %d' % (N1, N2))
-    print('Mean vertex count: %d' % (float(SumN) / mn))
-    print('Elapsed time for this step: %1.2fs' % (toc2 - tic2), '\n')
-print('\a')
+    print('Time = %1.2f mins / %1.1f mins' % (mn * rm * dt / 60., T / 60.))
+    print('Number of vertices after adaption step %d: ' % mn, nEle)
+    print('#Elements after adaption step %d: %d' % (mn, nEle))
+    print('Min/max #Elements:', N, ' Mean #Elements: %d' % (Sn / mn))
+    print('Elapsed time for this step: %1.2fs \n' % (toc2 - tic2))
 toc1 = clock()
-print('Elapsed time for adaptive solver: %1.1fs (%1.2f mins)' % (toc1 - tic1, (toc1 - tic1) / 60))
+print('Elapsed time for forward solver: %1.1fs (%1.2f mins)' % (toc1 - tic1, (toc1 - tic1) / 60))
