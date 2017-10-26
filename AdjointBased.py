@@ -19,6 +19,7 @@ mesh, eta0, b = dom.TohokuDomain(int(input('coarseness (Integer in range 1-5, de
 nEle, nVer = adap.meshStats(mesh)
 N = [nEle, nEle]    # Min/max #Elements
 mesh0 = mesh
+W0 = VectorFunctionSpace(mesh0, 'DG', 1) * FunctionSpace(mesh0, 'DG', 1)
 print('...... mesh loaded. Initial #Vertices : %d. Initial #Elements : %d. \n' % (nVer, nEle))
 gauge = input('Gauge choice from {P02, P06, 801, 802 803, 804, 806}? (default P02): ') or 'P02'
 
@@ -55,50 +56,45 @@ ndump = op.ndump
 rm = op.rm
 stored = bool(input('Hit anything but enter if adjoint data is already stored: ')) or False
 
-# Initalise counters:
-t = T
-i = -1
-dumpn = ndump
-meshn = rm
 tic1 = clock()
 
-# Forcing switch:
-coeff = Constant(1.)
-switch = True
-
-# TODO: how to consider the adjoint equations in Thetis?...
-
-# Establish mixed function spaces and associated initial conditions:
-W = VectorFunctionSpace(mesh, 'CG', 2) * FunctionSpace(mesh, 'CG', 1)
-q_ = Function(W)
-lam_ = Function(W)
-u_, eta_ = q_.split()
-lu_, le_ = lam_.split()
-u_.interpolate(Expression([0, 0]))
-eta_.assign(eta0)
-lu_.interpolate(Expression([0, 0]))
-le_.interpolate(Expression(0))
-
 if not stored:
+    # Initalise counters:
+    t = T
+    i = -1
+    dumpn = ndump
+    meshn = rm
+
+    # Forcing switch:
+    coeff = Constant(1.)
+    switch = True
+
+    # TODO: how to consider the adjoint equations in Thetis?...
+
+    # Establish adjoint variables and apply initial conditions:
+    lam_ = Function(W0)
+    lu_, le_ = lam_.split()
+    lu_.interpolate(Expression([0, 0]))
+    le_.interpolate(Expression(0))
+
     # Establish smoothened indicator function for adjoint equations:
-    f = Function(W.sub(1), name='Forcing term')
+    f = Function(W0.sub(1), name='Forcing term')
     f.interpolate(Expression('(x[0] > 490e3) & (x[0] < 640e3) & (x[1] > 4160e3) & (x[1] < 4360e3) ? ' +
                              'exp(1. / (pow(x[0] - 565e3, 2) - pow(75e3, 2))) * ' +
                              'exp(1. / (pow(x[1] - 4260e3, 2) - pow(100e3, 2))) : 0.'))
 
     # Set up dependent variables of the adjoint problem:
-    lam = Function(W)
+    lam = Function(W0)
     lam.assign(lam_)
     lu, le = lam.split()
     lu.rename('Adjoint velocity')
     le.rename('Adjoint free surface')
 
-    # Interpolate velocity onto P1 space and store final time data to HDF5 and PVD:
-    lu_P1 = Function(VectorFunctionSpace(mesh, 'CG', 1), name='P1 adjoint velocity')
-    lu_P1.interpolate(lu)
+    # Store final time data to HDF5 and PVD:
     with DumbCheckpoint('data/adjointSolution_{y}'.format(y=i), mode=FILE_CREATE) as chk:
-        chk.store(lu_P1)
+        chk.store(lu)
         chk.store(le)
+        chk.close()
     adjointFile = File('plots/adjointBased/adjoint.pvd')
     adjointFile.write(lu, le, time=T)
 
@@ -121,22 +117,21 @@ if not stored:
 
     print('\nStarting fixed resolution adjoint run...')
     tic2 = clock()
-while t > 0.5 * dt:
+    while t > 0.5 * dt:
 
-    # Increment counters:
-    t -= dt
-    dumpn -= 1
-    meshn -= 1
+        # Increment counters:
+        t -= dt
+        dumpn -= 1
+        meshn -= 1
 
-    # Modify forcing term:
-    if (t < Ts + 1.5 * dt) & switch:
-        coeff.assign(0.5)
-    elif (t < Ts + 0.5 * dt) & switch:
-        switch = False
-        coeff.assign(0.)
+        # Modify forcing term:
+        if (t < Ts + 1.5 * dt) & switch:
+            coeff.assign(0.5)
+        elif (t < Ts + 0.5 * dt) & switch:
+            switch = False
+            coeff.assign(0.)
 
     # Solve the problem and update:
-    if not stored:
         adjointSolver.solve()
         lam_.assign(lam)
 
@@ -152,37 +147,18 @@ while t > 0.5 * dt:
             # Interpolate velocity onto P1 space and store final time data to HDF5 and PVD:
             if not stored:
                 print('t = %1.1fs' % t)
-                lu_P1.interpolate(lu)
                 with DumbCheckpoint('data_dumps/tsunami/adjoint_soln_{y}'.format(y=i), mode=FILE_CREATE) as chk:
-                    chk.store(lu_P1)
+                    chk.store(lu)
                     chk.store(le)
-if not stored:
+                    chk.close()
+
     toc2 = clock()
     print('... done! Elapsed time for adjoint solver: %1.2fs' % (toc2 - tic2))
 
-# Set up dependent variables of the forward problem:
-q = Function(W)
-q.assign(q_)
-u, eta = q.split()
-
-# Label variables:
-u.rename('Fluid velocity')
-eta.rename('Free surface displacement')
-
-# Intialise files:
-if iso:
-    forwardFile = File('plots/adjointBased/isotropicForward.pvd')
-    significanceFile = File('plots/adjointBased/isotropicSignificance.pvd')
-else:
-    forwardFile = File('plots/adjointBased/anisotropicForward.pvd')
-    significanceFile = File('plots/adjointBased/anisotropicSignificance.pvd')
-forwardFile.write(u, eta, time=0)
-gaugeData = [eta.at(gcoord)]
-
 # Initialise counters:
-t = 0.
-dumpn = 0
-mn = 0
+dumpn = 0   # Dump counter
+mn = 0      # Mesh number
+Sn = 0      # Sum over #Elements
 
 # Approximate isotropic metric at boundaries of initial mesh using circumradius:
 h = Function(W.sub(1))
@@ -194,40 +170,53 @@ for j in DirichletBC(W.sub(1), 0, 'on_boundary').nodes:
     M_.dat.data[j][1, 1] = 1. / h2
 
 print('\nStarting mesh adaptive forward run...')
-while t < T - 0.5 * dt:
-    mn += 1
+while mn < np.ceil(T / (dt * rm)):
     tic2 = clock()
 
-    # Compute Hessian:
-    V = TensorFunctionSpace(mesh, 'CG', 1)
+    # Define discontinuous spaces on the new mesh:
+    elev_2d = Function(FunctionSpace(mesh, 'DG', 1))
+    uv_2d = Function(VectorFunctionSpace(mesh, 'DG', 1))
 
-    # Interpolate velocity in a P1 space:
-    vel = Function(VectorFunctionSpace(mesh, 'CG', 1))
-    vel.interpolate(u)
+    # Enforce initial conditions on discontinuous space / load variables from disk:
+    index = mn * int(rm / ndump)
+    indexStr = stor.indexString(index)
+    dirName = 'plots/adjointBased/'
+
+    if mn == 0:
+        elev_2d.interpolate(eta0)
+        uv_2d.interpolate(Expression((0, 0)))
+    else:
+        with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as el:
+            el.load(elev_2d, name='elev_2d')
+            el.close()
+        with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as ve:
+            ve.load(uv_2d, name='uv_2d')
+            ve.close()
 
     # Create functions to hold inner product and significance data:
-    ip = Function(W.sub(1), name='Inner product')
-    significance = Function(W.sub(1), name='Significant regions')
+    DG1 = FunctionSpace(mesh, 'DG', 1)
+    ip = Function(DG1, name='Inner product')
+    significance = Function(DG1, name='Significant regions')
 
     # Take maximal L2 inner product as most significant:
     for j in range(max(i, int((Ts - T) / (dt * ndump))), 0):
 
-        # Read in saved data from .h5:
+        # Read in saved data from HDF5:
         with DumbCheckpoint('data/adjointSolution_{y}'.format(y=i), mode=FILE_READ) as chk:
-            lu_P1 = Function(W0.sub(0), name='P1 adjoint velocity')
+            lu = Function(W0.sub(0), name='Adjoint velocity')
             le = Function(W0.sub(1), name='Adjoint free surface')
-            chk.load(lu_P1)
+            chk.load(lu)
             chk.load(le)
 
         # Interpolate saved data onto new mesh:
         if mn != 1:
             print('    #### Interpolation step %d / %d'
                   % (j - max(i, int((Ts - T) / (dt * ndump))) + 1, len(range(max(i, int((Ts - T) / (dt * ndump))), 0))))
-            lu_P1, le = interp(mesh, lu_P1, le)
+            lu, le = interp(mesh, lu, le)
 
         # Multiply fields together:
-        ip.dat.data[:] = lu_P1.dat.data[:, 0] * vel.dat.data[:, 0] + lu_P1.dat.data[:, 1] * vel.dat.data[:, 1]
-        ip.dat.data[:] += le.dat.data * eta.dat.data
+        ip.dat.data[:] = lu.dat.data[:, 0] * uv_2d.dat.data[:, 0] + lu.dat.data[:, 1] * uv_2d.dat.data[:, 1]
+        ip.dat.data[:] += le.dat.data * elev_2d.dat.data
 
         # Extract (pointwise) maximal values:
         if j == 0:
@@ -239,6 +228,7 @@ while t < T - 0.5 * dt:
     significanceFile.write(significance, time=t)
 
     # Interpolate initial mesh size onto new mesh and build associated metric:
+    V = TensorFunctionSpace(mesh, 'CG', 1)
     fields = inte.interp(mesh, h)
     h = Function(W.sub(1))
     h.dat.data[:] = fields[0].dat.data[:]
@@ -319,6 +309,7 @@ while t < T - 0.5 * dt:
             forwardFile.write(u, eta, time=t)
     toc2 = clock()
 
+    mn += 1
     print('\n************ Adaption step %d **************' % mn)
     print('Time = %1.2f mins / %1.1f mins' % (t / 60., T / 60.))
     print('Number of vertices after adaption step %d: ' % mn, n)
