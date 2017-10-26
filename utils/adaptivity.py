@@ -3,6 +3,7 @@ import numpy as np
 from numpy import linalg as la
 from scipy import linalg as sla
 
+from . import options
 
 def constructHessian(mesh, V, sol, method='dL2'):
     """
@@ -152,6 +153,33 @@ def computeSteadyMetric(mesh, V, H, sol, h_min=0.005, h_max=0.1, a=100., normali
     else:
         raise ValueError('Normalisation method ``%s`` not recognised.' % normalise)
 
+    return M
+
+
+def isotropicMetric(V, f, bdy=False):
+    """
+    :param V: tensor function space on which metric will be defined.
+    :param f: (scalar) function to adapt to.
+    :param bdy: toggle boundary metric.
+    :return: isotropic metric corresponding to the scalar function.
+    """
+    # TODO: assert meshes are the same.
+
+    op = options.Opt()
+    hmin2 = pow(op.hmin, 2)
+    hmax2 = pow(op.hmax, 2)
+
+    M = Function(V)
+    if bdy:
+        for i in DirichletBC(V, 0, 'on_boundary').nodes:
+            if2 = 1. / max(hmin2, min(pow(f.dat.data[i], 2), hmax2))
+            M.dat.data[i][0, 0] = if2
+            M.dat.data[i][1, 1] = if2
+    else:
+        for i in range(len(f.dat.data)):
+            if2 = 1. / max(hmin2, min(pow(f.dat.data[i], 2), hmax2))
+            M.dat.data[i][0, 0] = if2
+            M.dat.data[i][1, 1] = if2
     return M
 
 

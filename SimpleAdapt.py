@@ -87,11 +87,7 @@ while mn < np.ceil(T / (dt * rm)):
     # Compute Hessian and metric:
     V = TensorFunctionSpace(mesh, 'CG', 1)
     if iso:
-        M = Function(V)
-        for i in range(len(M.dat.data)):
-            ielev2 = 1. / max(hmin2, min(pow(elev_2d.dat.data[i], 2), hmax2))
-            M.dat.data[i][0, 0] = ieta2
-            M.dat.data[i][1, 1] = ieta2
+        M = adap.isotropicMetric(V, elev_2d)
     else:
         H = adap.constructHessian(mesh, V, elev_2d, method=hessMeth)
         M = adap.computeSteadyMetric(mesh, V, H, elev_2d, h_min=hmin, h_max=hmax, num=numVer, normalise=ntype)

@@ -163,11 +163,7 @@ tic1 = clock()
 # Approximate isotropic metric at boundaries of initial mesh using circumradius:
 h = Function(W0.sub(1))
 h.interpolate(CellSize(mesh0))
-M_ = Function(TensorFunctionSpace(mesh0, 'CG', 1))
-for j in DirichletBC(W0.sub(1), 0, 'on_boundary').nodes:
-    h2 = pow(h.dat.data[j], 2)
-    M_.dat.data[j][0, 0] = 1. / h2
-    M_.dat.data[j][1, 1] = 1. / h2
+M_ = adap.isotropicMetric(TensorFunctionSpace(mesh0, 'CG', 1), h, bdy=True)
 
 print('\nStarting mesh adaptive forward run...')
 while mn < np.ceil(T / (dt * rm)):
@@ -223,22 +219,13 @@ while mn < np.ceil(T / (dt * rm)):
                 if np.abs(ip.dat.data[k]) > np.abs(significance.dat.data[k]):
                     significance.dat.data[k] = ip.dat.data[k]
 
-    # Interpolate initial mesh size onto new mesh and build associated metric:
+    # Interpolate initial mesh size onto new mesh and build associated boundary metric:
     V = TensorFunctionSpace(mesh, 'CG', 1)
-    h = inte.interp(mesh, h)[0]
-    M_ = Function(V)
-    for j in DirichletBC(W.sub(1), 0, 'on_boundary').nodes:
-        h2 = pow(h.dat.data[j], 2)
-        M_.dat.data[j][0, 0] = 1. / h2
-        M_.dat.data[j][1, 1] = 1. / h2
+    M_ = adap.isotropicMetric(V, inte.interp(mesh, h)[0], bdy=True)
 
     # Generate metric associated with significant data:
     if iso:
-        M = Function(V)
-        for j in range(len(M.dat.data)):
-            isig2 = 1. / max(hmin2, min(pow(significance.dat.data[j], 2), hmax2))
-            M.dat.data[j][0, 0] = isig2
-            M.dat.data[j][1, 1] = isig2
+        M = adap.isotropicMetric(V, significance)
     else:
         H = Function(V)
         if mtype == 's':
