@@ -68,13 +68,13 @@ def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=options.O
         for i in range(mesh.topology.num_vertices()):
             sol_min = 1e-3  # Minimum tolerated value for the solution field
 
-            # Generate local Hessian:
+            # Generate local Hessian
             H_loc = H.dat.data[i] * iError / (max(np.sqrt(assemble(sol * sol * dx)), sol_min))  # Avoid round-off error
             mean_diag = 0.5 * (H_loc[0][1] + H_loc[1][0])
             H_loc[0][1] = mean_diag
             H_loc[1][0] = mean_diag
 
-            # Find eigenpairs and truncate eigenvalues:
+            # Find eigenpairs and truncate eigenvalues
             lam, v = la.eig(H_loc)
             v1, v2 = v[0], v[1]
             lam1 = min(ihmin2, max(ihmax2, abs(lam[0])))
@@ -83,28 +83,28 @@ def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=options.O
             lam1 = max(lam1, ia2 * lam_max)
             lam2 = max(lam2, ia2 * lam_max)
 
-            # Reconstruct edited Hessian:
+            # Reconstruct edited Hessian
             M.dat.data[i][0, 0] = lam1 * v1[0] * v1[0] + lam2 * v2[0] * v2[0]
             M.dat.data[i][0, 1] = lam1 * v1[0] * v1[1] + lam2 * v2[0] * v2[1]
             M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
             M.dat.data[i][1, 1] = lam1 * v1[1] * v1[1] + lam2 * v2[1] * v2[1]
-    elif op.ntype == 'lp':
+    else:
         detH = Function(FunctionSpace(mesh, 'CG', 1))
         for i in range(mesh.topology.num_vertices()):
-            # Generate local Hessian:
+            # Generate local Hessian
             H_loc = H.dat.data[i]
             mean_diag = 0.5 * (H_loc[0][1] + H_loc[1][0])
             H_loc[0][1] = mean_diag
             H_loc[1][0] = mean_diag
 
-            # Find eigenpairs of Hessian and truncate eigenvalues:
+            # Find eigenpairs of Hessian and truncate eigenvalues
             lam, v = la.eig(H_loc)
             v1, v2 = v[0], v[1]
             lam1 = max(abs(lam[0]), 1e-10)  # \ To avoid round-off error
             lam2 = max(abs(lam[1]), 1e-10)  # /
             det = lam1 * lam2
 
-            # Reconstruct edited Hessian and rescale:
+            # Reconstruct edited Hessian and rescale
             M.dat.data[i][0, 0] = lam1 * v1[0] * v1[0] + lam2 * v2[0] * v2[0]
             M.dat.data[i][0, 1] = lam1 * v1[0] * v1[1] + lam2 * v2[0] * v2[1]
             M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
@@ -115,7 +115,7 @@ def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=options.O
         detH_integral = assemble(detH * dx)
         M *= nVerT / detH_integral  # Scale by the target number of vertices
         for i in range(mesh.topology.num_vertices()):
-            # Find eigenpairs of metric and truncate eigenvalues:
+            # Find eigenpairs of metric and truncate eigenvalues
             lam, v = la.eig(M.dat.data[i])
             v1, v2 = v[0], v[1]
             lam1 = min(ihmin2, max(ihmax2, abs(lam[0])))
@@ -124,13 +124,11 @@ def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=options.O
             lam1 = max(lam1, ia2 * lam_max)
             lam2 = max(lam2, ia2 * lam_max)
 
-            # Reconstruct edited Hessian:
+            # Reconstruct edited Hessian
             M.dat.data[i][0, 0] = lam1 * v1[0] * v1[0] + lam2 * v2[0] * v2[0]
             M.dat.data[i][0, 1] = lam1 * v1[0] * v1[1] + lam2 * v2[0] * v2[1]
             M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
             M.dat.data[i][1, 1] = lam1 * v1[1] * v1[1] + lam2 * v2[1] * v2[1]
-    else:
-        raise ValueError('Normalisation method ``%s`` not recognised.' % op.ntype)
     return M
 
 
@@ -182,21 +180,21 @@ def metricGradation(mesh, metric, beta=1.4, isotropic=False):
     :return: gradated ``metric``.
     """
 
-    # Get vertices and edges of mesh:
+    # Get vertices and edges of mesh
     plex = mesh._plex
     vStart, vEnd = plex.getDepthStratum(0)
     numVer = vEnd - vStart
     eStart, eEnd = plex.getDepthStratum(1)
     xy = mesh.coordinates.dat.data
 
-    # Establish arrays for storage:
+    # Establish arrays for storage
     v12 = np.zeros(2)
     v21 = np.zeros(2)
     grownMet1 = np.zeros((2, 2))  # TODO: work only with the upper triangular part for speed
     grownMet2 = np.zeros((2, 2))
     M = metric.dat.data
 
-    # Create a list of tags for vertices:
+    # Create a list of tags for vertices
     verTag = np.zeros(numVer)
     for v in range(numVer):
         verTag[v] = 1
@@ -208,7 +206,7 @@ def metricGradation(mesh, metric, beta=1.4, isotropic=False):
         i += 1
         correction = False
 
-        # Loop over edges of mesh:
+        # Loop over edges of mesh
         for e in range(eStart, eEnd):
             cone = plex.getCone(e)  # Get vertices associated with edge e
             iVer1 = cone[0] - vStart  # Vertex 1 index
@@ -217,7 +215,7 @@ def metricGradation(mesh, metric, beta=1.4, isotropic=False):
             if (verTag[iVer1] < i) & (verTag[iVer2] < i):
                 continue
 
-            # Assemble local metrics and calculate edge lengths:
+            # Assemble local metrics and calculate edge lengths
             met1 = M[iVer1]
             met2 = M[iVer2]
             v12[0] = xy[iVer2][0] - xy[iVer1][0]
@@ -241,17 +239,17 @@ def metricGradation(mesh, metric, beta=1.4, isotropic=False):
                 eta2_12 = 1. / pow(1 + edgLen1 * ln_beta, 2)
                 eta2_21 = 1. / pow(1 + edgLen2 * ln_beta, 2)
 
-                # Scale to get 'grown' metric:
+                # Scale to get 'grown' metric
                 for j in range(2):
                     for k in range(2):
                         grownMet1[j, k] = eta2_12 * met1[j, k]
                         grownMet2[j, k] = eta2_21 * met2[j, k]
 
-                # Intersect metric with grown metric to get reduced metric:
+                # Intersect metric with grown metric to get reduced metric
                 redMet1 = localMetricIntersection(met1, grownMet2)
                 redMet2 = localMetricIntersection(met2, grownMet1)
 
-            # Calculate difference in order to ascertain whether the metric is modified:
+            # Calculate difference in order to ascertain whether the metric is modified
             diff = np.abs(met1[0, 0] - redMet1[0, 0]) + np.abs(met1[0, 1] - redMet1[0, 1]) \
                    + np.abs(met1[1, 1] - redMet1[1, 1])
             diff /= (np.abs(met1[0, 0]) + np.abs(met1[0, 1]) + np.abs(met1[1, 1]))
@@ -263,7 +261,7 @@ def metricGradation(mesh, metric, beta=1.4, isotropic=False):
                 verTag[iVer1] = i + 1
                 correction = True
 
-            # Repeat above process:
+            # Repeat above process
             diff = np.abs(met2[0, 0] - redMet2[0, 0]) + np.abs(met2[0, 1] - redMet2[0, 1]) \
                    + np.abs(met2[1, 1] - redMet2[1, 1])
             diff /= (np.abs(met2[0, 0]) + np.abs(met2[0, 1]) + np.abs(met2[1, 1]))

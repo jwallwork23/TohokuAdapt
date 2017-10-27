@@ -12,7 +12,7 @@ import utils.options as opt
 import utils.storage as stor
 
 
-# Define initial mesh and mesh statistics placeholders:
+# Define initial mesh and mesh statistics placeholders
 print('*************** ANISOTROPIC ADAPTIVE TSUNAMI SIMULATION ***************\n')
 print('MESH ADAPTIVE solver initially defined on a mesh of')
 mesh, eta0, b = dom.TohokuDomain(int(input('coarseness (Integer in range 1-5, default 5): ') or 5))
@@ -24,27 +24,27 @@ print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d. \n' %
 # if resume:
 #     iStart = int(input('Simulation starting index (default i = 0)?: ')) or 0
 
-# Get default parameter values and check CFL criterion:
+# Get default parameter values and check CFL criterion
 op = opt.Options()
 nVerT = op.vscale * nVer    # Target #Vertices
 iso = op.iso
+dirName = 'plots/simpleAdapt/'
+if iso:
+    dirName += 'isotropic/'
 T = op.T
 dt = op.dt
 cdt = op.hmin / np.sqrt(op.g * max(b.dat.data))
 if dt > cdt:
     print('WARNING: chosen timestep dt = %.2fs exceeds recommended value of %.2fs' % (dt, cdt))
-    if bool(input('Hit anything except enter if happy to proceed.')) or False:
+    if input('Hit anything except enter if happy to proceed.'):
         exit(23)
 ndump = op.ndump
 rm = op.rm
 
-# Initialise counters and filenames:
+# Initialise counters:
 dumpn = 0   # Dump counter
 mn = 0      # Mesh number
 Sn = 0      # Sum over #Elements
-dirName = 'plots/simpleAdapt/'
-if iso:
-    dirName += 'isotropic/'
 tic1 = clock()
 # if resume:
 #     mn += int(iStart * ndump / rm)
@@ -52,12 +52,10 @@ tic1 = clock()
 while mn < np.ceil(T / (dt * rm)):
     tic2 = clock()
 
-    # Define discontinuous spaces on the new mesh:
+    # Enforce initial conditions on discontinuous space / load variables from disk
     W = VectorFunctionSpace(mesh, 'DG', 1) * FunctionSpace(mesh, 'DG', 1)
     uv_2d = Function(W.sub(0))
     elev_2d = Function(W.sub(1))
-
-    # Enforce initial conditions on discontinuous space / load variables from disk:
     index = mn * int(rm / ndump)
     indexStr = stor.indexString(index)
     if mn == 0:
@@ -71,7 +69,7 @@ while mn < np.ceil(T / (dt * rm)):
             ve.load(uv_2d, name='uv_2d')
             ve.close()
 
-    # Compute Hessian and metric:
+    # Compute Hessian and metric, adapt mesh and interpolate variables
     V = TensorFunctionSpace(mesh, 'CG', 1)
     if op.mtype != 's':
         if iso:
@@ -90,13 +88,11 @@ while mn < np.ceil(T / (dt * rm)):
             M = adap.metricIntersection(mesh, V, M, M2)
         else:
             M = M2
-
-    # Adapt mesh with respect to computed metric field and interpolate functions onto new mesh:
     adaptor = AnisotropicAdaptation(mesh, M)
     mesh = adaptor.adapted_mesh
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
 
-    # Get solver parameter values and construct solver:
+    # Get solver parameter values and construct solver
     solver_obj = solver2d.FlowSolver2d(mesh, b)
     options = solver_obj.options
     options.simulation_export_time = dt * ndump
@@ -104,7 +100,7 @@ while mn < np.ceil(T / (dt * rm)):
     options.timestepper_type = op.timestepper
     options.timestep = dt
 
-    # Specify outfile directory and HDF5 checkpointing:
+    # Specify outfile directory and HDF5 checkpointing
     options.output_directory = dirName
     options.export_diagnostics = True
     options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
@@ -124,19 +120,13 @@ while mn < np.ceil(T / (dt * rm)):
 
     # For next export
     solver_obj.export_initial_state = (dirName != options.output_directory)
-    if solver_obj.export_initial_state:
-        offset = 0
-    else:
-        offset = 1
+    offset = 0 if solver_obj.export_initial_state else 1
     solver_obj.next_export_t += options.simulation_export_time
     for e in solver_obj.exporters.values():
         e.set_next_export_ix(solver_obj.i_export + offset)
 
-    # Time integrate
+    # Time integrate and print
     solver_obj.iterate()
-    toc2 = clock()
-
-    # Print to screen:
     nEle, nVer = adap.meshStats(mesh)
     N = [min(nEle, N[0]), max(nEle, N[1])]
     Sn += nEle
@@ -145,6 +135,6 @@ while mn < np.ceil(T / (dt * rm)):
     print('Time = %1.2f mins / %1.1f mins' % (mn * rm * dt / 60., T / 60.))
     print('#Elements after adaption step %d: %d' % (mn, nEle))
     print('Min/max #Elements:', N, ' Mean #Elements: %d' % (Sn / mn))
-    print('Elapsed time for this step: %1.2fs \n' % (toc2 - tic2))
+    print('Elapsed time for this step: %1.2fs \n' % (clock() - tic2))
 toc1 = clock()
 print('Elapsed time for adaptive solver: %1.1fs (%1.2f mins)' % (toc1 - tic1, (toc1 - tic1) / 60))
