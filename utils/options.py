@@ -6,7 +6,9 @@ class Options:
                  vscale=0.85,
                  hmin=500.,
                  hmax=1e7,
+                 a=100,
                  ntype='lp',
+                 p=2,
                  mtype='f',
                  iso=False,
                  hessMeth='dL2',
@@ -20,7 +22,9 @@ class Options:
         :param vscale: Scaling parameter for target number of vertices.
         :param hmin: Minimal tolerated element size (m).
         :param hmax: Maximal tolerated element size (m).
+        :param a: maximum tolerated aspect ratio.
         :param ntype: Normalisation approach: 'lp' or 'manual'.
+        :param p: norm order in the Lp normalisation approach, where ``p => 1`` and ``p = infty`` is an option.
         :param mtype: Adapt w.r.t 's'peed, 'f'ree surface or 'b'oth.
         :param iso: Toggle isotropic / anisotropic algorithm.
         :param hessMeth: Method of Hessian reconstruction: 'dL2' or 'parts'.
@@ -36,7 +40,9 @@ class Options:
         self.vscale = vscale
         self.hmin = hmin
         self.hmax = hmax
+        self.a = a
         self.ntype = ntype
+        self.p = p
         self.mtype = mtype
         self.iso = iso
         self.hessMeth = hessMeth

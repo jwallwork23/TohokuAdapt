@@ -29,7 +29,6 @@ op = opt.Options(vscale=0.2, rm=60)
 nVerT = op.vscale * nVer    # Target #Vertices
 iso = op.iso
 T = op.T
-Ts = op.Ts
 dt = op.dt
 Dt = Constant(dt)
 cdt = op.hmin / np.sqrt(op.g * max(b.dat.data))
@@ -105,9 +104,9 @@ if not stored:
         meshn -= 1
 
         # Modify forcing term:
-        if (t < Ts + 1.5 * dt) & switch:
+        if (t < op.Ts + 1.5 * dt) & switch:
             coeff.assign(0.5)
-        elif (t < Ts + 0.5 * dt) & switch:
+        elif (t < op.Ts + 0.5 * dt) & switch:
             switch = False
             coeff.assign(0.)
 
@@ -136,13 +135,13 @@ if stored:
 else:
     assert (mn == 0)
 Sn = 0                              # Sum over #Elements
-iStart = int(Ts / (dt * rm))        # Index corresponding to tStart
+iStart = int(op.Ts / (dt * rm))        # Index corresponding to tStart
 iEnd = int(np.ceil(T / (dt * rm)))  # Index corresponding to tEnd
 tic1 = clock()
 
 # Approximate isotropic metric at boundaries of initial mesh using circumradius:
 h = Function(W0.sub(1)).interpolate(CellSize(mesh0))
-M_ = adap.isotropicMetric(TensorFunctionSpace(mesh0, 'CG', 1), h, bdy=True)
+M_ = adap.isotropicMetric(TensorFunctionSpace(mesh0, 'CG', 1), h, bdy=True, op=op)
 
 print('\nStarting mesh adaptive forward run...')
 while mn < iEnd:
@@ -202,23 +201,23 @@ while mn < iEnd:
 
     # Interpolate initial mesh size onto new mesh and build associated boundary metric:
     V = TensorFunctionSpace(mesh, 'CG', 1)
-    M_ = adap.isotropicMetric(V, inte.interp(mesh, h)[0], bdy=True)
+    M_ = adap.isotropicMetric(V, inte.interp(mesh, h)[0], bdy=True, op=op)
 
     # Generate metric associated with significant data:
     if iso:
-        M = adap.isotropicMetric(V, significance)
+        M = adap.isotropicMetric(V, significance, op=op)
     else:
         H = Function(V)
         if op.mtype == 's':
             spd = Function(W.sub(1)).interpolate(sqrt(dot(u, u)))
-            H = adap.constructHessian(mesh, V, spd, method=op.hessMeth)
+            H = adap.constructHessian(mesh, V, spd, op=op)
         elif op.mtype == 'f':
-            H = adap.constructHessian(mesh, V, elev_2d, method=op.hessMeth)
+            H = adap.constructHessian(mesh, V, elev_2d, op=op)
         else:
             raise NotImplementedError('Cannot currently perform adjoint-based adaption with respect to two fields.')
         for k in range(mesh.topology.num_vertices()):
             H.dat.data[k] *= significance.dat.data[k]
-        M = adap.computeSteadyMetric(mesh, V, H, elev_2d, hmin=op.hmin, hmax=op.hmax, normalise=op.ntype, num=nVerT)
+        M = adap.computeSteadyMetric(mesh, V, H, elev_2d, nVerT=nVerT, op=op)
 
     # Gradate metric, adapt mesh and interpolate variables:
     M = adap.metricIntersection(mesh, V, M, M_, bdy=True)
@@ -255,10 +254,7 @@ while mn < iEnd:
 
     # For next export
     solver_obj.export_initial_state = dirName != options.output_directory
-    if solver_obj.export_initial_state:
-        offset = 0
-    else:
-        offset = 1
+    offset = 0 if solver_obj.export_initial_state else 1
     solver_obj.next_export_t += options.simulation_export_time
     for e in solver_obj.exporters.values():
         e.set_next_export_ix(solver_obj.i_export + offset)

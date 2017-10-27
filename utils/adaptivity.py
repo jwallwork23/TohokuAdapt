@@ -5,7 +5,8 @@ from scipy import linalg as sla
 
 from . import options
 
-def constructHessian(mesh, V, sol, method='dL2'):
+
+def constructHessian(mesh, V, sol, op=options.Options()):
     """
     Reconstructs the hessian of a scalar solution field with respect to the current mesh. The code for the integration 
     by parts reconstruction approach is based on the Monge-Amp\`ere tutorial provided in the Firedrake website 
@@ -14,45 +15,31 @@ def constructHessian(mesh, V, sol, method='dL2'):
     :param mesh: current mesh on which variables are defined.
     :param V: TensorFunctionSpace defined on ``mesh``.
     :param sol: P1 solution field defined on ``mesh``.
-    :param method: mode of Hessian reconstruction; either a double L2 projection ('dL2') or as integration by parts 
-    ('parts').
+    :param op: Options class object providing min/max cell size values.
     :return: reconstructed Hessian associated with ``sol``.
     """
-
-    # Construct functions:
     H = Function(V)
     tau = TestFunction(V)
     nhat = FacetNormal(mesh)  # Normal vector
     params = {'snes_rtol': 1e8,
               'ksp_rtol': 1e-5,
               'ksp_gmres_restart': 20,
-              'pc_type': 'sor',
-              'snes_monitor': False,
-              'snes_view': False,
-              'ksp_monitor_true_residual': False,
-              'snes_converged_reason': False,
-              'ksp_converged_reason': False, }
-
-    if method == 'parts':
-        # Hessian reconstruction using integration by parts:
+              'pc_type': 'sor'}
+    if op.mtype == 'parts':
         Lh = (inner(tau, H) + inner(div(tau), grad(sol))) * dx
         Lh -= (tau[0, 1] * nhat[1] * sol.dx(0) + tau[1, 0] * nhat[0] * sol.dx(1)) * ds
-        Lh -= (tau[0, 0] * nhat[1] * sol.dx(0) + tau[1, 1] * nhat[0] * sol.dx(1)) * ds  # Term not in tutorial
-    elif method == 'dL2':
-        # Hessian reconstruction using a double L2 projection:
-        V = VectorFunctionSpace(mesh, 'CG', 1)
-        g = Function(V)
-        psi = TestFunction(V)
+        Lh -= (tau[0, 0] * nhat[1] * sol.dx(0) + tau[1, 1] * nhat[0] * sol.dx(1)) * ds  # Term not in Firedrake tutorial
+    elif op.mtype == 'dL2':
+        W = VectorFunctionSpace(mesh, 'CG', 1)
+        g = Function(W)
+        psi = TestFunction(W)
         Lg = (inner(g, psi) - inner(grad(sol), psi)) * dx
-        g_prob = NonlinearVariationalProblem(Lg, g)
-        g_solv = NonlinearVariationalSolver(g_prob, solver_parameters=params)
-        g_solv.solve()
+        NonlinearVariationalSolver(NonlinearVariationalProblem(Lg, g), solver_parameters=params).solve()
         Lh = (inner(tau, H) + inner(div(tau), g)) * dx
         Lh -= (tau[0, 1] * nhat[1] * g[0] + tau[1, 0] * nhat[0] * g[1]) * ds
         Lh -= (tau[0, 0] * nhat[1] * g[0] + tau[1, 1] * nhat[0] * g[1]) * ds
     else:
         raise ValueError('Hessian reconstruction method ``%s`` not recognised' % method)
-
     H_prob = NonlinearVariationalProblem(Lh, H)
     H_solv = NonlinearVariationalSolver(H_prob, solver_parameters=params)
     H_solv.solve()
@@ -60,7 +47,7 @@ def constructHessian(mesh, V, sol, method='dL2'):
     return H
 
 
-def computeSteadyMetric(mesh, V, H, sol, hmin=0.005, hmax=0.1, a=100., normalise='lp', p=2, num=1000., ieps=1000.):
+def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=options.Options()):
     """
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``computeSteadyMetric``, from 
     ``adapt.py``, 2016.
@@ -69,27 +56,22 @@ def computeSteadyMetric(mesh, V, H, sol, hmin=0.005, hmax=0.1, a=100., normalise
     :param V: TensorFunctionSpace defined on ``mesh``.
     :param H: reconstructed Hessian, usually chosen to be associated with ``sol``.
     :param sol: P1 solution field defined on ``mesh``.
-    :param hmin: minimum tolerated side-lengths.
-    :param hmax: maximum tolerated side-lengths.
-    :param a: maximum tolerated aspect ratio.
-    :param normalise: mode of normalisation; either a manual rescaling ('manual') or an Lp approach ('Lp').
-    :param p: norm order in the Lp normalisation approach, where ``p => 1`` and ``p = infty`` is an option.
-    :param num: target number of vertices, in the case of Lp normalisation.
-    :param ieps: inverse of the target error, in the case of manual normalisation.
+    :param nVerT: target number of vertices, in the case of Lp normalisation.
+    :param iError: inverse of the target error, in the case of manual normalisation.
+    :param op: Options class object providing min/max cell size values.
     :return: steady metric associated with Hessian H.
     """
 
-    ia2 = 1. / pow(a, 2)  # Inverse square aspect ratio
-    ihmin2 = 1. / pow(hmin, 2)  # Inverse square minimal side-length
-    ihmax2 = 1. / pow(hmax, 2)  # Inverse square maximal side-length
+    ia2 = 1. / pow(op.a, 2)         # Inverse square aspect ratio
+    ihmin2 = 1. / pow(op.hmin, 2)   # Inverse square minimal side-length
+    ihmax2 = 1. / pow(op.hmax, 2)   # Inverse square maximal side-length
     M = Function(V)
-
-    if normalise == 'manual':
+    if op.ntype == 'manual':
         for i in range(mesh.topology.num_vertices()):
             sol_min = 1e-3  # Minimum tolerated value for the solution field
 
             # Generate local Hessian:
-            H_loc = H.dat.data[i] * ieps / (max(np.sqrt(assemble(sol * sol * dx)), sol_min))  # To avoid round-off error
+            H_loc = H.dat.data[i] * iError / (max(np.sqrt(assemble(sol * sol * dx)), sol_min))  # Avoid round-off error
             mean_diag = 0.5 * (H_loc[0][1] + H_loc[1][0])
             H_loc[0][1] = mean_diag
             H_loc[1][0] = mean_diag
@@ -108,8 +90,7 @@ def computeSteadyMetric(mesh, V, H, sol, hmin=0.005, hmax=0.1, a=100., normalise
             M.dat.data[i][0, 1] = lam1 * v1[0] * v1[1] + lam2 * v2[0] * v2[1]
             M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
             M.dat.data[i][1, 1] = lam1 * v1[1] * v1[1] + lam2 * v2[1] * v2[1]
-
-    elif normalise == 'lp':
+    elif op.ntype == 'lp':
         detH = Function(FunctionSpace(mesh, 'CG', 1))
         for i in range(mesh.topology.num_vertices()):
             # Generate local Hessian:
@@ -130,11 +111,11 @@ def computeSteadyMetric(mesh, V, H, sol, hmin=0.005, hmax=0.1, a=100., normalise
             M.dat.data[i][0, 1] = lam1 * v1[0] * v1[1] + lam2 * v2[0] * v2[1]
             M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
             M.dat.data[i][1, 1] = lam1 * v1[1] * v1[1] + lam2 * v2[1] * v2[1]
-            M.dat.data[i] *= pow(det, -1. / (2 * p + 2))
-            detH.dat.data[i] = pow(det, p / (2. * p + 2))
+            M.dat.data[i] *= pow(det, -1. / (2 * op.p + 2))
+            detH.dat.data[i] = pow(det, op.p / (2. * op.p + 2))
 
         detH_integral = assemble(detH * dx)
-        M *= num / detH_integral  # Scale by the target number of vertices
+        M *= nVerT / detH_integral  # Scale by the target number of vertices
         for i in range(mesh.topology.num_vertices()):
             # Find eigenpairs of metric and truncate eigenvalues:
             lam, v = la.eig(M.dat.data[i])
@@ -151,8 +132,7 @@ def computeSteadyMetric(mesh, V, H, sol, hmin=0.005, hmax=0.1, a=100., normalise
             M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
             M.dat.data[i][1, 1] = lam1 * v1[1] * v1[1] + lam2 * v2[1] * v2[1]
     else:
-        raise ValueError('Normalisation method ``%s`` not recognised.' % normalise)
-
+        raise ValueError('Normalisation method ``%s`` not recognised.' % op.ntype)
     return M
 
 
@@ -239,11 +219,9 @@ def metricGradation(mesh, metric, beta=1.4, isotropic=False):
             if (verTag[iVer1] < i) & (verTag[iVer2] < i):
                 continue
 
-            # Assemble local metrics:
+            # Assemble local metrics and calculate edge lengths:
             met1 = M[iVer1]
             met2 = M[iVer2]
-
-            # Calculate edge lengths and scale factor:
             v12[0] = xy[iVer2][0] - xy[iVer1][0]
             v12[1] = xy[iVer2][1] - xy[iVer1][1]
             v21[0] = - v12[0]
@@ -298,7 +276,6 @@ def metricGradation(mesh, metric, beta=1.4, isotropic=False):
                 M[iVer2][1, 1] = redMet2[1, 1]
                 verTag[iVer2] = i + 1
                 correction = True
-
     metric.dat.data[:] = M
 
 

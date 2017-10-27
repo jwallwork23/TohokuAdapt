@@ -26,7 +26,7 @@ print('...... mesh loaded. Initial #Vertices : %d. Initial #Elements : %d. \n' %
 #     iStart = int(input('Simulation starting index (default i = 0)?: ')) or 0
 
 # Get default parameter values and check CFL criterion:
-op = opt.Options(mtype='b')
+op = opt.Options()
 nVerT = op.vscale * nVer    # Target #Vertices
 iso = op.iso
 T = op.T
@@ -76,17 +76,17 @@ while mn < np.ceil(T / (dt * rm)):
     V = TensorFunctionSpace(mesh, 'CG', 1)
     if op.mtype != 's':
         if iso:
-            M = adap.isotropicMetric(V, elev_2d)
+            M = adap.isotropicMetric(V, elev_2d, op=op)
         else:
-            H = adap.constructHessian(mesh, V, elev_2d, method=op.hessMeth)
-            M = adap.computeSteadyMetric(mesh, V, H, elev_2d, hmin=op.hmin, hmax=op.hmax, num=nVerT, normalise=op.ntype)
+            H = adap.constructHessian(mesh, V, elev_2d, op=op)
+            M = adap.computeSteadyMetric(mesh, V, H, elev_2d, nVerT=nVerT, op=op)
     if op.mtype != 'f':
         spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
         if iso:
             M2 = adap.isotropicMetric(V, spd)
         else:
-            H = adap.constructHessian(mesh, V, elev_2d, method=op.hessMeth)
-            M2 = adap.computeSteadyMetric(mesh, V, H, spd, hmin=op.hmin, hmax=op.hmax, num=nVerT, normalise=op.ntype)
+            H = adap.constructHessian(mesh, V, elev_2d, op=op)
+            M2 = adap.computeSteadyMetric(mesh, V, H, spd, nVerT=nVerT, op=op)
         if op.mtype == 'b':
             M = adap.metricIntersection(mesh, V, M, M2)
         else:

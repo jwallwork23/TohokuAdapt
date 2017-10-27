@@ -11,14 +11,9 @@ def indexString(index):
     :param index: integer form of index.
     :return: five-digit string form of index.
     """
-    if index in range(0, 10):
-        indexStr = '0000' + str(index)
-    elif index in range(10, 100):
-        indexStr = '000' + str(index)
-    elif index in range(100, 1000):
-        indexStr = '00' + str(index)
-    elif index in range(1000, 10000):
-        indexStr = '0' + str(index)
+    indexStr = str(index)
+    for i in range(5 - len(indexStr))):
+        indexStr = '0' + indexStr
     return indexStr
 
 
@@ -32,7 +27,6 @@ def gaugeTimeseries(gauge, dirName, iEnd):
     :return: a file containing the timeseries data.
     """
     op = options.Options()
-
     name = input("Enter a name for this time series (e.g. 'meanEle=5767'): ")
     dirName = 'plots/' + dirName + '/hdf5'
     outfile = open('timeseries/{y1}_{y2}.txt'.format(y1=gauge, y2=name), 'w+')
