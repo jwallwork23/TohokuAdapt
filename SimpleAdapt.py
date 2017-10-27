@@ -67,8 +67,9 @@ while mn < np.ceil(T / (dt * rm)):
     tic2 = clock()
 
     # Define discontinuous spaces on the new mesh:
-    elev_2d = Function(FunctionSpace(mesh, 'DG', 1))
-    uv_2d = Function(VectorFunctionSpace(mesh, 'DG', 1))
+    W = VectorFunctionSpace(mesh, 'DG', 1) * FunctionSpace(mesh, 'DG', 1)
+    uv_2d = Function(W.sub(0))
+    elev_2d = Function(W.sub(1))
 
     # Enforce initial conditions on discontinuous space / load variables from disk:
     index = mn * int(rm / ndump)
@@ -86,11 +87,16 @@ while mn < np.ceil(T / (dt * rm)):
 
     # Compute Hessian and metric:
     V = TensorFunctionSpace(mesh, 'CG', 1)
+    fAdapt = Function(W.sub(1))
+    if mtype == 'f':
+        fAdapt.interpolate(elev_2d)
+    elif mtype == 's':
+        fAdapt.interpolate(sqrt(dot(uv_2d, uv_2d)))
     if iso:
-        M = adap.isotropicMetric(V, elev_2d)
+        M = adap.isotropicMetric(V, fAdapt)
     else:
-        H = adap.constructHessian(mesh, V, elev_2d, method=hessMeth)
-        M = adap.computeSteadyMetric(mesh, V, H, elev_2d, h_min=hmin, h_max=hmax, num=numVer, normalise=ntype)
+        H = adap.constructHessian(mesh, V, fAdapt, method=hessMeth)
+        M = adap.computeSteadyMetric(mesh, V, H, fAdapt, h_min=hmin, h_max=hmax, num=numVer, normalise=ntype)
 
     # Adapt mesh with respect to computed metric field and interpolate functions onto new mesh:
     adaptor = AnisotropicAdaptation(mesh, M)

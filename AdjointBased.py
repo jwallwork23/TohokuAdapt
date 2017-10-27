@@ -91,22 +91,20 @@ if not stored:
     adjointFile = File(dirName + 'adjoint.pvd')
     adjointFile.write(lu, le, time=T)
 
-    # Establish test functions and midpoint averages:
+    # Establish test functions:
     w, xi = TestFunctions(W0)
     lu, le = split(lam)
     lu_, le_ = split(lam_)
-    luh = 0.5 * (lu + lu_)
-    leh = 0.5 * (le + le_)
 
-    # Establish smoothened indicator function for adjoint equations:
-    f = Function(W0.sub(1), name='Forcing term')
-    f.interpolate(Expression('(x[0] > 490e3) & (x[0] < 640e3) & (x[1] > 4160e3) & (x[1] < 4360e3) ? ' +
-                             'exp(1. / (pow(x[0] - 565e3, 2) - pow(75e3, 2))) * ' +
-                             'exp(1. / (pow(x[1] - 4260e3, 2) - pow(100e3, 2))) : 0.'))
+    # Establish (smoothened) indicator function for adjoint equations:
+    fexpr = '(x[0] > 490e3) & (x[0] < 640e3) & (x[1] > 4160e3) & (x[1] < 4360e3) ? ' \
+            'exp(1. / (pow(x[0] - 565e3, 2) - pow(75e3, 2))) * exp(1. / (pow(x[1] - 4260e3, 2) - pow(100e3, 2))) : 0.'
+    f = Function(W0.sub(1), name='Forcing term').interpolate(Expression(fexpr))
 
-    # Set up the variational problem:
-    L = ((le - le_) * xi - Dt * g * inner(luh, grad(xi)) - coeff * f * xi
-          + inner(lu - lu_, w) + Dt * (b * inner(grad(leh), w) + leh * inner(grad(b), w))) * dx
+    # Set up the variational problem, using Crank Nicolson timestepping:
+    L = ((le - le_) * xi + inner(lu - lu_, w)
+         - Dt * g * inner(0.5 * (lu + lu_), grad(xi)) - coeff * f * xi
+         + Dt * (b * inner(grad(0.5 * (le + le_)), w) + 0.5 * (le + le_) * inner(grad(b), w))) * dx
     adjointProblem = NonlinearVariationalProblem(L, lam)
     adjointSolver = NonlinearVariationalSolver(adjointProblem, solver_parameters=op.params)
 
@@ -142,31 +140,32 @@ if not stored:
         if meshn == 0:
             meshn += rm
             mn -= 1
-            # Interpolate velocity onto P1 space and store final time data to HDF5 and PVD:
             if not stored:
                 print('t = %1.1fs' % t)
                 with DumbCheckpoint(dirName + 'hdf5/adjoint_' + stor.indexString(mn), mode=FILE_CREATE) as chk:
                     chk.store(lu)
                     chk.store(le)
                     chk.close()
-
     toc1 = clock()
     print('... done! Elapsed time for adjoint solver: %1.2fs' % (toc1 - tic1))
-    assert(mn == 0)
 
-# Initialise counters:
-dumpn = 0   # Dump counter
-mn = 0      # Mesh number
-Sn = 0      # Sum over #Elements
+# Initialise counters and constants:
+dumpn = 0                           # Dump counter
+if stored:
+    mn = 0
+else:
+    assert (mn == 0)
+Sn = 0                              # Sum over #Elements
+iStart = int(Ts / (dt * rm))        # Index corresponding to tStart
+iEnd = int(np.ceil(T / (dt * rm)))  # Index corresponding to tEnd
 tic1 = clock()
 
 # Approximate isotropic metric at boundaries of initial mesh using circumradius:
-h = Function(W0.sub(1))
-h.interpolate(CellSize(mesh0))
+h = Function(W0.sub(1)).interpolate(CellSize(mesh0))
 M_ = adap.isotropicMetric(TensorFunctionSpace(mesh0, 'CG', 1), h, bdy=True)
 
 print('\nStarting mesh adaptive forward run...')
-while mn < np.ceil(T / (dt * rm)):
+while mn < iEnd:
     tic2 = clock()
 
     # Define discontinuous spaces on the new mesh:
@@ -187,25 +186,27 @@ while mn < np.ceil(T / (dt * rm)):
         with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as ve:
             ve.load(uv_2d, name='uv_2d')
             ve.close()
+        print('    #### Interpolating...')
 
     # Create functions to hold inner product and significance data:
     ip = Function(mixedDG1.sub(1), name='Inner product')
     significance = Function(mixedDG1.sub(1), name='Significant regions')
 
     # Take maximal L2 inner product as most significant:
-    for j in range(max(i, int((Ts - T) / (dt * ndump))), 0):
+    for j in range(max(mn, iStart), iEnd):
 
         # Read in saved data from HDF5:
-        with DumbCheckpoint(dirName + 'hdf5/adjoint_' + stor.indexString(mn), mode=FILE_CREATE) as chk:
+        with DumbCheckpoint(dirName + 'hdf5/adjoint_' + stor.indexString(mn), mode=FILE_READ) as chk:
             lu = Function(W0.sub(0), name='Adjoint velocity')
             le = Function(W0.sub(1), name='Adjoint free surface')
             chk.load(lu)
             chk.load(le)
+            chk.close()
 
         # Interpolate saved data onto new mesh:
         if mn != 0:
-            print('    #### Interpolating adjoint data')
-            lu, le = interp(mesh, lu, le)
+            print('    #### Step %d / %d' % (j, iEnd - max(mn, iStart)))
+            lu, le = inte.interp(mesh, lu, le)
 
         # Multiply fields together:
         ip.dat.data[:] = lu.dat.data[:, 0] * uv_2d.dat.data[:, 0] + lu.dat.data[:, 1] * uv_2d.dat.data[:, 1]
@@ -229,16 +230,15 @@ while mn < np.ceil(T / (dt * rm)):
     else:
         H = Function(V)
         if mtype == 's':
-            spd = Function(W.sub(1))
-            spd.interpolate(sqrt(dot(u, u)))
+            spd = Function(W.sub(1)).interpolate(sqrt(dot(u, u)))
             H = adap.constructHessian(mesh, V, spd, method=hessMeth)
         elif mtype == 'f':
-            H = adap.constructHessian(mesh, V, eta, method=hessMeth)
+            H = adap.constructHessian(mesh, V, elev_2d, method=hessMeth)
         else:
             raise NotImplementedError('Cannot currently perform adjoint-based adaption with respect to two fields.')
         for k in range(mesh.topology.num_vertices()):
             H.dat.data[k] *= significance.dat.data[k]
-        M = adap.computeSteadyMetric(mesh, V, H, eta, h_min=hmin, h_max=hmax, normalise=ntype, num=numVer)
+        M = adap.computeSteadyMetric(mesh, V, H, elev_2d, h_min=hmin, h_max=hmax, normalise=ntype, num=numVer)
 
     # Gradate metric, adapt mesh and interpolate variables:
     M = adap.metricIntersection(mesh, V, M, M_, bdy=True)
@@ -272,10 +272,9 @@ while mn < np.ceil(T / (dt * rm)):
     solver_obj.next_export_t = solver_obj.i_export * options.simulation_export_time
     solver_obj.iteration = int(np.ceil(solver_obj.next_export_t / dt))
     solver_obj.simulation_time = solver_obj.iteration * dt
-    significanceFile.write(significance, time=solver_obj.simulation_time)
 
     # For next export
-    solver_obj.export_initial_state = (dirName != options.output_directory)
+    solver_obj.export_initial_state = dirName != options.output_directory
     if solver_obj.export_initial_state:
         offset = 0
     else:

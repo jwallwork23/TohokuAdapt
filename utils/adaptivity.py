@@ -165,7 +165,7 @@ def isotropicMetric(V, f, bdy=False):
     """
     # TODO: assert meshes are the same.
 
-    op = options.Opt()
+    op = options.Options()
     hmin2 = pow(op.hmin, 2)
     hmax2 = pow(op.hmax, 2)
 
@@ -279,8 +279,8 @@ def metricGradation(mesh, metric, beta=1.4, isotropic=False):
                         grownMet2[j, k] = eta2_21 * met2[j, k]
 
                 # Intersect metric with grown metric to get reduced metric:
-                redMet1 = local_metric_intersection(met1, grownMet2)
-                redMet2 = local_metric_intersection(met2, grownMet1)
+                redMet1 = localMetricIntersection(met1, grownMet2)
+                redMet2 = localMetricIntersection(met2, grownMet1)
 
             # Calculate difference in order to ascertain whether the metric is modified:
             diff = np.abs(met1[0, 0] - redMet1[0, 0]) + np.abs(met1[0, 1] - redMet1[0, 1]) \
@@ -344,6 +344,7 @@ def symmetricProduct(A, b):
     :return: product b^T * A * b.
     """
     return b[0] * A[0, 0] * b[0] + 2 * b[0] * A[0, 1] * b[1] + b[1] * A[1, 1] * b[1]
+
 
 def meshStats(mesh):
     """
