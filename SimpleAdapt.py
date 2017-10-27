@@ -12,14 +12,13 @@ import utils.options as opt
 import utils.storage as stor
 
 
-print('*************** ANISOTROPIC ADAPTIVE TSUNAMI SIMULATION ***************\n')
-
 # Define initial mesh and mesh statistics placeholders:
+print('*************** ANISOTROPIC ADAPTIVE TSUNAMI SIMULATION ***************\n')
 print('MESH ADAPTIVE solver initially defined on a mesh of')
 mesh, eta0, b = dom.TohokuDomain(int(input('coarseness (Integer in range 1-5, default 5): ') or 5))
 nEle, nVer = adap.meshStats(mesh)
 N = [nEle, nEle]    # Min/max #Elements
-print('...... mesh loaded. Initial #Vertices : %d. Initial #Elements : %d. \n' % (nVer, nEle))
+print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d. \n' % (nEle, nVer))
 # TODO: build in functionality for loading a previous state. NOTE this may involve saving the mesh to disk...
 # resume = input('Hit anything except enter to resume a previous simulation.')
 # if resume:

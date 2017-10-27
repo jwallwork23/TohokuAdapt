@@ -13,16 +13,15 @@ import utils.options as opt
 import utils.storage as stor
 
 
-print('************** ADJOINT-BASED ADAPTIVE TSUNAMI SIMULATION **************\n')
-
 # Define initial mesh and mesh statistics placeholders:
+print('************** ADJOINT-BASED ADAPTIVE TSUNAMI SIMULATION **************\n')
 print('ADJOINT-GUIDED mesh adaptive solver initially defined on a mesh of')
 mesh, eta0, b = dom.TohokuDomain(int(input('coarseness (Integer in range 1-5, default 4): ') or 4))
 nEle, nVer = adap.meshStats(mesh)
 N = [nEle, nEle]    # Min/max #Elements
 mesh0 = mesh
 W0 = VectorFunctionSpace(mesh0, 'DG', 1) * FunctionSpace(mesh0, 'DG', 1)
-print('...... mesh loaded. Initial #Vertices : %d. Initial #Elements : %d.' % (nVer, nEle))
+print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d.' % (nEle, nVer))
 
 # Get default parameter values and check CFL criterion:
 op = opt.Options(vscale=0.2, rm=60)

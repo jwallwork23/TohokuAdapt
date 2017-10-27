@@ -29,7 +29,7 @@ def constructHessian(mesh, V, sol, op=options.Options()):
         Lh = (inner(tau, H) + inner(div(tau), grad(sol))) * dx
         Lh -= (tau[0, 1] * nhat[1] * sol.dx(0) + tau[1, 0] * nhat[0] * sol.dx(1)) * ds
         Lh -= (tau[0, 0] * nhat[1] * sol.dx(0) + tau[1, 1] * nhat[0] * sol.dx(1)) * ds  # Term not in Firedrake tutorial
-    elif op.mtype == 'dL2':
+    else:
         W = VectorFunctionSpace(mesh, 'CG', 1)
         g = Function(W)
         psi = TestFunction(W)
@@ -38,8 +38,6 @@ def constructHessian(mesh, V, sol, op=options.Options()):
         Lh = (inner(tau, H) + inner(div(tau), g)) * dx
         Lh -= (tau[0, 1] * nhat[1] * g[0] + tau[1, 0] * nhat[0] * g[1]) * ds
         Lh -= (tau[0, 0] * nhat[1] * g[0] + tau[1, 1] * nhat[0] * g[1]) * ds
-    else:
-        raise ValueError('Hessian reconstruction method ``%s`` not recognised' % method)
     H_prob = NonlinearVariationalProblem(Lh, H)
     H_solv = NonlinearVariationalSolver(H_prob, solver_parameters=params)
     H_solv.solve()

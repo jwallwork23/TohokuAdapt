@@ -38,15 +38,48 @@ class Options:
 
         # Adaptivity parameters
         self.vscale = vscale
+        try:
+            assert vscale > 0
+        except:
+            raise ValueError('Invalid value for scaling parameter. vscale > 0 is required.')
         self.hmin = hmin
         self.hmax = hmax
+        try:
+            assert (hmin > 0) & (hmax > hmin)
+        except:
+            raise ValueError('Invalid min/max element sizes. hmax > hmin > 0 is required.')
         self.a = a
+        try:
+            assert a > 0
+        except:
+            raise ValueError('Invalid anisotropy value. a > 0 is required.')
         self.ntype = ntype
+        try:
+            assert ntype in ('lp', 'manual')
+        except:
+            raise ValueError('Normalisation approach ``%s`` not recognised.' % ntype)
         self.p = p
+        try:
+            assert p > 0
+        except:
+            raise ValueError('Invalid value for p. p > 0 is required.')
         self.mtype = mtype
+        try:
+            assert mtype in ('f', 's', 'b')
+        except:
+            raise ValueError('Field for adaption ``%s`` not recognised.' % mtype)
         self.iso = iso
+        assert type(iso) == bool
         self.hessMeth = hessMeth
+        try:
+            assert hessMeth in ('dL2', 'parts')
+        except:
+            raise ValueError('Hessian reconstruction method ``%s`` not recognised.' % hessMeth)
         self.beta = beta
+        try:
+            assert beta > 1
+        except:
+            raise ValueError('Invalid value for scaling parameter. beta > 1 is required.')
 
         # Physical parameters
         self.g = 9.81           # Gravitational acceleration (m s^{-2})
