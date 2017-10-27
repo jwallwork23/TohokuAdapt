@@ -12,7 +12,7 @@ def indexString(index):
     :return: five-digit string form of index.
     """
     indexStr = str(index)
-    for i in range(5 - len(indexStr))):
+    for i in range(5 - len(indexStr)):
         indexStr = '0' + indexStr
     return indexStr
 

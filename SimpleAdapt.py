@@ -105,11 +105,7 @@ while mn < np.ceil(T / (dt * rm)):
     options.export_diagnostics = True
     options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
     field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
-    e = exporter.ExportManager(dirName + 'hdf5',
-                               ['elev_2d', 'uv_2d'],
-                               field_dict,
-                               field_metadata,
-                               export_type='hdf5')
+    e = exporter.ExportManager(dirName + 'hdf5', ['elev_2d', 'uv_2d'], field_dict, field_metadata, export_type='hdf5')
     solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
 
     # Timestepper bookkeeping for export time step

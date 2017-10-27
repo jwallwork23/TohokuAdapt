@@ -43,14 +43,12 @@ rm = op.rm
 stored = bool(input('Hit anything but enter if adjoint data is already stored: '))
 
 if not stored:
-    # Initalise counters
+    # Initalise counters and forcing switch
     t = T
     mn = int(T / (rm * dt))
     dumpn = ndump
     meshn = rm
     tic1 = clock()
-
-    # Forcing switch
     coeff = Constant(1.)
     switch = True
 
@@ -73,24 +71,20 @@ if not stored:
     adjointFile = File(dirName + 'adjoint.pvd')
     adjointFile.write(lu, le, time=T)
 
-    # Establish test functions
-    w, xi = TestFunctions(W0)
-    lu, le = split(lam)
-    lu_, le_ = split(lam_)
-
     # Establish (smoothened) indicator function for adjoint equations
     fexpr = '(x[0] > 490e3) & (x[0] < 640e3) & (x[1] > 4160e3) & (x[1] < 4360e3) ? ' \
             'exp(1. / (pow(x[0] - 565e3, 2) - pow(75e3, 2))) * exp(1. / (pow(x[1] - 4260e3, 2) - pow(100e3, 2))) : 0.'
     f = Function(W0.sub(1), name='Forcing term').interpolate(Expression(fexpr))
 
     # Set up the variational problem, using Crank Nicolson timestepping
+    w, xi = TestFunctions(W0)
+    lu, le = split(lam)
+    lu_, le_ = split(lam_)
     L = ((le - le_) * xi + inner(lu - lu_, w)
          - Dt * op.g * inner(0.5 * (lu + lu_), grad(xi)) - coeff * f * xi
          + Dt * (b * inner(grad(0.5 * (le + le_)), w) + 0.5 * (le + le_) * inner(grad(b), w))) * dx
     adjointProblem = NonlinearVariationalProblem(L, lam)
     adjointSolver = NonlinearVariationalSolver(adjointProblem, solver_parameters=op.params)
-
-    # Split to access data
     lu, le = lam.split()
     lu_, le_ = lam_.split()
 
@@ -228,11 +222,7 @@ while mn < iEnd:
     options.export_diagnostics = True
     options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
     field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
-    e = exporter.ExportManager(dirName + 'hdf5',
-                               ['elev_2d', 'uv_2d'],
-                               field_dict,
-                               field_metadata,
-                               export_type='hdf5')
+    e = exporter.ExportManager(dirName + 'hdf5', ['elev_2d', 'uv_2d'], field_dict, field_metadata, export_type='hdf5')
     solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
 
     # Timestepper bookkeeping for export time step
