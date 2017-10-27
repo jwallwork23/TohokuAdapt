@@ -60,7 +60,7 @@ def constructHessian(mesh, V, sol, method='dL2'):
     return H
 
 
-def computeSteadyMetric(mesh, V, H, sol, h_min=0.005, h_max=0.1, a=100., normalise='lp', p=2, num=1000., ieps=1000.):
+def computeSteadyMetric(mesh, V, H, sol, hmin=0.005, hmax=0.1, a=100., normalise='lp', p=2, num=1000., ieps=1000.):
     """
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``computeSteadyMetric``, from 
     ``adapt.py``, 2016.
@@ -69,8 +69,8 @@ def computeSteadyMetric(mesh, V, H, sol, h_min=0.005, h_max=0.1, a=100., normali
     :param V: TensorFunctionSpace defined on ``mesh``.
     :param H: reconstructed Hessian, usually chosen to be associated with ``sol``.
     :param sol: P1 solution field defined on ``mesh``.
-    :param h_min: minimum tolerated side-lengths.
-    :param h_max: maximum tolerated side-lengths.
+    :param hmin: minimum tolerated side-lengths.
+    :param hmax: maximum tolerated side-lengths.
     :param a: maximum tolerated aspect ratio.
     :param normalise: mode of normalisation; either a manual rescaling ('manual') or an Lp approach ('Lp').
     :param p: norm order in the Lp normalisation approach, where ``p => 1`` and ``p = infty`` is an option.
@@ -80,8 +80,8 @@ def computeSteadyMetric(mesh, V, H, sol, h_min=0.005, h_max=0.1, a=100., normali
     """
 
     ia2 = 1. / pow(a, 2)  # Inverse square aspect ratio
-    ihmin2 = 1. / pow(h_min, 2)  # Inverse square minimal side-length
-    ihmax2 = 1. / pow(h_max, 2)  # Inverse square maximal side-length
+    ihmin2 = 1. / pow(hmin, 2)  # Inverse square minimal side-length
+    ihmax2 = 1. / pow(hmax, 2)  # Inverse square maximal side-length
     M = Function(V)
 
     if normalise == 'manual':
@@ -156,30 +156,25 @@ def computeSteadyMetric(mesh, V, H, sol, h_min=0.005, h_max=0.1, a=100., normali
     return M
 
 
-def isotropicMetric(V, f, bdy=False):
+def isotropicMetric(V, f, bdy=False, op=options.Options()):
     """
     :param V: tensor function space on which metric will be defined.
     :param f: (scalar) function to adapt to.
     :param bdy: toggle boundary metric.
+    :param op: Options class object providing min/max cell size values.
     :return: isotropic metric corresponding to the scalar function.
     """
-    # TODO: assert meshes are the same.
-
-    op = options.Options()
     hmin2 = pow(op.hmin, 2)
     hmax2 = pow(op.hmax, 2)
-
     M = Function(V)
-    if bdy:
-        for i in DirichletBC(V, 0, 'on_boundary').nodes:
-            if2 = 1. / max(hmin2, min(pow(f.dat.data[i], 2), hmax2))
-            M.dat.data[i][0, 0] = if2
-            M.dat.data[i][1, 1] = if2
-    else:
-        for i in range(len(f.dat.data)):
-            if2 = 1. / max(hmin2, min(pow(f.dat.data[i], 2), hmax2))
-            M.dat.data[i][0, 0] = if2
-            M.dat.data[i][1, 1] = if2
+    try:
+        assert(len(M.dat.data[0]) == len(f.dat.data))
+    except:
+        raise NotImplementedError('CG Tensor field and DG scalar field are currently at odds.')
+    for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(len(f.dat.data)):
+        if2 = 1. / max(hmin2, min(pow(f.dat.data[i], 2), hmax2))
+        M.dat.data[i][0, 0] = if2
+        M.dat.data[i][1, 1] = if2
     return M
 
 
@@ -191,12 +186,10 @@ def localMetricIntersection(M1, M2):
     :param M2: second metric to be intersected.
     :return: intersection of metrics M1 and M2.
     """
-    iM1 = la.inv(M1)
-    Mbar = np.transpose(sla.sqrtm(iM1)) * M2 * sla.sqrtm(iM1)
-    lam, v = la.eig(Mbar)
-    M = v * [[max(lam[0], 1), 0], [0, max(lam[1], 1)]] * np.transpose(v)
-
-    return np.transpose(sla.sqrtm(M1)) * M * sla.sqrtm(M1)
+    sqM1 = sla.sqrtm(M1)
+    sqiM1 = la.inv(sqM1)    # Note inverse and square root commute whenever both are defined
+    lam, v = la.eig(np.transpose(sqiM1) * M2 * sqiM1)
+    return np.transpose(sqM1) * v * [[max(lam[0], 1), 0], [0, max(lam[1], 1)]] * np.transpose(v) * sqM1
 
 
 def metricGradation(mesh, metric, beta=1.4, isotropic=False):
@@ -311,29 +304,20 @@ def metricGradation(mesh, metric, beta=1.4, isotropic=False):
 
 def metricIntersection(mesh, V, M1, M2, bdy=False):
     """
-    Intersect two metric fields.
-
     :param mesh: current mesh on which variables are defined.
-    :param V: TensorFunctionSpace defined on ``mesh``.
+    :param V: TensorFunctionSpace defined on current mesh.
     :param M1: first metric to be intersected.
     :param M2: second metric to be intersected.
     :param bdy: when True, intersection with M2 only contributes on the domain boundary.
     :return: intersection of metrics M1 and M2.
     """
     M12 = Function(V)
-    M12.assign(M1)
-    if bdy:
-        indexSet = DirichletBC(V, 0, 'on_boundary').nodes
-    else:
-        indexSet = range(mesh.topology.num_vertices())
-    for i in indexSet:
+    for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(mesh.topology.num_vertices()):
         M = M1.dat.data[i]
         iM = la.inv(M)
-        Mbar = np.transpose(sla.sqrtm(iM)) * M2.dat.data[i] * sla.sqrtm(iM)
-        lam, v = la.eig(Mbar)
+        lam, v = la.eig(np.transpose(sla.sqrtm(iM)) * M2.dat.data[i] * sla.sqrtm(iM))
         M12.dat.data[i] = v * [[max(lam[0], 1), 0], [0, max(lam[1], 1)]] * np.transpose(v)
         M12.dat.data[i] = np.transpose(sla.sqrtm(M)) * M12.dat.data[i] * sla.sqrtm(M)
-
     return M12
 
 
@@ -349,11 +333,9 @@ def symmetricProduct(A, b):
 def meshStats(mesh):
     """
     :param mesh: current mesh.
-    :return: number of elements and vertices on the mesh.
+    :return: number of cells and vertices on the mesh.
     """
     plex = mesh._plex
-    eStart, eEnd = plex.getHeightStratum(0)
+    cStart, cEnd = plex.getHeightStratum(0)
     vStart, vEnd = plex.getDepthStratum(0)
-    nEle = eEnd - eStart
-    nVer = vEnd - vStart
-    return nEle, nVer
+    return cEnd - cStart, vEnd - vStart

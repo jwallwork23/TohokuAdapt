@@ -24,29 +24,15 @@ mesh0 = mesh
 W0 = VectorFunctionSpace(mesh0, 'DG', 1) * FunctionSpace(mesh0, 'DG', 1)
 print('...... mesh loaded. Initial #Vertices : %d. Initial #Elements : %d.' % (nVer, nEle))
 
-# Get default adaptivity parameter values:
-op = opt.Options(vscale=0.2, mtype='f', rm=60)
-numVer = op.vscale * nVer
-hmin = op.hmin
-hmax = op.hmax
-hmin2 = pow(hmin, 2)      # Square minimal side-length
-hmax2 = pow(hmax, 2)      # Square maximal side-length
-ntype = op.ntype
-mtype = op.mtype
-beta = op.beta
+# Get default parameter values and check CFL criterion:
+op = opt.Options(vscale=0.2, rm=60)
+nVerT = op.vscale * nVer    # Target #Vertices
 iso = op.iso
-if not iso:
-    hessMeth = op.hessMeth
-
-# Get physical parameters:
-g = op.g
-
-# Get solver parameters:
 T = op.T
 Ts = op.Ts
 dt = op.dt
 Dt = Constant(dt)
-cdt = hmin / np.sqrt(g * max(b.dat.data))
+cdt = op.hmin / np.sqrt(op.g * max(b.dat.data))
 if dt > cdt:
     print('WARNING: chosen timestep dt = %.2fs exceeds recommended value of %.2fs' % (dt, cdt))
     if bool(input('Hit anything except enter if happy to proceed.')) or False:
@@ -103,7 +89,7 @@ if not stored:
 
     # Set up the variational problem, using Crank Nicolson timestepping:
     L = ((le - le_) * xi + inner(lu - lu_, w)
-         - Dt * g * inner(0.5 * (lu + lu_), grad(xi)) - coeff * f * xi
+         - Dt * op.g * inner(0.5 * (lu + lu_), grad(xi)) - coeff * f * xi
          + Dt * (b * inner(grad(0.5 * (le + le_)), w) + 0.5 * (le + le_) * inner(grad(b), w))) * dx
     adjointProblem = NonlinearVariationalProblem(L, lam)
     adjointSolver = NonlinearVariationalSolver(adjointProblem, solver_parameters=op.params)
@@ -223,20 +209,20 @@ while mn < iEnd:
         M = adap.isotropicMetric(V, significance)
     else:
         H = Function(V)
-        if mtype == 's':
+        if op.mtype == 's':
             spd = Function(W.sub(1)).interpolate(sqrt(dot(u, u)))
-            H = adap.constructHessian(mesh, V, spd, method=hessMeth)
-        elif mtype == 'f':
-            H = adap.constructHessian(mesh, V, elev_2d, method=hessMeth)
+            H = adap.constructHessian(mesh, V, spd, method=op.hessMeth)
+        elif op.mtype == 'f':
+            H = adap.constructHessian(mesh, V, elev_2d, method=op.hessMeth)
         else:
             raise NotImplementedError('Cannot currently perform adjoint-based adaption with respect to two fields.')
         for k in range(mesh.topology.num_vertices()):
             H.dat.data[k] *= significance.dat.data[k]
-        M = adap.computeSteadyMetric(mesh, V, H, elev_2d, h_min=hmin, h_max=hmax, normalise=ntype, num=numVer)
+        M = adap.computeSteadyMetric(mesh, V, H, elev_2d, hmin=op.hmin, hmax=op.hmax, normalise=op.ntype, num=nVerT)
 
     # Gradate metric, adapt mesh and interpolate variables:
     M = adap.metricIntersection(mesh, V, M, M_, bdy=True)
-    adap.metricGradation(mesh, M, beta, isotropic=iso)
+    adap.metricGradation(mesh, M, op.beta, isotropic=iso)
     adaptor = AnisotropicAdaptation(mesh, M)
     mesh = adaptor.adapted_mesh
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)

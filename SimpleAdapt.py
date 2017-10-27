@@ -25,26 +25,13 @@ print('...... mesh loaded. Initial #Vertices : %d. Initial #Elements : %d. \n' %
 # if resume:
 #     iStart = int(input('Simulation starting index (default i = 0)?: ')) or 0
 
-# Get default adaptivity parameter values:
-op = opt.Options()
-nVerTarget = op.vscale * nVer
-hmin = op.hmin
-hmax = op.hmax
-hmin2 = pow(hmin, 2)      # Square minimal side-length
-hmax2 = pow(hmax, 2)      # Square maximal side-length
-ntype = op.ntype
-mtype = op.mtype
+# Get default parameter values and check CFL criterion:
+op = opt.Options(mtype='b')
+nVerT = op.vscale * nVer    # Target #Vertices
 iso = op.iso
-if not iso:
-    hessMeth = op.hessMeth
-
-# Get physical parameters:
-g = op.g
-
-# Get Courant number adjusted timestepping parameters:
 T = op.T
 dt = op.dt
-cdt = hmin / np.sqrt(g * max(b.dat.data))
+cdt = op.hmin / np.sqrt(op.g * max(b.dat.data))
 if dt > cdt:
     print('WARNING: chosen timestep dt = %.2fs exceeds recommended value of %.2fs' % (dt, cdt))
     if bool(input('Hit anything except enter if happy to proceed.')) or False:
@@ -87,20 +74,20 @@ while mn < np.ceil(T / (dt * rm)):
 
     # Compute Hessian and metric:
     V = TensorFunctionSpace(mesh, 'CG', 1)
-    if mtype != 's':
+    if op.mtype != 's':
         if iso:
             M = adap.isotropicMetric(V, elev_2d)
         else:
-            H = adap.constructHessian(mesh, V, elev_2d, method=hessMeth)
-            M = adap.computeSteadyMetric(mesh, V, H, elev_2d, h_min=hmin, h_max=hmax, num=nVerTarget, normalise=ntype)
-    if mtype != 'f':
+            H = adap.constructHessian(mesh, V, elev_2d, method=op.hessMeth)
+            M = adap.computeSteadyMetric(mesh, V, H, elev_2d, hmin=op.hmin, hmax=op.hmax, num=nVerT, normalise=op.ntype)
+    if op.mtype != 'f':
         spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
         if iso:
             M2 = adap.isotropicMetric(V, spd)
         else:
-            H = adap.constructHessian(mesh, V, elev_2d, method=hessMeth)
-            M2 = adap.computeSteadyMetric(mesh, V, H, spd, h_min=hmin, h_max=hmax, num=nVerTarget, normalise=ntype)
-        if mtype == 'b':
+            H = adap.constructHessian(mesh, V, elev_2d, method=op.hessMeth)
+            M2 = adap.computeSteadyMetric(mesh, V, H, spd, hmin=op.hmin, hmax=op.hmax, num=nVerT, normalise=op.ntype)
+        if op.mtype == 'b':
             M = adap.metricIntersection(mesh, V, M, M2)
         else:
             M = M2
