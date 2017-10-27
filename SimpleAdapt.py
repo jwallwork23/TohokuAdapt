@@ -27,7 +27,7 @@ print('...... mesh loaded. Initial #Vertices : %d. Initial #Elements : %d. \n' %
 
 # Get default adaptivity parameter values:
 op = opt.Options()
-numVer = op.vscale * nVer
+nVerTarget = op.vscale * nVer
 hmin = op.hmin
 hmax = op.hmax
 hmin2 = pow(hmin, 2)      # Square minimal side-length
@@ -87,16 +87,23 @@ while mn < np.ceil(T / (dt * rm)):
 
     # Compute Hessian and metric:
     V = TensorFunctionSpace(mesh, 'CG', 1)
-    fAdapt = Function(W.sub(1))
-    if mtype == 'f':
-        fAdapt.interpolate(elev_2d)
-    elif mtype == 's':
-        fAdapt.interpolate(sqrt(dot(uv_2d, uv_2d)))
-    if iso:
-        M = adap.isotropicMetric(V, fAdapt)
-    else:
-        H = adap.constructHessian(mesh, V, fAdapt, method=hessMeth)
-        M = adap.computeSteadyMetric(mesh, V, H, fAdapt, h_min=hmin, h_max=hmax, num=numVer, normalise=ntype)
+    if mtype != 's':
+        if iso:
+            M = adap.isotropicMetric(V, elev_2d)
+        else:
+            H = adap.constructHessian(mesh, V, elev_2d, method=hessMeth)
+            M = adap.computeSteadyMetric(mesh, V, H, elev_2d, h_min=hmin, h_max=hmax, num=nVerTarget, normalise=ntype)
+    if mtype != 'f':
+        spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
+        if iso:
+            M2 = adap.isotropicMetric(V, spd)
+        else:
+            H = adap.constructHessian(mesh, V, elev_2d, method=hessMeth)
+            M2 = adap.computeSteadyMetric(mesh, V, H, spd, h_min=hmin, h_max=hmax, num=nVerTarget, normalise=ntype)
+        if mtype == 'b':
+            M = adap.metricIntersection(mesh, V, M, M2)
+        else:
+            M = M2
 
     # Adapt mesh with respect to computed metric field and interpolate functions onto new mesh:
     adaptor = AnisotropicAdaptation(mesh, M)

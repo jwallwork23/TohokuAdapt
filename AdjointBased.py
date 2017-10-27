@@ -114,8 +114,6 @@ if not stored:
 
     print('\nStarting fixed resolution adjoint run...')
     while t > 0.5 * dt:
-
-        # Increment counters:
         t -= dt
         dumpn -= 1
         meshn -= 1
@@ -127,16 +125,12 @@ if not stored:
             switch = False
             coeff.assign(0.)
 
-    # Solve the problem and update:
+        # Solve the problem, update variables and dump to vtu and HDF5:
         adjointSolver.solve()
         lam_.assign(lam)
-
-        # Dump to vtu:
         if dumpn == 0:
             dumpn += ndump
             adjointFile.write(lu, le, time=t)
-
-        # Dump to HDF5:
         if meshn == 0:
             meshn += rm
             mn -= 1
@@ -186,7 +180,7 @@ while mn < iEnd:
         with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as ve:
             ve.load(uv_2d, name='uv_2d')
             ve.close()
-        print('    #### Interpolating...')
+        print('#### Interpolating adjoint data...')
 
     # Create functions to hold inner product and significance data:
     ip = Function(mixedDG1.sub(1), name='Inner product')
@@ -292,7 +286,7 @@ while mn < iEnd:
     N = [min(nEle, N[0]), max(nEle, N[1])]
     Sn += nEle
     mn += 1
-    print('\n************ Adaption step %d **************' % mn)
+    print('\n************************** Adaption step %d ****************************' % mn)
     print('Time = %1.2f mins / %1.1f mins' % (mn * rm * dt / 60., T / 60.))
     print('Number of vertices after adaption step %d: ' % mn, nEle)
     print('#Elements after adaption step %d: %d' % (mn, nEle))
