@@ -104,7 +104,6 @@ u, eta = q.split()
 # Set up auxiliary functions and output files
 rk_01 = Function(W.sub(0), name="Element residual xy")
 rk_2 = Function(W.sub(1), name="Element residual z")
-rb = Function(W.sub(1), name="Boundary residual")
 hk = Function(W.sub(1), name="Element size").interpolate(CellSize(mesh))
 qfile = File("plots/adjointBased/explicit/forward.pvd")
 qfile.write(u, eta, time=t)
@@ -132,7 +131,9 @@ while mn < int(T / dt):
     rk_2.interpolate(eta_ - eta - Dt * div(b * uh))
     rho = assemble(v * sqrt(dot(rk_01, rk_01) + rk_2 * rk_2) / CellVolume(mesh) * dx)
 
-    # Get boundary residual     TODO: this only currently integrates over domain the boundary, NOT cell boundaries
+    # Get boundary residual
+    # TODO: this only currently integrates over domain the boundary, NOT cell boundaries
+    # TODO: also, need multiply by normed bdy size
     rho += assemble(v * Dt * b * dot(uh, n) * ds)
     lambdaNorm = assemble(v * sqrt((dot(lu, lu) + le * le)) * dx)
     rho *= lambdaNorm

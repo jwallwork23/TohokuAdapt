@@ -91,6 +91,7 @@ while mn < np.ceil(T / (dt * rm)):
     # Get solver parameter values and construct solver
     solver_obj = solver2d.FlowSolver2d(mesh, b)
     options = solver_obj.options
+    options.use_nonlinear_equations = False
     options.simulation_export_time = dt * ndump
     options.simulation_end_time = (mn + 1) * dt * rm
     options.timestepper_type = op.timestepper
