@@ -12,6 +12,7 @@ print('...... mesh loaded. #Elements : %d. #Vertices : %d. \n' % adap.meshStats(
 
 # Get solver parameter values and construct solver, with default dg1-dg1 space
 op = opt.Options()
+op.checkCFL(b)
 solver_obj = solver2d.FlowSolver2d(mesh, b)
 options = solver_obj.options
 options.simulation_export_time = op.dt * op.ndump

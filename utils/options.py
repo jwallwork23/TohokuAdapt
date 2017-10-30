@@ -1,3 +1,5 @@
+import numpy as np
+
 from . import conversion
 
 
@@ -112,3 +114,13 @@ class Options:
         """
         E, N, zn, zl = conversion.from_latlon(self.glatlon[gauge][0], self.glatlon[gauge][1], force_zone_number=54)
         return E, N
+
+    def checkCFL(self, b):
+        """
+        :param b: bathymetry profile considered.
+        """
+        cdt = self.hmin / np.sqrt(self.g * max(b.dat.data))
+        if self.dt > cdt:
+            print('WARNING: chosen timestep dt = %.2fs exceeds recommended value of %.2fs' % (dt, cdt))
+            if input('Hit anything except enter if happy to proceed.'):
+                exit(23)

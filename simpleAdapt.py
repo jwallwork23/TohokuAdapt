@@ -33,11 +33,7 @@ if iso:
     dirName += 'isotropic/'
 T = op.T
 dt = op.dt
-cdt = op.hmin / np.sqrt(op.g * max(b.dat.data))
-if dt > cdt:
-    print('WARNING: chosen timestep dt = %.2fs exceeds recommended value of %.2fs' % (dt, cdt))
-    if input('Hit anything except enter if happy to proceed.'):
-        exit(23)
+op.checkCFL(b)
 ndump = op.ndump
 rm = op.rm
 
