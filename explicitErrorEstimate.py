@@ -1,170 +1,131 @@
 from firedrake import *
-
 import numpy as np
-from time import clock
 
-import utils.adaptivity as adap
-import utils.domain as dom
-import utils.interpolation as inte
-import utils.options as opt
-import utils.storage as stor
-
-
-# Define initial mesh and mesh statistics placeholders
-# print('************** ADJOINT-BASED ADAPTIVE TSUNAMI SIMULATION **************\n')
-# print('ADJOINT-GUIDED mesh adaptive solver initially defined on a mesh of')
-mesh, eta0, b = dom.TohokuDomain(int(input('coarseness (Integer in range 1-5, default 4): ') or 4))
-nEle, nVer = adap.meshStats(mesh)
-N = [nEle, nEle]    # Min/max #Elements
-mesh0 = mesh
-W0 = VectorFunctionSpace(mesh0, 'CG', 2) * FunctionSpace(mesh0, 'CG', 1)
-print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d.' % (nEle, nVer))
-
-# Get default parameter values and check CFL criterion
-op = opt.Options(vscale=0.2, rm=60)
-nVerT = op.vscale * nVer    # Target #Vertices
-iso = op.iso
-dirName = 'plots/adjointBased/explicit/'
-if iso:
-    dirName += 'isotropic/'
-g = op.g
-T = op.T
-dt = op.dt
+# Set parameter values
+depth = 0.1
+T = 2.5
+g = 9.81
+dt = 0.05
 Dt = Constant(dt)
-op.checkCFL(b)
-ndump = op.ndump
-rm = op.rm
-stored = bool(input('Hit anything but enter if adjoint data is already stored: '))
-#
-# if not stored:
-#     # Initalise counters and forcing switch
-#     t = T
-#     mn = int(T / (rm * dt))
-#     dumpn = ndump
-#     meshn = rm
-#     tic1 = clock()
-#     coeff = Constant(1.)
-#     switch = True
-#
-#     # Establish adjoint variables and apply initial conditions
-#     lam_ = Function(W0)
-#     lu_, le_ = lam_.split()
-#     lu_.interpolate(Expression([0, 0]))
-#     le_.interpolate(Expression(0))
-#     lam = Function(W0).assign(lam_)
-#     lu, le = lam.split()
-#     lu.rename('Adjoint velocity')
-#     le.rename('Adjoint free surface')
-#
-#     # Store final time data to HDF5 and PVD
-#     with DumbCheckpoint(dirName + 'hdf5/adjoint_' + stor.indexString(mn), mode=FILE_CREATE) as chk:
-#         chk.store(lu)
-#         chk.store(le)
-#         chk.close()
-#     adjointFile = File(dirName + 'adjoint.pvd')
-#     adjointFile.write(lu, le, time=T)
-#
-#     # Establish (smoothened) indicator function for adjoint equations
-#     fexpr = '(x[0] > 490e3) & (x[0] < 640e3) & (x[1] > 4160e3) & (x[1] < 4360e3) ? ' \
-#             'exp(1. / (pow(x[0] - 565e3, 2) - pow(75e3, 2))) * exp(1. / (pow(x[1] - 4260e3, 2) - pow(100e3, 2))) : 0.'
-#     f = Function(W0.sub(1), name='Forcing term').interpolate(Expression(fexpr))
-#
-#     # Set up the variational problem, using Crank Nicolson timestepping
-#     w, xi = TestFunctions(W0)
-#     lu, le = split(lam)
-#     lu_, le_ = split(lam_)
-#     L = ((le - le_) * xi + inner(lu - lu_, w)
-#          - Dt * op.g * inner(0.5 * (lu + lu_), grad(xi)) - coeff * f * xi
-#          + Dt * (b * inner(grad(0.5 * (le + le_)), w) + 0.5 * (le + le_) * inner(grad(b), w))) * dx
-#     adjointProblem = NonlinearVariationalProblem(L, lam)
-#     adjointSolver = NonlinearVariationalSolver(adjointProblem, solver_parameters=op.params)
-#     lu, le = lam.split()
-#     lu_, le_ = lam_.split()
-#
-#     print('\nStarting fixed resolution adjoint run...')
-#     while t > 0.5 * dt:
-#         t -= dt
-#         dumpn -= 1
-#         meshn -= 1
-#
-#         # Modify forcing term
-#         if (t < op.Ts + 1.5 * dt) & switch:
-#             coeff.assign(0.5)
-#         elif (t < op.Ts + 0.5 * dt) & switch:
-#             switch = False
-#             coeff.assign(0.)
-#
-#         # Solve the problem, update variables and dump to vtu and HDF5
-#         adjointSolver.solve()
-#         lam_.assign(lam)
-#         if dumpn == 0:
-#             dumpn += ndump
-#             adjointFile.write(lu, le, time=t)
-#         if meshn == 0:
-#             meshn += rm
-#             mn -= 1
-#             if not stored:
-#                 print('t = %1.1fs' % t)
-#                 with DumbCheckpoint(dirName + 'hdf5/adjoint_' + stor.indexString(mn), mode=FILE_CREATE) as chk:
-#                     chk.store(lu)
-#                     chk.store(le)
-#                     chk.close()
-#     toc1 = clock()
-#     print('... done! Elapsed time for adjoint solver: %1.2fs' % (toc1 - tic1))
 
+# Define mesh and function space
+n = 32
+lx = 4
+mesh = SquareMesh(lx * n, lx * n, lx, lx)
+x, y = SpatialCoordinate(mesh)
+W = VectorFunctionSpace(mesh, "CG", 2) * FunctionSpace(mesh, "CG", 1)
+b = Function(W.sub(1), name="Bathymetry").assign(depth)
 
-t = 0.
+# Initalise counters
+t = T
+mn = int(T / dt)
 
+# Solver parameters
+params = {'mat_type': 'matfree',
+          'snes_type': 'ksponly',
+          'pc_type': 'python',
+          'pc_python_type': 'firedrake.AssembledPC',
+          'assembled_pc_type': 'lu',
+          'snes_lag_preconditioner': -1,
+          'snes_lag_preconditioner_persists': True}
+
+# Establish adjoint variables and apply initial conditions
+lam_ = Function(W)
+lu_, le_ = lam_.split()
+lu_.interpolate(Expression([0, 0]))
+le_.interpolate(Expression(0))
+lam = Function(W).assign(lam_)
+lu, le = lam.split()
+lu.rename("Adjoint velocity")
+le.rename("Adjoint free surface")
+
+# Store final time data to HDF5 and PVD
+with DumbCheckpoint("plots/adjointBased/explicit/hdf5/adjoint_" + str(mn), mode=FILE_CREATE) as chk:
+    chk.store(lu)
+    chk.store(le)
+    chk.close()
+adjointFile = File("plots/adjointBased/explicit/adjoint.pvd")
+adjointFile.write(lu, le, time=T)
+
+# Establish (smoothened) indicator function for adjoint equations
+fexpr = "(x[0] >= 0.) & (x[0] < 0.25) & (x[1] > 1.8) & (x[1] < 2.2) ? 1e-3 : 0."
+f = Function(W.sub(1), name="Forcing term").interpolate(Expression(fexpr))
+
+# Set up the variational problem, using Crank Nicolson timestepping
+w, xi = TestFunctions(W)
+lu, le = split(lam)
+lu_, le_ = split(lam_)
+L = ((le - le_) * xi + inner(lu - lu_, w)
+     - Dt * g * inner(0.5 * (lu + lu_), grad(xi)) - f * xi
+     + Dt * (b * inner(grad(0.5 * (le + le_)), w) + 0.5 * (le + le_) * inner(grad(b), w))) * dx
+adjointProblem = NonlinearVariationalProblem(L, lam)
+adjointSolver = NonlinearVariationalSolver(adjointProblem, solver_parameters=params)
+lu, le = lam.split()
+lu_, le_ = lam_.split()
+
+while mn > 0:
+    t -= dt
+    mn -= 1
+    print("mn = %3d, t = %5.2fs" % (mn, t))
+
+    # Solve the problem, update variables and dump to vtu and HDF5
+    adjointSolver.solve()
+    lam_.assign(lam)
+    adjointFile.write(lu, le, time=t)
+    with DumbCheckpoint("plots/adjointBased/explicit/hdf5/adjoint_" + str(mn), mode=FILE_CREATE) as chk:
+        chk.store(lu)
+        chk.store(le)
+        chk.close()
+
+assert(mn == 0)
 
 # Initialise variables and specify bathymetry
-q_ = Function(W0)
+q_ = Function(W)
 u_, eta_ = q_.split()
 u_.interpolate(Expression([0, 0]))
-eta_.interpolate(eta0)
-q = Function(W0).assign(q_)
+eta_.interpolate(1e-3 * exp( - (pow(x - 2., 2) + pow(y - 2., 2)) / 0.04))
+q = Function(W).assign(q_)
 u, eta = q.split()
 u.rename("Fluid velocity")
 eta.rename("Free surface displacement")
 
 # Establish variational problem
-v, ze = TestFunctions(W0)
+v, ze = TestFunctions(W)
 u, eta = split(q)
 u_, eta_ = split(q_)
 uh = 0.5 * (u + u_)
 etah = 0.5 * (eta + eta_)
-L = (ze * (eta - eta_) - Dt * inner(b * uh, grad(ze))
-     + inner(u - u_, v) + Dt * g * (inner(grad(etah), v))) * dx
+L = (ze * (eta - eta_) - Dt * inner(b * uh, grad(ze)) + inner(u - u_, v) + Dt * g * (inner(grad(etah), v))) * dx
 pde = NonlinearVariationalProblem(L, q)
-pde_solve = NonlinearVariationalSolver(pde, solver_parameters={'mat_type': 'matfree',
-                                                               'snes_type': 'ksponly',
-                                                               'pc_type': 'python',
-                                                               'pc_python_type': 'firedrake.AssembledPC',
-                                                               'assembled_pc_type': 'lu',
-                                                               'snes_lag_preconditioner': -1,
-                                                               'snes_lag_preconditioner_persists': True})
+pde_solve = NonlinearVariationalSolver(pde, solver_parameters=params)
 u_, eta_ = q_.split()
 u, eta = q.split()
 
 # Set up auxiliary functions and output files
-rk_01 = Function(W0.sub(0), name="Element residual xy")
-rk_2 = Function(W0.sub(1), name="Element residual z")
-rb = Function(W0.sub(1), name="Boundary residual")
-hk = Function(W0.sub(1), name="Element size").interpolate(CellSize(mesh))
-qfile = File(dirName + 'shallowWater.pvd')
+rk_01 = Function(W.sub(0), name="Element residual xy")
+rk_2 = Function(W.sub(1), name="Element residual z")
+rb = Function(W.sub(1), name="Boundary residual")
+hk = Function(W.sub(1), name="Element size").interpolate(CellSize(mesh))
+qfile = File("plots/adjointBased/explicit/forward.pvd")
 qfile.write(u, eta, time=t)
-rfile = File(dirName + 'residualSW.pvd')
+rfile = File("plots/adjointBased/explicit/residualEstimate.pvd")
 
 # DG test functions to get cell-wise norms
 P0 = FunctionSpace(mesh, "DG", 0)
 v = TestFunction(P0)
 n = FacetNormal(mesh)
 
-while t < T - 0.5 * dt:
+while mn < int(T / dt):
     t += dt
-    print('t = %5.2fs' % t)
+    mn += 1
+    print("mn = %3d, t = %5.2fs" % (mn, t))
     pde_solve.solve()
 
     # TODO this in Thetis, we will need to load TWO timesteps worth of field data
+    with DumbCheckpoint("plots/adjointBased/explicit/hdf5/adjoint_" + str(mn), mode=FILE_READ) as chk:
+        chk.load(lu, name="Adjoint velocity")
+        chk.load(le, name="Adjoint free surface")
+        chk.close()
 
     # Get element residual
     rk_01.interpolate(u_ - u - Dt * g * grad(etah))
@@ -173,7 +134,9 @@ while t < T - 0.5 * dt:
 
     # Get boundary residual     TODO: this only currently integrates over domain the boundary, NOT cell boundaries
     rho += assemble(v * Dt * b * dot(uh, n) * ds)
-    rho.rename('Local error indicators')
+    lambdaNorm = assemble(v * sqrt((dot(lu, lu) + le * le)) * dx)
+    rho *= lambdaNorm
+    rho.rename("Local error indicators")
 
     # Update variables and output (locally constant) error indicators
     q_.assign(q)

@@ -150,7 +150,6 @@ while mn < iEnd:
         with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as ve:
             ve.load(uv_2d, name='uv_2d')
             ve.close()
-        print('#### Interpolating adjoint data...')
 
     # Create functions to hold inner product and significance data
     ip = Function(mixedDG1.sub(1), name='Inner product')
@@ -167,6 +166,7 @@ while mn < iEnd:
 
         # Interpolate saved data onto new mesh and multiply fields together
         if mn != 0:
+            print('#### Interpolating adjoint data...')
             print('    #### Step %d / %d' % (j, iEnd - max(mn, iStart)))
             lu, le = inte.interp(mesh, lu, le)
         ip.dat.data[:] = lu.dat.data[:, 0] * uv_2d.dat.data[:, 0] + lu.dat.data[:, 1] * uv_2d.dat.data[:, 1]
