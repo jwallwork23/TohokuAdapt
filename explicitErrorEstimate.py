@@ -1,6 +1,9 @@
 from firedrake import *
 import numpy as np
 
+import utils.error as err
+
+
 # Set parameter values
 depth = 0.1
 T = 2.5
@@ -13,7 +16,7 @@ n = 32
 lx = 4
 mesh = SquareMesh(lx * n, lx * n, lx, lx)
 x, y = SpatialCoordinate(mesh)
-W = VectorFunctionSpace(mesh, "CG", 2) * FunctionSpace(mesh, "CG", 1)
+W = VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "CG", 2)
 b = Function(W.sub(1), name="Bathymetry").assign(depth)
 
 # Initalise counters
@@ -101,18 +104,10 @@ pde_solve = NonlinearVariationalSolver(pde, solver_parameters=params)
 u_, eta_ = q_.split()
 u, eta = q.split()
 
-# Set up auxiliary functions and output files
-rk_01 = Function(W.sub(0), name="Element residual xy")
-rk_2 = Function(W.sub(1), name="Element residual z")
-hk = Function(W.sub(1), name="Element size").interpolate(CellSize(mesh))
+# Set up output files
 qfile = File("plots/adjointBased/explicit/forward.pvd")
 qfile.write(u, eta, time=t)
 rfile = File("plots/adjointBased/explicit/residualEstimate.pvd")
-
-# DG test functions to get cell-wise norms
-P0 = FunctionSpace(mesh, "DG", 0)
-v = TestFunction(P0)
-n = FacetNormal(mesh)
 
 while mn < int(T / dt):
     t += dt
@@ -120,26 +115,12 @@ while mn < int(T / dt):
     print("mn = %3d, t = %5.2fs" % (mn, t))
     pde_solve.solve()
 
-    # TODO this in Thetis, we will need to load TWO timesteps worth of field data
+    # Load adjoint data and compute local error indicators
     with DumbCheckpoint("plots/adjointBased/explicit/hdf5/adjoint_" + str(mn), mode=FILE_READ) as chk:
         chk.load(lu, name="Adjoint velocity")
         chk.load(le, name="Adjoint free surface")
         chk.close()
-
-    # Get element residual
-    rk_01.interpolate(u_ - u - Dt * g * grad(etah))
-    rk_2.interpolate(eta_ - eta - Dt * div(b * uh))
-    rho = assemble(v * sqrt(dot(rk_01, rk_01) + rk_2 * rk_2) / CellVolume(mesh) * dx)
-
-    # Get boundary residual
-    # TODO: this only currently integrates over domain the boundary, NOT cell boundaries
-    # TODO: also, need multiply by normed bdy size
-    rho += assemble(v * Dt * b * dot(uh, n) * ds)
-    lambdaNorm = assemble(v * sqrt((dot(lu, lu) + le * le)) * dx)
-    rho *= lambdaNorm
-    rho.rename("Local error indicators")
-
-    # Update variables and output (locally constant) error indicators
+    rho = err.explicitErrorEstimator(W, u_, u, eta_, eta, lu, le, b, dt)
     q_.assign(q)
     qfile.write(u, eta, time=t)
     rfile.write(rho, time=t)
