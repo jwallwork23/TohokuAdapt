@@ -35,6 +35,9 @@ cdt = op.hmin / np.sqrt(op.g * max(b.dat.data))
 op.checkCFL(b)
 ndump = op.ndump
 rm = op.rm
+speed = op.mtype == 's'
+if op.mtype == 'b':
+    raise NotImplementedError('Cannot currently perform adjoint-based adaption with respect to two fields.')
 stored = bool(input('Hit anything but enter if adjoint data is already stored: '))
 
 # Create initial function space
@@ -198,20 +201,15 @@ while mn < iEnd:
         M = adap.isotropicMetric(V, significance, op=op)
     else:
         H = Function(V)
-        if op.mtype == 's':
+        if speed:
             spd = Function(W.sub(1)).interpolate(sqrt(dot(u, u)))
-            H = adap.constructHessian(mesh, V, spd, op=op)
-        elif op.mtype == 'f':
-            H = adap.constructHessian(mesh, V, elev_2d, op=op)
-        else:
-            raise NotImplementedError('Cannot currently perform adjoint-based adaption with respect to two fields.')
+        H = adap.constructHessian(mesh, V, spd if speed else elev_2d, op=op)
         for k in range(mesh.topology.num_vertices()):
             H.dat.data[k] *= significance.dat.data[k]
-        M = adap.computeSteadyMetric(mesh, V, H, elev_2d, nVerT=nVerT, op=op)
+        M = adap.computeSteadyMetric(mesh, V, H, spd if speed else elev_2d, nVerT=nVerT, op=op)
     M = adap.metricIntersection(mesh, V, M, M_, bdy=True)
     adap.metricGradation(mesh, M, op.beta, isotropic=iso)
-    adaptor = AnisotropicAdaptation(mesh, M)
-    mesh = adaptor.adapted_mesh
+    mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
 
     # Get solver parameter values and construct solver, using a P1DG-P2 mixed function space

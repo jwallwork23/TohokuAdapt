@@ -3,7 +3,6 @@ from thetis.field_defs import field_metadata
 
 import numpy as np
 from time import clock
-import math
 
 import utils.adaptivity as adap
 import utils.domain as dom
@@ -62,24 +61,14 @@ while mn < np.ceil(T / (dt * rm)):
     # Compute Hessian and metric, adapt mesh and interpolate variables
     V = TensorFunctionSpace(mesh, 'CG', 1)
     if op.mtype != 's':
-        if iso:
-            M = adap.isotropicMetric(V, elev_2d, op=op)
-        else:
-            H = adap.constructHessian(mesh, V, elev_2d, op=op)
-            M = adap.computeSteadyMetric(mesh, V, H, elev_2d, nVerT=nVerT, op=op)
+        M = adap.isotropicMetric(V, elev_2d, op=op) if iso else adap.computeSteadyMetric(
+            mesh, V, adap.constructHessian(mesh, V, elev_2d, op=op), elev_2d, nVerT=nVerT, op=op)
     if op.mtype != 'f':
         spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
-        if iso:
-            M2 = adap.isotropicMetric(V, spd)
-        else:
-            H = adap.constructHessian(mesh, V, elev_2d, op=op)
-            M2 = adap.computeSteadyMetric(mesh, V, H, spd, nVerT=nVerT, op=op)
-        if op.mtype == 'b':
-            M = adap.metricIntersection(mesh, V, M, M2)
-        else:
-            M = M2
-    adaptor = AnisotropicAdaptation(mesh, M)
-    mesh = adaptor.adapted_mesh
+        M2 = adap.isotropicMetric(V, spd) if iso else adap.computeSteadyMetric(
+            mesh, V, adap.constructHessian(mesh, V, spd, op=op), spd, nVerT=nVerT, op=op)
+        M = adap.metricIntersection(mesh, V, M, M2) if op.mtype == 'b' else M2
+    mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
 
     # Get solver parameter values and construct solver
