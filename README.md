@@ -8,11 +8,12 @@ integrates that work into the coastal, estuarine and ocean modelling solver prov
 Here you will find:
 * A ``utils`` directory, containing the necessary functions for implementation of isotropic and anisotropic mesh
 adaptivity:
-    * Hessians and metrics can be approximated using ``adaptivity``.
+    * Hessians and metrics are approximated using ``adaptivity``.
     * Coordinate transformations are achieved using ``conversion``.
     * Meshes and initial conditions on the realistic ocean domain are generated using ``domain``.
+    * (Local) error indicators are computed using ``error``.
     * Interpolation of functions from an old mesh to a newly adapted mesh is achieved using ``interpolation``.
-    * Default parameters are specified in ``options``.
+    * Default parameters are specified using ``options``.
     * Time series data can be stored and plotted using ``storage``.
 * A ``resources`` directory, containing bathymetry and coastline data for the ocean domain surrounding Fukushima. Mesh
 files have been removed for copyright reasons, but may be made available upon request.
