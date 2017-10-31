@@ -17,7 +17,7 @@
     <layer-tree-layer expanded="1" checked="Qt::Checked" id="final_bdys20170629151141574" name="final_bdys">
       <customproperties/>
     </layer-tree-layer>
-    <layer-tree-layer expanded="1" checked="Qt::Checked" id="OpenLayers_plugin_layer20170725145737369" name="Google Satellite">
+    <layer-tree-layer expanded="1" checked="Qt::Unchecked" id="OpenLayers_plugin_layer20170725145737369" name="Google Satellite">
       <customproperties/>
     </layer-tree-layer>
     <layer-tree-layer expanded="1" checked="Qt::Unchecked" id="islands220170227151946534" name="Japan">
@@ -31,10 +31,10 @@
   <mapcanvas>
     <units>meters</units>
     <extent>
-      <xmin>13741777.85342501103878021</xmin>
-      <ymin>3191853.02570223994553089</ymin>
-      <xmax>17885289.3772859051823616</xmax>
-      <ymax>5821775.99533725343644619</ymax>
+      <xmin>15123778.09981883317232132</xmin>
+      <ymin>3488372.33370389696210623</ymin>
+      <xmax>16615227.85597703233361244</xmax>
+      <ymax>5368072.43987612891942263</ymax>
     </extent>
     <rotation>0</rotation>
     <projections>1</projections>
@@ -92,9 +92,9 @@
         <legendlayerfile isInOverview="0" layerid="final_bdys20170629151141574" visible="1"/>
       </filegroup>
     </legendlayer>
-    <legendlayer drawingOrder="-1" open="true" checked="Qt::Checked" name="Google Satellite" showFeatureCount="0">
+    <legendlayer drawingOrder="-1" open="true" checked="Qt::Unchecked" name="Google Satellite" showFeatureCount="0">
       <filegroup open="true" hidden="false">
-        <legendlayerfile isInOverview="0" layerid="OpenLayers_plugin_layer20170725145737369" visible="1"/>
+        <legendlayerfile isInOverview="0" layerid="OpenLayers_plugin_layer20170725145737369" visible="0"/>
       </filegroup>
     </legendlayer>
     <legendlayer drawingOrder="-1" open="true" checked="Qt::Unchecked" name="Japan" showFeatureCount="0">
@@ -1131,9 +1131,9 @@ def my_form_open(dialog, layer, feature):
     <maplayer simplifyAlgorithm="0" minimumScale="0" maximumScale="1e+08" simplifyDrawingHints="1" readOnly="0" minLabelScale="0" maxLabelScale="1e+08" simplifyDrawingTol="1" geometry="Line" simplifyMaxScale="1" type="vector" hasScaleBasedVisibilityFlag="0" simplifyLocal="1" scaleBasedLabelVisibilityFlag="0">
       <extent>
         <xmin>136.17820832876810755</xmin>
-        <ymin>30.22983317978694373</ymin>
-        <xmax>148.93813319975143372</xmax>
-        <ymax>43.07449531014194122</ymax>
+        <ymin>30.31889150253972787</ymin>
+        <xmax>148.93264833687348414</xmax>
+        <ymax>43.06654465078528204</ymax>
       </extent>
       <id>final_ocean20170626160718604</id>
       <datasource>./final_ocean.shp</datasource>
