@@ -19,7 +19,7 @@ def indexString(index):
 
 def gaugeTimeseries(gauge, dirName, iEnd):
     """
-    Store timeseries data for a particular gauge.
+    Store timeseries data for a particular gauge and calculate (L1, L2, L-infinity) error norms.
     
     :param gauge: gauge name string, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
     :param dirName: name of directory for locating HDF5 files, from the set {'fixedMesh', 'simpleAdapt', 'adjointBased'}
@@ -29,14 +29,43 @@ def gaugeTimeseries(gauge, dirName, iEnd):
     op = options.Options()
     name = input("Enter a name for this time series (e.g. 'meanEle=5767'): ")
     dirName = 'plots/' + dirName + '/hdf5'
+    error = [0, 0, 0]
+
+    # Interpolate data from the inversion analysis and plot
+    measuredfile = open('timeseries/{}_measured_dat.txt'.format(gauge), 'r')
+    x = []
+    y = []
+    for line in measuredfile:
+        xy = line.split()
+        x.append(float(xy[0]))
+        y.append(float(xy[1]))
+    m = si.interp1d(x, y, kind=1)
+
+    # Write timeseries to file and calculate errors
     outfile = open('timeseries/{y1}_{y2}.txt'.format(y1=gauge, y2=name), 'w+')
+    val = []
+    t = np.linspace(0, 25, num=1501)
     for i in range(iEnd + 1):
         # TODO: how to define a function space if we do not know the mesh?
         with DumbCheckpoint(dirName + '/Elevation2d_' + indexString(i), mode=FILE_READ) as el:
             el.load(elev_2d, name='elev_2d')
         data = elev_2d.at(op.gaugeCoord(gauge))
+
+        if i == 0:
+            v0 = data - float(m(t[i]))
+        val.append(np.abs(data - v0 - float(m(t[i]))))
+        error[0] += val[-1]
+        error[1] += val[-1] ** 2
+        if val[-1] > error[2]:
+            error[2] = val[-1]
+
+        # TODO: also include TV-norm. Generalise number 1501
+
         outfile.write(str(data) + '\n')
     outfile.close()
+
+    # Print errors to screen
+    print('L1 norm : %5.2f, L2 norm : %5.2f, Linf norm : %5.2f', (error[0] / 1501, np.sqrt(error[1] / 1501), error[2]))
 
 
 def plotGauges(gauge, prob='comparison', log=False, error=False):
@@ -94,47 +123,11 @@ def plotGauges(gauge, prob='comparison', log=False, error=False):
         else:
             plt.plot(p, m(p), label='Gauge measurement', linestyle='-', linewidth=2)
 
-    # Plot simulations and calculate error norms:
-    x = np.linspace(0, 25, num=1501)
-    for key in setup:
-        val = []
-        i = 0
-        v0 = 0
-        L1 = 0
-        L2 = 0
-        Linf = 0
-        infile = open('timeseries/{y1}_{y2}.txt'.format(y1=gauge, y2=setup[key]), 'r')
-        for line in infile:
-            if i == 0:
-                if error:
-                    v0 = float(line) - float(m(x[i]))
-                else:
-                    v0 = float(line)
-            if error:
-                val.append(np.abs(float(line) - v0 - float(m(x[i]))))
-                L1 += val[-1]
-                L2 += val[-1] ** 2
-                if val[-1] > Linf:
-                    Linf = val[-1]
-            else:
-                val.append(float(line) - v0)
-            i += 1
-        infile.close()
-
-        # Print norm values to screen:
-        if error:
-            print('\nL1 norm for ', setup[key], ' : ', L1 / 1501)
-            print('L2 norm for ', setup[key], ' : ', np.sqrt(L2 / 1501))
-            print('Linf norm for ', setup[key], ' : ', Linf)
-
         # Deal with special cases:
-        if setup[key] in ('fine_nonlinear', 'fine_nonlinear_rotational',
-                          'xcoarse_25mins', 'medium_25mins', 'fine_25mins',
-                          'anisotropic_point85scaled_rm=30', 'goal-based_res4_fifthscaled',
-                          'goal-based_better_version'):
-            T = 25
-        else:
-            T = 60
+        T = 25 if setup[key] in ('fine_nonlinear', 'fine_nonlinear_rotational',
+                                 'xcoarse_25mins', 'medium_25mins', 'fine_25mins',
+                                 'anisotropic_point85scaled_rm=30', 'goal-based_res4_fifthscaled',
+                                 'goal-based_better_version') else T = 60
         if log:
             plt.semilogy(np.linspace(0, T, len(val)), val, label=labels[key], marker=styles[key], markevery=60,
                          linewidth=0.5)
@@ -171,10 +164,7 @@ def plotGauges(gauge, prob='comparison', log=False, error=False):
 
     # Set filename and save:
     filename = 'plots/tsunami_outputs/screenshots/'
-    if log:
-        filename += 'log'
-    else:
-        filename += 'full'
+    filename += 'log' if log else 'full'
     filename += '_gauge_timeseries_{y1}_{y2}'.format(y1=gauge, y2=prob)
     if error:
         filename += '_error'

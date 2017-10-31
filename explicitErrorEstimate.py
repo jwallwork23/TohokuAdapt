@@ -82,7 +82,6 @@ while mn > 0:
         chk.store(lu)
         chk.store(le)
         chk.close()
-
 assert(mn == 0)
 
 # Initialise variables and specify bathymetry
@@ -99,9 +98,8 @@ eta.rename("Free surface displacement")
 v, ze = TestFunctions(W)
 u, eta = split(q)
 u_, eta_ = split(q_)
-uh = 0.5 * (u + u_)
-etah = 0.5 * (eta + eta_)
-L = (ze * (eta - eta_) - Dt * inner(b * uh, grad(ze)) + inner(u - u_, v) + Dt * g * (inner(grad(etah), v))) * dx
+L = (ze * (eta - eta_) - Dt * inner(b * 0.5 * (u + u_), grad(ze))
+     + inner(u - u_, v) + Dt * g * (inner(grad(0.5 * (eta + eta_)), v))) * dx
 pde = NonlinearVariationalProblem(L, q)
 pde_solve = NonlinearVariationalSolver(pde, solver_parameters=params)
 u_, eta_ = q_.split()

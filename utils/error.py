@@ -9,6 +9,8 @@ class OutOfRangeError(ValueError):
 
 def explicitErrorEstimator(W, u_, u, eta_, eta, lu, le, b, dt, op=options.Options()):
     """
+    Estimate error locally using an a posteriori error indicator.
+    
     :param W: mixed function space upon which variables are defined.
     :param u_: fluid velocity at previous timestep.
     :param u: fluid velocity at current timestep.
@@ -17,7 +19,7 @@ def explicitErrorEstimator(W, u_, u, eta_, eta, lu, le, b, dt, op=options.Option
     :param lu: adjoint velocity at current timestep.
     :param le: adjoint free surface at current timestep.
     :param b: bathymetry field.
-    :param dt: timestep used.
+    :param dt: timestep used stepping from u_ to u (and eta_ to eta).
     :param op: Options class object providing min/max cell size values.
     :return: field of local error indicators.
     """
@@ -45,6 +47,9 @@ def explicitErrorEstimator(W, u_, u, eta_, eta, lu, le, b, dt, op=options.Option
 
 def basicErrorEstimator(u, eta, lu, le):
     """
+    Consider significant regions as those where the 'dot product' between forward and adjoint variables take significant
+    values in modulus, as per Davis & LeVeque 2016.
+    
     :param u: fluid velocity at current timestep.
     :param eta: free surface displacement at current timestep.
     :param lu: adjoint fluid velocity at current timestep.
