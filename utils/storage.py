@@ -46,13 +46,12 @@ def gaugeTimeseries(gauge, dirName, iEnd):
     outfile = open('timeseries/{y1}_{y2}.txt'.format(y1=gauge, y2=name), 'w+')
     val = []
     t = np.linspace(0, 25, num=1501)    # TODO: generalise number 1501
+    v0 = data - float(m(t[0]))
     for i in range(iEnd + 1):
         # TODO: how to define a function space if we do not know the mesh?
         with DumbCheckpoint(dirName + '/Elevation2d_' + indexString(i), mode=FILE_READ) as el:
             el.load(elev_2d, name='elev_2d')
         data = elev_2d.at(op.gaugeCoord(gauge))
-        if i == 0:
-            v0 = data - float(m(t[i]))
         val.append(np.abs(data - v0 - float(m(t[i]))))
         error[0] += val[-1]
         error[1] += val[-1] ** 2
@@ -63,17 +62,16 @@ def gaugeTimeseries(gauge, dirName, iEnd):
     error[3] = err.totalVariation(val)
 
     # Print errors to screen
-    print('L1 norm : %5.2f, L2 norm : %5.2f, Linf norm : %5.2f, Total variation : %5.2f',
+    print('L1 norm : %5.2f, L2 norm : %5.2f, L-infinity norm : %5.2f, Total variation : %5.2f',
           (error[0] / 1501, np.sqrt(error[1] / 1501), error[2], error[3]))
 
 
-def plotGauges(gauge, prob='comparison', log=False, error=False):
+def plotGauges(gauge, prob='comparison', error=False):
     """
     Plot timeseries data on a single axis.
     
     :param gauge: gauge name string, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
     :param prob: problem type name string, corresponding to either 'verification' or 'comparison'.
-    :param log: specify whether or not to use a logarithmic scale on the y-axis.
     :param error: make an error plot.
     :return: a matplotlib plot of the corresponding gauge timeseries data.
     """
@@ -108,7 +106,7 @@ def plotGauges(gauge, prob='comparison', log=False, error=False):
     plt.rc('legend', fontsize='x-large')
     plt.clf()
 
-    # Interpolate data from the inversion analysis and plot:
+    # Interpolate data from the inversion analysis and plot
     x = []
     y = []
     for line in measuredfile:
@@ -117,53 +115,27 @@ def plotGauges(gauge, prob='comparison', log=False, error=False):
         y.append(float(xy[1]))
     m = si.interp1d(x, y, kind=1)
     if not error:
-        if log:
-            plt.semilogy(p, m(p), label='Gauge measurement', linestyle='-', linewidth=2)
-        else:
-            plt.plot(p, m(p), label='Gauge measurement', linestyle='-', linewidth=2)
+        plt.plot(p, m(p), label='Gauge measurement', linestyle='-', linewidth=2)
 
-        # Deal with special cases:
+        # Deal with special cases
         T = 25 if setup[key] in ('fine_nonlinear', 'fine_nonlinear_rotational',
                                  'xcoarse_25mins', 'medium_25mins', 'fine_25mins',
                                  'anisotropic_point85scaled_rm=30', 'goal-based_res4_fifthscaled',
                                  'goal-based_better_version') else T = 60
-        if log:
-            plt.semilogy(np.linspace(0, T, len(val)), val, label=labels[key], marker=styles[key], markevery=60,
-                         linewidth=0.5)
-        else:
-            plt.plot(np.linspace(0, T, len(val)), val, label=labels[key], marker=styles[key], markevery=60,
-                     linewidth=0.5)
+        plt.plot(np.linspace(0, T, len(val)), val, label=labels[key], marker=styles[key], markevery=60, linewidth=0.5)
 
-        if prob == 'comparison':
-            plt.xlim([0, 25])
-        else:
-            plt.xlim([0, 60])
+        plt.xlim([0, 25] if prob == 'comparison' else [0, 60])
     plt.gcf()
-    if error:
-        plt.legend(loc=2, facecolor='white') # 'upper right' == 1 and anticlockwise
+    plt.legend(bbox_to_anchor=(1.13 if prob == 'comparison' else 1.1, 1.1), loc=1 if error else 2)
+    if gauge == 'P02':
+        plt.ylim([0, 1] if error else [-2, 5])
     else:
-        if prob == 'comparison':
-            plt.legend(bbox_to_anchor=(1.13, 1.1), loc=1)
-        else:
-            plt.legend(bbox_to_anchor=(1.1, 1), loc=1)
-    if log:
-        plt.ylim([10 ** -3, 10 ** 2])
-    elif gauge == 'P02':
-        if error:
-            plt.ylim([0, 1])
-        else:
-            plt.ylim([-2, 5])
-    else:
-        if error:
-            plt.ylim([0, 1])
-        else:
-            plt.ylim([-1, 5])
+        plt.ylim([0, 1] if error else [-1, 5])
     plt.xlabel(r'Time elapsed (mins)')
     plt.ylabel(r'Free surface (m)')
 
     # Set filename and save:
     filename = 'plots/tsunami_outputs/screenshots/'
-    filename += 'log' if log else 'full'
     filename += '_gauge_timeseries_{y1}_{y2}'.format(y1=gauge, y2=prob)
     if error:
         filename += '_error'
