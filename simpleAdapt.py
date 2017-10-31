@@ -19,10 +19,6 @@ mesh, eta0, b = dom.TohokuDomain(int(input('coarseness (Integer in range 1-5, de
 nEle, nVer = adap.meshStats(mesh)
 N = [nEle, nEle]    # Min/max #Elements
 print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d. \n' % (nEle, nVer))
-# TODO: build in functionality for loading a previous state. NOTE this may involve saving the mesh to disk...
-# resume = input('Hit anything except enter to resume a previous simulation.')
-# if resume:
-#     iStart = int(input('Simulation starting index (default i = 0)?: ')) or 0
 
 # Get default parameter values and check CFL criterion
 op = opt.Options()
@@ -42,14 +38,12 @@ dumpn = 0   # Dump counter
 mn = 0      # Mesh number
 Sn = 0      # Sum over #Elements
 tic1 = clock()
-# if resume:
-#     mn += int(iStart * ndump / rm)
 
 while mn < np.ceil(T / (dt * rm)):
     tic2 = clock()
 
     # Enforce initial conditions on discontinuous space / load variables from disk
-    W = VectorFunctionSpace(mesh, 'DG', 1) * FunctionSpace(mesh, 'DG', 1)
+    W = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
     uv_2d = Function(W.sub(0))
     elev_2d = Function(W.sub(1))
     index = mn * int(rm / ndump)
@@ -91,6 +85,7 @@ while mn < np.ceil(T / (dt * rm)):
     # Get solver parameter values and construct solver
     solver_obj = solver2d.FlowSolver2d(mesh, b)
     options = solver_obj.options
+    options.element_family = op.family
     options.use_nonlinear_equations = False
     options.simulation_export_time = dt * ndump
     options.simulation_end_time = (mn + 1) * dt * rm
@@ -105,18 +100,14 @@ while mn < np.ceil(T / (dt * rm)):
     e = exporter.ExportManager(dirName + 'hdf5', ['elev_2d', 'uv_2d'], field_dict, field_metadata, export_type='hdf5')
     solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
 
-    # Timestepper bookkeeping for export time step
+    # Timestepper bookkeeping for export time step and next export
     solver_obj.i_export = index
     solver_obj.next_export_t = solver_obj.i_export * options.simulation_export_time
     solver_obj.iteration = int(np.ceil(solver_obj.next_export_t / dt))
     solver_obj.simulation_time = solver_obj.iteration * dt
-
-    # For next export
-    solver_obj.export_initial_state = (dirName != options.output_directory)
-    offset = 0 if solver_obj.export_initial_state else 1
     solver_obj.next_export_t += options.simulation_export_time
     for e in solver_obj.exporters.values():
-        e.set_next_export_ix(solver_obj.i_export + offset)
+        e.set_next_export_ix(solver_obj.i_export)
 
     # Time integrate and print
     solver_obj.iterate()

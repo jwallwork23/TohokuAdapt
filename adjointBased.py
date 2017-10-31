@@ -19,8 +19,6 @@ print('ADJOINT-GUIDED mesh adaptive solver initially defined on a mesh of')
 mesh, eta0, b = dom.TohokuDomain(int(input('coarseness (Integer in range 1-5, default 4): ') or 4))
 nEle, nVer = adap.meshStats(mesh)
 N = [nEle, nEle]    # Min/max #Elements
-mesh0 = mesh
-W0 = VectorFunctionSpace(mesh0, 'DG', 1) * FunctionSpace(mesh0, 'CG', 2)
 print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d.' % (nEle, nVer))
 
 # Get default parameter values and check CFL criterion
@@ -38,6 +36,10 @@ op.checkCFL(b)
 ndump = op.ndump
 rm = op.rm
 stored = bool(input('Hit anything but enter if adjoint data is already stored: '))
+
+# Create initial function space
+mesh0 = mesh
+W0 = VectorFunctionSpace(mesh0, op.space1, op.degree1) * FunctionSpace(mesh0, op.space2, op.degree2)
 
 if not stored:
     # Initalise counters and forcing switch
@@ -135,9 +137,9 @@ while mn < iEnd:
     tic2 = clock()
 
     # Enforce initial conditions on discontinuous space / load variables from disk
-    mixedDG1 = VectorFunctionSpace(mesh, 'DG', 1) * FunctionSpace(mesh, 'DG', 1)
-    uv_2d = Function(mixedDG1.sub(0))
-    elev_2d = Function(mixedDG1.sub(1))
+    mixedSpace = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
+    uv_2d = Function(mixedSpace.sub(0))
+    elev_2d = Function(mixedSpace.sub(1))
     index = mn * int(rm / ndump)
     indexStr = stor.indexString(index)
     if mn == 0:
@@ -152,8 +154,10 @@ while mn < iEnd:
             ve.close()
 
     # Create functions to hold inner product and significance data
-    ip = Function(mixedDG1.sub(1), name='Inner product')
-    significance = Function(mixedDG1.sub(1), name='Significant regions')
+    spaceMatch = (op.space1 == op.space2) & (op.degree1 == op.degree2)
+    W = mixedSpace.sub(1) if spaceMatch else FunctionSpace(mesh, op.space1, op.degree1)
+    ip = Function(W, name='Inner product')
+    significance = Function(W, name='Significant regions')
 
     # Take maximal L2 inner product as most significant
     for j in range(max(mn, iStart), iEnd):
@@ -170,7 +174,12 @@ while mn < iEnd:
             print('    #### Step %d / %d' % (j, iEnd - max(mn, iStart)))
             lu, le = inte.interp(mesh, lu, le)
         ip.dat.data[:] = lu.dat.data[:, 0] * uv_2d.dat.data[:, 0] + lu.dat.data[:, 1] * uv_2d.dat.data[:, 1]
-        ip.dat.data[:] += le.dat.data * elev_2d.dat.data
+        if spaceMatch:
+            ip.dat.data[:] += le.dat.data * elev_2d.dat.data
+        else:
+            leInterp = Function(W).interpolate(le)
+            elInterp = Function(W).interpolate(elev_2d)
+            ip.dat.data[:] += leInterp.dat.data * elInterp.dat.data
 
         # Extract (pointwise) maximal values
         if j == 0:
@@ -208,7 +217,7 @@ while mn < iEnd:
     # Get solver parameter values and construct solver, using a P1DG-P2 mixed function space
     solver_obj = solver2d.FlowSolver2d(mesh, b)
     options = solver_obj.options
-    options.element_family = 'dg-cg'
+    options.element_family = op.family
     options.use_nonlinear_equations = False
     options.simulation_export_time = dt * ndump
     options.simulation_end_time = (mn + 1) * dt * rm

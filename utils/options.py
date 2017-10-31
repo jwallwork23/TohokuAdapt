@@ -5,6 +5,7 @@ from . import conversion
 
 class Options:
     def __init__(self,
+                 family='dg-cg',
                  vscale=0.85,
                  hmin=500.,
                  hmax=1e7,
@@ -21,6 +22,7 @@ class Options:
                  rm=30,
                  Ts=300.):
         """
+        :param family: mixed function space family, from {'dg-dg', 'dg-cg'}.
         :param vscale: Scaling parameter for target number of vertices.
         :param hmin: Minimal tolerated element size (m).
         :param hmax: Maximal tolerated element size (m).
@@ -39,6 +41,11 @@ class Options:
         """
 
         # Adaptivity parameters
+        self.family = family
+        try:
+            assert family in ('dg-dg', 'dg-cg')
+        except:
+            raise ValueError('Mixed function space not recognised.')
         self.vscale = vscale
         try:
             assert vscale > 0
@@ -102,6 +109,14 @@ class Options:
                        'assembled_pc_type': 'lu',
                        'snes_lag_preconditioner': -1,
                        'snes_lag_preconditioner_persists': True}
+        self.degree1 = 1
+        self.degree2 = 1
+        self.space1 = 'DG'
+        if family == 'dg-cg':
+            self.degree2 += 1
+            self.space2 = 'CG'
+        else:
+            self.space2 = 'DG'
 
         # Gauge locations in latitude-longitude coordinates
         self.glatlon = {'P02': (38.5002, 142.5016), 'P06': (38.6340, 142.5838), '801': (38.2, 141.7),
