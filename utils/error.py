@@ -2,6 +2,7 @@ from firedrake import *
 
 from . import options
 
+
 class OutOfRangeError(ValueError):
     pass
 
@@ -31,12 +32,27 @@ def explicitErrorEstimator(W, u_, u, eta_, eta, lu, le, b, dt, op=options.Option
     rk_2 = Function(W.sub(1)).interpolate(eta_ - eta - dt * div(b * 0.5 * (u + u_)))
     rho = assemble(v * hk * sqrt(dot(rk_01, rk_01) + rk_2 * rk_2) / CellVolume(mesh) * dx)
 
-    # Add boundary residual
+    # Compute and add boundary residual term
     # TODO: this only currently integrates over domain the boundary, NOT cell boundaries
     # TODO: also, need multiply by normed bdy size
     rho += assemble(v * dt * b * dot(0.5 * (u + u_), FacetNormal(mesh)) * ds)
     lambdaNorm = assemble(v * sqrt((dot(lu, lu) + le * le)) * dx)
     rho *= lambdaNorm
+    rho.rename("Local error indicators")
+
+    return rho
+
+
+def basicErrorEstimator(u, eta, lu, le):
+    """
+    :param u: fluid velocity at current timestep.
+    :param eta: free surface displacement at current timestep.
+    :param lu: adjoint fluid velocity at current timestep.
+    :param le: adjoint free surface displacement at current timestep.
+    :return: field of local error indicators taken as product over fields
+    """
+    rho = Function(eta.ufl_function_space()).assign(eta * le)
+    rho.dat.data[:] += u.dat.data[:, 0] * lu.dat.data[:, 0] + u.dat.data[:, 1] * lu.dat.data[:, 1]
     rho.rename("Local error indicators")
 
     return rho

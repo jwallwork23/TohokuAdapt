@@ -10,6 +10,7 @@ T = 2.5
 g = 9.81
 dt = 0.05
 Dt = Constant(dt)
+basic = False
 
 # Define mesh and function space
 n = 32
@@ -18,6 +19,8 @@ mesh = SquareMesh(lx * n, lx * n, lx, lx)
 x, y = SpatialCoordinate(mesh)
 W = VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "CG", 2)
 b = Function(W.sub(1), name="Bathymetry").assign(depth)
+if basic:
+    W1 = FunctionSpace(mesh, 'DG', 1)
 
 # Initalise counters
 t = T
@@ -120,7 +123,10 @@ while mn < int(T / dt):
         chk.load(lu, name="Adjoint velocity")
         chk.load(le, name="Adjoint free surface")
         chk.close()
-    rho = err.explicitErrorEstimator(W, u_, u, eta_, eta, lu, le, b, dt)
+    if basic:
+        rho = err.basicErrorEstimator(u, Function(W1).interpolate(eta), lu, Function(W1).interpolate(le))
+    else:
+        rho = err.explicitErrorEstimator(W, u_, u, eta_, eta, lu, le, b, dt)
     q_.assign(q)
     qfile.write(u, eta, time=t)
     rfile.write(rho, time=t)

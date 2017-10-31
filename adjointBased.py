@@ -8,6 +8,7 @@ import math
 
 import utils.adaptivity as adap
 import utils.domain as dom
+import utils.error as err
 import utils.interpolation as inte
 import utils.options as opt
 import utils.storage as stor
@@ -159,38 +160,30 @@ while mn < iEnd:
     # Create functions to hold inner product and significance data
     spaceMatch = (op.space1 == op.space2) & (op.degree1 == op.degree2)
     W = mixedSpace.sub(1) if spaceMatch else FunctionSpace(mesh, op.space1, op.degree1)
-    ip = Function(W, name='Inner product')
     significance = Function(W, name='Significant regions')
 
-    # Take maximal L2 inner product as most significant
     for j in range(max(mn, iStart), iEnd):
+        # Load adjoint data and interpolate onto current mesh
         with DumbCheckpoint(dirName + 'hdf5/adjoint_' + stor.indexString(mn), mode=FILE_READ) as chk:
             lu = Function(W0.sub(0), name='Adjoint velocity')
             le = Function(W0.sub(1), name='Adjoint free surface')
             chk.load(lu)
             chk.load(le)
             chk.close()
-
-        # Interpolate saved data onto new mesh and multiply fields together
         if mn != 0:
             print('#### Interpolating adjoint data...')
             print('    #### Step %d / %d' % (j, iEnd - max(mn, iStart)))
             lu, le = inte.interp(mesh, lu, le)
-        ip.dat.data[:] = lu.dat.data[:, 0] * uv_2d.dat.data[:, 0] + lu.dat.data[:, 1] * uv_2d.dat.data[:, 1]
-        if spaceMatch:
-            ip.dat.data[:] += le.dat.data * elev_2d.dat.data
-        else:
-            leInterp = Function(W).interpolate(le)
-            elInterp = Function(W).interpolate(elev_2d)
-            ip.dat.data[:] += leInterp.dat.data * elInterp.dat.data
 
-        # Extract (pointwise) maximal values
+        # Estimate error and extract (pointwise) maximal values
+        rho = err.basicErrorEstimator(uv_2d, lu, elev_2d if spaceMatch else Function(W).interpolate(elev_2d),
+                                      le if spaceMatch else Function(W).interpolate(le)).dat.data
         if j == 0:
-            significance.dat.data[:] = ip.dat.data[:]
+            significance.dat.data[:] = rho
         else:
-            for k in range(len(ip.dat.data)):
-                if np.abs(ip.dat.data[k]) > np.abs(significance.dat.data[k]):
-                    significance.dat.data[k] = ip.dat.data[k]
+            for k in range(len(rho)):
+                if np.abs(rho[k]) > np.abs(significance.dat.data[k]):
+                    significance.dat.data[k] = rho[k]
 
     # Interpolate initial mesh size onto new mesh and build associated boundary metric
     V = TensorFunctionSpace(mesh, 'CG', 1)
