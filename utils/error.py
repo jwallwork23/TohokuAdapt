@@ -1,5 +1,7 @@
 from firedrake import *
 
+import numpy as np
+
 from . import options
 
 
@@ -61,3 +63,22 @@ def basicErrorEstimator(u, eta, lu, le):
     rho.rename("Local error indicators")
 
     return rho
+
+
+def totalVariation(data):
+    """
+    :param data: (one-dimensional) timeseries record.
+    :return: total variation thereof.
+    """
+    TV = 0
+    iStart = 0
+    for i in range(1, len(data)):
+        if i == 1:
+            sign = (data[i] - data[i - 1]) / np.abs(data[i] - data[i - 1])
+        else:
+            sign_ = sign
+            sign = (data[i] - data[i - 1]) / np.abs(data[i] - data[i - 1])
+            if (sign != sign_) | (i == len(data) - 1):
+                TV += np.abs(data[i] - data[iStart])
+                iStart = i
+    return TV

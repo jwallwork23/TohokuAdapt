@@ -3,6 +3,7 @@ import numpy as np
 import scipy.interpolate as si
 import matplotlib.pyplot as plt
 
+from . import error
 from . import options
 
 
@@ -29,7 +30,7 @@ def gaugeTimeseries(gauge, dirName, iEnd):
     op = options.Options()
     name = input("Enter a name for this time series (e.g. 'meanEle=5767'): ")
     dirName = 'plots/' + dirName + '/hdf5'
-    error = [0, 0, 0]
+    error = [0, 0, 0, 0]
 
     # Interpolate data from the inversion analysis and plot
     measuredfile = open('timeseries/{}_measured_dat.txt'.format(gauge), 'r')
@@ -44,13 +45,12 @@ def gaugeTimeseries(gauge, dirName, iEnd):
     # Write timeseries to file and calculate errors
     outfile = open('timeseries/{y1}_{y2}.txt'.format(y1=gauge, y2=name), 'w+')
     val = []
-    t = np.linspace(0, 25, num=1501)
+    t = np.linspace(0, 25, num=1501)    # TODO: generalise number 1501
     for i in range(iEnd + 1):
         # TODO: how to define a function space if we do not know the mesh?
         with DumbCheckpoint(dirName + '/Elevation2d_' + indexString(i), mode=FILE_READ) as el:
             el.load(elev_2d, name='elev_2d')
         data = elev_2d.at(op.gaugeCoord(gauge))
-
         if i == 0:
             v0 = data - float(m(t[i]))
         val.append(np.abs(data - v0 - float(m(t[i]))))
@@ -58,14 +58,13 @@ def gaugeTimeseries(gauge, dirName, iEnd):
         error[1] += val[-1] ** 2
         if val[-1] > error[2]:
             error[2] = val[-1]
-
-        # TODO: also include TV-norm. Generalise number 1501
-
         outfile.write(str(data) + '\n')
     outfile.close()
+    error[3] = err.totalVariation(val)
 
     # Print errors to screen
-    print('L1 norm : %5.2f, L2 norm : %5.2f, Linf norm : %5.2f', (error[0] / 1501, np.sqrt(error[1] / 1501), error[2]))
+    print('L1 norm : %5.2f, L2 norm : %5.2f, Linf norm : %5.2f, Total variation : %5.2f',
+          (error[0] / 1501, np.sqrt(error[1] / 1501), error[2], error[3]))
 
 
 def plotGauges(gauge, prob='comparison', log=False, error=False):
