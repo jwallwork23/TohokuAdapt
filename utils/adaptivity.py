@@ -143,14 +143,15 @@ def isotropicMetric(V, f, bdy=False, op=options.Options()):
     hmin2 = pow(op.hmin, 2)
     hmax2 = pow(op.hmax, 2)
     M = Function(V)
-    try:
-        assert(len(M.dat.data[0]) == len(f.dat.data))
-    except:
-        raise NotImplementedError('CG Tensor field and DG scalar field are currently at odds.')
-    for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(len(f.dat.data)):
-        if2 = 1. / max(hmin2, min(pow(f.dat.data[i], 2), hmax2))
-        M.dat.data[i][0, 0] = if2
-        M.dat.data[i][1, 1] = if2
+    g = Function(FunctionSpace(V.mesh(), 'CG', 1))
+    if (f.ufl_element().family() == 'Lagrange') & (f.ufl_element().degree() == 1):
+        g.assign(f)
+    else:
+        g.interpolate(f)
+    for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(len(g.dat.data)):
+        ig2 = 1. / max(hmin2, min(pow(g.dat.data[i], 2), hmax2))
+        M.dat.data[i][0, 0] = ig2
+        M.dat.data[i][1, 1] = ig2
     return M
 
 

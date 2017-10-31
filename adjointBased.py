@@ -20,7 +20,7 @@ mesh, eta0, b = dom.TohokuDomain(int(input('coarseness (Integer in range 1-5, de
 nEle, nVer = adap.meshStats(mesh)
 N = [nEle, nEle]    # Min/max #Elements
 mesh0 = mesh
-W0 = VectorFunctionSpace(mesh0, 'DG', 1) * FunctionSpace(mesh0, 'DG', 1)
+W0 = VectorFunctionSpace(mesh0, 'DG', 1) * FunctionSpace(mesh0, 'CG', 2)
 print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d.' % (nEle, nVer))
 
 # Get default parameter values and check CFL criterion
@@ -205,9 +205,10 @@ while mn < iEnd:
     mesh = adaptor.adapted_mesh
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
 
-    # Get solver parameter values and construct solver
+    # Get solver parameter values and construct solver, using a P1DG-P2 mixed function space
     solver_obj = solver2d.FlowSolver2d(mesh, b)
     options = solver_obj.options
+    options.element_family = 'dg-cg'
     options.use_nonlinear_equations = False
     options.simulation_export_time = dt * ndump
     options.simulation_end_time = (mn + 1) * dt * rm
@@ -229,11 +230,9 @@ while mn < iEnd:
     solver_obj.simulation_time = solver_obj.iteration * dt
 
     # For next export
-    solver_obj.export_initial_state = dirName != options.output_directory
-    offset = 0 if solver_obj.export_initial_state else 1
     solver_obj.next_export_t += options.simulation_export_time
     for e in solver_obj.exporters.values():
-        e.set_next_export_ix(solver_obj.i_export + offset)
+        e.set_next_export_ix(solver_obj.i_export)
 
     # Time integrate and print
     solver_obj.iterate()

@@ -60,8 +60,7 @@ def interp(mesh, *fields):
                     f_new.dat.data[x] = val
                     notInDomain.remove(x)
             if eps >= 1e8:
-                print('#### Playing with epsilons failed. Abort.')
-                exit(23)
+                raise ValueError('Playing with epsilons failed. Abort.')
         fields_new += (f_new,)
     return fields_new
 
