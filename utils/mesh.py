@@ -1,4 +1,5 @@
 from firedrake import *
+# import qmesh
 
 import scipy.interpolate as si
 from scipy.io.netcdf import NetCDFFile
@@ -31,8 +32,7 @@ class MeshSetup():
 
 def TohokuDomain(res=3):
     """
-    Set up a mesh of the 2D ocean domain as in the Tohoku tsunami problem (courtesy of QMESH), along with the associated 
-    initial condition and bathymetry profile.
+    Load the mesh, initial condition and bathymetry profile for the 2D ocean domain of the Tohoku tsunami problem.
     
     :param res: mesh resolution value, ranging from 'extra coarse' (1) to extra fine (5).
     :return: associated mesh, initial condition and bathymetry field. 
