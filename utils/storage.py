@@ -7,6 +7,8 @@ from . import error
 from . import options
 
 
+op = options.Options()
+
 def indexString(index):
     """
     :param index: integer form of index.
@@ -25,15 +27,14 @@ def gaugeTimeseries(gauge, dirName, iEnd):
     :param gauge: gauge name string, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
     :param dirName: name of directory for locating HDF5 files, from the set {'fixedMesh', 'simpleAdapt', 'adjointBased'}
     :param iEnd: final HDF5 name string index.
-    :return: a file containing the timeseries data.
+    :return: a list containing the timeseries data.
     """
-    op = options.Options()
     name = input("Enter a name for this time series (e.g. 'meanEle=5767'): ")
     dirName = 'plots/' + dirName + '/hdf5'
     error = [0, 0, 0, 0]
 
     # Interpolate data from the inversion analysis and plot
-    measuredfile = open('timeseries/{}_measured_dat.txt'.format(gauge), 'r')
+    measuredfile = open('timeseries/' + gauge + '_measured_dat.txt', 'r')
     x = []
     y = []
     for line in measuredfile:
@@ -45,7 +46,7 @@ def gaugeTimeseries(gauge, dirName, iEnd):
     # Write timeseries to file and calculate errors
     outfile = open('timeseries/{y1}_{y2}.txt'.format(y1=gauge, y2=name), 'w+')
     val = []
-    t = np.linspace(0, 25, num=1501)    # TODO: generalise number 1501
+    t = np.linspace(0, 25, num=int(iEnd + 1))
     v0 = data - float(m(t[0]))
     for i in range(iEnd + 1):
         # TODO: how to define a function space if we do not know the mesh?
@@ -65,42 +66,21 @@ def gaugeTimeseries(gauge, dirName, iEnd):
     print('L1 norm : %5.2f, L2 norm : %5.2f, L-infinity norm : %5.2f, Total variation : %5.2f',
           (error[0] / 1501, np.sqrt(error[1] / 1501), error[2], error[3]))
 
+    return val
 
-def plotGauges(gauge, prob='comparison', error=False):
+
+def plotGauges(gauge):
     """
     Plot timeseries data on a single axis.
     
     :param gauge: gauge name string, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
-    :param prob: problem type name string, corresponding to either 'verification' or 'comparison'.
-    :param error: make an error plot.
     :return: a matplotlib plot of the corresponding gauge timeseries data.
     """
-    if prob == 'comparison':
-        setup = {1: 'xcoarse_25mins',                       # Fixed with 3,126 vertices
-                 2: 'medium_25mins',                        # Fixed with 25,976 vertices
-                 3: 'fine_25mins',                          # Fixed with 97,343 vertices
-                 4: 'anisotropic_point85scaled_rm=30',      # 'Simple adaptive': numVer = 0.85, rm=30, N1=3126
-                 # 5: 'goal-based_res4_fifthscaled'}          # Goal-based adaptive: numVer = 0.2, rm=60, N1=7194
-                 5: 'goal-based_better_version'}
-        labels = {1: 'Coarse mesh',
-                  2: 'Medium mesh',
-                  3: 'Fine mesh',
-                  4: 'Simple adaptive',
-                  5: 'Goal based'}
-        measuredfile = open('timeseries/{y}_measured_dat_25mins.txt'.format(y=gauge), 'r')
-        p = np.linspace(0, 25, num=1501)
-    else:
-        setup = {1: 'fine',
-                 2: 'fine_rotational',
-                 3: 'fine_nonlinear',
-                 4: 'fine_nonlinear_rotational'}
-        labels = {1: 'Linear, non-rotational equations',
-                  2: 'Linear, rotational equations',
-                  3: 'Nonlinear, non-rotational equations',
-                  4: 'Nonlinear, rotational equations'}
-        measuredfile = open('timeseries/{y}_measured_dat.txt'.format(y=gauge), 'r')
-        p = np.linspace(0, 60, num=3601)
-    styles = {1: 's', 2: '^', 3: 'x', 4: 'o', 5: '*'}
+    setup = op.plotDir
+    labels = op.labels
+    styles = op.styles
+    measuredfile = open('timeseries/{y}_measured_dat_25mins.txt'.format(y=gauge), 'r')
+    p = np.linspace(0, 25, num=1501)
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     plt.rc('legend', fontsize='x-large')
@@ -114,29 +94,20 @@ def plotGauges(gauge, prob='comparison', error=False):
         x.append(float(xy[0]))
         y.append(float(xy[1]))
     m = si.interp1d(x, y, kind=1)
-    if not error:
-        plt.plot(p, m(p), label='Gauge measurement', linestyle='-', linewidth=2)
+    plt.plot(p, m(p), label='Gauge measurement', linestyle='-', linewidth=2)
 
-        # Deal with special cases
+    # Deal with special cases and plot timeseries data
+    for key in setup:
         T = 25 if setup[key] in ('fine_nonlinear', 'fine_nonlinear_rotational',
                                  'xcoarse_25mins', 'medium_25mins', 'fine_25mins',
                                  'anisotropic_point85scaled_rm=30', 'goal-based_res4_fifthscaled',
                                  'goal-based_better_version') else T = 60
-        plt.plot(np.linspace(0, T, len(val)), val, label=labels[key], marker=styles[key], markevery=60, linewidth=0.5)
-
-        plt.xlim([0, 25] if prob == 'comparison' else [0, 60])
+        data = gaugeTimeseries(gauge, plotDir[key], 1501)
+        plt.plot(np.linspace(0, T, 1501), data, label=labels[key], marker=styles[key], markevery=60, linewidth=0.5)
+    plt.xlim([0, 25])
     plt.gcf()
-    plt.legend(bbox_to_anchor=(1.13 if prob == 'comparison' else 1.1, 1.1), loc=1 if error else 2)
-    if gauge == 'P02':
-        plt.ylim([0, 1] if error else [-2, 5])
-    else:
-        plt.ylim([0, 1] if error else [-1, 5])
+    plt.legend(bbox_to_anchor=(1.13, 1.1), loc=2)
+    plt.ylim([-2, 5] if gauge == 'P02' else [-1, 5])
     plt.xlabel(r'Time elapsed (mins)')
     plt.ylabel(r'Free surface (m)')
-
-    # Set filename and save:
-    filename = 'plots/tsunami_outputs/screenshots/'
-    filename += '_gauge_timeseries_{y1}_{y2}'.format(y1=gauge, y2=prob)
-    if error:
-        filename += '_error'
-    plt.savefig(filename + '.pdf', bbox_inches='tight')
+    plt.savefig('plots/timeseries/' + gauge + '.pdf', bbox_inches='tight')

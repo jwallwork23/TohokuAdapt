@@ -122,6 +122,12 @@ class Options:
         self.glatlon = {'P02': (38.5002, 142.5016), 'P06': (38.6340, 142.5838), '801': (38.2, 141.7),
                         '802': (39.3, 142.1), '803': (38.9, 141.8), '804': (39.7, 142.2), '806': (37.0, 141.2)}
 
+        # Plotting dictionaries
+        self.plotDir = {1: 'fixedMesh/coarse', 2: 'fixedMesh/medium', 3: 'fixedMesh/fine',
+                        4: 'simpleAdapt', 5: 'adjointBased'}
+        self.labels = {1: 'Coarse mesh', 2: 'Medium mesh', 3: 'Fine mesh', 4: 'Simple adaptive', 5: 'Adjoint based'}
+        self.styles = {1: 's', 2: '^', 3: 'x', 4: 'o', 5: '*'}
+
     def gaugeCoord(self, gauge):
         """
         :param gauge: Tide / pressure gauge name, from {P02, P06, 801, 802, 803, 804, 806}.
