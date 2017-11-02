@@ -9,7 +9,7 @@ class OutOfRangeError(ValueError):
     pass
 
 
-def explicitErrorEstimator(W, u_, u, eta_, eta, lu, le, b, dt, op=options.Options()):
+def explicitErrorEstimator(W, u_, u, eta_, eta, lu, le, b, dt):
     """
     Estimate error locally using an a posteriori error indicator.
     
@@ -22,7 +22,6 @@ def explicitErrorEstimator(W, u_, u, eta_, eta, lu, le, b, dt, op=options.Option
     :param le: adjoint free surface at current timestep.
     :param b: bathymetry field.
     :param dt: timestep used stepping from u_ to u (and eta_ to eta).
-    :param op: Options class object providing min/max cell size values.
     :return: field of local error indicators.
     """
 

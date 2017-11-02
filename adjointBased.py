@@ -7,9 +7,9 @@ from time import clock
 import math
 
 import utils.adaptivity as adap
-import utils.domain as dom
 import utils.error as err
 import utils.interpolation as inte
+import utils.mesh as msh
 import utils.options as opt
 import utils.storage as stor
 
@@ -17,7 +17,7 @@ import utils.storage as stor
 # Define initial mesh and mesh statistics placeholders
 print('************** ADJOINT-BASED ADAPTIVE TSUNAMI SIMULATION **************\n')
 print('ADJOINT-GUIDED mesh adaptive solver initially defined on a mesh of')
-mesh, eta0, b = dom.TohokuDomain(int(input('coarseness (Integer in range 1-5, default 4): ') or 4))
+mesh, eta0, b = msh.TohokuDomain(int(input('coarseness (Integer in range 1-5, default 4): ') or 4))
 nEle, nVer = adap.meshStats(mesh)
 N = [nEle, nEle]    # Min/max #Elements
 print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d.' % (nEle, nVer))

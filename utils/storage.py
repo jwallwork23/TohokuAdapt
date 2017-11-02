@@ -97,11 +97,8 @@ def plotGauges(gauge):
     plt.plot(p, m(p), label='Gauge measurement', linestyle='-', linewidth=2)
 
     # Deal with special cases and plot timeseries data
+    T = 25
     for key in setup:
-        T = 25 if setup[key] in ('fine_nonlinear', 'fine_nonlinear_rotational',
-                                 'xcoarse_25mins', 'medium_25mins', 'fine_25mins',
-                                 'anisotropic_point85scaled_rm=30', 'goal-based_res4_fifthscaled',
-                                 'goal-based_better_version') else T = 60
         data = gaugeTimeseries(gauge, plotDir[key], 1501)
         plt.plot(np.linspace(0, T, 1501), data, label=labels[key], marker=styles[key], markevery=60, linewidth=0.5)
     plt.xlim([0, 25])

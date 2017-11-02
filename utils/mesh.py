@@ -1,8 +1,32 @@
 from firedrake import *
+
 import scipy.interpolate as si
 from scipy.io.netcdf import NetCDFFile
 
 from . import conversion
+
+
+class MeshSetup():
+    def __init__(self, res=3):
+
+        # Get mesh descriptions
+        self.res = res
+        self.dirName = 'resources/meshes/'
+        try:
+            self.meshName = {1: 'TohokuXFine.msh', 2: 'TohokuFine.msh', 3: 'TohokuMedium.msh', 4: 'TohokuCoarse.msh',
+                             5: 'TohokuXCoarse.msh'}[res]
+        except:
+            raise ValueError('Resolution value not recognised. Choose an integer in the range 1-5.')
+
+        # Define gradations (in metres)
+        self.innerGradation1 = {1: 1000., 2: 1000., 3: 3000., 4: 5000., 5: 7500.}[res]
+        self.outerGradation1 = {1: 2500., 2: 4000., 3: 10000., 4: 15000., 5: 25000.}[res]
+        self.innerGradation2 = {1: 2500., 2: 3000., 3: 6000., 4: 10000., 5: 10000.}[res]
+        self.outerGradation2 = {1: 5000., 2: 8000., 3: 10000., 4: 15000., 5: 25000.}[res]
+
+        # Define gradation distances (in degrees)
+        self.gradationDistance1 = 1.
+        self.gradationDistance2 = {1: 1., 2: 1., 3: 1., 4: 0.5, 5: 0.5}[res]
 
 
 def TohokuDomain(res=3):
@@ -15,21 +39,8 @@ def TohokuDomain(res=3):
     """
 
     # Define mesh and an associated elevation function space and establish initial condition and bathymetry functions:
-    if res == 1:
-        mesh = Mesh('resources/meshes/TohokuXFine.msh')     # 226,967 vertices, ~45 seconds per timestep
-        print('WARNING: chosen mesh resolution can be extremely computationally intensive')
-        if input('Are you happy to proceed? (y/n)') == 'n':
-            exit(23)
-    elif res == 2:
-        mesh = Mesh('resources/meshes/TohokuFine.msh')      # 97,343 vertices, ~1 second per timestep
-    elif res == 3:
-        mesh = Mesh('resources/meshes/TohokuMedium.msh')    # 25,976 vertices, ~0.25 seconds per timestep
-    elif res == 4:
-        mesh = Mesh('resources/meshes/TohokuCoarse.msh')    # 7,194 vertices, ~0.07 seconds per timestep
-    elif res == 5:
-        mesh = Mesh('resources/meshes/TohokuXCoarse.msh')   # 3,126 vertices, ~0.03 seconds per timestep
-    else:
-        raise ValueError('Please try again, choosing an integer in the range 1-5.')
+    meshSetup = MeshSetup(res)
+    mesh = Mesh(meshSetup.dirName + meshSetup.meshName)
     meshCoords = mesh.coordinates.dat.data
     P1 = FunctionSpace(mesh, 'CG', 1)
     eta0 = Function(P1, name='Initial free surface displacement')

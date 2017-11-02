@@ -5,8 +5,8 @@ import numpy as np
 from time import clock
 
 import utils.adaptivity as adap
-import utils.domain as dom
 import utils.interpolation as inte
+import utils.mesh as msh
 import utils.options as opt
 import utils.storage as stor
 
@@ -14,13 +14,13 @@ import utils.storage as stor
 # Define initial mesh and mesh statistics placeholders
 print('*************** ANISOTROPIC ADAPTIVE TSUNAMI SIMULATION ***************\n')
 print('MESH ADAPTIVE solver initially defined on a mesh of')
-mesh, eta0, b = dom.TohokuDomain(int(input('coarseness (Integer in range 1-5, default 5): ') or 5))
+mesh, eta0, b = msh.TohokuDomain(int(input('coarseness (Integer in range 1-5, default 5): ') or 5))
 nEle, nVer = adap.meshStats(mesh)
 N = [nEle, nEle]    # Min/max #Elements
 print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d. \n' % (nEle, nVer))
 
 # Get default parameter values and check CFL criterion
-op = opt.Options()
+op = opt.Options(iso=True)
 nVerT = op.vscale * nVer    # Target #Vertices
 iso = op.iso
 dirName = 'plots/simpleAdapt/'
