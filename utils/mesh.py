@@ -38,15 +38,15 @@ def TohokuDomain(res=3):
     :return: associated mesh, initial condition and bathymetry field. 
     """
 
-    # Define mesh and an associated elevation function space and establish initial condition and bathymetry functions:
-    meshSetup = MeshSetup(res)
-    mesh = Mesh(meshSetup.dirName + meshSetup.meshName)
+    # Define mesh and an associated elevation function space and establish initial condition and bathymetry functions
+    ms = MeshSetup(res)
+    mesh = Mesh(ms.dirName + ms.meshName)
     meshCoords = mesh.coordinates.dat.data
     P1 = FunctionSpace(mesh, 'CG', 1)
     eta0 = Function(P1, name='Initial free surface displacement')
     b = Function(P1, name='Bathymetry profile')
 
-    # Read and interpolate initial surface data (courtesy of Saito):
+    # Read and interpolate initial surface data (courtesy of Saito)
     nc1 = NetCDFFile('resources/initialisation/surf.nc', mmap=False)
     lon1 = nc1.variables['x'][:]
     lat1 = nc1.variables['y'][:]
@@ -56,7 +56,7 @@ def TohokuDomain(res=3):
     eta0vec = eta0.dat.data
     assert meshCoords.shape[0] == eta0vec.shape[0]
 
-    # Read and interpolate bathymetry data (courtesy of GEBCO):
+    # Read and interpolate bathymetry data (courtesy of GEBCO)
     nc2 = NetCDFFile('resources/bathymetry/tohoku.nc', mmap=False)
     lon2 = nc2.variables['lon'][:]
     lat2 = nc2.variables['lat'][:-1]
@@ -66,15 +66,13 @@ def TohokuDomain(res=3):
     b_vec = b.dat.data
     assert meshCoords.shape[0] == b_vec.shape[0]
 
-    # Interpolate data onto initial surface and bathymetry profiles:
+    # Interpolate data onto initial surface and bathymetry profiles
     for i, p in enumerate(meshCoords):
         eta0vec[i] = interpolatorSurf(p[1], p[0])
         b_vec[i] = - interpolatorSurf(p[1], p[0]) - interpolatorBath(p[1], p[0])
 
-    # Post-process the bathymetry to have a minimum depth of 30m:
+    # Post-process the bathymetry to have a minimum depth of 30m and plot
     b.assign(conditional(lt(30, b), b, 30))
-
-    # Plot initial surface and bathymetry profiles:
     File('plots/initialisation/surf.pvd').write(eta0)
     File('plots/initialisation/bathymetry.pvd').write(b)
 

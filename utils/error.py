@@ -1,6 +1,7 @@
 from firedrake import *
 
 import numpy as np
+import cmath
 
 from . import options
 
@@ -81,3 +82,33 @@ def totalVariation(data):
                 TV += np.abs(data[i] - data[iStart])
                 iStart = i
     return TV
+
+
+def analyticSolutionSW(eta0, b, t, op=options.Options(), trunc=5):
+    """
+    Generate analytic solution for linear SWEs on a flat bottom model domain.
+    
+    :param eta0: initial free surface field.
+    :param b: (constant) water depth.
+    :param t: current time.
+    :param op: object holding default parameter values.
+    :param trunc: term of Fourier series at which to truncate.
+    :return: 
+    """
+
+    # Collect parameters
+    g = op.g
+
+    # Collect mesh data and establish functions
+    mesh = eta0.function_space().mesh()
+    xy = mesh.coordinates.dat.data
+    u = Function(FunctionSpace(mesh, "DG", 1), name="Analytic velocity")
+    eta = Function(FunctionSpace(mesh, "CG", 2), name="Analytic free surface")
+
+    for k in range(trunc):
+        for l in range(trunc):
+            omega = np.sqrt((k ** 2 + l ** 2) * g * b)
+            for i, x, y in zip(range(len(xy)), xy[:, 0], xy[:, 1]):
+                eta.dat.data[i] += eta0.dat.data[i] * np.exp(cmath.i * (k * x + l * y - omega * t))
+
+    # TODO: Also do velocity. TEST THIS
