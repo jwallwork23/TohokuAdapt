@@ -97,14 +97,17 @@ def analyticSolutionSW(eta0, b, t, trunc=5):
     mesh = eta0.function_space().mesh()
     xy = mesh.coordinates.dat.data
     u = Function(FunctionSpace(mesh, "DG", 1), name="Analytic velocity")
-    eta = Function(FunctionSpace(mesh, "CG", 2), name="Analytic free surface")
+    eta = Function(FunctionSpace(mesh, "CG", 1), name="Analytic free surface")
+    # TODO: not sure it is as simple as using .dat.data with CG2 or DG1 fields. NEED CHANGE p=1->2
     g = 9.81
+    i = cmath.sqrt(-1)
 
-    for k in range(trunc):
-        for l in range(trunc):
+    for k in range(-trunc, trunc + 1):
+        for l in range(-trunc, trunc + 1):
             omega = np.sqrt((k ** 2 + l ** 2) * g * b)
-            for i, x, y in zip(range(len(xy)), xy[:, 0], xy[:, 1]):
-                eta.dat.data[i] += eta0.dat.data[i] * np.exp(cmath.i * (k * x + l * y - omega * t))
+            for j, x, y in zip(range(len(xy)), xy[:, 0], xy[:, 1]):
+                exponent = np.exp(i * (k * x + l * y - omega * t))
+                eta.dat.data[j] += eta0.dat.data[j] * exponent.real
 
     return eta
 
