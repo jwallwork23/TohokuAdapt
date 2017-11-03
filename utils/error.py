@@ -84,26 +84,23 @@ def totalVariation(data):
     return TV
 
 
-def analyticSolutionSW(eta0, b, t, op=options.Options(), trunc=5):
+def analyticSolutionSW(eta0, b, t, trunc=5):
     """
     Generate analytic solution for linear SWEs on a flat bottom model domain.
     
     :param eta0: initial free surface field.
     :param b: (constant) water depth.
     :param t: current time.
-    :param op: object holding default parameter values.
     :param trunc: term of Fourier series at which to truncate.
     :return: 
     """
-
-    # Collect parameters
-    g = op.g
 
     # Collect mesh data and establish functions
     mesh = eta0.function_space().mesh()
     xy = mesh.coordinates.dat.data
     u = Function(FunctionSpace(mesh, "DG", 1), name="Analytic velocity")
     eta = Function(FunctionSpace(mesh, "CG", 2), name="Analytic free surface")
+    g = 9.81
 
     for k in range(trunc):
         for l in range(trunc):

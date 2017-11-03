@@ -144,9 +144,13 @@ def isotropicMetric(V, f, bdy=False, op=options.Options()):
     hmax2 = pow(op.hmax, 2)
     M = Function(V)
     g = Function(FunctionSpace(V.mesh(), 'CG', 1))
-    if (f.ufl_element().family() == 'Lagrange') & (f.ufl_element().degree() == 1):
+    family = f.ufl_element().family()
+    deg = f.ufl_element().degree()
+    if (family == 'Lagrange') & (deg == 1):
         g.assign(f)
     else:
+        print("""Field for adaption is degree %d %s. Interpolation is required to 
+get a degree 1 Lagrange metric.""" % (deg, family))
         g.interpolate(f)
     for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(len(g.dat.data)):
         ig2 = 1. / max(hmin2, min(pow(g.dat.data[i], 2), hmax2))
@@ -209,9 +213,9 @@ def metricGradation(mesh, metric, beta=1.4, isotropic=False):
 
         # Loop over edges of mesh
         for e in range(eStart, eEnd):
-            cone = plex.getCone(e)  # Get vertices associated with edge e
-            iVer1 = cone[0] - vStart  # Vertex 1 index
-            iVer2 = cone[1] - vStart  # Vertex 2 index
+            cone = plex.getCone(e)      # Get vertices associated with edge e
+            iVer1 = cone[0] - vStart    # Vertex 1 index
+            iVer2 = cone[1] - vStart    # Vertex 2 index
 
             if (verTag[iVer1] < i) & (verTag[iVer2] < i):
                 continue

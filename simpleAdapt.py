@@ -20,7 +20,7 @@ N = [nEle, nEle]    # Min/max #Elements
 print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d. \n' % (nEle, nVer))
 
 # Get default parameter values and check CFL criterion
-op = opt.Options(iso=True)
+op = opt.Options()
 nVerT = op.vscale * nVer    # Target #Vertices
 iso = op.iso
 dirName = 'plots/simpleAdapt/'
@@ -59,17 +59,18 @@ while mn < np.ceil(T / (dt * rm)):
             ve.close()
 
     # Compute Hessian and metric, adapt mesh and interpolate variables
-    V = TensorFunctionSpace(mesh, 'CG', 1)
-    if op.mtype != 's':
-        M = adap.isotropicMetric(V, elev_2d, op=op) if iso else adap.computeSteadyMetric(
-            mesh, V, adap.constructHessian(mesh, V, elev_2d, op=op), elev_2d, nVerT=nVerT, op=op)
-    if op.mtype != 'f':
-        spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
-        M2 = adap.isotropicMetric(V, spd) if iso else adap.computeSteadyMetric(
-            mesh, V, adap.constructHessian(mesh, V, spd, op=op), spd, nVerT=nVerT, op=op)
-        M = adap.metricIntersection(mesh, V, M, M2) if op.mtype == 'b' else M2
-    mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-    elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
+    if mn != 0:
+        V = TensorFunctionSpace(mesh, 'CG', 1)
+        if op.mtype != 's':
+            M = adap.isotropicMetric(V, elev_2d, op=op) if iso else adap.computeSteadyMetric(
+                mesh, V, adap.constructHessian(mesh, V, elev_2d, op=op), elev_2d, nVerT=nVerT, op=op)
+        if op.mtype != 'f':
+            spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
+            M2 = adap.isotropicMetric(V, spd) if iso else adap.computeSteadyMetric(
+                mesh, V, adap.constructHessian(mesh, V, spd, op=op), spd, nVerT=nVerT, op=op)
+            M = adap.metricIntersection(mesh, V, M, M2) if op.mtype == 'b' else M2
+        mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
+        elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
 
     # Get solver parameter values and construct solver
     solver_obj = solver2d.FlowSolver2d(mesh, b)
@@ -104,10 +105,10 @@ while mn < np.ceil(T / (dt * rm)):
     N = [min(nEle, N[0]), max(nEle, N[1])]
     Sn += nEle
     mn += 1
-    print('\n************************** Adaption step %d ****************************' % mn)
-    print('Time = %1.2f mins / %1.1f mins' % (mn * rm * dt / 60., T / 60.))
-    print('#Elements after adaption step %d: %d' % (mn, nEle))
-    print('Min/max #Elements:', N, ' Mean #Elements: %d' % (Sn / mn))
-    print('Elapsed time for this step: %1.2fs \n' % (clock() - tic2))
+    print("""\n************************** Adaption step %d ****************************
+Percent complete  : %4.1f      Elapsed time for this step : %4.2fs        
+Current #Elements : %d      Mean #Elements    : %d
+Minimum #Elements : %s      Maximum #Elements : %s\n""" %
+          (mn, clock() - tic2, (100 * mn * rm * dt) / T, nEle, Sn / mn, N[0], N[1]))
 toc1 = clock()
 print('Elapsed time for adaptive solver: %1.1fs (%1.2f mins)' % (toc1 - tic1, (toc1 - tic1) / 60))

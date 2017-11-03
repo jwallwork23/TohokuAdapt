@@ -240,11 +240,10 @@ while mn < iEnd:
     N = [min(nEle, N[0]), max(nEle, N[1])]
     Sn += nEle
     mn += 1
-    print('\n************************** Adaption step %d ****************************' % mn)
-    print('Time = %1.2f mins / %1.1f mins' % (mn * rm * dt / 60., T / 60.))
-    print('Number of vertices after adaption step %d: ' % mn, nEle)
-    print('#Elements after adaption step %d: %d' % (mn, nEle))
-    print('Min/max #Elements:', N, ' Mean #Elements: %d' % (Sn / mn))
-    print('Elapsed time for this step: %1.2fs \n' % (clock() - tic2))
+    print("""\n************************** Adaption step %d ****************************
+Percent complete  : %4.1f      Elapsed time for this step : %4.2fs        
+Current #Elements : %d      Mean #Elements    : %d
+Minimum #Elements : %s      Maximum #Elements : %s\n""" %
+      (mn, clock() - tic2, (100 * mn * rm * dt) / T, nEle, Sn / mn, N[0], N[1]))
 toc1 = clock()
 print('Elapsed time for forward solver: %1.1fs (%1.2f mins)' % (toc1 - tic1, (toc1 - tic1) / 60))
