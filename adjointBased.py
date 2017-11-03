@@ -241,9 +241,8 @@ while mn < iEnd:
     Sn += nEle
     mn += 1
     print("""\n************************** Adaption step %d ****************************
-Percent complete  : %4.1f      Elapsed time for this step : %4.2fs        
-Current #Elements : %d      Mean #Elements    : %d
-Minimum #Elements : %s      Maximum #Elements : %s\n""" %
-      (mn, clock() - tic2, (100 * mn * rm * dt) / T, nEle, Sn / mn, N[0], N[1]))
+Percent complete  : %4.1f%%    Elapsed time : %4.2fs (This step : %4.2fs)     
+#Elements... Current : %d  Mean : %d  Minimum : %s  Maximum : %s\n""" %
+          (mn, (100 * mn * rm * dt) / T, clock() - tic1, clock() - tic2, nEle, Sn / mn, N[0], N[1]))
 toc1 = clock()
 print('Elapsed time for forward solver: %1.1fs (%1.2f mins)' % (toc1 - tic1, (toc1 - tic1) / 60))

@@ -6,16 +6,16 @@ import utils.error as err
 
 # Set parameter values
 depth = 0.1
-T = 2.5
+T = 3.
 g = 9.81
 dt = 0.05
 Dt = Constant(dt)
 basic = False
 
 # Define mesh and function space
-n = 32
-lx = 4
-mesh = SquareMesh(lx * n, lx * n, lx, lx)
+n = 100
+lx = 2 * np.pi
+mesh = SquareMesh(n, n, lx, lx)
 x, y = SpatialCoordinate(mesh)
 W = VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "CG", 2)
 b = Function(W.sub(1), name="Bathymetry").assign(depth)
@@ -54,7 +54,7 @@ adjointFile = File("plots/adjointBased/explicit/adjoint.pvd")
 adjointFile.write(lu, le, time=T)
 
 # Establish (smoothened) indicator function for adjoint equations
-fexpr = "(x[0] >= 0.) & (x[0] < 0.25) & (x[1] > 1.8) & (x[1] < 2.2) ? 1e-3 : 0."
+fexpr = "(x[0] >= 0.) & (x[0] < 0.2) & (x[1] > %.2f) & (x[1] < %.2f) ? 1e-3 : 0." % (np.pi - 0.2, np.pi + 0.2)
 f = Function(W.sub(1), name="Forcing term").interpolate(Expression(fexpr))
 
 # Set up the variational problem, using Crank Nicolson timestepping
@@ -88,7 +88,7 @@ assert(mn == 0)
 q_ = Function(W)
 u_, eta_ = q_.split()
 u_.interpolate(Expression([0, 0]))
-eta_.interpolate(1e-3 * exp( - (pow(x - 2., 2) + pow(y - 2., 2)) / 0.04))
+eta_.interpolate(1e-3 * exp( - (pow(x - np.pi, 2) + pow(y - np.pi, 2)) / 0.04))
 q = Function(W).assign(q_)
 u, eta = q.split()
 u.rename("Fluid velocity")

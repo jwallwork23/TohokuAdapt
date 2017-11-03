@@ -32,7 +32,7 @@ def explicitErrorEstimator(W, u_, u, eta_, eta, lu, le, b, dt):
     hk = Function(W.sub(1)).interpolate(CellSize(mesh))
 
     # Compute element residual
-    rk_01 = Function(W.sub(0)).interpolate(u_ - u - dt * op.g * grad(0.5 * (eta + eta_)))
+    rk_01 = Function(W.sub(0)).interpolate(u_ - u - dt * 9.81 * grad(0.5 * (eta + eta_)))
     rk_2 = Function(W.sub(1)).interpolate(eta_ - eta - dt * div(b * 0.5 * (u + u_)))
     rho = assemble(v * hk * sqrt(dot(rk_01, rk_01) + rk_2 * rk_2) / CellVolume(mesh) * dx)
 
@@ -86,13 +86,11 @@ def totalVariation(data):
 
 def analyticSolutionSW(eta0, b, t, trunc=5):
     """
-    Generate analytic solution for linear SWEs on a flat bottom model domain.
-    
     :param eta0: initial free surface field.
     :param b: (constant) water depth.
     :param t: current time.
     :param trunc: term of Fourier series at which to truncate.
-    :return: 
+    :return: analytic solution for linear SWEs on a flat bottom model domain.
     """
 
     # Collect mesh data and establish functions
@@ -107,5 +105,7 @@ def analyticSolutionSW(eta0, b, t, trunc=5):
             omega = np.sqrt((k ** 2 + l ** 2) * g * b)
             for i, x, y in zip(range(len(xy)), xy[:, 0], xy[:, 1]):
                 eta.dat.data[i] += eta0.dat.data[i] * np.exp(cmath.i * (k * x + l * y - omega * t))
+
+    return eta
 
     # TODO: Also do velocity. TEST THIS
