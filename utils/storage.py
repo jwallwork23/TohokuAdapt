@@ -32,6 +32,7 @@ def gaugeTimeseries(gauge, dirName, iEnd):
     name = input("Enter a name for this time series (e.g. 'meanEle=5767'): ")
     dirName = 'plots/' + dirName + '/hdf5'
     error = [0, 0, 0, 0]
+    norm = [0, 0, 0, 0]
 
     # Interpolate data from the inversion analysis and plot
     measuredfile = open('timeseries/' + gauge + '_measured_dat.txt', 'r')
@@ -47,24 +48,62 @@ def gaugeTimeseries(gauge, dirName, iEnd):
     outfile = open('timeseries/{y1}_{y2}.txt'.format(y1=gauge, y2=name), 'w+')
     val = []
     t = np.linspace(0, 25, num=int(iEnd + 1))
-    v0 = data - float(m(t[0]))
+    TV = 0
     for i in range(iEnd + 1):
-        # TODO: how to define a function space if we do not know the mesh?
+
+        # Load data from HDF5 and get timeseries data TODO: how to define a function space if we do not know the mesh?
         with DumbCheckpoint(dirName + '/Elevation2d_' + indexString(i), mode=FILE_READ) as el:
             el.load(elev_2d, name='elev_2d')
         data = elev_2d.at(op.gaugeCoord(gauge))
-        val.append(np.abs(data - v0 - float(m(t[i]))))
+        mVal = float(m(t[i]))
+        if i == 0:
+            v0 = data - mVal
+            sStart = data
+            mStart = mVal
+        val.append(np.abs(data - v0 - mVal))
+
+        # Compute L1, L2, L-infinity errors and norms of gauge data
         error[0] += val[-1]
         error[1] += val[-1] ** 2
         if val[-1] > error[2]:
             error[2] = val[-1]
+        norm[0] += mVal
+        norm[1] += mVal ** 2
+        if mVal > norm[2]:
+            norm[2] = mVal
+
+        # Compute total variation of error and gauge data
+        if i == 1:
+            sign = (data - data_) / np.abs(data - data_)
+            mSign = (mVal - mVal_) / np.abs(mVal - mVal_)
+        elif i > 1:
+            sign_ = sign
+            mSign_ = mSign
+            sign = (data - data_) / np.abs(data - data_)
+            mSign = (mVal - mVal_) / np.abs(mVal - mVal_)
+            if (sign != sign_) | (i == iEnd):
+                error[3] += np.abs(data - sStart)
+                sStart = data
+            if (mSign != mSign_) | (i == iEnd):
+                norm[3] += np.abs(mVal - mStart)
+                mStart = mVal
+        data_ = data
+        mVal_ = mVal
+
         outfile.write(str(data) + '\n')
     outfile.close()
-    error[3] = err.totalVariation(val)
 
     # Print errors to screen
-    print('L1 norm : %5.2f, L2 norm : %5.2f, L-infinity norm : %5.2f, Total variation : %5.2f',
-          (error[0] / 1501, np.sqrt(error[1] / 1501), error[2], error[3]))
+    error[0] /= (iEnd + 1)
+    norm[0] /= (iEnd + 1)
+    error[1] = np.sqrt(error[1] / (iEnd + 1))
+    norm[1] = np.sqrt(norm[1] / (iEnd + 1))
+    print("""Absolute L1 norm :         %5.2f Relative L1 norm :         %5.2f
+             Absolute L2 norm :         %5.2f Relative L2 norm :         %5.2f
+             Absolute L-infinity norm : %5.2f Relative L-infinity norm : %5.2f
+             Absolute total variation : %5.2f Relative total variation : %5.2f""" %
+          (error[0], error[0] / norm[0], error[1], error[1] / norm[1],
+           error[2], error[2] / norm[2], error[3], error[3] / norm[3],))
 
     return val
 
