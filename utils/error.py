@@ -3,8 +3,6 @@ from firedrake import *
 import numpy as np
 import cmath
 
-from . import options
-
 
 class OutOfRangeError(ValueError):
     pass
@@ -84,31 +82,51 @@ def totalVariation(data):
     return TV
 
 
-def analyticSolutionSW(eta0, b, t, trunc=5):
+def analyticSolutionSW(V, b, t, x0=0., y0=0., s=5., h=1e-3, trunc=5):
     """
-    :param eta0: initial free surface field.
+    :param V: FunctionSpace on which to define analytic solution.
     :param b: (constant) water depth.
     :param t: current time.
+    :param x0: x-coordinate of initial Gaussian bell centroid.
+    :param y0: y-coordinate of initial Gaussian bell centroid.
+    :param s: size parameter for initial Gaussian bell.
+    :param h: initial free surface height.
     :param trunc: term of Fourier series at which to truncate.
     :return: analytic solution for linear SWEs on a flat bottom model domain.
     """
 
     # Collect mesh data and establish functions
-    mesh = eta0.function_space().mesh()
+    mesh = V.mesh()
     xy = mesh.coordinates.dat.data
-    u = Function(FunctionSpace(mesh, "DG", 1), name="Analytic velocity")
-    eta = Function(FunctionSpace(mesh, "CG", 1), name="Analytic free surface")
-    # TODO: not sure it is as simple as using .dat.data with CG2 or DG1 fields. NEED CHANGE p=1->2
+    eta = Function(V)
+    try:
+        assert((V.ufl_element().family() == 'Lagrange') & (V.ufl_element().degree() == 1))
+    except:
+        NotImplementedError("Only CG1 fields are currently supported.")
     g = 9.81
     i = cmath.sqrt(-1)
 
     for k in range(-trunc, trunc + 1):
         for l in range(-trunc, trunc + 1):
-            omega = np.sqrt((k ** 2 + l ** 2) * g * b)
+            kappa2 = k ** 2 + l ** 2
+            omega = np.sqrt(kappa2 * g * b)
             for j, x, y in zip(range(len(xy)), xy[:, 0], xy[:, 1]):
-                exponent = np.exp(i * (k * x + l * y - omega * t))
-                eta.dat.data[j] += eta0.dat.data[j] * exponent.real
+                exponent = np.exp(i * ((k * (x - x0) + l * (y - y0)) * s - omega * t))
+                eta.dat.data[j] += np.pi * h * exponent.real * np.sqrt(kappa2) * np.exp(- kappa2 / 4)
 
     return eta
 
-    # TODO: Also do velocity. TEST THIS
+
+if __name__ == '__main__':
+    n = 100
+    lx = 2 * np.pi
+    mesh = SquareMesh(n, n, lx, lx)
+    x, y = SpatialCoordinate(mesh)
+    V = FunctionSpace(mesh, "CG", 1)
+    outfile = File("plots/analytic/freeSurface.pvd")
+    print("Generating analytic solution to linear shallow water equations...")
+    for t in np.linspace(0., 3., 61):
+        print("t = %.2f" % t)
+        eta = analyticSolutionSW(V, 0.1, t, x0=np.pi, y0=np.pi, s=1.)
+        eta.rename("Analytic free surface")
+        outfile.write(eta, time=t)
