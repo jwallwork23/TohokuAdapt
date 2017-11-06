@@ -1,3 +1,4 @@
+from firedrake import *
 from thetis import *
 from thetis.field_defs import field_metadata
 
@@ -28,11 +29,15 @@ print('... with #Elements : %d. Initial #Vertices : %d. \n' % (nEle, nVer))
 op = opt.Options(dt=0.05, hmin=5e-2, hmax=1., T=2., ndump=1)
 nVerT = op.vscale * nVer    # Target #Vertices
 T = op.T
+g = op.g
 dt = op.dt
+Dt = Constant(dt)
 op.checkCFL(b)
 ndump = op.ndump
 
 # Run fixedMesh forward solver
+print('******************** FIXED MESH SHALLOW WATER TEST ********************\n')
+tic1 = clock()
 dirName = "plots/tests/fixedMesh"
 solver_obj = solver2d.FlowSolver2d(mesh, b)
 options = solver_obj.options
@@ -47,14 +52,13 @@ options.export_diagnostics = True
 options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
 solver_obj.assign_initial_conditions(elev=eta0)
 solver_obj.iterate()
+fixedMeshTime = clock() - tic1
+print('Elapsed time for fixed mesh solver: %1.1fs (%1.2f mins) \n' % (fixedMeshTime, fixedMeshTime / 60))
 
-# Update parameters for simpleAdapt solver
+print('************ "SIMPLE" MESH ADAPTIVE SHALLOW WATER TEST ****************\n')
 rm = 5
 dirName = 'plots/tests/simpleAdapt/'
-
-# Initialise counters
 t = 0.
-dumpn = 0
 mn = 0
 Sn = 0
 tic1 = clock()
@@ -121,12 +125,82 @@ while mn < np.ceil(T / (dt * rm)):
     Sn += nEle
     mn += 1
     print("""\n************************** Adaption step %d ****************************
-Percent complete  : %4.1f%%    Elapsed time : %4.2fs (This step : %4.2fs)     
+Percent complete  : %4.1f%%    Elapsed time : %4.2fs (This step : %4.2fs)
 #Elements... Current : %d  Mean : %d  Minimum : %s  Maximum : %s\n""" %
           (mn, (100 * mn * rm * dt) / T, clock() - tic1, clock() - tic2, nEle, Sn / mn, N[0], N[1]))
-toc1 = clock()
-print('Elapsed time for simple adaptive solver: %1.1fs (%1.2f mins)' % (toc1 - tic1, (toc1 - tic1) / 60))
+simpleAdaptTime = clock() - tic1
+print('Elapsed time for simple adaptive solver: %1.1fs (%1.2f mins) \n' % (simpleAdaptTime, simpleAdaptTime / 60))
 
-# TODO: Update parameters for adjointBased solver
-# TODO: run fixed mesh adjoint solver backward in time to t = 0, again storing to hdf5
-# TODO: run adjointBased forward solver
+print('********** ADJOINT BASED MESH ADAPTIVE SHALLOW WATER TEST *************\n')
+rm = 10
+t = T
+mn = int(T / dt)
+tic1 = clock()
+
+# Solver parameters
+params = {'mat_type': 'matfree',
+          'snes_type': 'ksponly',
+          'pc_type': 'python',
+          'pc_python_type': 'firedrake.AssembledPC',
+          'assembled_pc_type': 'lu',
+          'snes_lag_preconditioner': -1,
+          'snes_lag_preconditioner_persists': True}
+
+# Establish adjoint variables and apply initial conditions
+lam_ = Function(W)
+lu_, le_ = lam_.split()
+lu_.interpolate(Expression([0, 0]))
+le_.interpolate(Expression(0))
+lam = Function(W).assign(lam_)
+lu, le = lam.split()
+lu.rename("Adjoint velocity")
+le.rename("Adjoint free surface")
+
+# Store final time data to HDF5 and PVD
+with DumbCheckpoint("plots/adjointBased/explicit/hdf5/adjoint_" + str(mn), mode=FILE_CREATE) as chk:
+    chk.store(lu)
+    chk.store(le)
+    chk.close()
+adjointFile = File("plots/adjointBased/explicit/adjoint.pvd")
+adjointFile.write(lu, le, time=T)
+
+# Establish (smoothened) indicator function for adjoint equations
+x1 = 0.
+x2 = 0.4
+y1 = np.pi - 0.4
+y2 = np.pi + 0.4
+fexpr = "(x[0] >= %.2f) & (x[0] < %.2f) & (x[1] > %.2f) & (x[1] < %.2f) ? 1e-3 : 0." % (x1, x2, y1, y2)
+f = Function(W.sub(1), name="Forcing term").interpolate(Expression(fexpr))
+
+# Set up the variational problem, using Crank Nicolson timestepping
+w, xi = TestFunctions(W)
+lu, le = split(lam)
+lu_, le_ = split(lam_)
+L = ((le - le_) * xi + inner(lu - lu_, w)
+     - Dt * g * inner(0.5 * (lu + lu_), grad(xi)) - f * xi
+     + Dt * (b * inner(grad(0.5 * (le + le_)), w) + 0.5 * (le + le_) * inner(grad(b), w))) * dx
+adjointProblem = NonlinearVariationalProblem(L, lam)
+adjointSolver = NonlinearVariationalSolver(adjointProblem, solver_parameters=params)
+lu, le = lam.split()
+lu_, le_ = lam_.split()
+
+print("Starting adjoint run...")
+while mn > 0:
+    t -= dt
+    mn -= 1
+    print("t = %5.2fs" % t)
+
+    # Solve the problem, update variables and dump to vtu and HDF5
+    adjointSolver.solve()
+    lam_.assign(lam)
+    adjointFile.write(lu, le, time=t)
+    with DumbCheckpoint("plots/tests/adjointBased/hdf5/adjoint_" + str(mn), mode=FILE_CREATE) as chk:
+        chk.store(lu)
+        chk.store(le)
+        chk.close()
+assert(mn == 0)
+adjointRunTime = clock() - tic1
+print('Elapsed time for fixed mesh adjoint solver: %1.1fs (%1.2f mins) \n' % (adjointRunTime, adjointRunTime / 60))
+
+# TODO: use firedrake-adjoint or create a custom modified solver_obj for adjoint LSWEs in Thetis
+# TODO: run adjointBased forward solver (using Thetis)
