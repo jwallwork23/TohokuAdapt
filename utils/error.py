@@ -82,14 +82,13 @@ def totalVariation(data):
     return TV
 
 
-def analyticSolutionSW(V, b, t, x0=0., y0=0., s=5., h=1e-3, trunc=5):
+def analyticSolutionSW(V, b, t, x0=0., y0=0., h=1e-3, trunc=5):
     """
     :param V: FunctionSpace on which to define analytic solution.
     :param b: (constant) water depth.
     :param t: current time.
     :param x0: x-coordinate of initial Gaussian bell centroid.
     :param y0: y-coordinate of initial Gaussian bell centroid.
-    :param s: size parameter for initial Gaussian bell.
     :param h: initial free surface height.
     :param trunc: term of Fourier series at which to truncate.
     :return: analytic solution for linear SWEs on a flat bottom model domain.
@@ -111,7 +110,7 @@ def analyticSolutionSW(V, b, t, x0=0., y0=0., s=5., h=1e-3, trunc=5):
             kappa2 = k ** 2 + l ** 2
             omega = np.sqrt(kappa2 * g * b)
             for j, x, y in zip(range(len(xy)), xy[:, 0], xy[:, 1]):
-                exponent = np.exp(i * ((k * (x - x0) + l * (y - y0)) * s - omega * t))
+                exponent = np.exp(i * (k * (x - x0) + l * (y - y0) - omega * t))
                 eta.dat.data[j] += np.pi * h * exponent.real * np.sqrt(kappa2) * np.exp(- kappa2 / 4)
 
     return eta
@@ -125,8 +124,11 @@ if __name__ == '__main__':
     V = FunctionSpace(mesh, "CG", 1)
     outfile = File("plots/analytic/freeSurface.pvd")
     print("Generating analytic solution to linear shallow water equations...")
-    for t in np.linspace(0., 3., 61):
+    for t in np.linspace(0., 3., 41):
         print("t = %.2f" % t)
-        eta = analyticSolutionSW(V, 0.1, t, x0=np.pi, y0=np.pi, s=1.)
+        eta = analyticSolutionSW(V, 0.1, t, x0=np.pi, y0=np.pi)
         eta.rename("Analytic free surface")
         outfile.write(eta, time=t)
+        with DumbCheckpoint("plots/analytic/hdf5/freeSurface_" + str(t), mode=FILE_CREATE) as chk:
+            chk.store(eta)
+            chk.close()
