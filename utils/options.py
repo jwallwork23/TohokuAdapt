@@ -142,6 +142,6 @@ class Options:
         """
         cdt = self.hmin / np.sqrt(self.g * max(b.dat.data))
         if self.dt > cdt:
-            print('WARNING: chosen timestep dt = %.2fs exceeds recommended value of %.2fs' % (dt, cdt))
-            if input('Hit anything except enter if happy to proceed.'):
+            print('WARNING: chosen timestep dt = %.4fs exceeds recommended value of %.4fs' % (self.dt, cdt))
+            if input('Hit enter if happy to proceed.'):
                 exit(23)
