@@ -82,7 +82,7 @@ def totalVariation(data):
     return TV
 
 
-def analyticSolutionSW(V, b, t, x0=0., y0=0., h=1e-3, trunc=5):
+def analyticSolutionSW(V, b, t, x0=0., y0=0., h=1e-3, trunc=10):
     """
     :param V: FunctionSpace on which to define analytic solution.
     :param b: (constant) water depth.
@@ -124,7 +124,7 @@ if __name__ == '__main__':
     V = FunctionSpace(mesh, "CG", 1)
     outfile = File("plots/analytic/freeSurface.pvd")
     print("Generating analytic solution to linear shallow water equations...")
-    for t in np.linspace(0., 3., 41):
+    for t in np.linspace(0., 2., 41):
         print("t = %.2f" % t)
         eta = analyticSolutionSW(V, 0.1, t, x0=np.pi, y0=np.pi)
         eta.rename("Analytic free surface")

@@ -6,7 +6,7 @@ import utils.error as err
 
 # Set parameter values
 depth = 0.1
-T = 3.
+T = 2.
 g = 9.81
 dt = 0.05
 Dt = Constant(dt)
@@ -54,7 +54,11 @@ adjointFile = File("plots/adjointBased/explicit/adjoint.pvd")
 adjointFile.write(lu, le, time=T)
 
 # Establish (smoothened) indicator function for adjoint equations
-fexpr = "(x[0] >= 0.) & (x[0] < 0.2) & (x[1] > %.2f) & (x[1] < %.2f) ? 1e-3 : 0." % (np.pi - 0.2, np.pi + 0.2)
+x1 = 0.
+x2 = 0.4
+y1 = np.pi - 0.4
+y2 = np.pi + 0.4
+fexpr = "(x[0] >= %.2f) & (x[0] < %.2f) & (x[1] > %.2f) & (x[1] < %.2f) ? 1e-3 : 0." % (x1, x2, y1, y2)
 f = Function(W.sub(1), name="Forcing term").interpolate(Expression(fexpr))
 
 # Set up the variational problem, using Crank Nicolson timestepping
@@ -88,7 +92,7 @@ assert(mn == 0)
 q_ = Function(W)
 u_, eta_ = q_.split()
 u_.interpolate(Expression([0, 0]))
-eta_.interpolate(1e-3 * exp( - (pow(x - np.pi, 2) + pow(y - np.pi, 2)) / 0.04))
+eta_.interpolate(1e-3 * exp( - (pow(x - np.pi, 2) + pow(y - np.pi, 2))))
 q = Function(W).assign(q_)
 u, eta = q.split()
 u.rename("Fluid velocity")
@@ -121,10 +125,8 @@ while mn < int(T / dt):
         chk.load(lu, name="Adjoint velocity")
         chk.load(le, name="Adjoint free surface")
         chk.close()
-    if basic:
-        rho = err.basicErrorEstimator(u, Function(W1).interpolate(eta), lu, Function(W1).interpolate(le))
-    else:
-        rho = err.explicitErrorEstimator(W, u_, u, eta_, eta, lu, le, b, dt)
+    rho = err.basicErrorEstimator(u, Function(W1).interpolate(eta), lu, Function(W1).interpolate(le)) \
+        if basic else err.explicitErrorEstimator(W, u_, u, eta_, eta, lu, le, b, dt)
     q_.assign(q)
     qfile.write(u, eta, time=t)
     rfile.write(rho, time=t)
