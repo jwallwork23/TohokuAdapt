@@ -104,14 +104,17 @@ def analyticSolutionSW(V, b, t, x0=0., y0=0., h=1e-3, trunc=10):
         NotImplementedError("Only CG1 fields are currently supported.")
     g = 9.81
     i = cmath.sqrt(-1)
+    Zt = range(-trunc, trunc + 1)
 
-    for k in range(-trunc, trunc + 1):
-        for l in range(-trunc, trunc + 1):
+    for k in Zt:
+        for l in Zt:
             kappa2 = k ** 2 + l ** 2
             omega = np.sqrt(kappa2 * g * b)
             for j, x, y in zip(range(len(xy)), xy[:, 0], xy[:, 1]):
                 exponent = np.exp(i * (k * (x - x0) + l * (y - y0) - omega * t))
-                eta.dat.data[j] += np.pi * h * exponent.real * np.sqrt(kappa2) * np.exp(- kappa2 / 4)
+                # TODO: potentially swap out omega*t for a cosine term
+                # TODO: take into account proper coordinate transforms. CHECK THIS
+                eta.dat.data[j] += np.pi * h * exponent.real * np.sqrt(kappa2) * np.exp(- kappa2 / 4) / pow(2 * trunc + 1, 2)
 
     return eta
 
