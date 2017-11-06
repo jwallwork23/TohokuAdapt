@@ -44,14 +44,7 @@ lam = Function(W).assign(lam_)
 lu, le = lam.split()
 lu.rename("Adjoint velocity")
 le.rename("Adjoint free surface")
-
-# Store final time data to HDF5 and PVD
-with DumbCheckpoint("plots/adjointBased/explicit/hdf5/adjoint_" + str(mn), mode=FILE_CREATE) as chk:
-    chk.store(lu)
-    chk.store(le)
-    chk.close()
 adjointFile = File("plots/adjointBased/explicit/adjoint.pvd")
-adjointFile.write(lu, le, time=T)
 
 # Establish (smoothened) indicator function for adjoint equations
 x1 = 0.
@@ -74,18 +67,19 @@ lu, le = lam.split()
 lu_, le_ = lam_.split()
 
 while mn > 0:
-    t -= dt
-    mn -= 1
     print("mn = %3d, t = %5.2fs" % (mn, t))
 
     # Solve the problem, update variables and dump to vtu and HDF5
-    adjointSolver.solve()
-    lam_.assign(lam)
+    if mn != int(T / dt):
+        adjointSolver.solve()
+        lam_.assign(lam)
     adjointFile.write(lu, le, time=t)
     with DumbCheckpoint("plots/adjointBased/explicit/hdf5/adjoint_" + str(mn), mode=FILE_CREATE) as chk:
         chk.store(lu)
         chk.store(le)
         chk.close()
+    t -= dt
+    mn -= 1
 assert(mn == 0)
 
 # Initialise variables and specify bathymetry

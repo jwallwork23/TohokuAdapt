@@ -6,6 +6,7 @@ import numpy as np
 from time import clock
 
 import utils.adaptivity as adap
+import utils.error as err
 import utils.interpolation as inte
 import utils.options as opt
 import utils.storage as stor
@@ -155,14 +156,7 @@ lam = Function(W).assign(lam_)
 lu, le = lam.split()
 lu.rename("Adjoint velocity")
 le.rename("Adjoint free surface")
-
-# Store final time data to HDF5 and PVD
-with DumbCheckpoint("plots/adjointBased/explicit/hdf5/adjoint_" + str(mn), mode=FILE_CREATE) as chk:
-    chk.store(lu)
-    chk.store(le)
-    chk.close()
-adjointFile = File("plots/adjointBased/explicit/adjoint.pvd")
-adjointFile.write(lu, le, time=T)
+adjointFile = File("plots/tests/adjointBased/adjoint.pvd")
 
 # Establish (smoothened) indicator function for adjoint equations
 x1 = 0.
@@ -186,18 +180,19 @@ lu_, le_ = lam_.split()
 
 print("Starting adjoint run...")
 while mn > 0:
-    t -= dt
-    mn -= 1
     print("t = %5.2fs" % t)
 
     # Solve the problem, update variables and dump to vtu and HDF5
-    adjointSolver.solve()
-    lam_.assign(lam)
+    if mn != int(T / dt):
+        adjointSolver.solve()
+        lam_.assign(lam)
     adjointFile.write(lu, le, time=t)
     with DumbCheckpoint("plots/tests/adjointBased/hdf5/adjoint_" + str(mn), mode=FILE_CREATE) as chk:
         chk.store(lu)
         chk.store(le)
         chk.close()
+    t -= dt
+    mn -= 1
 assert(mn == 0)
 adjointRunTime = clock() - tic1
 print('Elapsed time for fixed mesh adjoint solver: %1.1fs (%1.2f mins) \n' % (adjointRunTime, adjointRunTime / 60))
