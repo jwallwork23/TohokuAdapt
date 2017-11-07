@@ -3,11 +3,10 @@ import numpy as np
 import scipy.interpolate as si
 import matplotlib.pyplot as plt
 
-from . import error
-from . import options
+import options as opt
 
 
-op = options.Options()
+op = opt.Options()
 
 def indexString(index):
     """

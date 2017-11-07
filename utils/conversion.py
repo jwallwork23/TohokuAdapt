@@ -1,7 +1,7 @@
 import math
 import numpy as np
 
-from . import error
+import error as err
 
 # Top matter courtesy of Tobias Bieniek, 2012.
 __all__ = ['to_latlon', 'from_latlon', 'vectorlonlat2utm', 'get_latitude']
@@ -53,17 +53,17 @@ def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None):
         raise ValueError('set either zone_letter or northern, but not both')
 
     if not 100000 <= easting < 1000000:
-        raise error.OutOfRangeError('easting out of range (must be between 100,000 m and 999,999 m)')
+        raise err.OutOfRangeError('easting out of range (must be between 100,000 m and 999,999 m)')
     if not 0 <= northing <= 10000000:
-        raise error.OutOfRangeError('northing out of range (must be between 0 m and 10,000,000 m)')
+        raise err.OutOfRangeError('northing out of range (must be between 0 m and 10,000,000 m)')
     if not 1 <= zone_number <= 60:
-        raise error.OutOfRangeError('zone number out of range (must be between 1 and 60)')
+        raise err.OutOfRangeError('zone number out of range (must be between 1 and 60)')
 
     if zone_letter:
         zone_letter = zone_letter.upper()
 
         if not 'C' <= zone_letter <= 'X' or zone_letter in ['I', 'O']:
-            raise error.OutOfRangeError('zone letter out of range (must be between C and X)')
+            raise err.OutOfRangeError('zone letter out of range (must be between C and X)')
 
         northern = (zone_letter >= 'N')
 
@@ -137,9 +137,9 @@ def from_latlon(latitude, longitude, force_zone_number=None):
     :return: UTM coordinate 4-tuple.
     """
     if not -80.0 <= latitude <= 84.0:
-        raise error.OutOfRangeError('latitude out of range (must be between 80 deg S and 84 deg N)')
+        raise err.OutOfRangeError('latitude out of range (must be between 80 deg S and 84 deg N)')
     if not -180.0 <= longitude <= 180.0:
-        raise error.OutOfRangeError('longitude out of range (must be between 180 deg W and 180 deg E)')
+        raise err.OutOfRangeError('longitude out of range (must be between 180 deg W and 180 deg E)')
 
     lat_rad = math.radians(latitude)
     lat_sin = math.sin(lat_rad)

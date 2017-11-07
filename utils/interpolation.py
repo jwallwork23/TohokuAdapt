@@ -1,5 +1,7 @@
 from firedrake import *
 
+import error as err
+
 
 def interp(mesh, *fields):
     """
@@ -60,7 +62,7 @@ def interp(mesh, *fields):
                     f_new.dat.data[x] = val
                     notInDomain.remove(x)
             if eps >= 1e8:
-                raise ValueError('Playing with epsilons failed. Abort.')
+                raise err.OutOfRangeError('Playing with epsilons failed. Abort.')
         fields_new += (f_new,)
     return fields_new
 

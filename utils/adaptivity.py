@@ -3,10 +3,10 @@ import numpy as np
 from numpy import linalg as la
 from scipy import linalg as sla
 
-from . import options
+import options as opt
 
 
-def constructHessian(mesh, V, sol, op=options.Options()):
+def constructHessian(mesh, V, sol, op=opt.Options()):
     """
     Reconstructs the hessian of a scalar solution field with respect to the current mesh. The code for the integration 
     by parts reconstruction approach is based on the Monge-Amp\`ere tutorial provided in the Firedrake website 
@@ -45,7 +45,7 @@ def constructHessian(mesh, V, sol, op=options.Options()):
     return H
 
 
-def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=options.Options()):
+def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=opt.Options()):
     """
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``computeSteadyMetric``, from 
     ``adapt.py``, 2016.
@@ -132,7 +132,7 @@ def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=options.O
     return M
 
 
-def isotropicMetric(V, f, bdy=False, op=options.Options()):
+def isotropicMetric(V, f, bdy=False, op=opt.Options()):
     """
     :param V: tensor function space on which metric will be defined.
     :param f: (scalar) function to adapt to.

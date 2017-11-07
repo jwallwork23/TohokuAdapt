@@ -3,6 +3,8 @@ from firedrake import *
 import numpy as np
 import cmath
 
+import storage as stor
+
 
 class OutOfRangeError(ValueError):
     pass
@@ -95,43 +97,58 @@ def analyticSolutionSW(V, b, t, x0=0., y0=0., h=1e-3, trunc=10):
     """
 
     # Collect mesh data and establish functions
-    mesh = V.mesh()
-    xy = mesh.coordinates.dat.data
+    xy = V.mesh().coordinates.dat.data
     eta = Function(V)
     try:
         assert((V.ufl_element().family() == 'Lagrange') & (V.ufl_element().degree() == 1))
     except:
-        NotImplementedError("Only CG1 fields are currently supported.")
-    g = 9.81
-    i = cmath.sqrt(-1)
-    Zt = range(-trunc, trunc + 1)
+        raise NotImplementedError("Only CG1 fields are currently supported.")
 
-    for k in Zt:
-        for l in Zt:
+    for k in range(-trunc, trunc + 1):
+        for l in range(-trunc, trunc + 1):
             kappa2 = k ** 2 + l ** 2
-            omega = np.sqrt(kappa2 * g * b)
+            omega = np.sqrt(kappa2 * 9.81 * b)
             for j, x, y in zip(range(len(xy)), xy[:, 0], xy[:, 1]):
-                exponent = np.exp(i * (k * (x - x0) + l * (y - y0) - omega * t))
-                # TODO: potentially swap out omega*t for a cosine term
-                # TODO: take into account proper coordinate transforms. CHECK THIS
-                eta.dat.data[j] += np.pi * h * exponent.real * np.sqrt(kappa2) * np.exp(- kappa2 / 4) / pow(2 * trunc + 1, 2)
-
+                eta.dat.data[j] += 2 * pow(np.pi, 2) * h * np.sqrt(kappa2) * np.exp(- kappa2 / 4) * \
+                                   np.exp(cmath.sqrt(-1) * (k * (x - x0) + l * (y - y0) - omega * t)).real \
+                                   / pow(2 * trunc + 1, 2)
     return eta
 
 
 if __name__ == '__main__':
-    n = 100
     lx = 2 * np.pi
-    mesh = SquareMesh(n, n, lx, lx)
-    x, y = SpatialCoordinate(mesh)
-    V = FunctionSpace(mesh, "CG", 1)
-    outfile = File("plots/analytic/freeSurface.pvd")
-    print("Generating analytic solution to linear shallow water equations...")
-    for t in np.linspace(0., 2., 41):
-        print("t = %.2f" % t)
-        eta = analyticSolutionSW(V, 0.1, t, x0=np.pi, y0=np.pi)
-        eta.rename("Analytic free surface")
-        outfile.write(eta, time=t)
-        with DumbCheckpoint("plots/analytic/hdf5/freeSurface_" + str(t), mode=FILE_CREATE) as chk:
-            chk.store(eta)
-            chk.close()
+    if input("Hit anything except enter to compute analytic solution. "):
+        n = 128
+        mesh = SquareMesh(n, n, lx, lx)
+        x, y = SpatialCoordinate(mesh)
+        V = FunctionSpace(mesh, "CG", 1)
+        outfile = File("plots/analytic/freeSurface.pvd")
+        print("Generating analytic solution to linear shallow water equations...")
+        for i, t in zip(range(41), np.linspace(0., 2., 41)):
+            print("t = %.2f" % t)
+            eta = analyticSolutionSW(V, 0.1, t, x0=np.pi, y0=np.pi)
+            eta.rename("Analytic free surface")
+            outfile.write(eta, time=t)
+            with DumbCheckpoint("plots/analytic/hdf5/freeSurface_" + stor.indexString(i), mode=FILE_CREATE) as chk:
+                chk.store(eta)
+                chk.close()
+    else:
+        mode = input("Enter error type to compute")
+        assert mode in ('fixedMesh', 'adjointBased', 'simpleAdapt')
+        index = 0
+        for index, t in zip(range(41), np.linspace(0., 2., 41)):
+            indexStr = stor.indexString(index)
+            SquareMesh(64, 64, lx, lx)
+            if mode == 'fixedMesh':
+                elev_2d = Function(FunctionSpace(mesh, "CG", 2))
+            # TODO: save meshes to compute other error norms
+            with DumbCheckpoint("plots/tests/" + mode + "/hdf5/Elevation2d_" + indexStr, mode=FILE_READ) as approx:
+                approx.load(elev_2d, name="Elevation")
+                approx.close()
+            V = FunctionSpace(mesh, "CG", 1)
+            approxn = Function(V).interpolate(elev_2d)
+            eta = Function(V)
+            with DumbCheckpoint("plots/analytic/hdf5/freeSurface_" + indexStr, mode=FILE_READ) as exact:
+                exact.load(eta, name="Analytic free surface")
+                exact.close()
+            print('t = %5.2fs, norm = %5.2f' % (t, norm(elev_2d - eta)))
