@@ -316,5 +316,8 @@ print('Elapsed time for adjoint based solver: %1.1fs (%1.2f mins)' % (adjointBas
 
 # TODO: use firedrake-adjoint or create a custom modified solver_obj for adjoint LSWEs in Thetis
 # TODO: use explicit error estimators
-# TODO: output table of timings
-# TODO: compute errors using analytic solution
+
+print("""\n************************* Times to solution ****************************
+Fixed mesh solver           %5.2fs  Simple adaptive solver      %5.2fs
+Fixed mesh adjoint solver   %5.2fs  Adjoint based solver        %5.2fs"""
+      % (fixedMeshTime, simpleAdaptTime, adjointRunTime, adjointBasedRunTime))

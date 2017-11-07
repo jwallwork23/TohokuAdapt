@@ -143,6 +143,10 @@ if __name__ == '__main__':
         approxn = Function(V, name="Approximation")
         if mode == 'fixedMesh':
             elev_2d = Function(FunctionSpace(SquareMesh(64, 64, lx, lx), "CG", 2), name="elev_2d")
+        elif mode == 'simpleAdapt':
+            raise NotImplementedError('Need save mesh to load data.')
+        elif mode == 'adjointBased':
+            raise NotImplementedError('Need save mesh to load data.')
         # TODO: save meshes to compute other error norms
         for index, t in zip(range(41), np.linspace(0., 2., 41)):
             indexStr = stor.indexString(index)
