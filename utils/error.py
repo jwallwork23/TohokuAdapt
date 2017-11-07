@@ -3,6 +3,7 @@ from firedrake import *
 import numpy as np
 import cmath
 
+import interpolation as inte
 import storage as stor
 
 
@@ -133,22 +134,23 @@ if __name__ == '__main__':
                 chk.store(eta)
                 chk.close()
     else:
-        mode = input("Enter error type to compute")
+        mode = input("Enter error type to compute: ")
         assert mode in ('fixedMesh', 'adjointBased', 'simpleAdapt')
         index = 0
+        fineMesh = SquareMesh(128, 128, lx, lx)
+        V = FunctionSpace(fineMesh, "CG", 1)
+        eta = Function(V, name="Analytic free surface")
+        approxn = Function(V, name="Approximation")
+        if mode == 'fixedMesh':
+            elev_2d = Function(FunctionSpace(SquareMesh(64, 64, lx, lx), "CG", 2), name="elev_2d")
+        # TODO: save meshes to compute other error norms
         for index, t in zip(range(41), np.linspace(0., 2., 41)):
             indexStr = stor.indexString(index)
-            SquareMesh(64, 64, lx, lx)
-            if mode == 'fixedMesh':
-                elev_2d = Function(FunctionSpace(mesh, "CG", 2))
-            # TODO: save meshes to compute other error norms
-            with DumbCheckpoint("plots/tests/" + mode + "/hdf5/Elevation2d_" + indexStr, mode=FILE_READ) as approx:
-                approx.load(elev_2d, name="Elevation")
-                approx.close()
-            V = FunctionSpace(mesh, "CG", 1)
-            approxn = Function(V).interpolate(elev_2d)
-            eta = Function(V)
             with DumbCheckpoint("plots/analytic/hdf5/freeSurface_" + indexStr, mode=FILE_READ) as exact:
                 exact.load(eta, name="Analytic free surface")
                 exact.close()
-            print('t = %5.2fs, norm = %5.2f' % (t, norm(elev_2d - eta)))
+            with DumbCheckpoint('plots/tests/' + mode + '/hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as approx:
+                approx.load(elev_2d, name="elev_2d")
+                approx.close()
+            approxn.interpolate(inte.interp(fineMesh, elev_2d)[0])
+            print('t = %5.2fs, relative error = %8.6f' % (t, errornorm(approxn, eta) / norm(eta)))
