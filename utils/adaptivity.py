@@ -163,21 +163,6 @@ get a degree 1 Lagrange metric.""" % (deg, family))
     return M
 
 
-def localMetricIntersection(M1, M2):
-    """
-    Intersect two metrics (i.e. two 2x2 matrices).
-
-    :param M1: first metric to be intersected.
-    :param M2: second metric to be intersected.
-    :return: intersection of metrics M1 and M2.
-    """
-    # print('#### localMetricIntersection DEBUG: attempting to compute sqrtm of matrix with determinant ', la.det(M1))
-    sqM1 = sla.sqrtm(M1)
-    sqiM1 = la.inv(sqM1)    # Note inverse and square root commute whenever both are defined
-    lam, v = la.eig(np.transpose(sqiM1) * M2 * sqiM1)
-    return np.transpose(sqM1) * v * [[max(lam[0], 1), 0], [0, max(lam[1], 1)]] * np.transpose(v) * sqM1
-
-
 def metricGradation(mesh, M, beta=1.4, iso=False):
     """
     Perform anisotropic metric gradation in the method described in Alauzet 2010, using linear interpolation. Python
@@ -263,6 +248,21 @@ def metricGradation(mesh, M, beta=1.4, iso=False):
                 correction = True
 
 
+def localMetricIntersection(M1, M2):
+    """
+    Intersect two metrics (i.e. two 2x2 matrices).
+
+    :param M1: first metric to be intersected.
+    :param M2: second metric to be intersected.
+    :return: intersection of metrics M1 and M2.
+    """
+    # print('#### localMetricIntersection DEBUG: attempting to compute sqrtm of matrix with determinant ', la.det(M1))
+    sqM1 = sla.sqrtm(M1)
+    sqiM1 = la.inv(sqM1)    # Note inverse and square root commute whenever both are defined
+    lam, v = la.eig(np.transpose(sqiM1) * M2 * sqiM1)
+    return np.transpose(sqM1) * v * [[max(lam[0], 1), 0], [0, max(lam[1], 1)]] * np.transpose(v) * sqM1
+
+
 def metricIntersection(mesh, V, M1, M2, bdy=False):
     """
     :param mesh: current mesh on which variables are defined.
@@ -273,11 +273,7 @@ def metricIntersection(mesh, V, M1, M2, bdy=False):
     :return: intersection of metrics M1 and M2.
     """
     for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(mesh.topology.num_vertices()):
-        M = M1.dat.data[i]
-        iM = la.inv(M)
-        lam, v = la.eig(np.transpose(sla.sqrtm(iM)) * M2.dat.data[i] * sla.sqrtm(iM))
-        M1.dat.data[i] = v * [[max(lam[0], 1), 0], [0, max(lam[1], 1)]] * np.transpose(v)
-        M1.dat.data[i] = np.transpose(sla.sqrtm(M)) * M1.dat.data[i] * sla.sqrtm(M)
+        M1.dat.data[i] = localMetricIntersection(M1.dat.data[i], M2.dat.data[i])
         # print('#### metricIntersection DEBUG: det(Mi) = ', la.det(M1.dat.data[i]))
     return M1
 

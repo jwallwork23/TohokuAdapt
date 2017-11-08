@@ -163,7 +163,7 @@ while mn < iEnd:
             chk.load(le)
             chk.close()
         if mn != 0:
-            print('    #### Step %d / %d' % (j - max(mn, iStart), iEnd))
+            print('    #### Step %d / %d' % (j+1 - max(mn, iStart), iEnd - max(iStart - mn, 0)))
             lu, le = inte.interp(mesh, lu, le)
 
         # Estimate error and extract (pointwise) maximal values
@@ -190,7 +190,7 @@ while mn < iEnd:
         for k in range(mesh.topology.num_vertices()):
             H.dat.data[k] *= significance.dat.data[k]
         M = adap.computeSteadyMetric(mesh, V, H, spd if speed else elev_2d, nVerT=nVerT, op=op)
-        # File('plots/adjointBased/metric.pvd').write(M)
+        # File('plots/adjointBased/metric.pvd').write(M, time=mn)
     M = adap.metricIntersection(mesh, V, M, M_, bdy=True)
     adap.metricGradation(mesh, M, op.beta, iso=iso)
     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
