@@ -289,14 +289,3 @@ def symmetricProduct(A, b):
     :return: product b^T * A * b.
     """
     return b[0] * A[0, 0] * b[0] + 2 * b[0] * A[0, 1] * b[1] + b[1] * A[1, 1] * b[1]
-
-
-def meshStats(mesh):
-    """
-    :param mesh: current mesh.
-    :return: number of cells and vertices on the mesh.
-    """
-    plex = mesh._plex
-    cStart, cEnd = plex.getHeightStratum(0)
-    vStart, vEnd = plex.getDepthStratum(0)
-    return cEnd - cStart, vEnd - vStart

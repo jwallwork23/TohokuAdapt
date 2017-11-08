@@ -17,7 +17,7 @@ import utils.storage as stor
 print('************** ADJOINT-BASED ADAPTIVE TSUNAMI SIMULATION **************\n')
 print('ADJOINT-GUIDED mesh adaptive solver initially defined on a mesh of')
 mesh, eta0, b = msh.TohokuDomain(int(input('coarseness (Integer in range 1-5, default 4): ') or 4))
-nEle, nVer = adap.meshStats(mesh)
+nEle, nVer = msh.meshStats(mesh)
 N = [nEle, nEle]    # Min/max #Elements
 print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d.' % (nEle, nVer))
 
@@ -38,18 +38,19 @@ rm = op.rm
 speed = op.mtype == 's'
 if op.mtype == 'b':
     raise NotImplementedError('Cannot currently perform adjoint-based adaption with respect to two fields.')
-stored = bool(input('Hit anything but enter if adjoint data is already stored: '))
 
 # Create initial function space
 mesh0 = mesh
 W0 = VectorFunctionSpace(mesh0, op.space1, op.degree1) * FunctionSpace(mesh0, op.space2, op.degree2)
 
-if not stored:
+if bool(input('Hit anything but enter if adjoint data is already stored: ')):
+    mn = 0
+else:
     # Initalise counters and forcing switch
     t = T
     mn = int(T / (rm * dt))
-    dumpn = ndump
-    meshn = rm
+    dumpn = 0
+    meshn = 0
     tic1 = clock()
     coeff = Constant(1.)
     switch = True
@@ -63,14 +64,7 @@ if not stored:
     lu, le = lam.split()
     lu.rename('Adjoint velocity')
     le.rename('Adjoint free surface')
-
-    # Store final time data to HDF5 and PVD
-    with DumbCheckpoint(dirName + 'hdf5/adjoint_' + stor.indexString(mn), mode=FILE_CREATE) as chk:
-        chk.store(lu)
-        chk.store(le)
-        chk.close()
     adjointFile = File(dirName + 'adjoint.pvd')
-    adjointFile.write(lu, le, time=T)
 
     # Establish (smoothened) indicator function for adjoint equations
     fexpr = '(x[0] > 490e3) & (x[0] < 640e3) & (x[1] > 4160e3) & (x[1] < 4360e3) ? ' \
@@ -91,9 +85,6 @@ if not stored:
 
     print('\nStarting fixed resolution adjoint run...')
     while t > 0.5 * dt:
-        t -= dt
-        dumpn -= 1
-        meshn -= 1
 
         # Modify forcing term
         if (t < op.Ts + 1.5 * dt) & switch:
@@ -103,36 +94,37 @@ if not stored:
             coeff.assign(0.)
 
         # Solve the problem, update variables and dump to vtu and HDF5
-        adjointSolver.solve()
-        lam_.assign(lam)
+        if t != T:
+            adjointSolver.solve()
+            lam_.assign(lam)
         if dumpn == 0:
-            dumpn += ndump
             adjointFile.write(lu, le, time=t)
+            dumpn += ndump
         if meshn == 0:
+            print('t = %1.1fs' % t)
+            with DumbCheckpoint(dirName + 'hdf5/adjoint_' + stor.indexString(mn), mode=FILE_CREATE) as chk:
+                chk.store(lu)
+                chk.store(le)
+                chk.close()
             meshn += rm
             mn -= 1
-            if not stored:
-                print('t = %1.1fs' % t)
-                with DumbCheckpoint(dirName + 'hdf5/adjoint_' + stor.indexString(mn), mode=FILE_CREATE) as chk:
-                    chk.store(lu)
-                    chk.store(le)
-                    chk.close()
+        t -= dt
+        dumpn -= 1
+        meshn -= 1
     toc1 = clock()
     print('... done! Elapsed time for adjoint solver: %1.2fs' % (toc1 - tic1))
+    assert(mn == 0)
 
 # Initialise counters and constants
 dumpn = 0                           # Dump counter
-if stored:
-    mn = 0
-else:
-    assert (mn == 0)
 Sn = 0                              # Sum over #Elements
-iStart = int(op.Ts / (dt * rm))        # Index corresponding to tStart
+iStart = int(op.Ts / (dt * rm))     # Index corresponding to tStart
 iEnd = int(np.ceil(T / (dt * rm)))  # Index corresponding to tEnd
 tic1 = clock()
 
 # Approximate isotropic metric at boundaries of initial mesh using circumradius
 h = Function(W0.sub(1)).interpolate(CellSize(mesh0))
+# File('plots/adjointBased/initialSize.pvd').write(h)
 
 print('\nStarting mesh adaptive forward run...')
 while mn < iEnd:
@@ -160,6 +152,8 @@ while mn < iEnd:
     W = mixedSpace.sub(1) if spaceMatch else FunctionSpace(mesh, op.space1, op.degree1)
     significance = Function(W, name='Significant regions')
 
+    if mn != 0:
+        print('#### Interpolating adjoint data...')
     for j in range(max(mn, iStart), iEnd):
         # Load adjoint data and interpolate onto current mesh
         with DumbCheckpoint(dirName + 'hdf5/adjoint_' + stor.indexString(mn), mode=FILE_READ) as chk:
@@ -169,8 +163,7 @@ while mn < iEnd:
             chk.load(le)
             chk.close()
         if mn != 0:
-            print('#### Interpolating adjoint data...')
-            print('    #### Step %d / %d' % (j, iEnd - max(mn, iStart)))
+            print('    #### Step %d / %d' % (j - max(mn, iStart), iEnd))
             lu, le = inte.interp(mesh, lu, le)
 
         # Estimate error and extract (pointwise) maximal values
@@ -197,7 +190,7 @@ while mn < iEnd:
         for k in range(mesh.topology.num_vertices()):
             H.dat.data[k] *= significance.dat.data[k]
         M = adap.computeSteadyMetric(mesh, V, H, spd if speed else elev_2d, nVerT=nVerT, op=op)
-        File('plots/adjointBased/metric.pvd').write(M)
+        # File('plots/adjointBased/metric.pvd').write(M)
     M = adap.metricIntersection(mesh, V, M, M_, bdy=True)
     adap.metricGradation(mesh, M, op.beta, iso=iso)
     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
@@ -234,7 +227,7 @@ while mn < iEnd:
 
     # Time integrate and print
     solver_obj.iterate()
-    nEle, nVer = adap.meshStats(mesh)
+    nEle = msh.meshStats(mesh)[0]
     N = [min(nEle, N[0]), max(nEle, N[1])]
     Sn += nEle
     mn += 1

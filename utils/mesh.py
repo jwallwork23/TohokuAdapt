@@ -76,3 +76,14 @@ def TohokuDomain(res=3):
     File('plots/initialisation/bathymetry.pvd').write(b)
 
     return mesh, eta0, b
+
+
+def meshStats(mesh):
+    """
+    :param mesh: current mesh.
+    :return: number of cells and vertices on the mesh.
+    """
+    plex = mesh._plex
+    cStart, cEnd = plex.getHeightStratum(0)
+    vStart, vEnd = plex.getDepthStratum(0)
+    return cEnd - cStart, vEnd - vStart

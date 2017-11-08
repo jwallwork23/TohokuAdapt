@@ -1,14 +1,12 @@
 from thetis import *
-import numpy as np
 
-import utils.adaptivity as adap
 import utils.mesh as msh
 import utils.options as opt
 
 # Set up mesh, initialise variables and specify parameters
 print('******************** FIXED MESH TSUNAMI SIMULATION ********************\nOptions...')
 mesh, eta0, b = msh.TohokuDomain(res=int(input('Mesh coarseness (integer in range 1-5, default 4)?: ') or 4))
-print('...... mesh loaded. #Elements : %d. #Vertices : %d. \n' % adap.meshStats(mesh))
+print('...... mesh loaded. #Elements : %d. #Vertices : %d. \n' % msh.meshStats(mesh))
 
 # Get solver parameter values and construct solver, with default dg1-dg1 space
 op = opt.Options()

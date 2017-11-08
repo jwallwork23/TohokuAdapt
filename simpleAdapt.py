@@ -15,7 +15,7 @@ import utils.storage as stor
 print('*************** ANISOTROPIC ADAPTIVE TSUNAMI SIMULATION ***************\n')
 print('MESH ADAPTIVE solver initially defined on a mesh of')
 mesh, eta0, b = msh.TohokuDomain(int(input('coarseness (Integer in range 1-5, default 5): ') or 5))
-nEle, nVer = adap.meshStats(mesh)
+nEle, nVer = msh.meshStats(mesh)
 N = [nEle, nEle]    # Min/max #Elements
 print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d. \n' % (nEle, nVer))
 
@@ -101,7 +101,7 @@ while mn < np.ceil(T / (dt * rm)):
 
     # Time integrate and print
     solver_obj.iterate()
-    nEle, nVer = adap.meshStats(mesh)
+    nEle = msh.meshStats(mesh)[0]
     N = [min(nEle, N[0]), max(nEle, N[1])]
     Sn += nEle
     mn += 1
