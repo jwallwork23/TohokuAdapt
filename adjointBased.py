@@ -134,7 +134,6 @@ tic1 = clock()
 
 # Approximate isotropic metric at boundaries of initial mesh using circumradius
 h = Function(W0.sub(1)).interpolate(CellSize(mesh0))
-M_ = adap.isotropicMetric(TensorFunctionSpace(mesh0, 'CG', 1), h, bdy=True, op=op)
 
 print('\nStarting mesh adaptive forward run...')
 while mn < iEnd:
@@ -193,7 +192,6 @@ while mn < iEnd:
     if iso:
         M = adap.isotropicMetric(V, significance, op=op)
     else:
-        H = Function(V)
         if speed:
             spd = Function(W.sub(1)).interpolate(sqrt(dot(u, u)))
         H = adap.constructHessian(mesh, V, spd if speed else elev_2d, op=op)

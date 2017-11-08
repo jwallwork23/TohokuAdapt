@@ -1,22 +1,18 @@
 from firedrake import *
+
 import numpy as np
 import scipy.interpolate as si
 import matplotlib.pyplot as plt
 
-import options as opt
+from . import options
 
-
-op = opt.Options()
 
 def indexString(index):
     """
     :param index: integer form of index.
     :return: five-digit string form of index.
     """
-    indexStr = str(index)
-    for i in range(5 - len(indexStr)):
-        indexStr = '0' + indexStr
-    return indexStr
+    return (5 - len(str(index))) * '0' + str(index)
 
 
 def gaugeTimeseries(gauge, dirName, iEnd):
@@ -28,6 +24,8 @@ def gaugeTimeseries(gauge, dirName, iEnd):
     :param iEnd: final HDF5 name string index.
     :return: a list containing the timeseries data.
     """
+    op = options.Options()
+
     name = input("Enter a name for this time series (e.g. 'meanEle=5767'): ")
     dirName = 'plots/' + dirName + '/hdf5'
     error = [0, 0, 0, 0]
@@ -47,7 +45,6 @@ def gaugeTimeseries(gauge, dirName, iEnd):
     outfile = open('timeseries/{y1}_{y2}.txt'.format(y1=gauge, y2=name), 'w+')
     val = []
     t = np.linspace(0, 25, num=int(iEnd + 1))
-    TV = 0
     for i in range(iEnd + 1):
 
         # Load data from HDF5 and get timeseries data TODO: how to define a function space if we do not know the mesh?
@@ -114,6 +111,7 @@ def plotGauges(gauge):
     :param gauge: gauge name string, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
     :return: a matplotlib plot of the corresponding gauge timeseries data.
     """
+    op = options.Options()
     setup = op.plotDir
     labels = op.labels
     styles = op.styles

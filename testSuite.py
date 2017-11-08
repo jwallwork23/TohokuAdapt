@@ -36,6 +36,10 @@ Dt = Constant(dt)
 op.checkCFL(b)
 ndump = op.ndump
 
+# Save initial function space
+mesh0 = mesh
+W0 = VectorFunctionSpace(mesh0, op.space1, op.degree1) * FunctionSpace(mesh0, op.space2, op.degree2)
+
 # Run fixedMesh forward solver
 print('******************** FIXED MESH SHALLOW WATER TEST ********************\n')
 tic1 = clock()
@@ -149,15 +153,16 @@ params = {'mat_type': 'matfree',
           'snes_lag_preconditioner_persists': True}
 
 # Establish adjoint variables and apply initial conditions
-lam_ = Function(W)
+lam_ = Function(W0)
 lu_, le_ = lam_.split()
 lu_.interpolate(Expression([0, 0]))
 le_.interpolate(Expression(0))
-lam = Function(W).assign(lam_)
+lam = Function(W0).assign(lam_)
 lu, le = lam.split()
 lu.rename("Adjoint velocity")
 le.rename("Adjoint free surface")
 adjointFile = File("plots/tests/adjointBased/adjoint.pvd")
+b = Function(W0.sub(1), name="Bathymetry").assign(0.1)
 
 # Establish (smoothened) indicator function for adjoint equations
 x1 = 0.
@@ -165,10 +170,10 @@ x2 = 0.4
 y1 = np.pi - 0.4
 y2 = np.pi + 0.4
 fexpr = "(x[0] >= %.2f) & (x[0] < %.2f) & (x[1] > %.2f) & (x[1] < %.2f) ? 1e-3 : 0." % (x1, x2, y1, y2)
-f = Function(W.sub(1), name="Forcing term").interpolate(Expression(fexpr))
+f = Function(W0.sub(1), name="Forcing term").interpolate(Expression(fexpr))
 
 # Set up the variational problem, using Crank Nicolson timestepping
-w, xi = TestFunctions(W)
+w, xi = TestFunctions(W0)
 lu, le = split(lam)
 lu_, le_ = split(lam_)
 L = ((le - le_) * xi + inner(lu - lu_, w)
@@ -188,7 +193,7 @@ while mn > 0:
         adjointSolver.solve()
         lam_.assign(lam)
     adjointFile.write(lu, le, time=t)
-    with DumbCheckpoint("plots/tests/adjointBased/hdf5/adjoint_" + str(mn), mode=FILE_CREATE) as chk:
+    with DumbCheckpoint("plots/tests/adjointBased/hdf5/adjoint_" + stor.indexString(mn), mode=FILE_CREATE) as chk:
         chk.store(lu)
         chk.store(le)
         chk.close()
@@ -202,10 +207,6 @@ print('Elapsed time for fixed mesh adjoint solver: %1.1fs (%1.2f mins) \n' % (ad
 iStart = int(op.Ts / (dt * rm))         # Index corresponding to tStart
 iEnd = int(np.ceil(T / (dt * rm)))      # Index corresponding to tEnd
 dirName = 'plots/tests/adjointBased'
-
-# Save initial function space
-mesh0 = mesh
-W0 = VectorFunctionSpace(mesh0, op.space1, op.degree1) * FunctionSpace(mesh0, op.space2, op.degree2)
 
 print("Starting forward run...")
 while mn < iEnd:
@@ -270,7 +271,6 @@ while mn < iEnd:
     adap.metricGradation(mesh, M, op.beta)
     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
-    # TODO: no need to interpolate b
 
     # Get solver parameter values and construct solver, using a P1DG-P2 mixed function space
     solver_obj = solver2d.FlowSolver2d(mesh, b)

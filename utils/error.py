@@ -3,8 +3,8 @@ from firedrake import *
 import numpy as np
 import cmath
 
-import interpolation as inte
-import storage as stor
+from . import interpolation
+from . import storage
 
 
 class OutOfRangeError(ValueError):
@@ -48,14 +48,14 @@ def explicitErrorEstimator(W, u_, u, eta_, eta, lu, le, b, dt):
     return rho
 
 
-def basicErrorEstimator(u, eta, lu, le):
+def basicErrorEstimator(u, lu, eta, le):
     """
     Consider significant regions as those where the 'dot product' between forward and adjoint variables take significant
     values in modulus, as per Davis & LeVeque 2016.
     
     :param u: fluid velocity at current timestep.
-    :param eta: free surface displacement at current timestep.
     :param lu: adjoint fluid velocity at current timestep.
+    :param eta: free surface displacement at current timestep.
     :param le: adjoint free surface displacement at current timestep.
     :return: field of local error indicators taken as product over fields
     """
@@ -130,7 +130,7 @@ if __name__ == '__main__':
             eta = analyticSolutionSW(V, 0.1, t, x0=np.pi, y0=np.pi)
             eta.rename("Analytic free surface")
             outfile.write(eta, time=t)
-            with DumbCheckpoint("plots/analytic/hdf5/freeSurface_" + stor.indexString(i), mode=FILE_CREATE) as chk:
+            with DumbCheckpoint("plots/analytic/hdf5/freeSurface_" + storage.indexString(i), mode=FILE_CREATE) as chk:
                 chk.store(eta)
                 chk.close()
     else:
@@ -149,12 +149,12 @@ if __name__ == '__main__':
             raise NotImplementedError('Need save mesh to load data.')
         # TODO: save meshes to compute other error norms
         for index, t in zip(range(41), np.linspace(0., 2., 41)):
-            indexStr = stor.indexString(index)
+            indexStr = storage.indexString(index)
             with DumbCheckpoint("plots/analytic/hdf5/freeSurface_" + indexStr, mode=FILE_READ) as exact:
                 exact.load(eta, name="Analytic free surface")
                 exact.close()
             with DumbCheckpoint('plots/tests/' + mode + '/hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as approx:
                 approx.load(elev_2d, name="elev_2d")
                 approx.close()
-            approxn.interpolate(inte.interp(fineMesh, elev_2d)[0])
+            approxn.interpolate(interpolation.interp(fineMesh, elev_2d)[0])
             print('t = %5.2fs, relative error = %8.6f' % (t, errornorm(approxn, eta) / norm(eta)))

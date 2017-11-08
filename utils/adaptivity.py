@@ -1,12 +1,15 @@
 from firedrake import *
+
 import numpy as np
 from numpy import linalg as la
 from scipy import linalg as sla
 
-import options as opt
+from . import options
 
 
-def constructHessian(mesh, V, sol, op=opt.Options()):
+op = options.Options()
+
+def constructHessian(mesh, V, sol, op=op):
     """
     Reconstructs the hessian of a scalar solution field with respect to the current mesh. The code for the integration 
     by parts reconstruction approach is based on the Monge-Amp\`ere tutorial provided in the Firedrake website 
@@ -45,7 +48,7 @@ def constructHessian(mesh, V, sol, op=opt.Options()):
     return H
 
 
-def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=opt.Options()):
+def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=op):
     """
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``computeSteadyMetric``, from 
     ``adapt.py``, 2016.
@@ -132,7 +135,7 @@ def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=opt.Optio
     return M
 
 
-def isotropicMetric(V, f, bdy=False, op=opt.Options()):
+def isotropicMetric(V, f, bdy=False, op=op):
     """
     :param V: tensor function space on which metric will be defined.
     :param f: (scalar) function to adapt to.
@@ -154,6 +157,7 @@ get a degree 1 Lagrange metric.""" % (deg, family))
         g.interpolate(f)
     for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(len(g.dat.data)):
         ig2 = 1. / max(hmin2, min(pow(g.dat.data[i], 2), hmax2))
+        # print('#### istropicMetic DEBUG: 1/g^2 = ', ig2)
         M.dat.data[i][0, 0] = ig2
         M.dat.data[i][1, 1] = ig2
     return M
@@ -167,6 +171,7 @@ def localMetricIntersection(M1, M2):
     :param M2: second metric to be intersected.
     :return: intersection of metrics M1 and M2.
     """
+    # print('#### localMetricIntersection DEBUG: attempting to compute sqrtm of matrix with determinant ', la.det(M1))
     sqM1 = sla.sqrtm(M1)
     sqiM1 = la.inv(sqM1)    # Note inverse and square root commute whenever both are defined
     lam, v = la.eig(np.transpose(sqiM1) * M2 * sqiM1)
@@ -289,14 +294,14 @@ def metricIntersection(mesh, V, M1, M2, bdy=False):
     :param bdy: when True, intersection with M2 only contributes on the domain boundary.
     :return: intersection of metrics M1 and M2.
     """
-    M12 = Function(V)
     for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(mesh.topology.num_vertices()):
         M = M1.dat.data[i]
         iM = la.inv(M)
         lam, v = la.eig(np.transpose(sla.sqrtm(iM)) * M2.dat.data[i] * sla.sqrtm(iM))
-        M12.dat.data[i] = v * [[max(lam[0], 1), 0], [0, max(lam[1], 1)]] * np.transpose(v)
-        M12.dat.data[i] = np.transpose(sla.sqrtm(M)) * M12.dat.data[i] * sla.sqrtm(M)
-    return M12
+        M1.dat.data[i] = v * [[max(lam[0], 1), 0], [0, max(lam[1], 1)]] * np.transpose(v)
+        M1.dat.data[i] = np.transpose(sla.sqrtm(M)) * M1.dat.data[i] * sla.sqrtm(M)
+        # print('#### metricIntersection DEBUG: det(Mi) = ', la.det(M1.dat.data[i]))
+    return M1
 
 
 def symmetricProduct(A, b):
