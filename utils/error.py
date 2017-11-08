@@ -105,14 +105,15 @@ def analyticSolutionSW(V, b, t, x0=0., y0=0., h=1e-3, trunc=10):
     except:
         raise NotImplementedError("Only CG1 fields are currently supported.")
 
+    # TODO: implement quadrature properly
     for k in range(-trunc, trunc + 1):
         for l in range(-trunc, trunc + 1):
             kappa2 = k ** 2 + l ** 2
             omega = np.sqrt(kappa2 * 9.81 * b)
             for j, x, y in zip(range(len(xy)), xy[:, 0], xy[:, 1]):
-                eta.dat.data[j] += 2 * pow(np.pi, 2) * h * np.sqrt(kappa2) * np.exp(- kappa2 / 4) * \
-                                   np.exp(cmath.sqrt(-1) * (k * (x - x0) + l * (y - y0) - omega * t)).real \
-                                   / pow(2 * trunc + 1, 2)
+                eta.dat.data[j] += np.sqrt(kappa2) * np.exp(- kappa2 / 4) * \
+                                   np.exp(cmath.sqrt(-1) * (k * (x - x0) + l * (y - y0) - omega * t)).real
+    eta.dat.data[:] *= h / (4 * pow(np.pi, 3 / 2))
     return eta
 
 

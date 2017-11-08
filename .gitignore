@@ -10,8 +10,10 @@
 
 # Directories to be ignored:
 
-/plots/
-/resources/meshes/
+plots/
+resources/meshes/
+utils/.idea/
+.idea/
 
 # Files to be ignored:
 

@@ -4,7 +4,6 @@ from thetis.field_defs import field_metadata
 
 import numpy as np
 from time import clock
-import math
 
 import utils.adaptivity as adap
 import utils.error as err
@@ -198,8 +197,9 @@ while mn < iEnd:
         for k in range(mesh.topology.num_vertices()):
             H.dat.data[k] *= significance.dat.data[k]
         M = adap.computeSteadyMetric(mesh, V, H, spd if speed else elev_2d, nVerT=nVerT, op=op)
+        File('plots/adjointBased/metric.pvd').write(M)
     M = adap.metricIntersection(mesh, V, M, M_, bdy=True)
-    adap.metricGradation(mesh, M, op.beta, isotropic=iso)
+    adap.metricGradation(mesh, M, op.beta, iso=iso)
     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
 

@@ -178,7 +178,7 @@ def localMetricIntersection(M1, M2):
     return np.transpose(sqM1) * v * [[max(lam[0], 1), 0], [0, max(lam[1], 1)]] * np.transpose(v) * sqM1
 
 
-def metricGradation(mesh, metric, beta=1.4, isotropic=False):
+def metricGradation(mesh, M, beta=1.4, iso=False):
     """
     Perform anisotropic metric gradation in the method described in Alauzet 2010, using linear interpolation. Python
     code based on Nicolas Barral's function ``DMPlexMetricGradation2d_Internal`` in ``plex-metGradation.c``, 2017.
@@ -186,28 +186,21 @@ def metricGradation(mesh, metric, beta=1.4, isotropic=False):
     :param mesh: current mesh on which variables are defined.
     :param metric: metric to be gradated.
     :param beta: scale factor used.
-    :param isotropic: specify whether isotropic or anisotropic mesh adaptivity is being used.
+    :param iso: specify whether isotropic or anisotropic mesh adaptivity is being used.
     :return: gradated ``metric``.
     """
 
     # Get vertices and edges of mesh
     plex = mesh._plex
-    vStart, vEnd = plex.getDepthStratum(0)
+    vStart, vEnd = plex.getDepthStratum(0)  # Vertices
+    eStart, eEnd = plex.getDepthStratum(1)  # Edges
     numVer = vEnd - vStart
-    eStart, eEnd = plex.getDepthStratum(1)
     xy = mesh.coordinates.dat.data
 
-    # Establish arrays for storage
-    v12 = np.zeros(2)
-    v21 = np.zeros(2)
-    grownMet1 = np.zeros((2, 2))  # TODO: work only with the upper triangular part for speed
-    grownMet2 = np.zeros((2, 2))
-    M = metric.dat.data
-
-    # Create a list of tags for vertices
-    verTag = np.zeros(numVer)
-    for v in range(numVer):
-        verTag[v] = 1
+    # Establish arrays for storage and a list of tags for vertices
+    v12 = v21 = np.zeros(2)
+    # TODO: work only with the upper triangular part for speed
+    verTag = np.zeros(numVer) + 1
     correction = True
     i = 0
     ln_beta = np.log(beta)
@@ -221,53 +214,39 @@ def metricGradation(mesh, metric, beta=1.4, isotropic=False):
             cone = plex.getCone(e)      # Get vertices associated with edge e
             iVer1 = cone[0] - vStart    # Vertex 1 index
             iVer2 = cone[1] - vStart    # Vertex 2 index
-
             if (verTag[iVer1] < i) & (verTag[iVer2] < i):
                 continue
 
             # Assemble local metrics and calculate edge lengths
-            met1 = M[iVer1]
-            met2 = M[iVer2]
+            met1 = M.dat.data[iVer1]
+            met2 = M.dat.data[iVer2]
             v12[0] = xy[iVer2][0] - xy[iVer1][0]
             v12[1] = xy[iVer2][1] - xy[iVer1][1]
             v21[0] = - v12[0]
             v21[1] = - v12[1]
 
-            if isotropic:
-                redMet1 = np.zeros((2, 2))
-                redMet2 = np.zeros((2, 2))
-                ih12 = 1. / met1[0, 0]
-                ih21 = 1. / met2[0, 0]
-                eta2_12 = 1. / pow(1 + np.dot(v12) * ih12 * ln_beta, 2)
-                eta2_21 = 1. / pow(1 + np.dot(v21) * ih21 * ln_beta, 2)
-                for j in range(2):
-                    redMet1[j, j] = eta2_12 * met2[j, j]
-                    redMet2[j, j] = eta2_21 * met1[j, j]
+            if iso:
+                eta2_12 = 1. / pow(1 + (v12[0] * v12[0] + v12[1] * v12[1]) * ln_beta / met1[0, 0], 2)
+                eta2_21 = 1. / pow(1 + (v21[0] * v21[0] + v21[1] * v21[1]) * ln_beta / met2[0, 0], 2)
+                redMet1 = eta2_12 * met2
+                redMet2 = eta2_21 * met1
             else:
-                edgLen1 = symmetricProduct(met1, v12)
-                edgLen2 = symmetricProduct(met2, v21)
-                eta2_12 = 1. / pow(1 + edgLen1 * ln_beta, 2)
-                eta2_21 = 1. / pow(1 + edgLen2 * ln_beta, 2)
-
-                # Scale to get 'grown' metric
-                for j in range(2):
-                    for k in range(2):
-                        grownMet1[j, k] = eta2_12 * met1[j, k]
-                        grownMet2[j, k] = eta2_21 * met2[j, k]
-
-                # Intersect metric with grown metric to get reduced metric
-                redMet1 = localMetricIntersection(met1, grownMet2)
-                redMet2 = localMetricIntersection(met2, grownMet1)
+                # Intersect metric with a scaled 'grown' metric to get reduced metric
+                eta2_12 = 1. / pow(1 + symmetricProduct(met1, v12) * ln_beta, 2)
+                eta2_21 = 1. / pow(1 + symmetricProduct(met2, v21) * ln_beta, 2)
+                # print('#### metricGradation DEBUG: determinants', la.det(met1), la.det(met2))
+                redMet1 = localMetricIntersection(met1, eta2_21 * met2)
+                redMet2 = localMetricIntersection(met2, eta2_12 * met1)
 
             # Calculate difference in order to ascertain whether the metric is modified
             diff = np.abs(met1[0, 0] - redMet1[0, 0]) + np.abs(met1[0, 1] - redMet1[0, 1]) \
                    + np.abs(met1[1, 1] - redMet1[1, 1])
             diff /= (np.abs(met1[0, 0]) + np.abs(met1[0, 1]) + np.abs(met1[1, 1]))
             if diff > 1e-3:
-                M[iVer1][0, 0] = redMet1[0, 0]
-                M[iVer1][0, 1] = redMet1[0, 1]
-                M[iVer1][1, 0] = redMet1[1, 0]
-                M[iVer1][1, 1] = redMet1[1, 1]
+                M.dat.data[iVer1][0, 0] = redMet1[0, 0]
+                M.dat.data[iVer1][0, 1] = redMet1[0, 1]
+                M.dat.data[iVer1][1, 0] = redMet1[1, 0]
+                M.dat.data[iVer1][1, 1] = redMet1[1, 1]
                 verTag[iVer1] = i + 1
                 correction = True
 
@@ -276,13 +255,12 @@ def metricGradation(mesh, metric, beta=1.4, isotropic=False):
                    + np.abs(met2[1, 1] - redMet2[1, 1])
             diff /= (np.abs(met2[0, 0]) + np.abs(met2[0, 1]) + np.abs(met2[1, 1]))
             if diff > 1e-3:
-                M[iVer2][0, 0] = redMet2[0, 0]
-                M[iVer2][0, 1] = redMet2[0, 1]
-                M[iVer2][1, 0] = redMet2[1, 0]
-                M[iVer2][1, 1] = redMet2[1, 1]
+                M.dat.data[iVer2][0, 0] = redMet2[0, 0]
+                M.dat.data[iVer2][0, 1] = redMet2[0, 1]
+                M.dat.data[iVer2][1, 0] = redMet2[1, 0]
+                M.dat.data[iVer2][1, 1] = redMet2[1, 1]
                 verTag[iVer2] = i + 1
                 correction = True
-    metric.dat.data[:] = M
 
 
 def metricIntersection(mesh, V, M1, M2, bdy=False):
