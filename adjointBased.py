@@ -124,28 +124,14 @@ tic1 = clock()
 
 # Approximate isotropic metric at boundaries of initial mesh using circumradius
 h = Function(W0.sub(1)).interpolate(CellSize(mesh0))
-# File('plots/adjointBased/initialSize.pvd').write(h)
+sigfile = File('plots/adjointBased/significance.pvd')
 
 print('\nStarting mesh adaptive forward run...')
 while mn < iEnd:
     tic2 = clock()
 
     # Enforce initial conditions on discontinuous space / load variables from disk
-    mixedSpace = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
-    uv_2d = Function(mixedSpace.sub(0))
-    elev_2d = Function(mixedSpace.sub(1))
-    index = mn * int(rm / ndump)
-    indexStr = stor.indexString(index)
-    if mn == 0:
-        elev_2d.interpolate(eta0)
-        uv_2d.interpolate(Expression((0, 0)))
-    else:
-        with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as el:
-            el.load(elev_2d, name='elev_2d')
-            el.close()
-        with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as ve:
-            ve.load(uv_2d, name='uv_2d')
-            ve.close()
+    elev_2d, uv_2d, index = op.loadFromDisk(mesh, mn, dirName, eta0)
 
     # Create functions to hold inner product and significance data
     spaceMatch = (op.space1 == op.space2) & (op.degree1 == op.degree2)
@@ -163,7 +149,7 @@ while mn < iEnd:
             chk.load(le)
             chk.close()
         if mn != 0:
-            print('    #### Step %d / %d' % (j+1 - max(mn, iStart), iEnd - max(iStart - mn, 0)))
+            print('    #### Step %d / %d' % (j + 1 - max(mn, iStart), iEnd - max(mn, iStart)))
             lu, le = inte.interp(mesh, lu, le)
 
         # Estimate error and extract (pointwise) maximal values
@@ -175,6 +161,7 @@ while mn < iEnd:
             for k in range(len(rho)):
                 if np.abs(rho[k]) > np.abs(significance.dat.data[k]):
                     significance.dat.data[k] = rho[k]
+    sigfile.write(significance, time=mn)
 
     # Interpolate initial mesh size onto new mesh and build associated boundary metric
     V = TensorFunctionSpace(mesh, 'CG', 1)
@@ -231,9 +218,6 @@ while mn < iEnd:
     N = [min(nEle, N[0]), max(nEle, N[1])]
     Sn += nEle
     mn += 1
-    print("""\n************************** Adaption step %d ****************************
-Percent complete  : %4.1f%%    Elapsed time : %4.2fs (This step : %4.2fs)     
-#Elements... Current : %d  Mean : %d  Minimum : %s  Maximum : %s\n""" %
-          (mn, (100 * mn * rm * dt) / T, clock() - tic1, clock() - tic2, nEle, Sn / mn, N[0], N[1]))
+    op.printToScreen(mn, clock() - tic1, clock() - tic2, nEle, Sn, N)
 toc1 = clock()
 print('Elapsed time for forward solver: %1.1fs (%1.2f mins)' % (toc1 - tic1, (toc1 - tic1) / 60))

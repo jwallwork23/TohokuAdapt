@@ -1,6 +1,9 @@
+from firedrake import *
+
 import numpy as np
 
 from . import conversion
+from . import storage
 
 
 class Options:
@@ -145,3 +148,44 @@ class Options:
             print('WARNING: chosen timestep dt = %.4fs exceeds recommended value of %.4fs' % (self.dt, cdt))
             if input('Hit enter if happy to proceed.'):
                 exit(23)
+
+    def loadFromDisk(self, mesh, mn, dirName, elev0):
+        """
+        
+        :param mesh: mesh on which data is stored.
+        :param mn: mesh number.
+        :param dirName: name of directory for storage.
+        :param elev0: initial free surface.
+        :return: saved free surface elevation and fluid velocity, along with mesh index.
+        """
+        # Enforce initial conditions on discontinuous space / load variables from disk
+        W = VectorFunctionSpace(mesh, self.space1, self.degree1) * FunctionSpace(mesh, self.space2, self.degree2)
+        uv_2d = Function(W.sub(0))
+        elev_2d = Function(W.sub(1))
+        index = mn * int(self.rm / self.ndump)
+        indexStr = storage.indexString(index)
+        if mn == 0:
+            elev_2d.interpolate(elev0)
+            uv_2d.interpolate(Expression((0, 0)))
+        else:
+            with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as el:
+                el.load(elev_2d, name='elev_2d')
+                el.close()
+            with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as ve:
+                ve.load(uv_2d, name='uv_2d')
+                ve.close()
+        return elev_2d, uv_2d, index
+
+    def printToScreen(self, mn, outerTime, innerTime, nEle, Sn, N):
+        """
+        :param mn: mesh number.
+        :param outerTime: time taken so far.
+        :param innerTime: time taken for this step.
+        :param nEle: current number of elements.
+        :param Sn: sum over #Elements.
+        :param N: tuple of min and max #Elements.
+        """
+        print("""\n************************** Adaption step %d ****************************
+Percent complete  : %4.1f%%    Elapsed time : %4.2fs (This step : %4.2fs)     
+#Elements... Current : %d  Mean : %d  Minimum : %s  Maximum : %s\n""" %
+              (mn, (100 * mn * self.rm * self.dt) / self.T, outerTime, innerTime, nEle, Sn / mn, N[0], N[1]))

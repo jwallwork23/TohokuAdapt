@@ -8,7 +8,6 @@ import utils.adaptivity as adap
 import utils.interpolation as inte
 import utils.mesh as msh
 import utils.options as opt
-import utils.storage as stor
 
 
 # Define initial mesh and mesh statistics placeholders
@@ -42,35 +41,20 @@ while mn < np.ceil(T / (dt * rm)):
     tic2 = clock()
 
     # Enforce initial conditions on discontinuous space / load variables from disk
-    W = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
-    uv_2d = Function(W.sub(0))
-    elev_2d = Function(W.sub(1))
-    index = mn * int(rm / ndump)
-    indexStr = stor.indexString(index)
-    if mn == 0:
-        elev_2d.interpolate(eta0)
-        uv_2d.interpolate(Expression((0, 0)))
-    else:
-        with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as el:
-            el.load(elev_2d, name='elev_2d')
-            el.close()
-        with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as ve:
-            ve.load(uv_2d, name='uv_2d')
-            ve.close()
+    elev_2d, uv_2d, index = op.loadFromDisk(mesh, mn, dirName, eta0)
 
     # Compute Hessian and metric, adapt mesh and interpolate variables
-    if mn != 0:
-        V = TensorFunctionSpace(mesh, 'CG', 1)
-        if op.mtype != 's':
-            M = adap.isotropicMetric(V, elev_2d, op=op) if iso else adap.computeSteadyMetric(
-                mesh, V, adap.constructHessian(mesh, V, elev_2d, op=op), elev_2d, nVerT=nVerT, op=op)
-        if op.mtype != 'f':
-            spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
-            M2 = adap.isotropicMetric(V, spd) if iso else adap.computeSteadyMetric(
-                mesh, V, adap.constructHessian(mesh, V, spd, op=op), spd, nVerT=nVerT, op=op)
-            M = adap.metricIntersection(mesh, V, M, M2) if op.mtype == 'b' else M2
-        mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-        elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
+    V = TensorFunctionSpace(mesh, 'CG', 1)
+    if op.mtype != 's':
+        M = adap.isotropicMetric(V, elev_2d, op=op) if iso else adap.computeSteadyMetric(
+            mesh, V, adap.constructHessian(mesh, V, elev_2d, op=op), elev_2d, nVerT=nVerT, op=op)
+    if op.mtype != 'f':
+        spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
+        M2 = adap.isotropicMetric(V, spd) if iso else adap.computeSteadyMetric(
+            mesh, V, adap.constructHessian(mesh, V, spd, op=op), spd, nVerT=nVerT, op=op)
+        M = adap.metricIntersection(mesh, V, M, M2) if op.mtype == 'b' else M2
+    mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
+    elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
 
     # Get solver parameter values and construct solver
     solver_obj = solver2d.FlowSolver2d(mesh, b)
@@ -105,9 +89,6 @@ while mn < np.ceil(T / (dt * rm)):
     N = [min(nEle, N[0]), max(nEle, N[1])]
     Sn += nEle
     mn += 1
-    print("""\n************************** Adaption step %d ****************************
-Percent complete  : %4.1f%%    Elapsed time : %4.2fs (This step : %4.2fs)     
-#Elements... Current : %d  Mean : %d  Minimum : %s  Maximum : %s\n""" %
-          (mn, (100 * mn * rm * dt) / T, clock() - tic1, clock() - tic2, nEle, Sn / mn, N[0], N[1]))
+    op.printToScreen(mn, clock() - tic1, clock() - tic2, nEle, Sn, N)
 toc1 = clock()
 print('Elapsed time for adaptive solver: %1.1fs (%1.2f mins)' % (toc1 - tic1, (toc1 - tic1) / 60))
