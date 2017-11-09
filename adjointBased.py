@@ -22,7 +22,7 @@ N = [nEle, nEle]    # Min/max #Elements
 print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d.' % (nEle, nVer))
 
 # Get default parameter values and check CFL criterion
-op = opt.Options(vscale=0.2, rm=60, outputHessian=True)
+op = opt.Options(vscale=0.2, rm=60, ndump=1, outputHessian=True)    # ndump=1 is needed for explicit error estimators
 nVerT = op.vscale * nVer    # Target #Vertices
 dirName = 'plots/adjointBased/'
 # if op.iso:
@@ -128,55 +128,53 @@ hfile = File("plots/adjointBased/hessian.pvd")
 print('\nStarting mesh adaptive forward run...')
 while mn < iEnd:
     tic2 = clock()
-
-    # Enforce initial conditions on discontinuous space / load variables from disk
     index = mn * int(rm / ndump)
-    elev_2d, uv_2d = op.loadFromDisk(mesh, index, dirName, eta0)
-
-    # Create functions to hold inner product and significance data
-    spaceMatch = (op.space1 == op.space2) & (op.degree1 == op.degree2)
-    W = mixedSpace.sub(1) if spaceMatch else FunctionSpace(mesh, op.space1, op.degree1)
-    significance = Function(W, name='Significant regions')
+    elev_2d, uv_2d = op.loadFromDisk(mesh, index, dirName, eta0)    # Enforce ICs / load variables from disk
+    Wcomp = FunctionSpace(mesh, op.space1, op.degree1)              # Computational space for forming error estimators
+    DG0 = FunctionSpace(mesh, "DG", 0)
+    significance = Function(DG0, name='Significant regions')        # Elementwise significance
+    Wnative = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2) # DG1-CG2
 
     if mn != 0:
         print('#### Interpolating adjoint data...')
+        elev_2d_, uv_2d_ = op.loadFromDisk(mesh, index - 1, dirName, eta0)  # Load saved forward data
     for j in range(max(mn, iStart), iEnd):
-
-        # Load adjoint data and interpolate onto current mesh
-        le, lu = op.loadFromDiskAdjoint(mesh0, j, dirName)
+        le, lu = op.loadFromDiskAdjoint(mesh0, j, dirName)                  # Load saved adjoint data
         if mn != 0:
             print('    #### Step %d / %d' % (j + 1 - max(mn, iStart), iEnd - max(mn, iStart)))
-            lu, le = inte.interp(mesh, lu, le)
+            lu, le = inte.interp(mesh, lu, le)                              # Interpolate saved data onto current mesh
 
         # Estimate error and extract (pointwise) maximal values
-        rho = err.basicErrorEstimator(uv_2d, lu, elev_2d if spaceMatch else Function(W).interpolate(elev_2d),
-                                      le if spaceMatch else Function(W).interpolate(le))
+        # TODO: Note here we consider significance in a DG0 space. Perhaps CG1 would be better? (Considering we
+        # TODO: wish to construct a cts metric...)
+        if mn == 0:
+            rho = Function(DG0).interpolate(err.basicErrorEstimator(uv_2d, lu, Function(Wcomp).interpolate(elev_2d),
+                                                                    Function(Wcomp).interpolate(le)))
+        else:
+            rho = err.explicitErrorEstimator(Wnative, uv_2d_, uv_2d, elev_2d_, elev_2d, lu, le, b, dt)
         if j == 0:
-            significance.dat.data[:] = rho.dat.data
+            significance.assign(rho)
         else:
             significance = adap.pointwiseMax(significance, rho)
-    op.gamma = np.abs(assemble(significance * dx))    # Rescale significance i.e. change gamma rescaling
+    significance.dat.data[:] *= np.abs(assemble(significance * dx))         # Normalise significance scaling (?)
 
-    # Interpolate initial mesh size onto new mesh and build associated boundary metric
     V = TensorFunctionSpace(mesh, 'CG', 1)
-    M_ = adap.isotropicMetric(V, inte.interp(mesh, h)[0], bdy=True, op=op)
-
-    # Generate metric associated with significant data, gradate it, adapt mesh and interpolate variables
+    M_ = adap.isotropicMetric(V, inte.interp(mesh, h)[0], bdy=True, op=op)  # (Interpolated) initial boundary metric
     if speed:
-        spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
-    H = adap.constructHessian(mesh, V, spd if speed else elev_2d, op=op)
+        spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))       # Get fluid speed
+    H = adap.constructHessian(mesh, V, spd if speed else elev_2d, op=op)    # Construct Hessian
     for k in range(mesh.topology.num_vertices()):
-        H.dat.data[k] *= significance.dat.data[k]
-    M = adap.computeSteadyMetric(mesh, V, H, spd if speed else elev_2d, nVerT=nVerT, op=op)
-    M = adap.metricIntersection(mesh, V, M, M_, bdy=True)
-    adap.metricGradation(mesh, M, op.beta, iso=op.iso)
-    mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
+        H.dat.data[k] *= significance.dat.data[k]                           # Scale by significance
+    M = adap.computeSteadyMetric(mesh, V, H, spd if speed else elev_2d, nVerT=nVerT, op=op)     # Generate metric
+    M = adap.metricIntersection(mesh, V, M, M_, bdy=True)                   # Intersect with initial bdy metric
+    adap.metricGradation(mesh, M, op.beta, iso=op.iso)                      # Gradate to 'smoothen' metric
+    mesh = AnisotropicAdaptation(mesh, M).adapted_mesh                      # Adapt mesh
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
     if op.outputHessian:
         H.rename("Hessian")
         hfile.write(H, time=float(mn))
 
-    # Get solver parameter values and construct solver, using a P1DG-P2 mixed function space
+    # Establish Thetis flow solver object
     solver_obj = solver2d.FlowSolver2d(mesh, b)
     options = solver_obj.options
     options.element_family = op.family
@@ -185,8 +183,6 @@ while mn < iEnd:
     options.simulation_end_time = (mn + 1) * dt * rm
     options.timestepper_type = op.timestepper
     options.timestep = dt
-
-    # Specify outfile directory and HDF5 checkpointing
     options.output_directory = dirName
     options.export_diagnostics = True
     options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
@@ -199,9 +195,7 @@ while mn < iEnd:
     solver_obj.next_export_t = solver_obj.i_export * options.simulation_export_time
     solver_obj.iteration = int(np.ceil(solver_obj.next_export_t / dt))
     solver_obj.simulation_time = solver_obj.iteration * dt
-
-    # For next export
-    solver_obj.next_export_t += options.simulation_export_time
+    solver_obj.next_export_t += options.simulation_export_time  # For next export
     for e in solver_obj.exporters.values():
         e.set_next_export_ix(solver_obj.i_export)
 

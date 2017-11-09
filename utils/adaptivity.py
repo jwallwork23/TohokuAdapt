@@ -133,8 +133,6 @@ def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=op):
             M.dat.data[i][0, 1] = lam1 * v1[0] * v1[1] + lam2 * v2[0] * v2[1]
             M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
             M.dat.data[i][1, 1] = lam1 * v1[1] * v1[1] + lam2 * v2[1] * v2[1]
-    if op.gamma != 1.:
-        M.dat.data[:] *= op.gamma
     return M
 
 
@@ -298,7 +296,12 @@ def pointwiseMax(f, g):
     """
     fdat = f.dat.data
     gdat = g.dat.data
-    assert(len(fdat) == len(gdat))
+    try:
+        assert(len(fdat) == len(gdat))
+    except:
+        raise ValueError("Function space mismatch: ", f.function_space().ufl_element().family(),
+                         f.function_space().ufl_element().degree(), " vs. ", g.function_space().ufl_element().family(),
+                         g.function_space().ufl_element().degree())
     for i in range(len(fdat)):
         if np.abs(gdat[i]) > np.abs(fdat[i]):
             f.dat.data[i] = gdat[i]

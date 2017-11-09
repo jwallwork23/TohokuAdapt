@@ -19,8 +19,7 @@ mesh = SquareMesh(n, n, lx, lx)
 x, y = SpatialCoordinate(mesh)
 W = VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "CG", 2)
 b = Function(W.sub(1), name="Bathymetry").assign(depth)
-if basic:
-    W1 = FunctionSpace(mesh, 'DG', 1)
+W1 = FunctionSpace(mesh, 'DG', 1)
 
 # Initalise counters
 t = T
