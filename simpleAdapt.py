@@ -21,9 +21,8 @@ print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d. \n' %
 # Get default parameter values and check CFL criterion
 op = opt.Options(outputHessian=True)
 nVerT = op.vscale * nVer    # Target #Vertices
-iso = op.iso
 dirName = 'plots/simpleAdapt/'
-# if iso:
+# if op.iso:
 #     dirName += 'isotropic/'
 T = op.T
 dt = op.dt
@@ -58,6 +57,7 @@ while mn < np.ceil(T / (dt * rm)):
     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
     if op.outputHessian:
+        H.rename("Hessian")
         hfile.write(H, time=float(mn))
 
     # Get solver parameter values and construct solver

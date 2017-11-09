@@ -68,8 +68,9 @@ def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=op):
     ihmax2 = 1. / pow(op.hmax, 2)   # Inverse square maximal side-length
     M = Function(V)
     if op.ntype == 'manual':
+        sol_min = 1e-3  # Minimum tolerated value for the solution field
+
         for i in range(mesh.topology.num_vertices()):
-            sol_min = 1e-3  # Minimum tolerated value for the solution field
 
             # Generate local Hessian
             H_loc = H.dat.data[i] * iError / (max(np.sqrt(assemble(sol * sol * dx)), sol_min))  # Avoid round-off error
@@ -132,6 +133,8 @@ def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=op):
             M.dat.data[i][0, 1] = lam1 * v1[0] * v1[1] + lam2 * v2[0] * v2[1]
             M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
             M.dat.data[i][1, 1] = lam1 * v1[1] * v1[1] + lam2 * v2[1] * v2[1]
+    if op.gamma != 1.:
+        M.dat.data[:] *= op.gamma
     return M
 
 

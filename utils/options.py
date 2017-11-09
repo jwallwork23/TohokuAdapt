@@ -19,6 +19,7 @@ class Options:
                  iso=False,
                  hessMeth='dL2',
                  beta=1.4,
+                 gamma=1.,
                  outputHessian=False,
                  T=1500.,
                  dt=1.,
@@ -36,7 +37,8 @@ class Options:
         :param mtype: Adapt w.r.t 's'peed, 'f'ree surface or 'b'oth.
         :param iso: Toggle isotropic / anisotropic algorithm.
         :param hessMeth: Method of Hessian reconstruction: 'dL2' or 'parts'.
-        :param beta: Metric gradation scaling parameter.
+        :param beta: metric gradation scaling parameter.
+        :param gamma: metric rescaling parameter.
         :param outputHessian: toggle saving Hessian to .pvd.
         :param T: Simulation duration (s).
         :param dt: Timestep (s).
@@ -90,10 +92,11 @@ class Options:
         except:
             raise ValueError('Hessian reconstruction method ``%s`` not recognised.' % hessMeth)
         self.beta = beta
+        self.gamma = gamma
         try:
-            assert beta > 1
+            assert (beta > 1) & (gamma > 0)
         except:
-            raise ValueError('Invalid value for scaling parameter. beta > 1 is required.')
+            raise ValueError('Invalid value for scaling parameter.')
         self.outputHessian = outputHessian
 
         # Physical parameters

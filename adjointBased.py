@@ -22,12 +22,11 @@ N = [nEle, nEle]    # Min/max #Elements
 print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d.' % (nEle, nVer))
 
 # Get default parameter values and check CFL criterion
-op = opt.Options(vscale=0.2, rm=60)
+op = opt.Options(vscale=0.2, rm=60, outputHessian=True)
 nVerT = op.vscale * nVer    # Target #Vertices
-iso = op.iso
 dirName = 'plots/adjointBased/'
-if iso:
-    dirName += 'isotropic/'
+# if op.iso:
+#     dirName += 'isotropic/'
 T = op.T
 dt = op.dt
 Dt = Constant(dt)
@@ -124,7 +123,7 @@ tic1 = clock()
 
 # Approximate isotropic metric at boundaries of initial mesh using circumradius
 h = Function(W0.sub(1)).interpolate(CellSize(mesh0))
-sigfile = File('plots/adjointBased/significance.pvd')
+hfile = File("plots/adjointBased/hessian.pvd")
 
 print('\nStarting mesh adaptive forward run...')
 while mn < iEnd:
@@ -156,26 +155,26 @@ while mn < iEnd:
             significance.dat.data[:] = rho.dat.data
         else:
             significance = adap.pointwiseMax(significance, rho)
-    sigfile.write(significance, time=mn)
+    op.gamma = np.abs(assemble(significance * dx))    # Rescale significance i.e. change gamma rescaling
 
     # Interpolate initial mesh size onto new mesh and build associated boundary metric
     V = TensorFunctionSpace(mesh, 'CG', 1)
     M_ = adap.isotropicMetric(V, inte.interp(mesh, h)[0], bdy=True, op=op)
 
     # Generate metric associated with significant data, gradate it, adapt mesh and interpolate variables
-    if iso:
-        M = adap.isotropicMetric(V, significance, op=op)
-    else:
-        if speed:
-            spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
-        H = adap.constructHessian(mesh, V, spd if speed else elev_2d, op=op)
-        for k in range(mesh.topology.num_vertices()):
-            H.dat.data[k] *= significance.dat.data[k]
-        M = adap.computeSteadyMetric(mesh, V, H, spd if speed else elev_2d, nVerT=nVerT, op=op)
+    if speed:
+        spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
+    H = adap.constructHessian(mesh, V, spd if speed else elev_2d, op=op)
+    for k in range(mesh.topology.num_vertices()):
+        H.dat.data[k] *= significance.dat.data[k]
+    M = adap.computeSteadyMetric(mesh, V, H, spd if speed else elev_2d, nVerT=nVerT, op=op)
     M = adap.metricIntersection(mesh, V, M, M_, bdy=True)
-    adap.metricGradation(mesh, M, op.beta, iso=iso)
+    adap.metricGradation(mesh, M, op.beta, iso=op.iso)
     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
+    if op.outputHessian:
+        H.rename("Hessian")
+        hfile.write(H, time=float(mn))
 
     # Get solver parameter values and construct solver, using a P1DG-P2 mixed function space
     solver_obj = solver2d.FlowSolver2d(mesh, b)
