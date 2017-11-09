@@ -285,3 +285,18 @@ def symmetricProduct(A, b):
     :return: product b^T * A * b.
     """
     return b[0] * A[0, 0] * b[0] + 2 * b[0] * A[0, 1] * b[1] + b[1] * A[1, 1] * b[1]
+
+
+def pointwiseMax(f, g):
+    """
+    :param f: first field to be considered.
+    :param g: second field to be considered.
+    :return: field taking pointwise maximal values in modulus.
+    """
+    fdat = f.dat.data
+    gdat = g.dat.data
+    assert(len(fdat) == len(gdat))
+    for i in range(len(fdat)):
+        if np.abs(gdat[i]) > np.abs(fdat[i]):
+            f.dat.data[i] = gdat[i]
+    return f

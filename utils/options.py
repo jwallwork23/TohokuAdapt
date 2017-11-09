@@ -19,6 +19,7 @@ class Options:
                  iso=False,
                  hessMeth='dL2',
                  beta=1.4,
+                 outputHessian=False,
                  T=1500.,
                  dt=1.,
                  ndump=15,
@@ -36,6 +37,7 @@ class Options:
         :param iso: Toggle isotropic / anisotropic algorithm.
         :param hessMeth: Method of Hessian reconstruction: 'dL2' or 'parts'.
         :param beta: Metric gradation scaling parameter.
+        :param outputHessian: toggle saving Hessian to .pvd.
         :param T: Simulation duration (s).
         :param dt: Timestep (s).
         :param ndump: Timesteps per data dump.
@@ -92,6 +94,7 @@ class Options:
             assert beta > 1
         except:
             raise ValueError('Invalid value for scaling parameter. beta > 1 is required.')
+        self.outputHessian = outputHessian
 
         # Physical parameters
         self.g = 9.81           # Gravitational acceleration (m s^{-2})
@@ -162,7 +165,7 @@ class Options:
         uv_2d = Function(W.sub(0))
         elev_2d = Function(W.sub(1))
         indexStr = storage.indexString(index)
-        if mn == 0:
+        if index == 0:
             elev_2d.interpolate(elev0)
             uv_2d.interpolate(Expression((0, 0)))
         else:

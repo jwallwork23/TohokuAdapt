@@ -144,20 +144,18 @@ while mn < iEnd:
     for j in range(max(mn, iStart), iEnd):
 
         # Load adjoint data and interpolate onto current mesh
-        le, lu = op.loadFromDiskAdjoint(mesh0, mn, dirName)
+        le, lu = op.loadFromDiskAdjoint(mesh0, j, dirName)
         if mn != 0:
             print('    #### Step %d / %d' % (j + 1 - max(mn, iStart), iEnd - max(mn, iStart)))
             lu, le = inte.interp(mesh, lu, le)
 
         # Estimate error and extract (pointwise) maximal values
         rho = err.basicErrorEstimator(uv_2d, lu, elev_2d if spaceMatch else Function(W).interpolate(elev_2d),
-                                      le if spaceMatch else Function(W).interpolate(le)).dat.data
+                                      le if spaceMatch else Function(W).interpolate(le))
         if j == 0:
-            significance.dat.data[:] = rho
+            significance.dat.data[:] = rho.dat.data
         else:
-            for k in range(len(rho)):
-                if np.abs(rho[k]) > np.abs(significance.dat.data[k]):
-                    significance.dat.data[k] = rho[k]
+            significance = adap.pointwiseMax(significance, rho)
     sigfile.write(significance, time=mn)
 
     # Interpolate initial mesh size onto new mesh and build associated boundary metric
@@ -169,12 +167,11 @@ while mn < iEnd:
         M = adap.isotropicMetric(V, significance, op=op)
     else:
         if speed:
-            spd = Function(W.sub(1)).interpolate(sqrt(dot(u, u)))
+            spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
         H = adap.constructHessian(mesh, V, spd if speed else elev_2d, op=op)
         for k in range(mesh.topology.num_vertices()):
             H.dat.data[k] *= significance.dat.data[k]
         M = adap.computeSteadyMetric(mesh, V, H, spd if speed else elev_2d, nVerT=nVerT, op=op)
-        # File('plots/adjointBased/metric.pvd').write(M, time=mn)
     M = adap.metricIntersection(mesh, V, M, M_, bdy=True)
     adap.metricGradation(mesh, M, op.beta, iso=iso)
     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh

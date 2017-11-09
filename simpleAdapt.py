@@ -19,12 +19,12 @@ N = [nEle, nEle]    # Min/max #Elements
 print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d. \n' % (nEle, nVer))
 
 # Get default parameter values and check CFL criterion
-op = opt.Options()
+op = opt.Options(outputHessian=True)
 nVerT = op.vscale * nVer    # Target #Vertices
 iso = op.iso
 dirName = 'plots/simpleAdapt/'
-if iso:
-    dirName += 'isotropic/'
+# if iso:
+#     dirName += 'isotropic/'
 T = op.T
 dt = op.dt
 op.checkCFL(b)
@@ -36,6 +36,7 @@ dumpn = 0   # Dump counter
 mn = 0      # Mesh number
 Sn = 0      # Sum over #Elements
 tic1 = clock()
+hfile = File("plots/simpleAdapt/hessian.pvd")
 
 while mn < np.ceil(T / (dt * rm)):
     tic2 = clock()
@@ -47,15 +48,17 @@ while mn < np.ceil(T / (dt * rm)):
     # Compute Hessian and metric, adapt mesh and interpolate variables
     V = TensorFunctionSpace(mesh, 'CG', 1)
     if op.mtype != 's':
-        M = adap.isotropicMetric(V, elev_2d, op=op) if iso else adap.computeSteadyMetric(
-            mesh, V, adap.constructHessian(mesh, V, elev_2d, op=op), elev_2d, nVerT=nVerT, op=op)
+        H = adap.constructHessian(mesh, V, elev_2d, op=op)
+        M = adap.computeSteadyMetric(mesh, V, H, elev_2d, nVerT=nVerT, op=op)
     if op.mtype != 'f':
         spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
-        M2 = adap.isotropicMetric(V, spd) if iso else adap.computeSteadyMetric(
-            mesh, V, adap.constructHessian(mesh, V, spd, op=op), spd, nVerT=nVerT, op=op)
+        H = adap.constructHessian(mesh, V, spd, op=op)
+        M2 = adap.computeSteadyMetric(mesh, V, H, spd, nVerT=nVerT, op=op)
         M = adap.metricIntersection(mesh, V, M, M2) if op.mtype == 'b' else M2
     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
+    if op.outputHessian:
+        hfile.write(H, time=float(mn))
 
     # Get solver parameter values and construct solver
     solver_obj = solver2d.FlowSolver2d(mesh, b)
