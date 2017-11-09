@@ -131,7 +131,8 @@ while mn < iEnd:
     tic2 = clock()
 
     # Enforce initial conditions on discontinuous space / load variables from disk
-    elev_2d, uv_2d, index = op.loadFromDisk(mesh, mn, dirName, eta0)
+    index = mn * int(rm / ndump)
+    elev_2d, uv_2d = op.loadFromDisk(mesh, index, dirName, eta0)
 
     # Create functions to hold inner product and significance data
     spaceMatch = (op.space1 == op.space2) & (op.degree1 == op.degree2)
@@ -141,13 +142,9 @@ while mn < iEnd:
     if mn != 0:
         print('#### Interpolating adjoint data...')
     for j in range(max(mn, iStart), iEnd):
+
         # Load adjoint data and interpolate onto current mesh
-        with DumbCheckpoint(dirName + 'hdf5/adjoint_' + stor.indexString(mn), mode=FILE_READ) as chk:
-            lu = Function(W0.sub(0), name='Adjoint velocity')
-            le = Function(W0.sub(1), name='Adjoint free surface')
-            chk.load(lu)
-            chk.load(le)
-            chk.close()
+        le, lu = op.loadFromDiskAdjoint(mesh0, mn, dirName)
         if mn != 0:
             print('    #### Step %d / %d' % (j + 1 - max(mn, iStart), iEnd - max(mn, iStart)))
             lu, le = inte.interp(mesh, lu, le)

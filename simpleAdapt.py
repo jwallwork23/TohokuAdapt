@@ -41,7 +41,8 @@ while mn < np.ceil(T / (dt * rm)):
     tic2 = clock()
 
     # Enforce initial conditions on discontinuous space / load variables from disk
-    elev_2d, uv_2d, index = op.loadFromDisk(mesh, mn, dirName, eta0)
+    index = mn * int(rm / ndump)
+    elev_2d, uv_2d = op.loadFromDisk(mesh, index, dirName, eta0)
 
     # Compute Hessian and metric, adapt mesh and interpolate variables
     V = TensorFunctionSpace(mesh, 'CG', 1)
