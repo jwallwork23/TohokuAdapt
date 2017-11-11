@@ -145,8 +145,6 @@ while mn < iEnd:
             lu, le = inte.interp(mesh, lu, le)                              # Interpolate saved data onto current mesh
 
         # Estimate error and extract (pointwise) maximal values
-        # TODO: Note here we consider significance in a DG0 space. Perhaps CG1 would be better? (Considering we
-        # TODO: wish to construct a cts metric...)
         if mn == 0:
             rho = Function(DG0).interpolate(err.basicErrorEstimator(uv_2d, lu, Function(Wcomp).interpolate(elev_2d),
                                                                     Function(Wcomp).interpolate(le)))
@@ -157,6 +155,7 @@ while mn < iEnd:
         else:
             significance = adap.pointwiseMax(significance, rho)
     significance.dat.data[:] *= np.abs(assemble(significance * dx))         # Normalise significance scaling (?)
+    # TODO: Note here we consider significance in a DG0 space. Perhaps CG1 would be better? (For CG metric)
 
     V = TensorFunctionSpace(mesh, 'CG', 1)
     M_ = adap.isotropicMetric(V, inte.interp(mesh, h)[0], bdy=True, op=op)  # (Interpolated) initial boundary metric

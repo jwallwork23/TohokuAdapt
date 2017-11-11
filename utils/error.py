@@ -117,6 +117,24 @@ def analyticSolutionSW(V, b, t, x0=0., y0=0., h=1e-3, trunc=10):
     return eta
 
 
+def analyticSolution(eta0, t, b, trunc=10):
+
+    V = eta0.function_space()
+    eta = Function(V)
+    gbSqrt = np.sqrt(9.81 * b)
+    pi22 = pow(2 * np.pi, 2)
+    for k in range(-trunc, trunc + 1):
+        for l in range(-trunc, trunc + 1):
+            kappa = np.sqrt(k**2 + l**2)
+            omega = kappa * gbSqrt
+            cosTerm = Function(V).interpolate(Expression("cos(%.f * x[0] + %.f * x[1])" % (k, l)))
+            sinTerm = Function(V).interpolate(Expression("sin(%.f * x[0] + %.f * x[1])" % (k, l)))
+            transform = (assemble(cosTerm * eta0 * dx) - cmath.sqrt(-1) * assemble(sinTerm * eta0 * dx)) / pi22
+            eta.dat.data[:] += \
+                ((cosTerm.dat.data + cmath.sqrt(-1) * sinTerm.dat.data) * kappa * transform * cos(omega * t)).real
+    return eta
+
+
 if __name__ == '__main__':
     lx = 2 * np.pi
     if input("Hit anything except enter to compute analytic solution. "):

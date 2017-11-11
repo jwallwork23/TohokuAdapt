@@ -39,10 +39,8 @@ hfile = File("plots/simpleAdapt/hessian.pvd")
 
 while mn < np.ceil(T / (dt * rm)):
     tic2 = clock()
-
-    # Enforce initial conditions on discontinuous space / load variables from disk
     index = mn * int(rm / ndump)
-    elev_2d, uv_2d = op.loadFromDisk(mesh, index, dirName, eta0)
+    elev_2d, uv_2d = op.loadFromDisk(mesh, index, dirName, eta0)    # Enforce ICS / load variables from disk
 
     # Compute Hessian and metric, adapt mesh and interpolate variables
     V = TensorFunctionSpace(mesh, 'CG', 1)
@@ -60,7 +58,7 @@ while mn < np.ceil(T / (dt * rm)):
         H.rename("Hessian")
         hfile.write(H, time=float(mn))
 
-    # Get solver parameter values and construct solver
+    # Establish Thetis flow solver object
     solver_obj = solver2d.FlowSolver2d(mesh, b)
     options = solver_obj.options
     options.element_family = op.family
@@ -69,8 +67,6 @@ while mn < np.ceil(T / (dt * rm)):
     options.simulation_end_time = (mn + 1) * dt * rm
     options.timestepper_type = op.timestepper
     options.timestep = dt
-
-    # Specify outfile directory and HDF5 checkpointing
     options.output_directory = dirName
     options.export_diagnostics = True
     options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
@@ -83,7 +79,7 @@ while mn < np.ceil(T / (dt * rm)):
     solver_obj.next_export_t = solver_obj.i_export * options.simulation_export_time
     solver_obj.iteration = int(np.ceil(solver_obj.next_export_t / dt))
     solver_obj.simulation_time = solver_obj.iteration * dt
-    solver_obj.next_export_t += options.simulation_export_time
+    solver_obj.next_export_t += options.simulation_export_time  # For next export
     for e in solver_obj.exporters.values():
         e.set_next_export_ix(solver_obj.i_export)
 
