@@ -22,8 +22,6 @@ print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d. \n' %
 op = opt.Options(outputHessian=True)
 nVerT = op.vscale * nVer    # Target #Vertices
 dirName = 'plots/simpleAdapt/'
-# if op.iso:
-#     dirName += 'isotropic/'
 T = op.T
 dt = op.dt
 op.checkCFL(b)

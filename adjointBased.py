@@ -23,13 +23,13 @@ print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d.' % (n
 
 # Get default parameter values and check CFL criterion
 op = opt.Options(vscale=0.2, rm=60, ndump=1, outputHessian=True)    # ndump=1 is needed for explicit error estimators
-nVerT = op.vscale * nVer    # Target #Vertices
+nVerT = op.vscale * nVer                                            # Target #Vertices
 dirName = 'plots/adjointBased/'
-# if op.iso:
-#     dirName += 'isotropic/'
+basic = bool(input('Hit anything but enter to use basic error estimators, as in DL16: '))
+if not basic:
+    dirName += 'explicit/'
 T = op.T
 dt = op.dt
-Dt = Constant(dt)
 cdt = op.hmin / np.sqrt(op.g * max(b.dat.data))
 op.checkCFL(b)
 ndump = op.ndump
@@ -75,8 +75,8 @@ else:
     lu, le = split(lam)
     lu_, le_ = split(lam_)
     L = ((le - le_) * xi + inner(lu - lu_, w)
-         - Dt * op.g * inner(0.5 * (lu + lu_), grad(xi)) - coeff * f * xi
-         + Dt * (b * inner(grad(0.5 * (le + le_)), w) + 0.5 * (le + le_) * inner(grad(b), w))) * dx
+         - Constant(dt) * op.g * inner(0.5 * (lu + lu_), grad(xi)) - coeff * f * xi
+         + Constant(dt) * (b * inner(grad(0.5 * (le + le_)), w) + 0.5 * (le + le_) * inner(grad(b), w))) * dx
     adjointProblem = NonlinearVariationalProblem(L, lam)
     adjointSolver = NonlinearVariationalSolver(adjointProblem, solver_parameters=op.params)
     lu, le = lam.split()
@@ -130,9 +130,11 @@ print('\nStarting mesh adaptive forward run...')
 while mn < iEnd:
     tic2 = clock()
     index = mn * int(rm / ndump)
-    elev_2d, uv_2d = op.loadFromDisk(mesh, index, dirName, eta0)                # Enforce ICs / load variables from disk
-    errEst = Function(FunctionSpace(mesh, "CG", 1), name='Error estimator')     # Elementwise significance
-    # hk = Function(FunctionSpace(mesh, "DG", 0)).interpolate(CellSize(mesh))    # Current sizes of mesh elements
+    elev_2d, uv_2d = op.loadFromDisk(mesh, index, dirName, eta0)    # Enforce ICs / load variables from disk
+    Wcomp = FunctionSpace(mesh, "CG", 1)                            # Computational space to match metric P1 space
+    errEst = Function(Wcomp, name='Error estimator')                # Elementwise significance
+    if not basic:
+        hk = Function(Wcomp).interpolate(CellSize(mesh))            # Current sizes of mesh elements
 
     if mn != 0:
         print('#### Interpolating adjoint data...')
@@ -144,19 +146,15 @@ while mn < iEnd:
             lu, le = inte.interp(mesh, lu, le)                              # Interpolate saved data onto current mesh
 
         # Estimate error and extract (pointwise) maximal values
-        # if mn == 0:
-        rho = err.basicErrorEstimator(uv_2d, lu, elev_2d, le, 1)
-        # else:
-        #     rho = err.explicitErrorEstimator(uv_2d_, uv_2d, elev_2d_, elev_2d, lu, le, b, dt, hk)
+        rho = err.basicErrorEstimator(uv_2d, lu, elev_2d, le, 1) if (basic or mn == 0) else \
+            err.explicitErrorEstimator(uv_2d_, uv_2d, elev_2d_, elev_2d, lu, le, b, dt, hk)
         if j == 0:
             errEst.assign(rho)
         else:
             errEst = adap.pointwiseMax(errEst, rho)
-    # significance.dat.data[:] *= np.abs(assemble(significance * dx))         # Normalise significance scaling (?)
     sfile.write(errEst)
-    # TODO: Note here we consider significance in a DG0 space. Perhaps CG1 would be better? (For CG metric)
 
-    V = TensorFunctionSpace(mesh, 'CG', 1)
+    V = TensorFunctionSpace(mesh, "CG", 1)
     M_ = adap.isotropicMetric(V, inte.interp(mesh, h)[0], bdy=True, op=op)  # (Interpolated) initial boundary metric
     if speed:
         spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))       # Get fluid speed

@@ -3,9 +3,6 @@ from firedrake import *
 import numpy as np
 import cmath
 
-from . import interpolation
-from . import storage
-
 
 class OutOfRangeError(ValueError):
     pass
@@ -32,20 +29,20 @@ def explicitErrorEstimator(u_, u, eta_, eta, lu, le, b, dt, hk):
     v = TestFunction(FunctionSpace(mesh, "DG", 0))      # DG test functions to get cell-wise norms
 
     # Compute element residual
-    rho = assemble(v * hk * sqrt(dot(u_ - u - dt * 9.81 * grad(0.5 * (eta + eta_)),
-                                     u_ - u - dt * 9.81 * grad(0.5 * (eta + eta_)))
-                                 + (eta_ - eta - dt * div(b * 0.5 * (u + u_)))
-                                 * (eta_ - eta - dt * div(b * 0.5 * (u + u_)))) / CellVolume(mesh) * dx)
+    rho = assemble(v * hk * (dot(u_ - u - dt * 9.81 * grad(0.5 * (eta + eta_)),
+                                u_ - u - dt * 9.81 * grad(0.5 * (eta + eta_)))
+                             + (eta_ - eta - dt * div(b * 0.5 * (u + u_)))
+                             * (eta_ - eta - dt * div(b * 0.5 * (u + u_)))) / CellVolume(mesh) * dx)
 
     # Compute and add boundary residual term
     # TODO: this only currently integrates over domain the boundary, NOT cell boundaries
     # TODO: also, need multiply by normed bdy size
-    rho += assemble(v * dt * b * dot(0.5 * (u + u_), FacetNormal(mesh)) / CellVolume(mesh) * ds)
+    rho_bdy = assemble(v * dt * b * dot(0.5 * (u + u_), FacetNormal(mesh)) / CellVolume(mesh) * ds)
     lambdaNorm = assemble(v * sqrt((dot(lu, lu) + le * le)) * dx)
-    rho *= lambdaNorm
+    rho = assemble((sqrt(rho) + sqrt(rho_bdy)) * lambdaNorm)
     rho.rename("Local error indicators")
 
-    return rho
+    return Function(FunctionSpace(mesh, "CG", 1)).interpolate(rho)
 
 
 def basicErrorEstimator(u, lu, eta, le, p):

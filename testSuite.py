@@ -95,7 +95,6 @@ while mn < np.ceil(T / (dt * rm)):
                                      elev_2d, nVerT=nVerT, op=op)
         mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
         elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
-    # TODO: no need to interpolate b
 
     # Get solver parameter values and construct solver
     solver_obj = solver2d.FlowSolver2d(mesh, b)
