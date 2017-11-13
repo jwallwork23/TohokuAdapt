@@ -48,7 +48,7 @@ def explicitErrorEstimator(u_, u, eta_, eta, lu, le, b, dt, hk):
     return rho
 
 
-def basicErrorEstimator(u, lu, eta, le, family, p):
+def basicErrorEstimator(u, lu, eta, le, p):
     """
     Consider significant regions as those where the 'dot product' between forward and adjoint variables take significant
     values in modulus, as per Davis & LeVeque 2016.
@@ -57,12 +57,12 @@ def basicErrorEstimator(u, lu, eta, le, family, p):
     :param lu: adjoint fluid velocity at current timestep.
     :param eta: free surface displacement at current timestep.
     :param le: adjoint free surface displacement at current timestep.
-    :param family: FunctionSpace family for error estimator.
     :param p: FunctionSpace degree for error estimator.
     :return: field of local error indicators taken as product over fields.
     """
-    rho = Function(FunctionSpace(mesh, family, p)).interpolate(eta * le)
-    rho_u = Function(FunctionSpace(mesh, family, p)).interpolate(u[0] * lu[0] + u[1] * lu[1])
+    mesh = u.function_space().mesh()
+    rho = Function(FunctionSpace(mesh, "CG", p)).interpolate(eta * le)      # NOTE error estimators should be cts!
+    rho_u = Function(FunctionSpace(mesh, "CG", p)).interpolate(u[0] * lu[0] + u[1] * lu[1])
     rho.assign(rho + rho_u)
     rho.rename("Local error indicators")
 

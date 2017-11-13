@@ -130,11 +130,9 @@ print('\nStarting mesh adaptive forward run...')
 while mn < iEnd:
     tic2 = clock()
     index = mn * int(rm / ndump)
-    elev_2d, uv_2d = op.loadFromDisk(mesh, index, dirName, eta0)    # Enforce ICs / load variables from disk
-    Wcomp = FunctionSpace(mesh, "CG", 1)                            # Computational space for forming error estimators
-    # DG0 = FunctionSpace(mesh, "DG", 0)
-    errEst = Function(Wcomp, name='Error estimator')                  # Elementwise significance
-    # hk = Function(DG0).interpolate(CellSize(mesh))                  # Cell size of mesh
+    elev_2d, uv_2d = op.loadFromDisk(mesh, index, dirName, eta0)                # Enforce ICs / load variables from disk
+    errEst = Function(FunctionSpace(mesh, "CG", 1), name='Error estimator')     # Elementwise significance
+    # hk = Function(FunctionSpace(mesh, "DG", 0)).interpolate(CellSize(mesh))    # Current sizes of mesh elements
 
     if mn != 0:
         print('#### Interpolating adjoint data...')
@@ -147,7 +145,7 @@ while mn < iEnd:
 
         # Estimate error and extract (pointwise) maximal values
         # if mn == 0:
-        rho = err.basicErrorEstimator(uv_2d, lu, elev_2d, le, "CG", 1)
+        rho = err.basicErrorEstimator(uv_2d, lu, elev_2d, le, 1)
         # else:
         #     rho = err.explicitErrorEstimator(uv_2d_, uv_2d, elev_2d_, elev_2d, lu, le, b, dt, hk)
         if j == 0:
