@@ -15,7 +15,7 @@ print('*************** ANISOTROPIC ADAPTIVE TSUNAMI SIMULATION ***************\n
 print('MESH ADAPTIVE solver initially defined on a mesh of')
 mesh, eta0, b = msh.TohokuDomain(int(input('coarseness (Integer in range 1-5, default 5): ') or 5))
 nEle, nVer = msh.meshStats(mesh)
-N = [nEle, nEle]    # Min/max #Elements
+N = [nEle, nEle]            # Min/max #Elements
 print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d. \n' % (nEle, nVer))
 
 # Get default parameter values and check CFL criterion

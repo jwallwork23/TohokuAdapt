@@ -124,16 +124,17 @@ tic1 = clock()
 # Approximate isotropic metric at boundaries of initial mesh using circumradius
 h = Function(W0.sub(1)).interpolate(CellSize(mesh0))
 hfile = File("plots/adjointBased/hessian.pvd")
+sfile = File("plots/adjointBased/significance.pvd")
 
 print('\nStarting mesh adaptive forward run...')
 while mn < iEnd:
     tic2 = clock()
     index = mn * int(rm / ndump)
     elev_2d, uv_2d = op.loadFromDisk(mesh, index, dirName, eta0)    # Enforce ICs / load variables from disk
-    Wcomp = FunctionSpace(mesh, op.space1, op.degree1)              # Computational space for forming error estimators
-    DG0 = FunctionSpace(mesh, "DG", 0)
-    significance = Function(DG0, name='Significant regions')        # Elementwise significance
-    Wnative = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2) # DG1-CG2
+    Wcomp = FunctionSpace(mesh, "CG", 1)                            # Computational space for forming error estimators
+    # DG0 = FunctionSpace(mesh, "DG", 0)
+    errEst = Function(Wcomp, name='Error estimator')                  # Elementwise significance
+    # hk = Function(DG0).interpolate(CellSize(mesh))                  # Cell size of mesh
 
     if mn != 0:
         print('#### Interpolating adjoint data...')
@@ -145,16 +146,16 @@ while mn < iEnd:
             lu, le = inte.interp(mesh, lu, le)                              # Interpolate saved data onto current mesh
 
         # Estimate error and extract (pointwise) maximal values
-        if mn == 0:
-            rho = Function(DG0).interpolate(err.basicErrorEstimator(uv_2d, lu, Function(Wcomp).interpolate(elev_2d),
-                                                                    Function(Wcomp).interpolate(le)))
-        else:
-            rho = err.explicitErrorEstimator(Wnative, uv_2d_, uv_2d, elev_2d_, elev_2d, lu, le, b, dt)
+        # if mn == 0:
+        rho = err.basicErrorEstimator(uv_2d, lu, elev_2d, le, "CG", 1)
+        # else:
+        #     rho = err.explicitErrorEstimator(uv_2d_, uv_2d, elev_2d_, elev_2d, lu, le, b, dt, hk)
         if j == 0:
-            significance.assign(rho)
+            errEst.assign(rho)
         else:
-            significance = adap.pointwiseMax(significance, rho)
-    significance.dat.data[:] *= np.abs(assemble(significance * dx))         # Normalise significance scaling (?)
+            errEst = adap.pointwiseMax(errEst, rho)
+    # significance.dat.data[:] *= np.abs(assemble(significance * dx))         # Normalise significance scaling (?)
+    sfile.write(errEst)
     # TODO: Note here we consider significance in a DG0 space. Perhaps CG1 would be better? (For CG metric)
 
     V = TensorFunctionSpace(mesh, 'CG', 1)
@@ -163,7 +164,7 @@ while mn < iEnd:
         spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))       # Get fluid speed
     H = adap.constructHessian(mesh, V, spd if speed else elev_2d, op=op)    # Construct Hessian
     for k in range(mesh.topology.num_vertices()):
-        H.dat.data[k] *= significance.dat.data[k]                           # Scale by significance
+        H.dat.data[k] *= errEst.dat.data[k]                           # Scale by significance
     M = adap.computeSteadyMetric(mesh, V, H, spd if speed else elev_2d, nVerT=nVerT, op=op)     # Generate metric
     M = adap.metricIntersection(mesh, V, M, M_, bdy=True)                   # Intersect with initial bdy metric
     adap.metricGradation(mesh, M, op.beta, iso=op.iso)                      # Gradate to 'smoothen' metric
