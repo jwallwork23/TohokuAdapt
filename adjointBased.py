@@ -39,7 +39,7 @@ if op.mtype == 'b':
     raise NotImplementedError('Cannot currently perform adjoint-based adaption with respect to two fields.')
 
 # Initialise counters, constants and function space
-Sn = 0                              # Sum over #Elements
+Sn = meshn = 0                      # Sum over #Elements and mesh counter
 iStart = int(op.Ts / (dt * rm))     # Index corresponding to tStart
 iEnd = int(np.ceil(T / (dt * rm)))  # Index corresponding to tEnd
 mesh0 = mesh
@@ -51,7 +51,6 @@ else:
     # Initalise counters and forcing switch
     t = T
     mn = iEnd
-    meshn = 0
     tic1 = clock()
     coeff = Constant(1.)
     switch = True

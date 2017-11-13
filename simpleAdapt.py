@@ -29,9 +29,7 @@ ndump = op.ndump
 rm = op.rm
 
 # Initialise counters:
-dumpn = 0   # Dump counter
-mn = 0      # Mesh number
-Sn = 0      # Sum over #Elements
+dumpn = mn = Sn = 0   # Dump counter, mesh number and sum over #Elements
 tic1 = clock()
 hfile = File("plots/simpleAdapt/hessian.pvd")
 
