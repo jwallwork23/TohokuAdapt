@@ -38,7 +38,7 @@ hfile = File("plots/simpleAdapt/hessian.pvd")
 while mn < np.ceil(T / (dt * rm)):
     tic2 = clock()
     index = mn * int(rm / ndump)
-    elev_2d, uv_2d = op.loadFromDisk(mesh, index, dirName, eta0)    # Enforce ICS / load variables from disk
+    elev_2d, uv_2d = op.loadFromDisk(mesh, index, dirName, elev0=eta0)      # Enforce ICs / load variables from disk
 
     # Compute Hessian and metric, adapt mesh and interpolate variables
     V = TensorFunctionSpace(mesh, 'CG', 1)

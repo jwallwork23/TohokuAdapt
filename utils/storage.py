@@ -144,3 +144,15 @@ def plotGauges(gauge):
     plt.xlabel(r'Time elapsed (mins)')
     plt.ylabel(r'Free surface (m)')
     plt.savefig('plots/timeseries/' + gauge + '.pdf', bbox_inches='tight')
+
+
+def saveToDisk(lu, le, dirName, index):
+    """
+    :param lu: adjoint velocity field.
+    :param le: adjoint free surface field.
+    :param dirName: name of directory to save in.
+    """
+    with DumbCheckpoint(dirName + 'hdf5/adjoint_' + stor.indexString(index), mode=FILE_CREATE) as chk:
+        chk.store(lu)
+        chk.store(le)
+        chk.close()

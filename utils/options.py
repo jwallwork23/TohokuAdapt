@@ -155,49 +155,40 @@ class Options:
             if input('Hit enter if happy to proceed.'):
                 exit(23)
 
-    def loadFromDisk(self, mesh, index, dirName, elev0):
+    def loadFromDisk(self, mesh, index, dirName, elev0=None, adjoint=False):
         """
         :param mesh: mesh on which data is stored.
         :param index: index of data stored.
         :param dirName: name of directory for storage.
         :param elev0: initial free surface.
+        :param adjoint: toggle use of adjoint or forward equations.
         :return: saved free surface elevation and fluid velocity, along with mesh index.
         """
         # Enforce initial conditions on discontinuous space / load variables from disk
         W = VectorFunctionSpace(mesh, self.space1, self.degree1) * FunctionSpace(mesh, self.space2, self.degree2)
-        uv_2d = Function(W.sub(0))
-        elev_2d = Function(W.sub(1))
         indexStr = storage.indexString(index)
-        if index == 0:
-            elev_2d.interpolate(elev0)
-            uv_2d.interpolate(Expression((0, 0)))
+        if adjoint:
+            with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_READ) as chk:
+                lu = Function(W.sub(0), name='Adjoint velocity')
+                le = Function(W.sub(1), name='Adjoint free surface')
+                chk.load(lu)
+                chk.load(le)
+                chk.close()
+            return le, lu
         else:
-            with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as el:
-                el.load(elev_2d, name='elev_2d')
-                el.close()
-            with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as ve:
-                ve.load(uv_2d, name='uv_2d')
-                ve.close()
-        return elev_2d, uv_2d
-
-    def loadFromDiskAdjoint(self, mesh, index, dirName):
-        """
-        :param mesh: mesh on which data is stored.
-        :param index: index of data stored.
-        :param dirName: name of directory for storage.
-        :param elev0: initial free surface.
-        :return: saved free surface elevation and fluid velocity, along with mesh index.
-        """
-        # Enforce initial conditions on discontinuous space / load variables from disk
-        W = VectorFunctionSpace(mesh, self.space1, self.degree1) * FunctionSpace(mesh, self.space2, self.degree2)
-        indexStr = storage.indexString(index)
-        with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_READ) as chk:
-            lu = Function(W.sub(0), name='Adjoint velocity')
-            le = Function(W.sub(1), name='Adjoint free surface')
-            chk.load(lu)
-            chk.load(le)
-            chk.close()
-        return le, lu
+            uv_2d = Function(W.sub(0))
+            elev_2d = Function(W.sub(1))
+            if index == 0:
+                elev_2d.interpolate(elev0)
+                uv_2d.interpolate(Expression((0, 0)))
+            else:
+                with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as el:
+                    el.load(elev_2d, name='elev_2d')
+                    el.close()
+                with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as ve:
+                    ve.load(uv_2d, name='uv_2d')
+                    ve.close()
+            return elev_2d, uv_2d
 
     def printToScreen(self, mn, outerTime, innerTime, nEle, Sn, N):
         """

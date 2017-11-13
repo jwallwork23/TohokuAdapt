@@ -57,9 +57,9 @@ def basicErrorEstimator(u, lu, eta, le, p):
     :param p: FunctionSpace degree for error estimator.
     :return: field of local error indicators taken as product over fields.
     """
-    mesh = u.function_space().mesh()
-    rho = Function(FunctionSpace(mesh, "CG", p)).interpolate(eta * le)      # NOTE error estimators should be cts!
-    rho_u = Function(FunctionSpace(mesh, "CG", p)).interpolate(u[0] * lu[0] + u[1] * lu[1])
+    W = FunctionSpace(u.function_space().mesh(), "CG", p)   # NOTE error estimators should be cts!
+    rho = Function(W).interpolate(eta * le)
+    rho_u = Function(W).interpolate(u[0] * lu[0] + u[1] * lu[1])
     rho.assign(rho + rho_u)
     rho.rename("Local error indicators")
 

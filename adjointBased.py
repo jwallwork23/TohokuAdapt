@@ -60,15 +60,12 @@ else:
     lu_.interpolate(Expression([0, 0]))
     le_.interpolate(Expression(0))
     lam = Function(W0).assign(lam_)
-    lu, le = lam.split()
-    lu.rename('Adjoint velocity')
-    le.rename('Adjoint free surface')
-    adjointFile = File(dirName + 'adjoint.pvd')
+    lu, le = lam.split()            # Velocity and free surface components of adjoint variable, respectively
 
     # Establish (smoothened) indicator function for adjoint equations
     fexpr = '(x[0] > 490e3) & (x[0] < 640e3) & (x[1] > 4160e3) & (x[1] < 4360e3) ? ' \
             'exp(1. / (pow(x[0] - 565e3, 2) - pow(75e3, 2))) * exp(1. / (pow(x[1] - 4260e3, 2) - pow(100e3, 2))) : 0.'
-    f = Function(W0.sub(1), name='Forcing term').interpolate(Expression(fexpr))
+    f = Function(W0.sub(1)).interpolate(Expression(fexpr))
 
     # Set up the variational problem, using Crank Nicolson timestepping
     w, xi = TestFunctions(W0)
@@ -96,22 +93,14 @@ else:
         if t != T:
             adjointSolver.solve()
             lam_.assign(lam)
-        if dumpn == 0:
-            adjointFile.write(lu, le, time=t)
-            dumpn += ndump
         if meshn == 0:
             print('t = %1.1fs' % t)
-            with DumbCheckpoint(dirName + 'hdf5/adjoint_' + stor.indexString(mn), mode=FILE_CREATE) as chk:
-                chk.store(lu)
-                chk.store(le)
-                chk.close()
+            stor.saveToDisk(lu, le, dirName, mn)
             meshn += rm
             mn -= 1
         t -= dt
-        dumpn -= 1
         meshn -= 1
-    toc1 = clock()
-    print('... done! Elapsed time for adjoint solver: %1.2fs' % (toc1 - tic1))
+    print('... done! Elapsed time for adjoint solver: %1.2fs' % (clock() - tic1))
     assert(mn == 0)
 
 # Initialise counters and constants
@@ -130,38 +119,36 @@ print('\nStarting mesh adaptive forward run...')
 while mn < iEnd:
     tic2 = clock()
     index = mn * int(rm / ndump)
-    elev_2d, uv_2d = op.loadFromDisk(mesh, index, dirName, eta0)    # Enforce ICs / load variables from disk
-    Wcomp = FunctionSpace(mesh, "CG", 1)                            # Computational space to match metric P1 space
-    errEst = Function(Wcomp, name='Error estimator')                # Elementwise significance
+    elev_2d, uv_2d = op.loadFromDisk(mesh, index, dirName, elev0=eta0)  # Enforce ICs / load variables from disk
+    Wcomp = FunctionSpace(mesh, "CG", 1)                                # Computational space to match metric P1 space
+    errEst = Function(Wcomp, name='Error estimator')                    # Local error indicators
     if not basic:
-        hk = Function(Wcomp).interpolate(CellSize(mesh))            # Current sizes of mesh elements
-
+        hk = Function(Wcomp).interpolate(CellSize(mesh))                # Current sizes of mesh elements
     if mn != 0:
         print('#### Interpolating adjoint data...')
-        elev_2d_, uv_2d_ = op.loadFromDisk(mesh, index - 1, dirName, eta0)  # Load saved forward data
+        elev_2d_, uv_2d_ = op.loadFromDisk(mesh, index - 1, dirName, elev0=eta0)    # Load saved forward data
     for j in range(max(mn, iStart), iEnd):
-        le, lu = op.loadFromDiskAdjoint(mesh0, j, dirName)                  # Load saved adjoint data
+        le, lu = op.loadFromDisk(mesh0, j, dirName, adjoint=True)                   # Load saved adjoint data
         if mn != 0:
             print('    #### Step %d / %d' % (j + 1 - max(mn, iStart), iEnd - max(mn, iStart)))
-            lu, le = inte.interp(mesh, lu, le)                              # Interpolate saved data onto current mesh
-
-        # Estimate error and extract (pointwise) maximal values
+            lu, le = inte.interp(mesh, lu, le)                                      # Interpolate onto current mesh
         rho = err.basicErrorEstimator(uv_2d, lu, elev_2d, le, 1) if (basic or mn == 0) else \
-            err.explicitErrorEstimator(uv_2d_, uv_2d, elev_2d_, elev_2d, lu, le, b, dt, hk)
+            err.explicitErrorEstimator(uv_2d_, uv_2d, elev_2d_, elev_2d, lu, le, b, dt, hk)     # Estimate error
         if j == 0:
             errEst.assign(rho)
         else:
-            errEst = adap.pointwiseMax(errEst, rho)
+            errEst = adap.pointwiseMax(errEst, rho)     # Extract (pointwise) maximal values
+    errEst = assemble(sqrt(errEst * errEst))            # Take modulus (error estimator must be strictly positive)
     sfile.write(errEst)
 
     V = TensorFunctionSpace(mesh, "CG", 1)
-    M_ = adap.isotropicMetric(V, inte.interp(mesh, h)[0], bdy=True, op=op)  # (Interpolated) initial boundary metric
+    M_ = adap.isotropicMetric(V, inte.interp(mesh, h)[0], bdy=True, op=op)                  # Initial boundary metric
     if speed:
-        spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))       # Get fluid speed
-    H = adap.constructHessian(mesh, V, spd if speed else elev_2d, op=op)    # Construct Hessian
+        spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))                       # Get fluid speed
+    H = adap.constructHessian(mesh, V, spd if speed else elev_2d, op=op)                    # Construct Hessian
     for k in range(mesh.topology.num_vertices()):
-        H.dat.data[k] *= errEst.dat.data[k]                           # Scale by significance
-    M = adap.computeSteadyMetric(mesh, V, H, spd if speed else elev_2d, nVerT=nVerT, op=op)     # Generate metric
+        H.dat.data[k] *= errEst.dat.data[k]                                                 # Scale by error estimate
+    M = adap.computeSteadyMetric(mesh, V, H, spd if speed else elev_2d, nVerT=nVerT, op=op) # Generate metric
     M = adap.metricIntersection(mesh, V, M, M_, bdy=True)                   # Intersect with initial bdy metric
     adap.metricGradation(mesh, M, op.beta, iso=op.iso)                      # Gradate to 'smoothen' metric
     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh                      # Adapt mesh
