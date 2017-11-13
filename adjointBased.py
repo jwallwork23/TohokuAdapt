@@ -38,7 +38,10 @@ speed = op.mtype == 's'
 if op.mtype == 'b':
     raise NotImplementedError('Cannot currently perform adjoint-based adaption with respect to two fields.')
 
-# Create initial function space
+# Initialise counters, constants and function space
+Sn = 0                              # Sum over #Elements
+iStart = int(op.Ts / (dt * rm))     # Index corresponding to tStart
+iEnd = int(np.ceil(T / (dt * rm)))  # Index corresponding to tEnd
 mesh0 = mesh
 W0 = VectorFunctionSpace(mesh0, op.space1, op.degree1) * FunctionSpace(mesh0, op.space2, op.degree2)
 
@@ -47,8 +50,7 @@ if bool(input('Hit anything but enter if adjoint data is already stored: ')):
 else:
     # Initalise counters and forcing switch
     t = T
-    mn = int(T / (rm * dt))
-    dumpn = 0
+    mn = iEnd
     meshn = 0
     tic1 = clock()
     coeff = Constant(1.)
@@ -89,7 +91,7 @@ else:
             switch = False
             coeff.assign(0.)
 
-        # Solve the problem, update variables and dump to vtu and HDF5
+        # Solve the problem, update variables and dump to HDF5
         if t != T:
             adjointSolver.solve()
             lam_.assign(lam)
@@ -103,48 +105,43 @@ else:
     print('... done! Elapsed time for adjoint solver: %1.2fs' % (clock() - tic1))
     assert(mn == 0)
 
-# Initialise counters and constants
-dumpn = 0                           # Dump counter
-Sn = 0                              # Sum over #Elements
-iStart = int(op.Ts / (dt * rm))     # Index corresponding to tStart
-iEnd = int(np.ceil(T / (dt * rm)))  # Index corresponding to tEnd
-tic1 = clock()
-
 # Approximate isotropic metric at boundaries of initial mesh using circumradius
 h = Function(W0.sub(1)).interpolate(CellSize(mesh0))
 hfile = File("plots/adjointBased/hessian.pvd")
 sfile = File("plots/adjointBased/significance.pvd")
 
 print('\nStarting mesh adaptive forward run...')
+tic1 = clock()
 while mn < iEnd:
     tic2 = clock()
     index = mn * int(rm / ndump)
+    i0 = max(mn, iStart)
     elev_2d, uv_2d = op.loadFromDisk(mesh, index, dirName, elev0=eta0)  # Enforce ICs / load variables from disk
     Wcomp = FunctionSpace(mesh, "CG", 1)                                # Computational space to match metric P1 space
-    errEst = Function(Wcomp, name='Error estimator')                    # Local error indicators
     if not basic:
         hk = Function(Wcomp).interpolate(CellSize(mesh))                # Current sizes of mesh elements
     if mn != 0:
         print('#### Interpolating adjoint data...')
         elev_2d_, uv_2d_ = op.loadFromDisk(mesh, index - 1, dirName, elev0=eta0)    # Load saved forward data
-    for j in range(max(mn, iStart), iEnd):
+    for j in range(i0, iEnd):
         le, lu = op.loadFromDisk(mesh0, j, dirName, adjoint=True)                   # Load saved adjoint data
         if mn != 0:
-            print('    #### Step %d / %d' % (j + 1 - max(mn, iStart), iEnd - max(mn, iStart)))
+            print('    #### Step %d / %d' % (j + 1 - i0, iEnd - i0))
             lu, le = inte.interp(mesh, lu, le)                                      # Interpolate onto current mesh
         rho = err.basicErrorEstimator(uv_2d, lu, elev_2d, le, 1) if (basic or mn == 0) else \
             err.explicitErrorEstimator(uv_2d_, uv_2d, elev_2d_, elev_2d, lu, le, b, dt, hk)     # Estimate error
-        if j == 0:
-            errEst.assign(rho)
+        if j == i0:
+            errEst = Function(Wcomp).assign(rho)
         else:
             errEst = adap.pointwiseMax(errEst, rho)     # Extract (pointwise) maximal values
     errEst = assemble(sqrt(errEst * errEst))            # Take modulus (error estimator must be strictly positive)
+    errEst.rename("Local error indicators")             # TODO: how to use the ufl function `abs`?
     sfile.write(errEst)
 
     V = TensorFunctionSpace(mesh, "CG", 1)
     M_ = adap.isotropicMetric(V, inte.interp(mesh, h)[0], bdy=True, op=op)                  # Initial boundary metric
     if speed:
-        spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))                       # Get fluid speed
+        spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))                       # Interpolate fluid speed
     H = adap.constructHessian(mesh, V, spd if speed else elev_2d, op=op)                    # Construct Hessian
     for k in range(mesh.topology.num_vertices()):
         H.dat.data[k] *= errEst.dat.data[k]                                                 # Scale by error estimate

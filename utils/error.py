@@ -40,7 +40,6 @@ def explicitErrorEstimator(u_, u, eta_, eta, lu, le, b, dt, hk):
     rho_bdy = assemble(v * dt * b * dot(0.5 * (u + u_), FacetNormal(mesh)) / CellVolume(mesh) * ds)
     lambdaNorm = assemble(v * sqrt((dot(lu, lu) + le * le)) * dx)
     rho = assemble((sqrt(rho) + sqrt(rho_bdy)) * lambdaNorm)
-    rho.rename("Local error indicators")
 
     return Function(FunctionSpace(mesh, "CG", 1)).interpolate(rho)
 
@@ -61,7 +60,6 @@ def basicErrorEstimator(u, lu, eta, le, p):
     rho = Function(W).interpolate(eta * le)
     rho_u = Function(W).interpolate(u[0] * lu[0] + u[1] * lu[1])
     rho.assign(rho + rho_u)
-    rho.rename("Local error indicators")
 
     return rho
 

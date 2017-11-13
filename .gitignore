@@ -10,10 +10,11 @@
 
 # Directories to be ignored:
 
+.idea/
+outdata/
 plots/
 resources/meshes/
 utils/.idea/
-.idea/
 
 # Files to be ignored:
 
