@@ -127,7 +127,7 @@ while mn < iEnd:
         if mn != 0:
             print('    #### Step %d / %d' % (j + 1 - i0, iEnd - i0))
             lu, le = inte.interp(mesh, lu, le)                                      # Interpolate onto current mesh
-        rho = err.basicErrorEstimator(uv_2d, lu, elev_2d, le, 1) if (basic or mn == 0) else \
+        rho = err.basicErrorEstimator(uv_2d, lu, elev_2d, le) if (basic or mn == 0) else \
             err.explicitErrorEstimator(uv_2d_, uv_2d, elev_2d_, elev_2d, lu, le, b, dt, hk)     # Estimate error
         if j == i0:
             errEst = Function(Wcomp).assign(rho)
@@ -158,6 +158,7 @@ while mn < iEnd:
     options = solver_obj.options
     options.element_family = op.family
     options.use_nonlinear_equations = False
+    options.use_grad_depth_viscosity_term = False
     options.simulation_export_time = dt * ndump
     options.simulation_end_time = (mn + 1) * dt * rm
     options.timestepper_type = op.timestepper

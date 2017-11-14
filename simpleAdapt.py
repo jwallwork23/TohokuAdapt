@@ -59,6 +59,7 @@ while mn < np.ceil(T / (dt * rm)):
     options = solver_obj.options
     options.element_family = op.family
     options.use_nonlinear_equations = False
+    options.use_grad_depth_viscosity_term = False
     options.simulation_export_time = dt * ndump
     options.simulation_end_time = (mn + 1) * dt * rm
     options.timestepper_type = op.timestepper

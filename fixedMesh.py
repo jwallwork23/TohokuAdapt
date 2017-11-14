@@ -13,7 +13,9 @@ op = opt.Options()
 op.checkCFL(b)
 solver_obj = solver2d.FlowSolver2d(mesh, b)
 options = solver_obj.options
+options.element_family = op.family
 options.use_nonlinear_equations = False
+options.use_grad_depth_viscosity_term = False
 options.simulation_export_time = op.dt * op.ndump
 options.simulation_end_time = op.T
 options.timestepper_type = op.timestepper

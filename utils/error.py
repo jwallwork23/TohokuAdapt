@@ -29,10 +29,10 @@ def explicitErrorEstimator(u_, u, eta_, eta, lu, le, b, dt, hk):
     v = TestFunction(FunctionSpace(mesh, "DG", 0))      # DG test functions to get cell-wise norms
 
     # Compute element residual
-    rho = assemble(v * hk * (dot(u_ - u - dt * 9.81 * grad(0.5 * (eta + eta_)),
-                                u_ - u - dt * 9.81 * grad(0.5 * (eta + eta_)))
-                             + (eta_ - eta - dt * div(b * 0.5 * (u + u_)))
-                             * (eta_ - eta - dt * div(b * 0.5 * (u + u_)))) / CellVolume(mesh) * dx)
+    rho = assemble(v * pow(hk, 2) * (dot(u_ - u - dt * 9.81 * grad(0.5 * (eta + eta_)),
+                                         u_ - u - dt * 9.81 * grad(0.5 * (eta + eta_)))
+                                     + (eta_ - eta - dt * div(b * 0.5 * (u + u_)))
+                                     * (eta_ - eta - dt * div(b * 0.5 * (u + u_)))) / CellVolume(mesh) * dx)
 
     # Compute and add boundary residual term
     # TODO: this only currently integrates over domain the boundary, NOT cell boundaries
@@ -44,7 +44,7 @@ def explicitErrorEstimator(u_, u, eta_, eta, lu, le, b, dt, hk):
     return Function(FunctionSpace(mesh, "CG", 1)).interpolate(rho)
 
 
-def basicErrorEstimator(u, lu, eta, le, p):
+def basicErrorEstimator(u, lu, eta, le):
     """
     Consider significant regions as those where the 'dot product' between forward and adjoint variables take significant
     values in modulus, as per Davis & LeVeque 2016.
@@ -53,10 +53,9 @@ def basicErrorEstimator(u, lu, eta, le, p):
     :param lu: adjoint fluid velocity at current timestep.
     :param eta: free surface displacement at current timestep.
     :param le: adjoint free surface displacement at current timestep.
-    :param p: FunctionSpace degree for error estimator.
     :return: field of local error indicators taken as product over fields.
     """
-    W = FunctionSpace(u.function_space().mesh(), "CG", p)   # NOTE error estimators should be cts!
+    W = FunctionSpace(u.function_space().mesh(), "CG", 1)   # NOTE error estimators should be continuous!
     rho = Function(W).interpolate(eta * le)
     rho_u = Function(W).interpolate(u[0] * lu[0] + u[1] * lu[1])
     rho.assign(rho + rho_u)
