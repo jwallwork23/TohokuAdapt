@@ -1,11 +1,3 @@
-from firedrake import *
-
-import scipy.interpolate as si
-from scipy.io.netcdf import NetCDFFile
-
-from . import conversion
-
-
 class MeshSetup():
     def __init__(self, res=3):
 
@@ -13,8 +5,8 @@ class MeshSetup():
         self.res = res
         self.dirName = 'resources/meshes/'
         try:
-            self.meshName = {1: 'TohokuXFine.msh', 2: 'TohokuFine.msh', 3: 'TohokuMedium.msh', 4: 'TohokuCoarse.msh',
-                             5: 'TohokuXCoarse.msh'}[res]
+            self.meshName = {1: 'TohokuXFine', 2: 'TohokuFine', 3: 'TohokuMedium', 4: 'TohokuCoarse',
+                             5: 'TohokuXCoarse'}[res]
         except:
             raise ValueError('Resolution value not recognised. Choose an integer in the range 1-5.')
 
@@ -28,6 +20,85 @@ class MeshSetup():
         self.gradationDistance1 = 1.
         self.gradationDistance2 = {1: 1., 2: 1., 3: 1., 4: 0.5, 5: 0.5}[res]
 
+    def generateMesh(self):
+        """
+        Generate mesh using QMESH. This script is based on work by Alexandros Advis et al, 2017.
+        """
+
+        # Reading in the shapefile describing the domain boundaries, and creating a gmsh file.
+        bdyLoc = 'resources/boundaries/'
+        boundaries = qmesh.vector.Shapes()
+        boundaries.fromFile(bdyLoc + 'final_bdys.shp')
+        loopShapes = qmesh.vector.identifyLoops(boundaries, isGlobal=False, defaultPhysID=1000, fixOpenLoops=True)
+        polygonShapes = qmesh.vector.identifyPolygons(loopShapes,
+                                                      meshedAreaPhysID=1,
+                                                      smallestNotMeshedArea=5e6,
+                                                      smallestMeshedArea=2e8)
+        polygonShapes.writeFile('polygons.shp')
+
+        # Create raster for mesh gradation towards coastal region of importance
+        fukushimaCoast = qmesh.vector.Shapes()
+        fukushimaCoast.fromFile(bdyLoc + 'fukushima.shp')
+        gradationRaster_fukushimaCoast = qmesh.raster.gradationToShapes()
+        gradationRaster_fukushimaCoast.setShapes(fukushimaCoast)
+        gradationRaster_fukushimaCoast.setRasterBounds(140., 143., 36., 40.0)
+        gradationRaster_fukushimaCoast.setRasterResolution(300, 300)
+        gradationRaster_fukushimaCoast.setGradationParameters(self.innerGradation1, self.outerGradation1,
+                                                              self.gradationDistance1, 0.05)
+        gradationRaster_fukushimaCoast.calculateLinearGradation()
+        gradationRaster_fukushimaCoast.writeNetCDF('gradationFukushima.nc')
+
+        # Create raster for mesh gradation towards rest of coast
+        gebcoCoastlines = qmesh.vector.Shapes()
+        gebcoCoastlines.fromFile(bdyLoc + 'coastline.shp')
+        gradationRaster_gebcoCoastlines = qmesh.raster.gradationToShapes()
+        gradationRaster_gebcoCoastlines.setShapes(gebcoCoastlines)
+        gradationRaster_gebcoCoastlines.setRasterBounds(135., 146., 30., 45.0)
+        gradationRaster_gebcoCoastlines.setRasterResolution(300, 300)
+        gradationRaster_gebcoCoastlines.setGradationParameters(self.innerGradation2, self.outerGradation2,
+                                                               self.gradationDistance2)
+        gradationRaster_gebcoCoastlines.calculateLinearGradation()
+        gradationRaster_gebcoCoastlines.writeNetCDF('gradationCoastlines.nc')
+
+        # Create overall mesh metric
+        meshMetricRaster = qmesh.raster.meshMetricTools.minimumRaster([gradationRaster_fukushimaCoast,
+                                                                       gradationRaster_gebcoCoastlines])
+        meshMetricRaster.writeNetCDF('meshMetricRaster.nc')
+
+        # Create domain object and write gmsh files
+        domain = qmesh.mesh.Domain()
+        domain.setTargetCoordRefSystem('EPSG:32654', fldFillValue=1000.0)
+        domain.setGeometry(loopShapes, polygonShapes)
+        domain.setMeshMetricField(meshMetricRaster)
+
+        # Meshing
+        domain.gmsh(geoFilename=self.dirName + self.meshName + '.geo',
+                    fldFilename=self.dirName + self.meshName + '.fld',
+                    mshFilename=self.dirName + self.meshName + '.msh')
+        # NOTE: default meshing algorithm is Delaunay. To use a frontal approach, include "gmshAlgo='front2d' "
+
+    def convertMesh(self):
+        """
+        Convert mesh coordinates using QMESH. This script is based on work by Alexandros Advis et al, 2017.
+        """
+        TohokuMesh = qmesh.mesh.Mesh()
+        TohokuMesh.readGmsh(self.dirName + self.meshName + '.msh', 'EPSG:3857')
+        TohokuMesh.writeShapefile(self.dirName + self.meshName + '.shp')
+
+
+if __name__ == '__main__':
+    import qmesh
+    qmesh.setLogOutputFile('generateMesh.log')      # Store the QMESH log into a file too, for later reference
+    qmesh.initialise()                              # Initialise QGIS API
+    ms = MeshSetup(input('Specify mesh resolution: ') or 3)
+    ms.generateMesh()                             # Generate the mesh
+    ms.convertMesh()                              # Convert mesh into shapefile format, for visualisation with QGIS
+else:
+    from firedrake import *
+    import scipy.interpolate as si
+    from scipy.io.netcdf import NetCDFFile
+    from . import conversion
+
 
 def TohokuDomain(res=3):
     """
@@ -39,7 +110,7 @@ def TohokuDomain(res=3):
 
     # Define mesh and an associated elevation function space and establish initial condition and bathymetry functions
     ms = MeshSetup(res)
-    mesh = Mesh(ms.dirName + ms.meshName)
+    mesh = Mesh(ms.dirName + ms.meshName + '.msh')
     meshCoords = mesh.coordinates.dat.data
     P1 = FunctionSpace(mesh, 'CG', 1)
     eta0 = Function(P1, name='Initial free surface displacement')

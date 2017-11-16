@@ -12,7 +12,7 @@ import utils.mesh as msh
 import utils.options as opt
 import utils.storage as stor
 
-print('\n******************************** SHALLOW WATER TEST PROBLEM ********************************\n')
+print('\n*********************** SHALLOW WATER TEST PROBLEM ************************\n')
 print('Mesh adaptive solver initially defined on a square mesh')
 basic = bool(input('Hit anything but enter to use basic error estimators, as in DL16: '))
 
@@ -24,14 +24,15 @@ x, y = SpatialCoordinate(mesh)
 W = VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "CG", 2)
 b = Function(W.sub(1), name="Bathymetry").assign(0.1)
 eta0 = Function(W.sub(1), name="Initial surface").interpolate(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))))
-nEle, nVer = adap.meshStats(mesh)
+nEle, nVer = msh.meshStats(mesh)
 N = [nEle, nEle]    # Min/max #Elements
 print('... with #Elements : %d. Initial #Vertices : %d. \n' % (nEle, nVer))
 
 # Set parameter values
-op = opt.Options(dt=0.05, hmin=5e-2, hmax=1., T=2., ndump=1)
+op = opt.Options(dt=0.05, hmin=5e-2, hmax=1., T=2, ndump=1, Ts=0.5)
 nVerT = op.vscale * nVer    # Target #Vertices
 T = op.T
+Ts = op.Ts
 g = op.g
 dt = op.dt
 op.checkCFL(b)
@@ -63,7 +64,7 @@ fixedMeshTime = clock() - tic1
 print('Elapsed time for fixed mesh solver: %1.1fs (%1.2f mins) \n' % (fixedMeshTime, fixedMeshTime / 60))
 
 print('************ "SIMPLE" MESH ADAPTIVE SHALLOW WATER TEST ****************\n')
-rm = 5
+op.rm = rm = 5
 dirName = 'plots/tests/simpleAdapt/'
 t = 0.
 mn = Sn = 0
@@ -76,6 +77,7 @@ while mn < np.ceil(T / (dt * rm)):
 
     # Compute Hessian and metric, adapt mesh and interpolate variables
     V = TensorFunctionSpace(mesh, 'CG', 1)
+    H = adap.constructHessian(mesh, V, elev_2d, op=op)
     M = adap.computeSteadyMetric(mesh, V, H, elev_2d, nVerT=nVerT, op=op)
     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
@@ -120,7 +122,7 @@ simpleAdaptTime = clock() - tic1
 print('Elapsed time for adaptive solver: %1.1fs (%1.2f mins)' % (simpleAdaptTime, (simpleAdaptTime) / 60))
 
 print('********** ADJOINT BASED MESH ADAPTIVE SHALLOW WATER TEST *************\n')
-rm = 10
+op.rm = rm = 10
 t = T
 mn = int(T / dt)
 tic1 = clock()
@@ -174,9 +176,9 @@ while mn > 0:
     print("t = %5.2fs" % t)
 
     # Modify forcing term
-    if (t < op.Ts + 1.5 * dt) & switch:
+    if (t < Ts + 1.5 * dt) & switch:
         coeff.assign(0.5)
-    elif (t < op.Ts + 0.5 * dt) & switch:
+    elif (t < Ts + 0.5 * dt) & switch:
         switch = False
         coeff.assign(0.)
 
@@ -185,7 +187,7 @@ while mn > 0:
         adjointSolver.solve()
         lam_.assign(lam)
     adjointFile.write(lu, le, time=t)
-    stor.saveToDisk(lu, le, dirName, stor.indexString(mn))
+    stor.saveToDisk(lu, le, dirName, mn)
     t -= dt
     mn -= 1
 assert(mn == 0)
@@ -193,7 +195,7 @@ adjointRunTime = clock() - tic1
 print('Elapsed time for fixed mesh adjoint solver: %1.1fs (%1.2f mins) \n' % (adjointRunTime, adjointRunTime / 60))
 
 # Set up forward problem
-iStart = int(op.Ts / (dt * rm))         # Index corresponding to tStart
+iStart = int(Ts / (dt * rm))         # Index corresponding to tStart
 iEnd = int(np.ceil(T / (dt * rm)))      # Index corresponding to tEnd
 
 # Approximate isotropic metric at boundaries of initial mesh using circumradius
