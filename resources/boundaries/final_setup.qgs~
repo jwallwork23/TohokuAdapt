@@ -26,9 +26,9 @@
     <units>meters</units>
     <extent>
       <xmin>15106871.10300708189606667</xmin>
-      <ymin>3496252.48226763587445021</ymin>
+      <ymin>3496252.48226763680577278</ymin>
       <xmax>16596010.60933004692196846</xmax>
-      <ymax>5360538.55226574931293726</ymax>
+      <ymax>5360538.55226572975516319</ymax>
     </extent>
     <rotation>0</rotation>
     <projections>1</projections>
@@ -48,6 +48,7 @@
     <layer_coordinate_transform_info>
       <layer_coordinate_transform destAuthId="EPSG:53004" srcAuthId="EPSG:4326" srcDatumTransform="-1" destDatumTransform="-1" layerid="coastline20171102101803274"/>
       <layer_coordinate_transform destAuthId="EPSG:53004" srcAuthId="EPSG:4326" srcDatumTransform="-1" destDatumTransform="-1" layerid="final_bdys20170629151141574"/>
+      <layer_coordinate_transform destAuthId="EPSG:53004" srcAuthId="EPSG:4326" srcDatumTransform="-1" destDatumTransform="-1" layerid="final_ocean20171116174148121"/>
       <layer_coordinate_transform destAuthId="EPSG:53004" srcAuthId="EPSG:4326" srcDatumTransform="-1" destDatumTransform="-1" layerid="final_ocean20170626160718604"/>
       <layer_coordinate_transform destAuthId="EPSG:53004" srcAuthId="EPSG:4326" srcDatumTransform="-1" destDatumTransform="-1" layerid="Lines_from_polygons20170227152549656"/>
       <layer_coordinate_transform destAuthId="EPSG:53004" srcAuthId="EPSG:3857" srcDatumTransform="-1" destDatumTransform="-1" layerid="OpenLayers_plugin_layer20170725145737369"/>
@@ -1398,8 +1399,8 @@ def my_form_open(dialog, layer, feature):
       <DegreeFormat type="QString">MU</DegreeFormat>
     </PositionPrecision>
     <WCSUrl type="QString"></WCSUrl>
-    <WMSServiceCapabilities type="bool">false</WMSServiceCapabilities>
     <WMSContactPhone type="QString"></WMSContactPhone>
+    <WMSServiceCapabilities type="bool">false</WMSServiceCapabilities>
     <WMSServiceAbstract type="QString"></WMSServiceAbstract>
     <WMSContactPosition type="QString"></WMSContactPosition>
     <WMSAddWktGeometry type="bool">false</WMSAddWktGeometry>
