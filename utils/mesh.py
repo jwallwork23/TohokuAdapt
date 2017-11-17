@@ -10,23 +10,15 @@ class MeshSetup():
         except:
             raise ValueError('Resolution value not recognised. Choose an integer in the range 1-5.')
 
-        # # Define gradations (in metres)
-        # self.innerGradation1 = {1: 1000., 2: 1000., 3: 3000., 4: 5000., 5: 7500.}[res]
-        # self.outerGradation1 = {1: 2500., 2: 4000., 3: 10000., 4: 15000., 5: 25000.}[res]
-        # self.innerGradation2 = {1: 2500., 2: 3000., 3: 6000., 4: 10000., 5: 10000.}[res]
-        # self.outerGradation2 = {1: 5000., 2: 8000., 3: 10000., 4: 15000., 5: 25000.}[res]
         # Define gradations (in metres)
-        self.innerGradation1 = {1: 1000, 2: 1000, 3: 3000, 4: 5000, 5: 7500}[res]
-        self.outerGradation1 = {1: 2500, 2: 4000, 3: 10000, 4: 15000, 5: 20000}[res]
-        self.innerGradation2 = {1: 2500, 2: 3000, 3: 6000, 4: 8000, 5: 10000}[res]
-        self.outerGradation2 = {1: 5000, 2: 8000, 3: 10000, 4: 15000, 5: 20000}[res]
+        self.innerGradation1 = {1: 1000., 2: 1000., 3: 3000., 4: 5000., 5: 7500.}[res]
+        self.outerGradation1 = {1: 2500., 2: 4000., 3: 10000., 4: 15000., 5: 25000.}[res]
+        self.innerGradation2 = {1: 2500., 2: 3000., 3: 6000., 4: 10000., 5: 10000.}[res]
+        self.outerGradation2 = {1: 5000., 2: 8000., 3: 10000., 4: 15000., 5: 25000.}[res]
 
         # Define gradation distances (in degrees)
         self.gradationDistance1 = 1.
-        self.gradationDistance2 = {1: 1., 2: 1., 3: 1., 4: 0.5, 5: 1.5}[res]
-        #  Define gradation distances (in degrees)
-        # self.gradationDistance1 = 1.
-        # self.gradationDistance2 = {1: 1., 2: 1., 3: 1., 4: 0.5, 5: 0.5}[res]
+        self.gradationDistance2 = {1: 1., 2: 1., 3: 1., 4: 0.5, 5: 0.5}[res]
 
     def generateMesh(self):
         """
@@ -47,7 +39,7 @@ class MeshSetup():
         fukushimaCoast.fromFile(bdyLoc + 'fukushima.shp')
         gradationRaster_fukushimaCoast = qmesh.raster.gradationToShapes()
         gradationRaster_fukushimaCoast.setShapes(fukushimaCoast)
-        gradationRaster_fukushimaCoast.setRasterBounds(140., 143., 36., 40.)
+        gradationRaster_fukushimaCoast.setRasterBounds(135., 149., 30., 45.)
         gradationRaster_fukushimaCoast.setRasterResolution(300, 300)
         gradationRaster_fukushimaCoast.setGradationParameters(self.innerGradation1, self.outerGradation1,
                                                               self.gradationDistance1, 0.05)
@@ -59,7 +51,7 @@ class MeshSetup():
         gebcoCoastlines.fromFile(bdyLoc + 'coastline.shp')
         gradationRaster_gebcoCoastlines = qmesh.raster.gradationToShapes()
         gradationRaster_gebcoCoastlines.setShapes(gebcoCoastlines)
-        gradationRaster_gebcoCoastlines.setRasterBounds(135., 146., 30., 45.)
+        gradationRaster_gebcoCoastlines.setRasterBounds(135., 149., 30., 45.)
         gradationRaster_gebcoCoastlines.setRasterResolution(300, 300)
         gradationRaster_gebcoCoastlines.setGradationParameters(self.innerGradation2, self.outerGradation2,
                                                                self.gradationDistance2)
