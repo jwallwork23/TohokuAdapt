@@ -1,4 +1,4 @@
-class MeshSetup():
+class MeshSetup:
     def __init__(self, res=3):
 
         # Get mesh descriptions
