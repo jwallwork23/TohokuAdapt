@@ -22,21 +22,21 @@ N = [nEle, nEle]    # Min/max #Elements
 print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d.' % (nEle, nVer))
 
 # Get default parameter values and check CFL criterion
-op = opt.Options(vscale=0.2, rm=60, ndump=1, outputHessian=True)    # ndump=1 is needed for explicit error estimators
-nVerT = op.vscale * nVer                                            # Target #Vertices
+op = opt.Options(vscale=0.2, rm=60, ndump=1, outputHessian=True, mtype='b') # ndump=1 needed for explicit error estn
+nVerT = op.vscale * nVer                                                    # Target #Vertices
 dirName = 'plots/adjointBased/'
 basic = bool(input('Hit anything but enter to use basic error estimators, as in DL16: '))
 if not basic:
     dirName += 'explicit/'
+iso = op.iso
+if iso:
+    dirName += 'isotropic/'
 T = op.T
 dt = op.dt
 cdt = op.hmin / np.sqrt(op.g * max(b.dat.data))
 op.checkCFL(b)
 ndump = op.ndump
 rm = op.rm
-speed = op.mtype == 's'
-if op.mtype == 'b':
-    raise NotImplementedError('Cannot currently perform adjoint-based adaption with respect to two fields.')
 
 # Initialise counters, constants and function space
 Sn = meshn = 0                      # Sum over #Elements and mesh counter
@@ -141,18 +141,34 @@ while mn < iEnd:
     sfile.write(errEst)
 
     V = TensorFunctionSpace(mesh, "CG", 1)
-    M_ = adap.isotropicMetric(V, inte.interp(mesh, h)[0], bdy=True, op=op)                  # Initial boundary metric
-    if speed:
-        spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))                       # Interpolate fluid speed
-    H = adap.constructHessian(mesh, V, spd if speed else elev_2d, op=op)                    # Construct Hessian
-    for k in range(mesh.topology.num_vertices()):
-        H.dat.data[k] *= errEst.dat.data[k]                                                 # Scale by error estimate
-    M = adap.computeSteadyMetric(mesh, V, H, spd if speed else elev_2d, nVerT=nVerT, op=op) # Generate metric
-    M = adap.metricIntersection(mesh, V, M, M_, bdy=True)                   # Intersect with initial bdy metric
-    adap.metricGradation(mesh, M, op.beta, iso=op.iso)                      # Gradate to 'smoothen' metric
-    mesh = AnisotropicAdaptation(mesh, M).adapted_mesh                      # Adapt mesh
+    M_ = adap.isotropicMetric(V, inte.interp(mesh, h)[0], bdy=True, op=op)      # Initial boundary metric
+    if op.mtype != 's':
+        if iso:
+            M = adap.isotropicMetric(V, elev_2d, op=op)
+            for k in range(mesh.topology.num_vertices()):
+                M.dat.data[k] *= errEst.dat.data[k]
+        else:
+            H = adap.constructHessian(mesh, V, elev_2d, op=op)
+            for k in range(mesh.topology.num_vertices()):
+                H.dat.data[k] *= errEst.dat.data[k]                             # Scale by error estimate
+            M = adap.computeSteadyMetric(mesh, V, H, elev_2d, nVerT=nVerT, op=op)
+    if op.mtype != 'f':
+        spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))           # Interpolate fluid speed
+        if iso:
+            M2 = adap.isotropicMetric(V, spd, op=op)
+            for k in range(mesh.topology.num_vertices()):
+                M2.dat.data[k] *= errEst.dat.data[k]
+        else:
+            H = adap.constructHessian(mesh, V, spd, op=op)
+            for k in range(mesh.topology.num_vertices()):
+                H.dat.data[k] *= errEst.dat.data[k]
+            M2 = adap.computeSteadyMetric(mesh, V, H, spd, nVerT=nVerT, op=op)
+        M = adap.metricIntersection(mesh, V, M, M2) if op.mtype == 'b' else M2
+    M = adap.metricIntersection(mesh, V, M, M_, bdy=True)                       # Intersect with initial bdy metric
+    adap.metricGradation(mesh, M, op.beta, iso=op.iso)                          # Gradate to 'smoothen' metric
+    mesh = AnisotropicAdaptation(mesh, M).adapted_mesh                          # Adapt mesh
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
-    if op.outputHessian:
+    if (not iso and op.outputHessian):
         H.rename("Hessian")
         hfile.write(H, time=float(mn))
 

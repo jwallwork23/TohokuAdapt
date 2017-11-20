@@ -19,9 +19,12 @@ N = [nEle, nEle]            # Min/max #Elements
 print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d. \n' % (nEle, nVer))
 
 # Get default parameter values and check CFL criterion
-op = opt.Options(outputHessian=True)
+op = opt.Options(outputHessian=True, iso=True)
 nVerT = op.vscale * nVer    # Target #Vertices
 dirName = 'plots/simpleAdapt/'
+iso = op.iso
+if iso:
+    dirName += 'isotropic/'
 T = op.T
 dt = op.dt
 op.checkCFL(b)
@@ -42,17 +45,24 @@ while mn < np.ceil(T / (dt * rm)):
     # Compute Hessian and metric, adapt mesh and interpolate variables
     V = TensorFunctionSpace(mesh, 'CG', 1)
     if op.mtype != 's':
-        H = adap.constructHessian(mesh, V, elev_2d, op=op)
-        M = adap.computeSteadyMetric(mesh, V, H, elev_2d, nVerT=nVerT, op=op)
+        if iso:
+            M = adap.isotropicMetric(V, elev_2d, op=op)
+        else:
+            H = adap.constructHessian(mesh, V, elev_2d, op=op)
+            M = adap.computeSteadyMetric(mesh, V, H, elev_2d, nVerT=nVerT, op=op)
     if op.mtype != 'f':
         spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
-        H = adap.constructHessian(mesh, V, spd, op=op)
-        M2 = adap.computeSteadyMetric(mesh, V, H, spd, nVerT=nVerT, op=op)
+        if iso:
+            M2 = adap.isotropicMetric(V, spd, op=op)
+        else:
+            H = adap.constructHessian(mesh, V, spd, op=op)
+            M2 = adap.computeSteadyMetric(mesh, V, H, spd, nVerT=nVerT, op=op)
         M = adap.metricIntersection(mesh, V, M, M2) if op.mtype == 'b' else M2
-    # adap.advectMetric(mesh, M, uv_2d, 5e4, pm=-1)       # Advect metric in direction of fluid velocity
+    if op.advect:
+        adap.advectMetric(mesh, M, uv_2d, 5e4, pm=-1)       # Advect metric in direction of fluid velocity
     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
-    if op.outputHessian:
+    if (not iso and op.outputHessian):
         H.rename("Hessian")
         hfile.write(H, time=float(mn))
 

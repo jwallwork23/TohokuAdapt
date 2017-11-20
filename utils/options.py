@@ -17,6 +17,7 @@ class Options:
                  p=2,
                  mtype='f',
                  iso=False,
+                 advect=False,
                  hessMeth='dL2',
                  beta=1.4,
                  gamma=1.,
@@ -36,6 +37,7 @@ class Options:
         :param p: norm order in the Lp normalisation approach, where ``p => 1`` and ``p = infty`` is an option.
         :param mtype: Adapt w.r.t 's'peed, 'f'ree surface or 'b'oth.
         :param iso: Toggle isotropic / anisotropic algorithm.
+        :param advect: Toggle metric advection.
         :param hessMeth: Method of Hessian reconstruction: 'dL2' or 'parts'.
         :param beta: metric gradation scaling parameter.
         :param gamma: metric rescaling parameter.
@@ -85,7 +87,8 @@ class Options:
         except:
             raise ValueError('Field for adaption ``%s`` not recognised.' % mtype)
         self.iso = iso
-        assert type(iso) == bool
+        self.advect = advect
+        assert(type(advect) == type(iso) == bool)
         self.hessMeth = hessMeth
         try:
             assert hessMeth in ('dL2', 'parts')
