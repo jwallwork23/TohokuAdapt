@@ -308,7 +308,7 @@ def pointwiseMax(f, g):
     return f
 
 
-def metricAdvection(mesh, M, u, d, xy=0, pm=1, tol=1e-3):
+def advectMetric(mesh, M, u, d, xy=0, pm=1, tol=0.25):
     """
     'Advect' metric M with finest resolution in direction of fluid velocity u.
     
@@ -325,11 +325,11 @@ def metricAdvection(mesh, M, u, d, xy=0, pm=1, tol=1e-3):
 
     toIntersect = []  # Nodes at which to perform intersection
     for i in range(len(M.dat.data)):
-        if np.abs(M.dat.data[xy, xy]) > tol:
+        if np.abs(M.dat.data[i][xy, xy]) > tol:
             toIntersect.append(i)
 
-    for i in uP1.dat.data[:, xy]:
-        if i > pm * tol:
+    for i in range(len(uP1.dat.data)):
+        if uP1.dat.data[i] > pm * tol:
             for j in toIntersect:
                 if np.abs(mesh.coordinates[i, xy] - mesh.coordinates[j, xy]) < d:
                     M.dat.data[i] = localMetricIntersection(M.dat.data[i], M.dat.data[j])

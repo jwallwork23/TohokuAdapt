@@ -155,9 +155,9 @@ class Options:
             if input('Hit enter if happy to proceed.'):
                 exit(23)
 
-    def loadFromDisk(self, mesh, index, dirName, elev0=None, adjoint=False):
+    def loadFromDisk(self, W, index, dirName, elev0=None, adjoint=False):
         """
-        :param mesh: mesh on which data is stored.
+        :param mesh: FunctionSpace on which data is stored.
         :param index: index of data stored.
         :param dirName: name of directory for storage.
         :param elev0: initial free surface.
@@ -165,7 +165,6 @@ class Options:
         :return: saved free surface elevation and fluid velocity, along with mesh index.
         """
         # Enforce initial conditions on discontinuous space / load variables from disk
-        W = VectorFunctionSpace(mesh, self.space1, self.degree1) * FunctionSpace(mesh, self.space2, self.degree2)
         indexStr = storage.indexString(index)
         if adjoint:
             with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_READ) as chk:

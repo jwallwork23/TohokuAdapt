@@ -31,12 +31,13 @@ rm = op.rm
 # Initialise counters:
 dumpn = mn = Sn = 0   # Dump counter, mesh number and sum over #Elements
 tic1 = clock()
-hfile = File("plots/simpleAdapt/hessian.pvd")
+hfile = File(dirName + "hessian.pvd")
 
 while mn < np.ceil(T / (dt * rm)):
     tic2 = clock()
     index = mn * int(rm / ndump)
-    elev_2d, uv_2d = op.loadFromDisk(mesh, index, dirName, elev0=eta0)      # Enforce ICs / load variables from disk
+    W = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
+    elev_2d, uv_2d = op.loadFromDisk(W, index, dirName, elev0=eta0)     # Enforce ICs / load variables from disk
 
     # Compute Hessian and metric, adapt mesh and interpolate variables
     V = TensorFunctionSpace(mesh, 'CG', 1)

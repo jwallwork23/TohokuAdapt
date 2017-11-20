@@ -106,8 +106,8 @@ else:
 
 # Approximate isotropic metric at boundaries of initial mesh using circumradius
 h = Function(W0.sub(1)).interpolate(CellSize(mesh0))
-hfile = File("plots/adjointBased/hessian.pvd")
-sfile = File("plots/adjointBased/significance.pvd")
+hfile = File(dirName + "hessian.pvd")
+sfile = File(dirName + "significance.pvd")
 
 print('\nStarting mesh adaptive forward run...')
 tic1 = clock()
@@ -115,15 +115,16 @@ while mn < iEnd:
     tic2 = clock()
     index = mn * int(rm / ndump)
     i0 = max(mn, iStart)
-    elev_2d, uv_2d = op.loadFromDisk(mesh, index, dirName, elev0=eta0)  # Enforce ICs / load variables from disk
     Wcomp = FunctionSpace(mesh, "CG", 1)                                # Computational space to match metric P1 space
+    W = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
+    elev_2d, uv_2d = op.loadFromDisk(W, index, dirName, elev0=eta0)     # Enforce ICs / load variables from disk
     if not basic:
         hk = Function(Wcomp).interpolate(CellSize(mesh))                # Current sizes of mesh elements
-    if mn != 0:
+    if (not basic) and (mn != 0):
         print('#### Interpolating adjoint data...')
-        elev_2d_, uv_2d_ = op.loadFromDisk(mesh, index - 1, dirName, elev0=eta0)    # Load saved forward data
+        elev_2d_, uv_2d_ = op.loadFromDisk(W, index - 1, dirName, elev0=eta0)    # Load saved forward data
     for j in range(i0, iEnd):
-        le, lu = op.loadFromDisk(mesh0, j, dirName, adjoint=True)                   # Load saved adjoint data
+        le, lu = op.loadFromDisk(W0, j, dirName, adjoint=True)          # Load saved adjoint data
         if mn != 0:
             print('    #### Step %d / %d' % (j + 1 - i0, iEnd - i0))
             lu, le = inte.interp(mesh, lu, le)                                      # Interpolate onto current mesh
@@ -146,7 +147,7 @@ while mn < iEnd:
         H.dat.data[k] *= errEst.dat.data[k]                                                 # Scale by error estimate
     M = adap.computeSteadyMetric(mesh, V, H, spd if speed else elev_2d, nVerT=nVerT, op=op) # Generate metric
     M = adap.metricIntersection(mesh, V, M, M_, bdy=True)                   # Intersect with initial bdy metric
-    adap.metricGradation(mesh, M, op.beta, iso=op.iso)                      # Gradate to 'smoothen' metric
+    # adap.metricGradation(mesh, M, op.beta, iso=op.iso)                      # Gradate to 'smoothen' metric
     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh                      # Adapt mesh
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
     if op.outputHessian:
