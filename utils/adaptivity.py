@@ -306,3 +306,30 @@ def pointwiseMax(f, g):
         if np.abs(gdat[i]) > np.abs(fdat[i]):
             f.dat.data[i] = gdat[i]
     return f
+
+
+def metricAdvection(mesh, M, u, d, xy=0, pm=1, tol=1e-3):
+    """
+    'Advect' metric M with finest resolution in direction of fluid velocity u.
+    
+    :param mesh: current mesh.
+    :param M: metric field defined on current mesh (to be advected).
+    :param u: (vector) velocity field on current mesh.
+    :param d: distance over which metric is to be advected.
+    :param xy: toggle whether to advect in x- (0th) or y- (1st) direction.
+    :param pm: toggle whether to advect in the positive (+1) or negative (-1) direction.
+    :param tol: tolerance for velocity above which advection is performed.
+    """
+    assert((xy in (0, 1)) & (pm in (1, -1)))
+    uP1 = Function(FunctionSpace(mesh, "CG", 1)).interpolate(u[xy]) # Interpolate velocity in P1 space
+
+    toIntersect = []  # Nodes at which to perform intersection
+    for i in range(len(M.dat.data)):
+        if np.abs(M.dat.data[xy, xy]) > tol:
+            toIntersect.append(i)
+
+    for i in uP1.dat.data[:, xy]:
+        if i > pm * tol:
+            for j in toIntersect:
+                if np.abs(mesh.coordinates[i, xy] - mesh.coordinates[j, xy]) < d:
+                    M.dat.data[i] = localMetricIntersection(M.dat.data[i], M.dat.data[j])

@@ -48,6 +48,7 @@ while mn < np.ceil(T / (dt * rm)):
         H = adap.constructHessian(mesh, V, spd, op=op)
         M2 = adap.computeSteadyMetric(mesh, V, H, spd, nVerT=nVerT, op=op)
         M = adap.metricIntersection(mesh, V, M, M2) if op.mtype == 'b' else M2
+    adap.advectMetric(mesh, M, uv_2d, 5e4, pm=-1)
     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
     if op.outputHessian:

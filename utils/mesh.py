@@ -86,7 +86,7 @@ class MeshSetup:
 
 if __name__ == '__main__':
     import qmesh
-    ms = MeshSetup(input('Specify mesh resolution: ') or 3)
+    ms = MeshSetup(input('Specify mesh coarseness (1 = x-fine, 5 = x-coarse): ') or 3)
     qmesh.setLogOutputFile(ms.dirName + 'generateMesh.log')     # Store QMESH log for later reference
     qmesh.initialise()                                          # Initialise QGIS API
     ms.generateMesh()                                           # Generate the mesh
