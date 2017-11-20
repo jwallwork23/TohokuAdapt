@@ -62,6 +62,8 @@ else:
     le_.interpolate(Expression(0))
     lam = Function(W0).assign(lam_)
     lu, le = lam.split()            # Velocity and free surface components of adjoint variable, respectively
+    lu.rename('Adjoint velocity')
+    le.rename('Adjoint free surface')
 
     # Establish (smoothened) indicator function for adjoint equations
     fexpr = '(x[0] > 490e3) & (x[0] < 640e3) & (x[1] > 4160e3) & (x[1] < 4360e3) ? ' \
@@ -147,7 +149,7 @@ while mn < iEnd:
         H.dat.data[k] *= errEst.dat.data[k]                                                 # Scale by error estimate
     M = adap.computeSteadyMetric(mesh, V, H, spd if speed else elev_2d, nVerT=nVerT, op=op) # Generate metric
     M = adap.metricIntersection(mesh, V, M, M_, bdy=True)                   # Intersect with initial bdy metric
-    # adap.metricGradation(mesh, M, op.beta, iso=op.iso)                      # Gradate to 'smoothen' metric
+    adap.metricGradation(mesh, M, op.beta, iso=op.iso)                      # Gradate to 'smoothen' metric
     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh                      # Adapt mesh
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
     if op.outputHessian:
