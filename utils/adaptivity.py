@@ -361,7 +361,6 @@ def advectMetric(mesh, M, w, d, level=0.99, level2=0.99):
         maxM = max(windM)
         wind = [wP1.dat.data[i, 0] **2 + wP1.dat.data[i, 1] **2 for i in range(len(windM))]  # Wind field strength
         maxW = max(wind)
-        print(maxW)
         for i in range(len(windM)):
             if windM[i] > level * maxM:
                 toIntersect.append(i)           # Get nodes corresp. to most significant metric field in wind direction
@@ -369,7 +368,7 @@ def advectMetric(mesh, M, w, d, level=0.99, level2=0.99):
               % (len(toIntersect), len(M.dat.data)))
         cnt = 0
         for i in range(len(M.dat.data)):
-            if wind[i] > level * maxW:
+            if wind[i] > level2 * maxW:
                 for j in toIntersect:
                     if 0 < np.dot(mesh.coordinates.dat.data[i] - mesh.coordinates.dat.data[j], wP1.dat.data[i]) < d:
                         cnt += 1

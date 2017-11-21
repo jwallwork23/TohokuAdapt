@@ -19,7 +19,7 @@ N = [nEle, nEle]            # Min/max #Elements
 print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d. \n' % (nEle, nVer))
 
 # Get default parameter values and check CFL criterion
-op = opt.Options(outputHessian=True, iso=True, advect=True)
+op = opt.Options(outputHessian=True, advect=True)
 nVerT = op.vscale * nVer    # Target #Vertices
 dirName = 'plots/simpleAdapt/'
 iso = op.iso
@@ -30,6 +30,7 @@ dt = op.dt
 op.checkCFL(b)
 ndump = op.ndump
 rm = op.rm
+waveSpd = np.sqrt(op.g * max(b.dat.data))   # Calculate maximal wave speed
 
 # Initialise counters:
 dumpn = mn = Sn = 0   # Dump counter, mesh number and sum over #Elements
@@ -59,7 +60,8 @@ while mn < np.ceil(T / (dt * rm)):
             M2 = adap.computeSteadyMetric(mesh, V, H, spd, nVerT=nVerT, op=op)
         M = adap.metricIntersection(mesh, V, M, M2) if op.mtype == 'b' else M2
     if op.advect & mn != 0:
-        adap.advectMetric(mesh, M, uv_2d, 5e4)       # Advect metric in direction of fluid velocity
+        print('Advecting metric...')
+        adap.advectMetric(mesh, M, uv_2d, waveSpd * rm * dt, level=0.9, level2=0.9)     # Advect in velocity direction
     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
     if (not iso and op.outputHessian):
