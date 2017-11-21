@@ -19,7 +19,7 @@ N = [nEle, nEle]            # Min/max #Elements
 print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d. \n' % (nEle, nVer))
 
 # Get default parameter values and check CFL criterion
-op = opt.Options(outputHessian=True, iso=True)
+op = opt.Options(outputHessian=True, iso=True, advect=True)
 nVerT = op.vscale * nVer    # Target #Vertices
 dirName = 'plots/simpleAdapt/'
 iso = op.iso
@@ -58,8 +58,8 @@ while mn < np.ceil(T / (dt * rm)):
             H = adap.constructHessian(mesh, V, spd, op=op)
             M2 = adap.computeSteadyMetric(mesh, V, H, spd, nVerT=nVerT, op=op)
         M = adap.metricIntersection(mesh, V, M, M2) if op.mtype == 'b' else M2
-    if op.advect:
-        adap.advectMetric(mesh, M, uv_2d, 5e4, pm=-1)       # Advect metric in direction of fluid velocity
+    if op.advect & mn != 0:
+        adap.advectMetric(mesh, M, uv_2d, 5e4)       # Advect metric in direction of fluid velocity
     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
     if (not iso and op.outputHessian):

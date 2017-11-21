@@ -1,6 +1,7 @@
 from firedrake import *
 
 import numpy as np
+import numpy
 from numpy import linalg as la
 from scipy import linalg as sla
 
@@ -281,11 +282,26 @@ def metricIntersection(mesh, V, M1, M2, bdy=False):
 
 def symmetricProduct(A, b):
     """
-    :param A: symmetric, 2x2 matrix.
-    :param b: 2-vector.
+    :param A: symmetric, 2x2 matrix / metric field.
+    :param b: 2-vector / vector field.
     :return: product b^T * A * b.
     """
-    return b[0] * A[0, 0] * b[0] + 2 * b[0] * A[0, 1] * b[1] + b[1] * A[1, 1] * b[1]
+    # assert(isinstance(A, numpy.ndarray) | isinstance(A, Function))
+    # assert(isinstance(b, list) | isinstance(b, numpy.ndarray) | isinstance(b, Function))
+
+    def bAb(A, b):
+        return b[0] * A[0, 0] * b[0] + 2 * b[0] * A[0, 1] * b[1] + b[1] * A[1, 1] * b[1]
+
+    if isinstance(A, numpy.ndarray) | isinstance(A, list):
+        if isinstance(b, list) | isinstance(b, numpy.ndarray):
+            return bAb(A, b)
+        else:
+            return [bAb(A, b.dat.data[i]) for i in range(len(b.dat.data))]
+    else:
+        if isinstance(b, list) | isinstance(b, numpy.ndarray):
+            return [bAb(A.dat.data[i], b) for i in range(len(A.dat.data))]
+        else:
+            return [bAb(A.dat.data[i], b.dat.data[i]) for i in range(len(A.dat.data))]
 
 
 def pointwiseMax(f, g):
@@ -308,31 +324,56 @@ def pointwiseMax(f, g):
     return f
 
 
-def advectMetric(mesh, M, u, d, xy=0, pm=1, tol1=0.25, tol2=0.25):
+def advectMetric(mesh, M, w, d, level=0.99, level2=0.99):
     """
     'Advect' metric M with finest resolution in direction of fluid velocity u.
     
     :param mesh: current mesh.
     :param M: metric field defined on current mesh (to be advected).
-    :param u: (vector) velocity field on current mesh.
+    :param w: (vector) velocity field on current mesh. Can be Function, list or ndarray.
     :param d: distance over which metric is to be advected.
-    :param xy: toggle whether to advect in x- (0th) or y- (1st) direction.
-    :param pm: toggle whether to advect in the positive (+1) or negative (-1) direction.
-    :param tol2: tolerance for metric above which advection is considered.
-    :param tol2: tolerance for velocity above which advection is performed.
+    :param level: tolerance for metric above which advection is considered, as a proportion of the maximum.
+    :param level2: tolerance for velocity above which advection is performed, as a proportion of the maximum.
     """
-    assert((xy in (0, 1)) & (pm in (1, -1)))
-    uP1 = Function(FunctionSpace(mesh, "CG", 1)).interpolate(u[xy]) # Interpolate velocity in P1 space
+    toIntersect = []  # Lists of nodes with considerable metric contribution in the direction of the wind field
 
-    toIntersect = []  # Nodes at which to perform intersection
-    for i in range(len(M.dat.data)):
-        if np.abs(M.dat.data[i][xy, xy]) > tol1:
-            toIntersect.append(i)
-    print('Considering metric advection on %d / %d nodes...' % (len(toIntersect), len(uP1.dat.data)))
-
-    for i in range(len(uP1.dat.data)):
-        if uP1.dat.data[i] > pm * tol2:
+    if (isinstance(w, list) | isinstance(w, numpy.ndarray)):
+        windM = symmetricProduct(M, w)    # Project metric field in wind direction
+        maxM = max(windM)
+        for i in range(len(sigM)):
+            if windM[i] > level * maxM:
+                toIntersect.append(i)           # Get nodes corresp. to most significant metric field in wind direction
+        print('#### advectMetric DEBUG: Considering metric advection on %d / %d nodes...'
+              % (len(toIntersect), len(M.dat.data)))
+        cnt = 0
+        for i in range(len(M.dat.data)):
             for j in toIntersect:
-                diff = mesh.coordinates.dat.data[i, xy] - mesh.coordinates.dat.data[j, xy]
-                if (pm * diff > 0) & (np.abs(diff) < d):
+                if 0 < np.dot(mesh.coordinates.dat.data[i] - mesh.coordinates.dat.data[j], w) < d:
+                    cnt += 1
                     M.dat.data[i] = localMetricIntersection(M.dat.data[i], M.dat.data[j])
+        print('#### advectMetric DEBUG: Made %d intersections of metric...' % cnt)
+
+    elif isinstance(w, Function):
+        spaceMatch = (w.function_space().ufl_element().family() == 'Lagrange') and \
+                     (w.function_space().ufl_element().degree() == 1)
+        wP1 = w if spaceMatch else Function(VectorFunctionSpace(mesh, "CG", 1)).interpolate(w)
+        windM = symmetricProduct(M, w)
+        maxM = max(windM)
+        wind = [wP1.dat.data[i, 0] **2 + wP1.dat.data[i, 1] **2 for i in range(len(windM))]  # Wind field strength
+        maxW = max(wind)
+        print(maxW)
+        for i in range(len(windM)):
+            if windM[i] > level * maxM:
+                toIntersect.append(i)           # Get nodes corresp. to most significant metric field in wind direction
+        print('#### advectMetric DEBUG: Considering metric advection on %d / %d nodes...'
+              % (len(toIntersect), len(M.dat.data)))
+        cnt = 0
+        for i in range(len(M.dat.data)):
+            if wind[i] > level * maxW:
+                for j in toIntersect:
+                    if 0 < np.dot(mesh.coordinates.dat.data[i] - mesh.coordinates.dat.data[j], wP1.dat.data[i]) < d:
+                        cnt += 1
+                        M.dat.data[i] = localMetricIntersection(M.dat.data[i], M.dat.data[j])
+        print('#### advectMetric DEBUG: Made %d intersections of metric...' % cnt)
+    else:
+        raise ValueError('Velocity field type %s not recognised.' % type(w))
