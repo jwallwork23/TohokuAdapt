@@ -7,6 +7,7 @@ from time import clock
 
 import utils.adaptivity as adap
 import utils.error as err
+import utils.forms as form
 import utils.interpolation as inte
 import utils.mesh as msh
 import utils.options as opt
@@ -33,6 +34,7 @@ if iso:
     dirName += 'isotropic/'
 T = op.T
 dt = op.dt
+Dt = Constant(dt)
 cdt = op.hmin / np.sqrt(op.g * max(b.dat.data))
 op.checkCFL(b)
 ndump = op.ndump
@@ -55,6 +57,29 @@ else:
     coeff = Constant(1.)
     switch = True
 
+    # TODO: implement discrete adjoint
+    # currentTime = Constant(t)       # Re-assign this whenever changed
+    # q_ = Function(W0)
+    # u_, eta_ = q_.split()
+    # u_.interpolate(Expression([0, 0]))
+    # eta_.interpolate(eta0)
+    # q = Function(W0).assign(q_)
+    # qt = TestFunction(W0)
+    # ut, etat = qt.split()
+    # F = form.weakResidual(q, qt, b, Dt)
+    # a_adj = adjoint(derivative(F, q))
+    # L_adj = form.objectiveFunctional(etat, currentTime, dt)
+
+    # TODO: Then solve the problem using
+    #       solve(a_adj == L_adj, phi)
+
+    # TODO: then the error indicator `ei` can be expressed as
+    #       Z = FunctionSpace(mesh, 'DG', 0)
+    #       z = TestFunction(Z)
+    #       Lei = form.weakResidual(q, z*phi)
+    #       ei = Function(Z)
+    #       ei.vector()[:] = assemble(Lei).array()
+
     # Establish adjoint variables and apply initial conditions
     lam_ = Function(W0)
     lu_, le_ = lam_.split()
@@ -75,8 +100,8 @@ else:
     lu, le = split(lam)
     lu_, le_ = split(lam_)
     L = ((le - le_) * xi + inner(lu - lu_, w)
-         - Constant(dt) * op.g * inner(0.5 * (lu + lu_), grad(xi)) - coeff * f * xi
-         + Constant(dt) * (b * inner(grad(0.5 * (le + le_)), w) + 0.5 * (le + le_) * inner(grad(b), w))) * dx
+         - Dt * op.g * inner(0.5 * (lu + lu_), grad(xi)) - coeff * f * xi
+         + Dt * (b * inner(grad(0.5 * (le + le_)), w) + 0.5 * (le + le_) * inner(grad(b), w))) * dx
     adjointProblem = NonlinearVariationalProblem(L, lam)
     adjointSolver = NonlinearVariationalSolver(adjointProblem, solver_parameters=op.params)
     lu, le = lam.split()
