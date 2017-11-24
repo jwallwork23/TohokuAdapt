@@ -34,6 +34,8 @@ def objectiveFunctional(eta, t, dt, Tstart=300., x1=490e3, x2=640e3, y1=4160e3, 
 
     return (coeff * eta * iA) * dx * dt_meas
 
+    # TODO: can use notation dt_meas[Tstart:Tend]
+
 
 def strongResidual(q, q_, b, Dt, nu=0.):
     """
