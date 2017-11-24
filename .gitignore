@@ -20,5 +20,5 @@ utils/.idea/
 # Files to be ignored:
 
 .README.md.swp
-BurgersTest.py
 adaptTest.py
+advectionDiffusionTest.py
