@@ -48,8 +48,9 @@ def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson'):
     :param nu: coefficient for stress term.
     :return: strong residual for shallow water equations at current timestep.
     """
-    u, eta = q.split()
-    u_, eta_ = q_.split()
+
+    (u, eta) = (as_vector((q[0], q[1])), q[2])
+    (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
 
     if timestepper == 'CrankNicolson':
         um = 0.5 * (u + u_)
@@ -62,8 +63,6 @@ def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson'):
         em = eta_
     else:
         raise NotImplementedError
-
-    b = Constant(3000.)  # TODO: don't assume flat bathymetry
 
     Au = u - u_ + Dt * 9.81 * grad(em)
     Ae = eta - eta_ + Dt * div(b * um)

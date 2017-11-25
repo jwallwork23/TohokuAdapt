@@ -18,8 +18,6 @@ mesh, eta0, b = msh.TohokuDomain(4)
 # print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d.' % (nEle, nVer))
 # Interpolate bathymetry in DG space
 
-b = Constant(3000.)     # TODO: don't assume flat bathymetry
-
 # Get default parameter values and check CFL criterion
 op = opt.Options()
 dirName = 'plots/adjointBased/discrete/'
@@ -78,7 +76,7 @@ while t <= T:
             adj_inc_timestep(time=t, finished=finished)
 
         # Approximate residual of forward equation and save to HDF5
-        Au, Ae = form.strongResidualSW(q, q_, qt, b, Dt)
+        Au, Ae = form.strongResidualSW(q, q_, b, Dt)
         rho_u, rho_e = rho.split()
         rho_u.interpolate(Au)
         rho_e.interpolate(Ae)

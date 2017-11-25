@@ -86,6 +86,7 @@ class MeshSetup:
 
 if __name__ == '__main__':
     import qmesh
+
     ms = MeshSetup(input('Specify mesh coarseness (1 = x-fine, 5 = x-coarse): ') or 3)
     qmesh.setLogOutputFile(ms.dirName + 'generateMesh.log')     # Store QMESH log for later reference
     qmesh.initialise()                                          # Initialise QGIS API
@@ -93,6 +94,7 @@ if __name__ == '__main__':
     ms.convertMesh()                                            # Convert to shapefile, for visualisation with QGIS
 else:
     from firedrake import *
+
     import scipy.interpolate as si
     from scipy.io.netcdf import NetCDFFile
     from . import conversion
