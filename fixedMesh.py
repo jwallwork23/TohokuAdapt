@@ -6,7 +6,8 @@ import utils.options as opt
 
 # Set up mesh, initialise variables and specify parameters
 print('******************** FIXED MESH TSUNAMI SIMULATION ********************')
-mesh, eta0, b = msh.TohokuDomain(res=4)
+res = 4     # Coarse resolution
+mesh, eta0, b = msh.TohokuDomain(res=res)
 print('...... mesh loaded. #Elements : %d. #Vertices : %d. \n' % msh.meshStats(mesh))
 
 # Get solver parameter values and construct solver, with default dg1-dg1 space

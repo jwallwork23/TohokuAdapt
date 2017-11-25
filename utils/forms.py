@@ -4,17 +4,19 @@ from firedrake import *
 
 dt_meas = dt  # Keep a reference to dt, the time-measure of Firedrake
 
-def objectiveFunctional(eta, t, dt, Tstart=300., x1=490e3, x2=640e3, y1=4160e3, y2=4360e3):
+
+def objectiveFunctionalSW(eta, t, dt, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=4160e3, y2=4360e3):
     """
     :param eta: free surface displacement solution.
     :param t: current time value (s).
     :param dt: time step (s).
     :param Tstart: first time considered as relevant (s).
+    :param Tend: last time considered as relevant (s).
     :param x1: West-most coordinate for region A (m).
     :param x2: East-most coordinate for region A (m).
     :param y1: South-most coordinate for region A (m).
     :param y2: North-most coordinate for region A (m).
-    :return: 
+    :return: objective functional for shallow water equations. 
     """
 
     # Create a 'smoothened' indicator function for region A = [x1, x2] x [y1, y1]
@@ -32,12 +34,10 @@ def objectiveFunctional(eta, t, dt, Tstart=300., x1=490e3, x2=640e3, y1=4160e3, 
     elif t.dat.data < Tstart + 0.5 * dt:
         coeff.assign(0.)
 
-    return (coeff * eta * iA) * dx * dt_meas
-
-    # TODO: can use notation dt_meas[Tstart:Tend]
+    return (coeff * eta * iA) * dx * dt_meas[Tstart:Tend]
 
 
-def strongResidual(q, q_, b, Dt, nu=0.):
+def strongResidualSW(q, q_, b, Dt, nu=0.):
     """
     Construct the strong residual for linear shallow water equations at the current timestep, using Crank Nicolson
     timestepping to express as a 'stationary' PDE `Lq-s=0`, where the 'source term' s depends on the data from the
@@ -48,7 +48,7 @@ def strongResidual(q, q_, b, Dt, nu=0.):
     :param b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: coefficient for stress term.
-    :return: strong residual at current timestep.
+    :return: strong residual for shallow water equations at current timestep.
     """
     (u, eta) = (as_vector((q[0], q[1])), q[2])
     (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
@@ -66,7 +66,7 @@ def strongResidual(q, q_, b, Dt, nu=0.):
 
 # TODO: implement Galerkin Least Squares (GLS) stabilisation
 
-def weakResidual(q, q_, qt, b, Dt, nu=0.):
+def weakResidualSW(q, q_, qt, b, Dt, nu=0.):
     """
     :param q: solution tuple for linear shallow water equations.
     :param q_: solution tuple for linear shallow water equations at previous timestep.
@@ -74,7 +74,7 @@ def weakResidual(q, q_, qt, b, Dt, nu=0.):
     :param b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: coefficient for stress term.
-    :return: weak residual at current timestep.
+    :return: weak residual for shallow water equations at current timestep.
     """
     (u, eta) = (as_vector((q[0], q[1])), q[2])
     (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
@@ -88,3 +88,38 @@ def weakResidual(q, q_, qt, b, Dt, nu=0.):
         F -= nu * inner(grad(uh) + transpose(grad(uh)), grad(w))
 
     return F
+
+
+def strongResidualAD(c, c_, u, Dt, nu=1e-3, timestepper='CrankNicolson'):
+    """
+    :param c: concentration solution at current timestep. 
+    :param c_: concentration at previous timestep.
+    :param u: wind field.
+    :param Dt: timestep expressed as a FiredrakeConstant.
+    :param nu: diffusivity parameter.
+    :param timestepper: time integration scheme used.
+    :return: weak residual for advection diffusion equation at current timestep.
+    """
+    if timestepper == 'CrankNicolson':
+        cm = 0.5 * (c + c_)
+    else:
+        raise NotImplementedError
+    return c - c_ + Dt * inner(u, grad(cm)) - Dt * Constant(nu) * div(grad(cm))
+
+
+def weakResidualAD(c, c_, ct, u, Dt, nu=1e-3, timestepper='CrankNicolson'):
+    """
+    :param c: concentration solution at current timestep. 
+    :param c_: concentration at previous timestep.
+    :param ct: test function.
+    :param u: wind field.
+    :param Dt: timestep expressed as a FiredrakeConstant.
+    :param nu: diffusivity parameter.
+    :param timestepper: time integration scheme used.
+    :return: weak residual for advection diffusion equation at current timestep.
+    """
+    if timestepper == 'CrankNicolson':
+        cm = 0.5 * (c + c_)
+    else:
+        raise NotImplementedError
+    return ((c - c_) * ct - Dt * inner(cm * u, grad(ct)) + Dt * Constant(nu) * inner(grad(cm), grad(ct))) * dx
