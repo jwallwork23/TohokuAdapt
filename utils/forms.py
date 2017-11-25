@@ -1,11 +1,11 @@
 from firedrake import *
 
 
-def objectiveFunctionalSW(eta, t, timestep, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=4160e3, y2=4360e3):
+def objectiveFunctionalSW(eta, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=4160e3, y2=4360e3):
     """
     :param eta: free surface displacement solution.
-    :param t: current time value (s).
-    :param timestep: time step (s).
+    # :param t: current time value (s).
+    # :param timestep: time step (s).
     :param Tstart: first time considered as relevant (s).
     :param Tend: last time considered as relevant (s).
     :param x1: West-most coordinate for region A (m).
@@ -23,16 +23,18 @@ def objectiveFunctionalSW(eta, t, timestep, Tstart=300., Tend=1500., x1=490e3, x
                 % (x1, x2, y1, y2, x1 + xd, xd, y1 + yd, yd)
     iA = Function(eta.function_space()).interpolate(Expression(indicator))
 
-    # Modify forcing term to 'smoothen' in time
-    coeff = Constant(1.)
-    if t.dat.data < Tstart + 1.5 * timestep:
-        coeff.assign(0.5)
-    elif t.dat.data < Tstart + 0.5 * timestep:
-        coeff.assign(0.)
+    # # Modify forcing term to 'smoothen' in time
+    # coeff = Constant(1.)
+    # if t.dat.data < Tstart + 1.5 * timestep:
+    #     coeff.assign(0.5)
+    # elif t.dat.data < Tstart + 0.5 * timestep:
+    #     coeff.assign(0.)
 
-    from firedrake_adjoint import dt
+    from firedrake_adjoint import dt, Functional
 
-    return (coeff * eta * iA) * dx * dt[Tstart:Tend]
+    #  return (coeff * eta * iA) * dx * dt[Tstart:Tend]
+
+    return  Functional(eta * iA * dx * dt[Tstart:Tend])
 
 
 def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson'):

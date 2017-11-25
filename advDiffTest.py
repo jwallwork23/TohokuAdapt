@@ -75,6 +75,8 @@ t = T
 save = True
 adjointFile = File("plots/advectionDiffusion/adjointAD.pvd")
 errorFile = File("plots/advectionDiffusion/errorIndicatorAD.pvd")
+
+# Time integrate (backwards)
 for (variable, solution) in compute_adjoint(J):
     try:
         dual.dat.data[:] = variable.dat.data
