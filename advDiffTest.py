@@ -9,7 +9,7 @@ dt_meas = dt  # Keep a reference to dt, the time-measure of Firedrake
 dirName = "plots/advectionDiffusion/"
 
 # Define Mesh and FunctionSpace
-n = 10
+n = 16
 mesh = RectangleMesh(4 * n, n, 4, 1)
 x, y = SpatialCoordinate(mesh)
 V = FunctionSpace(mesh, "CG", 2)
