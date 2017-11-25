@@ -1,11 +1,12 @@
 from firedrake import *
 from firedrake_adjoint import *
 
+import numpy as np
+
 import utils.forms as form
 import utils.storage as stor
 
 
-dt_meas = dt  # Keep a reference to dt, the time-measure of Firedrake
 dirName = "plots/advectionDiffusion/"
 
 # Define Mesh and FunctionSpace
@@ -26,12 +27,13 @@ dual = Function(V, name='Adjoint')
 rho = Function(V, name='Residual')
 
 # Specify physical and solver parameters
-dt = 0.05
+dt = 0.025  # Timestep
 Dt = Constant(dt)
 w = Function(VectorFunctionSpace(mesh, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
+nu = 1e-3   # Diffusivity
 
 # Establish bilinear form and set boundary conditions
-F = form.weakResidualAD(phi_next, phi, psi, w, Dt)
+F = form.weakResidualAD(phi_next, phi, psi, w, Dt, nu=nu)
 bc = DirichletBC(V, 0., "on_boundary")
 
 # Initialise counters and time integrate
@@ -55,7 +57,7 @@ while t <= T:
         adj_inc_timestep(time=t, finished=finished)
 
     # Approximate residual of forward equation and save to HDF5
-    rho.interpolate(form.strongResidualAD(phi_next, phi, w, Dt))
+    rho.interpolate(form.strongResidualAD(phi_next, phi, w, Dt, nu=nu))
     with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_CREATE) as chk:
         chk.store(rho)
         chk.close()
@@ -69,7 +71,7 @@ while t <= T:
 cnt -= 1
 
 # Set up adjoint problem
-J = Functional(inner(phi, phi)*dx*dt_meas)          # Establish objective functional
+J = form.objectiveFunctionalAD(phi)
 parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
 t = T
 save = True
@@ -89,6 +91,7 @@ for (variable, solution) in compute_adjoint(J):
 
             # Estimate error using forward residual
             epsilon = assemble(v * rho * dual * dx)
+            epsilon.dat.data[:] = np.abs(epsilon.dat.data) * 1e10
             epsilon.rename("Error indicator")
 
             # Print to screen, save data and increment counters

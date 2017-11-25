@@ -1,5 +1,7 @@
 from firedrake import *
+from firedrake_adjoint import dt, Functional
 
+dt_meas = dt
 
 def objectiveFunctionalSW(eta, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=4160e3, y2=4360e3):
     """
@@ -30,11 +32,9 @@ def objectiveFunctionalSW(eta, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=4
     # elif t.dat.data < Tstart + 0.5 * timestep:
     #     coeff.assign(0.)
 
-    from firedrake_adjoint import dt, Functional
-
     #  return (coeff * eta * iA) * dx * dt[Tstart:Tend]
 
-    return  Functional(eta * iA * dx * dt[Tstart:Tend])
+    return  Functional(eta * iA * dx * dt_meas[Tstart:Tend])
 
 
 def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson'):
@@ -109,6 +109,27 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson'):
         F -= nu * inner(grad(um) + transpose(grad(um)), grad(w))
 
     return F
+
+
+def objectiveFunctionalAD(c, x1=2.5, x2=3.5, y1=0.1, y2=0.9):
+    """
+    :param c: concentration.
+    :param x1: West-most coordinate for region A (m).
+    :param x2: East-most coordinate for region A (m).
+    :param y1: South-most coordinate for region A (m).
+    :param y2: North-most coordinate for region A (m).
+    :return: objective functional for advection diffusion problem. 
+    """
+
+    # Create a 'smoothened' indicator function for region A = [x1, x2] x [y1, y1]
+    xd = (x2 - x1) / 2
+    yd = (y2 - y1) / 2
+    indicator = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? ' \
+                'exp(1. / (pow(x[0] - %f, 2) - pow(%f, 2))) * exp(1. / (pow(x[1] - %f, 2) - pow(%f, 2))) : 0.'\
+                % (x1, x2, y1, y2, x1 + xd, xd, y1 + yd, yd)
+    iA = Function(c.function_space()).interpolate(Expression(indicator))
+
+    return  Functional(c * iA * dx * dt_meas)
 
 
 def strongResidualAD(c, c_, u, Dt, nu=1e-3, timestepper='CrankNicolson'):
