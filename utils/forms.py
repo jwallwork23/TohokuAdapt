@@ -2,9 +2,6 @@ from firedrake import *
 # from firedrake_adjoint import *
 
 
-dt_meas = dt  # Keep a reference to dt, the time-measure of Firedrake
-
-
 def objectiveFunctionalSW(eta, t, dt, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=4160e3, y2=4360e3):
     """
     :param eta: free surface displacement solution.
