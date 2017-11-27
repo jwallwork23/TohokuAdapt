@@ -1,8 +1,6 @@
 from firedrake import *
 from firedrake_adjoint import *
 
-import numpy as np
-
 import utils.forms as form
 import utils.mesh as msh
 import utils.options as opt
@@ -12,21 +10,14 @@ import utils.storage as stor
 dt_meas = dt
 dirName = 'plots/adjointBased/discrete/'
 
-# Define initial mesh and mesh statistics placeholders
-print('************** ADJOINT-BASED ADAPTIVE TSUNAMI SIMULATION **************\n')
-# print('ADJOINT-GUIDED mesh adaptive solver initially defined on a mesh of')
+# Define initial mesh
 mesh, eta0, b = msh.TohokuDomain(4)
-# nEle, nVer = msh.meshStats(mesh)
-# N = [nEle, nEle]    # Min/max #Elements
-# print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d.' % (nEle, nVer))
-# Interpolate bathymetry in DG space
 
 # Get default parameter values and check CFL criterion
 op = opt.Options()
-T = 150. #op.T
+T = op.T
 dt = op.dt
 Dt = Constant(dt)
-cdt = op.hmin / np.sqrt(op.g * max(b.dat.data))
 op.checkCFL(b)
 ndump = op.ndump
 
@@ -50,8 +41,8 @@ forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.
 # Define Function to hold residual data
 rho = Function(Q)
 rho_u, rho_e = rho.split()
-rho_u.rename("Residual for velocity")
-rho_e.rename("Residual for elevation")
+rho_u.rename("Velocity residual")
+rho_e.rename("Elevation residual")
 dual = Function(Q)
 dual_u, dual_e = dual.split()
 dual_u.rename("Adjoint velocity")
@@ -99,7 +90,7 @@ while t <= T:
 cnt -= 1
 
 # Set up adjoint problem
-J = form.objectiveFunctionalSW(q, plot=True, smooth=False)
+J = form.objectiveFunctionalSW(q, plot=True)
 parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
 t = T
 save = True
@@ -107,14 +98,10 @@ adjointFile = File(dirName + "adjoint.pvd")
 errorFile = File(dirName + "errorIndicator.pvd")
 
 # P0 test function to extract elementwise values
-P0 = FunctionSpace(mesh, "DG", 0)
-v = TestFunction(P0)
+v = TestFunction(FunctionSpace(mesh, "DG", 0))
 
 # Time integrate (backwards)
 for (variable, solution) in compute_adjoint(J):
-
-    # TODO: here ``variable`` comes out as all zeros. How to fix this?
-
     if save:
         # Load adjoint data
         dual_u.dat.data[:] = variable.dat.data[0]
@@ -122,14 +109,12 @@ for (variable, solution) in compute_adjoint(J):
 
         # Load residual data from HDF5
         with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_READ) as chk:
-            rho_u = Function(Q.sub(0), name="Residual for velocity")
-            rho_e = Function(Q.sub(1), name="Residual for elevation")
             chk.load(rho_u)
             chk.load(rho_e)
             chk.close()
 
         # Estimate error using forward residual
-        epsilon = assemble(v * (inner(rho_u, dual_u) + rho_e * dual_e) * dx)
+        epsilon = assemble(v * inner(rho, dual) * dx)
         epsilon.rename("Error indicator")
 
         # Print to screen, save data and increment counters
@@ -139,8 +124,7 @@ for (variable, solution) in compute_adjoint(J):
         cnt -= 1
         if (t <= 0.) | (cnt == 0):
             break
-        dumpn = 0
-        save = False
         t -= ndump
+        save = False
     else:
         save = True

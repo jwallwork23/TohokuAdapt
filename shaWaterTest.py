@@ -7,6 +7,7 @@ import utils.forms as form
 import utils.options as opt
 import utils.storage as stor
 
+
 dt_meas = dt
 dirName = "plots/tests/discreteAdjoint/"
 
@@ -97,12 +98,10 @@ adjointFile = File(dirName + "adjoint.pvd")
 errorFile = File(dirName + "errorIndicator.pvd")
 
 # P0 test function to extract elementwise values
-P0 = FunctionSpace(mesh, "DG", 0)
-v = TestFunction(P0)
+v = TestFunction(FunctionSpace(mesh, "DG", 0))
 
 # Time integrate (backwards)
 for (variable, solution) in compute_adjoint(J):
-
     if save:
         # Load adjoint data. NOTE the interpolation operator is overloaded
         dual_u.dat.data[:] = variable.dat.data[0]

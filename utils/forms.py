@@ -2,7 +2,8 @@ from firedrake import *
 from firedrake_adjoint import dt, Functional
 
 
-def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=4160e3, y2=4360e3, plot=False, smooth=True):
+def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=4160e3, y2=4360e3,
+                          plot=False, smooth=True):
     """
     :param q: forward solution tuple.
     # :param t: current time value (s).
@@ -13,6 +14,8 @@ def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=416
     :param x2: East-most coordinate for region A (m).
     :param y1: South-most coordinate for region A (m).
     :param y2: North-most coordinate for region A (m).
+    :param plot: toggle plotting of indicator function.
+    :param smooth: toggle 'smoothening' of the indicator function.
     :return: objective functional for shallow water equations. 
     """
 
@@ -30,7 +33,6 @@ def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=416
     ke.interpolate(Expression(indicator))
 
     # TODO: `smoothen` in time
-
     # # Modify forcing term to 'smoothen' in time
     # coeff = Constant(1.)
     # if t.dat.data < Tstart + 1.5 * timestep:
@@ -42,8 +44,9 @@ def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=416
     if plot:
         File("plots/adjointBased/kernel.pvd").write(ke)
 
-    # return Functional(inner(q, k) * dx * dt[Tstart:Tend])
-    return Functional(inner(q, k) * dx * dt)
+    return Functional(inner(q, k) * dx * dt[Tstart:Tend])
+    # return Functional(inner(q, k) * dx * dt)
+
 
 def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson'):
     """
@@ -76,7 +79,6 @@ def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson'):
 
     Au = u - u_ + Dt * 9.81 * grad(em)
     Ae = eta - eta_ + Dt * div(b * um)
-
     if nu != 0.:
         Au += div(nu * (grad(um) + transpose(grad(um))))
 
@@ -112,7 +114,6 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson'):
         raise NotImplementedError
 
     F = (inner(u - u_, w) + inner(eta - eta_, xi) + Dt * (9.81 * inner(grad(em), w) - inner(b * um, grad(xi)))) * dx
-
     if nu != 0.:
         F -= nu * inner(grad(um) + transpose(grad(um)), grad(w))
 
