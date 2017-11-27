@@ -61,7 +61,7 @@ while mn < np.ceil(T / (dt * rm)):
         M = adap.metricIntersection(mesh, V, M, M2) if op.mtype == 'b' else M2
     if op.advect & mn != 0:
         print('Advecting metric...')
-        adap.advectMetric(mesh, M, uv_2d, waveSpd * rm * dt, level=0.9, level2=0.9)     # Advect in velocity direction
+        adap.advectMetric(M, uv_2d, dt, rm)         # Advect metric ahead in direction of velocity
     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
     elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
     if (not iso and op.outputHessian):

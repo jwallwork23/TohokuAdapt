@@ -5,12 +5,8 @@ import numpy
 from numpy import linalg as la
 from scipy import linalg as sla
 
-from . import options
 
-
-op = options.Options()
-
-def constructHessian(mesh, V, sol, op=op):
+def constructHessian(mesh, V, sol, op=None):
     """
     Reconstructs the hessian of a scalar solution field with respect to the current mesh. The code for the integration 
     by parts reconstruction approach is based on the Monge-Amp\`ere tutorial provided in the Firedrake website 
@@ -22,6 +18,11 @@ def constructHessian(mesh, V, sol, op=op):
     :param op: Options class object providing min/max cell size values.
     :return: reconstructed Hessian associated with ``sol``.
     """
+    if op == None:
+        from . import options
+
+        op = options.Options()
+
     H = Function(V)
     tau = TestFunction(V)
     nhat = FacetNormal(mesh)  # Normal vector
@@ -49,7 +50,7 @@ def constructHessian(mesh, V, sol, op=op):
     return H
 
 
-def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=op):
+def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=None):
     """
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``computeSteadyMetric``, from 
     ``adapt.py``, 2016.
@@ -63,6 +64,10 @@ def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=op):
     :param op: Options class object providing min/max cell size values.
     :return: steady metric associated with Hessian H.
     """
+    if op == None:
+        from . import options
+
+        op = options.Options()
 
     ia2 = 1. / pow(op.a, 2)         # Inverse square aspect ratio
     ihmin2 = 1. / pow(op.hmin, 2)   # Inverse square minimal side-length
@@ -137,7 +142,7 @@ def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=op):
     return M
 
 
-def isotropicMetric(V, f, bdy=False, op=op):
+def isotropicMetric(V, f, bdy=False, op=None):
     """
     :param V: tensor function space on which metric will be defined.
     :param f: (scalar) function to adapt to.
@@ -145,6 +150,11 @@ def isotropicMetric(V, f, bdy=False, op=op):
     :param op: Options class object providing min/max cell size values.
     :return: isotropic metric corresponding to the scalar function.
     """
+    if op == None:
+        from . import options
+
+        op = options.Options()
+
     hmin2 = pow(op.hmin, 2)
     hmax2 = pow(op.hmax, 2)
     M = Function(V)
@@ -324,55 +334,43 @@ def pointwiseMax(f, g):
     return f
 
 
-def advectMetric(mesh, M, w, d, level=0.99, level2=0.99):
+def advectMetric(M_, w, dt, n=1, outfile=None):
     """
-    'Advect' metric M with finest resolution in direction of fluid velocity u.
+    'Advect' metric M with finest resolution in direction of fluid velocity/wind field w.
     
-    :param mesh: current mesh.
     :param M: metric field defined on current mesh (to be advected).
     :param w: (vector) velocity field on current mesh. Can be Function, list or ndarray.
-    :param d: distance over which metric is to be advected.
-    :param level: tolerance for metric above which advection is considered, as a proportion of the maximum.
-    :param level2: tolerance for velocity above which advection is performed, as a proportion of the maximum.
+    :param dt: timestep.
+    :param n: number of timesteps to advect over.
     """
-    toIntersect = []  # Lists of nodes with considerable metric contribution in the direction of the wind field
+    # Set up Tensor advection FEM problem
+    V = M_.function_space()
+    sigma = TestFunction(V)
+    M = Function(V)
+    F = (inner(M - M_, sigma) + dt * inner(dot(w, nabla_grad(M)), sigma)) * dx
+    prob = NonlinearVariationalProblem(F, M)
+    solv = NonlinearVariationalSolver(prob)
 
-    if (isinstance(w, list) | isinstance(w, numpy.ndarray)):
-        windM = symmetricProduct(M, w)    # Project metric field in wind direction
-        maxM = max(windM)
-        for i in range(len(sigM)):
-            if windM[i] > level * maxM:
-                toIntersect.append(i)           # Get nodes corresp. to most significant metric field in wind direction
-        print('#### advectMetric DEBUG: Considering metric advection on %d / %d nodes...'
-              % (len(toIntersect), len(M.dat.data)))
-        cnt = 0
-        for i in range(len(M.dat.data)):
-            for j in toIntersect:
-                if 0 < np.dot(mesh.coordinates.dat.data[i] - mesh.coordinates.dat.data[j], w) < d:
-                    cnt += 1
-                    M.dat.data[i] = localMetricIntersection(M.dat.data[i], M.dat.data[j])
-        print('#### advectMetric DEBUG: Made %d intersections of metric...' % cnt)
+    if outfile != None:
+        Mfile = File(outfile)
+        Mfile.write(M_, time=0)
 
-    elif isinstance(w, Function):
-        spaceMatch = (w.function_space().ufl_element().family() == 'Lagrange') and \
-                     (w.function_space().ufl_element().degree() == 1)
-        wP1 = w if spaceMatch else Function(VectorFunctionSpace(mesh, "CG", 1)).interpolate(w)
-        windM = symmetricProduct(M, w)
-        maxM = max(windM)
-        wind = [wP1.dat.data[i, 0] **2 + wP1.dat.data[i, 1] **2 for i in range(len(windM))]  # Wind field strength
-        maxW = max(wind)
-        for i in range(len(windM)):
-            if windM[i] > level * maxM:
-                toIntersect.append(i)           # Get nodes corresp. to most significant metric field in wind direction
-        print('#### advectMetric DEBUG: Considering metric advection on %d / %d nodes...'
-              % (len(toIntersect), len(M.dat.data)))
-        cnt = 0
-        for i in range(len(M.dat.data)):
-            if wind[i] > level2 * maxW:
-                for j in toIntersect:
-                    if 0 < np.dot(mesh.coordinates.dat.data[i] - mesh.coordinates.dat.data[j], wP1.dat.data[i]) < d:
-                        cnt += 1
-                        M.dat.data[i] = localMetricIntersection(M.dat.data[i], M.dat.data[j])
-        print('#### advectMetric DEBUG: Made %d intersections of metric...' % cnt)
-    else:
-        raise ValueError('Velocity field type %s not recognised.' % type(w))
+    # Time integrate
+    for i in range(1, n+1):
+        solv.solve()
+        M_.assign(M)
+        if outfile != None:
+            Mfile.write(M_, time=i)
+
+    return M
+
+    # TODO: include diffusion option
+
+
+if __name__ == '__main__':
+
+    mesh = RectangleMesh(64, 16, 4, 1)
+    V = TensorFunctionSpace(mesh, "CG", 1)
+    M = Function(V, name="Metric").interpolate(Expression([['1+x[0]', 0], [0, '1+x[1]']]))
+    w = Function(VectorFunctionSpace(mesh, "CG", 1)).interpolate(Expression([1, 0]))
+    advectMetric(M, w, 0.05, 20, outfile='plots/tests/utils/meshAdvect.pvd')
