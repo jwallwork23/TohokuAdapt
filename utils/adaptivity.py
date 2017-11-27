@@ -343,34 +343,36 @@ def advectMetric(M_, w, dt, n=1, outfile=None):
     :param dt: timestep.
     :param n: number of timesteps to advect over.
     """
+    if outfile != None:
+        Mfile = File(outfile)
+        Mfile.write(M_, time=0)
+
     # Set up Tensor advection FEM problem
     V = M_.function_space()
+    mesh = V.mesh()
     sigma = TestFunction(V)
     M = Function(V)
     F = (inner(M - M_, sigma) + dt * inner(dot(w, nabla_grad(M)), sigma)) * dx
     prob = NonlinearVariationalProblem(F, M)
     solv = NonlinearVariationalSolver(prob)
 
-    if outfile != None:
-        Mfile = File(outfile)
-        Mfile.write(M_, time=0)
-
     # Time integrate
     for i in range(1, n+1):
         solv.solve()
-        M_.assign(M)
+        M_.assign(metricIntersection(mesh, V, M_, M))
         if outfile != None:
             Mfile.write(M_, time=i)
 
     return M
 
     # TODO: include diffusion option
+    # TODO: include different timestepping options
 
 
 if __name__ == '__main__':
 
     mesh = RectangleMesh(64, 16, 4, 1)
     V = TensorFunctionSpace(mesh, "CG", 1)
-    M = Function(V, name="Metric").interpolate(Expression([['1+x[0]', 0], [0, '1+x[1]']]))
+    M = Function(V, name="Metric").interpolate(Expression([['2+sin(pi * x[0] / 2)', 0], [0, '1']]))
     w = Function(VectorFunctionSpace(mesh, "CG", 1)).interpolate(Expression([1, 0]))
     advectMetric(M, w, 0.05, 20, outfile='plots/tests/utils/meshAdvect.pvd')
