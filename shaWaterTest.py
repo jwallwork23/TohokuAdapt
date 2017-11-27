@@ -37,11 +37,11 @@ eta.rename("Free surface displacement")
 
 # Define variational problem
 qt = TestFunction(Q)
-# forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
-# forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
+forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
+forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 F = form.weakResidualSW(q, q_, qt, b, Dt)
 
-# Define Function to hold residual data
+# Define Functions to hold residual and adjoint solution data
 rho = Function(Q)
 rho_u, rho_e = rho.split()
 rho_u.rename("Velocity residual")
@@ -60,8 +60,7 @@ residualFile = File(dirName + "residual.pvd")
 forwardFile.write(u, eta, time=t)
 while t <= T:
     # Solve problem at current timestep
-    # forwardSolver.solve()
-    solve(F == 0, q)
+    forwardSolver.solve()
     q_.assign(q)
 
     # Tell dolfin about timesteps, so it can compute functionals including time measures other than dt[FINISH_TIME]
@@ -105,20 +104,18 @@ v = TestFunction(P0)
 for (variable, solution) in compute_adjoint(J):
 
     if save:
-        # Load adjoint data
+        # Load adjoint data. NOTE the interpolation operator is overloaded
         dual_u.dat.data[:] = variable.dat.data[0]
         dual_e.dat.data[:] = variable.dat.data[1]
 
         # Load residual data from HDF5
         with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_READ) as chk:
-            rho_u = Function(Q.sub(0), name="Velocity residual")
-            rho_e = Function(Q.sub(1), name="Elevation residual")
             chk.load(rho_u)
             chk.load(rho_e)
             chk.close()
 
         # Estimate error using forward residual
-        epsilon = assemble(v * (inner(rho_u, dual_u) + rho_e * dual_e) * dx)
+        epsilon = assemble(v * inner(rho, dual) * dx)
         epsilon.rename("Error indicator")
 
         # Print to screen, save data and increment counters
