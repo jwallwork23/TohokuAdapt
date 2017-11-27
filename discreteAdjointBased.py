@@ -8,8 +8,9 @@ import utils.mesh as msh
 import utils.options as opt
 import utils.storage as stor
 
-dt_meas = dt
 
+dt_meas = dt
+dirName = 'plots/adjointBased/discrete/'
 
 # Define initial mesh and mesh statistics placeholders
 print('************** ADJOINT-BASED ADAPTIVE TSUNAMI SIMULATION **************\n')
@@ -22,14 +23,12 @@ mesh, eta0, b = msh.TohokuDomain(4)
 
 # Get default parameter values and check CFL criterion
 op = opt.Options()
-dirName = 'plots/adjointBased/discrete/'
 T = 150. #op.T
 dt = op.dt
 Dt = Constant(dt)
 cdt = op.hmin / np.sqrt(op.g * max(b.dat.data))
 op.checkCFL(b)
 ndump = op.ndump
-rm = op.rm
 
 # Define variables of problem and apply initial conditions
 Q = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
@@ -60,7 +59,7 @@ dual_e.rename("Adjoint elevation")
 
 # Initialise counters and time integrate
 t = 0.
-cnt = meshn = 0
+cnt = dumpn = 0
 finished = False
 forwardFile = File(dirName + "forward.pvd")
 residualFile = File(dirName + "residual.pvd")
@@ -70,7 +69,7 @@ while t <= T:
     forwardSolver.solve()
     q_.assign(q)
 
-    if meshn == 0:
+    if dumpn == 0:
 
         # Tell dolfin about timesteps, so it can compute functionals including time measures other than dt[FINISH_TIME]
         if t >= T - dt:
@@ -90,17 +89,17 @@ while t <= T:
             chk.close()
 
         # Print to screen, save data and increment counters
-        print('FORWARD: t = %.2fs' % t)
+        print('FORWARD: t = %.2fs, Count: %d' % (t, cnt))
         forwardFile.write(u, eta, time=t)
         residualFile.write(rho_u, rho_e, time=t)
         cnt += 1
-        meshn += rm
-    meshn -= 1
+        dumpn += ndump
+    dumpn -= 1
     t += dt
 cnt -= 1
 
 # Set up adjoint problem
-J = form.objectiveFunctionalSW(eta)
+J = form.objectiveFunctionalSW(q, plot=True, smooth=False)
 parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
 t = T
 save = True
@@ -117,34 +116,31 @@ for (variable, solution) in compute_adjoint(J):
     # TODO: here ``variable`` comes out as all zeros. How to fix this?
 
     if save:
-        if meshn == rm:
+        # Load adjoint data
+        dual_u.dat.data[:] = variable.dat.data[0]
+        dual_e.dat.data[:] = variable.dat.data[1]
 
-            # Load adjoint data
-            dual_u.dat.data[:] = variable.dat.data[0]
-            dual_e.dat.data[:] = variable.dat.data[1]
+        # Load residual data from HDF5
+        with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_READ) as chk:
+            rho_u = Function(Q.sub(0), name="Residual for velocity")
+            rho_e = Function(Q.sub(1), name="Residual for elevation")
+            chk.load(rho_u)
+            chk.load(rho_e)
+            chk.close()
 
-            # Load residual data from HDF5
-            with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_READ) as chk:
-                rho_u = Function(Q.sub(0), name="Residual for velocity")
-                rho_e = Function(Q.sub(1), name="Residual for elevation")
-                chk.load(rho_u)
-                chk.load(rho_e)
-                chk.close()
+        # Estimate error using forward residual
+        epsilon = assemble(v * (inner(rho_u, dual_u) + rho_e * dual_e) * dx)
+        epsilon.rename("Error indicator")
 
-            # Estimate error using forward residual
-            epsilon = assemble(v * (inner(rho_u, dual_u) + rho_e * dual_e) * dx)
-            epsilon.rename("Error indicator")
-
-            # Print to screen, save data and increment counters
-            print('ADJOINT: t = %.2fs' % t)
-            adjointFile.write(dual_u, dual_e, time=t)
-            errorFile.write(epsilon, time=t)
-            cnt -= 1
-            if (t <= 0.) | (cnt == 0):
-                break
-            meshn = 0
+        # Print to screen, save data and increment counters
+        print('ADJOINT: t = %.2fs, Count: %d' % (t, cnt))
+        adjointFile.write(dual_u, dual_e, time=t)
+        errorFile.write(epsilon, time=t)
+        cnt -= 1
+        if (t <= 0.) | (cnt == 0):
+            break
+        dumpn = 0
         save = False
-        t -= dt
+        t -= ndump
     else:
         save = True
-    meshn += 1

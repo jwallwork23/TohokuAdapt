@@ -42,7 +42,8 @@ def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=416
     if plot:
         File("plots/adjointBased/kernel.pvd").write(ke)
 
-    return Functional(inner(q, k) * dx * dt[Tstart:Tend])
+    # return Functional(inner(q, k) * dx * dt[Tstart:Tend])
+    return Functional(inner(q, k) * dx * dt)
 
 def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson'):
     """
