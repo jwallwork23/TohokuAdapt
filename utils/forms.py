@@ -48,7 +48,7 @@ def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=416
     # return Functional(inner(q, k) * dx * dt)
 
 
-def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson'):
+def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson', rotational=False):
     """
     Construct the strong residual for linear shallow water equations at the current timestep, using Crank Nicolson
     timestepping to express as a 'stationary' PDE `Lq-s=0`, where the 'source term' s depends on the data from the
@@ -59,6 +59,7 @@ def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson'):
     :param b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: coefficient for stress term.
+    :param rotational: toggle rotational / non-rotational equations.
     :return: strong residual for shallow water equations at current timestep.
     """
 
@@ -81,13 +82,15 @@ def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson'):
     Ae = eta - eta_ + Dt * div(b * um)
     if nu != 0.:
         Au += div(nu * (grad(um) + transpose(grad(um))))
+    if rotational:
+        Au += as_vector((-u[1], u[0]))
 
     return Au, Ae
 
 
 # TODO: implement Galerkin Least Squares (GLS) stabilisation
 
-def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson'):
+def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson', rotational=False):
     """
     :param q: solution tuple for linear shallow water equations.
     :param q_: solution tuple for linear shallow water equations at previous timestep.
@@ -95,6 +98,7 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson'):
     :param b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: coefficient for stress term.
+    :param rotational: toggle rotational / non-rotational equations.
     :return: weak residual for shallow water equations at current timestep.
     """
     (u, eta) = (as_vector((q[0], q[1])), q[2])
@@ -116,6 +120,8 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson'):
     F = (inner(u - u_, w) + inner(eta - eta_, xi) + Dt * (9.81 * inner(grad(em), w) - inner(b * um, grad(xi)))) * dx
     if nu != 0.:
         F -= nu * inner(grad(um) + transpose(grad(um)), grad(w))
+    if rotational:
+        F += inner(as_vector((-u[1], u[0])), w) * dx
 
     return F
 
@@ -138,7 +144,7 @@ def objectiveFunctionalAD(c, x1=2.5, x2=3.5, y1=0.1, y2=0.9):
                 % (x1, x2, y1, y2, x1 + xd, xd, y1 + yd, yd)
     iA = Function(c.function_space()).interpolate(Expression(indicator))
 
-    return  Functional(c * iA * dx * dt_meas)
+    return  Functional(c * iA * dx * dt)
 
 
 def strongResidualAD(c, c_, u, Dt, nu=1e-3, timestepper='CrankNicolson'):
