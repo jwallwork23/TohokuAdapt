@@ -1,11 +1,10 @@
 from firedrake import *
 from firedrake_adjoint import dt, Functional
 
-dt_meas = dt
 
-def objectiveFunctionalSW(eta, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=4160e3, y2=4360e3):
+def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=4160e3, y2=4360e3, plot=False, smooth=True):
     """
-    :param eta: free surface displacement solution.
+    :param q: forward solution tuple.
     # :param t: current time value (s).
     # :param timestep: time step (s).
     :param Tstart: first time considered as relevant (s).
@@ -17,13 +16,20 @@ def objectiveFunctionalSW(eta, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=4
     :return: objective functional for shallow water equations. 
     """
 
-    # Create a 'smoothened' indicator function for region A = [x1, x2] x [y1, y1]
-    xd = (x2 - x1) / 2
-    yd = (y2 - y1) / 2
-    indicator = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? ' \
-                'exp(1. / (pow(x[0] - %f, 2) - pow(%f, 2))) * exp(1. / (pow(x[1] - %f, 2) - pow(%f, 2))) : 0.'\
-                % (x1, x2, y1, y2, x1 + xd, xd, y1 + yd, yd)
-    iA = Function(eta.function_space()).interpolate(Expression(indicator))
+    # Create a (possibly 'smoothened') indicator function for region A = [x1, x2] x [y1, y1]
+    if smooth:
+        xd = (x2 - x1) / 2
+        yd = (y2 - y1) / 2
+        indicator = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? ' \
+                    'exp(1. / (pow(x[0] - %f, 2) - pow(%f, 2))) * exp(1. / (pow(x[1] - %f, 2) - pow(%f, 2))) : 0.'\
+                    % (x1, x2, y1, y2, x1 + xd, xd, y1 + yd, yd)
+    else:
+        indicator = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' % (x1, x2, y1, y2)
+    k = Function(q.function_space())
+    ku, ke = k.split()
+    ke.interpolate(Expression(indicator))
+
+    # TODO: `smoothen` in time
 
     # # Modify forcing term to 'smoothen' in time
     # coeff = Constant(1.)
@@ -31,11 +37,12 @@ def objectiveFunctionalSW(eta, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=4
     #     coeff.assign(0.5)
     # elif t.dat.data < Tstart + 0.5 * timestep:
     #     coeff.assign(0.)
-
     #  return (coeff * eta * iA) * dx * dt[Tstart:Tend]
 
-    return  Functional(eta * iA * dx * dt_meas[Tstart:Tend])
+    if plot:
+        File("plots/adjointBased/kernel.pvd").write(ke)
 
+    return Functional(inner(q, k) * dx * dt[Tstart:Tend])
 
 def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson'):
     """
@@ -103,7 +110,7 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson'):
     else:
         raise NotImplementedError
 
-    F = (inner(u - u_, w) + inner(eta - eta_, xi) + 9.81 * inner(grad(em), w) - inner(b * um, grad(xi))) * dx
+    F = (inner(u - u_, w) + inner(eta - eta_, xi) + Dt * (9.81 * inner(grad(em), w) - inner(b * um, grad(xi)))) * dx
 
     if nu != 0.:
         F -= nu * inner(grad(um) + transpose(grad(um)), grad(w))
