@@ -15,10 +15,10 @@ mesh, eta0, b = msh.TohokuDomain(4)
 
 # Get default parameter values and check CFL criterion
 op = opt.Options()
-T = op.T
+op.checkCFL(b)
 dt = op.dt
 Dt = Constant(dt)
-op.checkCFL(b)
+T = op.T
 ndump = op.ndump
 
 # Define variables of problem and apply initial conditions
@@ -55,21 +55,20 @@ finished = False
 forwardFile = File(dirName + "forward.pvd")
 residualFile = File(dirName + "residual.pvd")
 forwardFile.write(u, eta, time=t)
-while t <= T:
+while t <= T - dt:
     # Solve problem at current timestep
     forwardSolver.solve()
     q_.assign(q)
 
+    # Mark timesteps to be used in adjoint simulation
+    if t >= T - dt:
+        finished = True
+    if t == 0.:
+        adj_start_timestep()
+    else:
+        adj_inc_timestep(time=t, finished=finished)
+
     if dumpn == 0:
-
-        # Tell dolfin about timesteps, so it can compute functionals including time measures other than dt[FINISH_TIME]
-        if t >= T - dt:
-            finished = True
-        if t == 0.:
-            adj_start_timestep()
-        else:
-            adj_inc_timestep(time=t, finished=finished)
-
         # Approximate residual of forward equation and save to HDF5
         Au, Ae = form.strongResidualSW(q, q_, b, Dt)
         rho_u.interpolate(Au)
@@ -79,12 +78,12 @@ while t <= T:
             chk.store(rho_e)
             chk.close()
 
-        # Print to screen, save data and increment counters
-        print('FORWARD: t = %.2fs, Count: %d' % (t, cnt))
+        # Save to vtu
         forwardFile.write(u, eta, time=t)
         residualFile.write(rho_u, rho_e, time=t)
-        cnt += 1
+        print('FORWARD: t = %.2fs, Count: %d ' % (t, cnt))
         dumpn += ndump
+        cnt += 1
     dumpn -= 1
     t += dt
 cnt -= 1
@@ -103,28 +102,31 @@ v = TestFunction(FunctionSpace(mesh, "DG", 0))
 # Time integrate (backwards)
 for (variable, solution) in compute_adjoint(J):
     if save:
-        # Load adjoint data
-        dual_u.dat.data[:] = variable.dat.data[0]
-        dual_e.dat.data[:] = variable.dat.data[1]
+        if dumpn == ndump:
+            # Load adjoint data
+            dual_u.dat.data[:] = variable.dat.data[0]
+            dual_e.dat.data[:] = variable.dat.data[1]
 
-        # Load residual data from HDF5
-        with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_READ) as chk:
-            chk.load(rho_u)
-            chk.load(rho_e)
-            chk.close()
+            # Load residual data from HDF5
+            with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_READ) as chk:
+                chk.load(rho_u)
+                chk.load(rho_e)
+                chk.close()
 
-        # Estimate error using forward residual
-        epsilon = assemble(v * inner(rho, dual) * dx)
-        epsilon.rename("Error indicator")
+            # Estimate error using forward residual
+            epsilon = assemble(v * inner(rho, dual) * dx)
+            epsilon.rename("Error indicator")
 
-        # Print to screen, save data and increment counters
-        print('ADJOINT: t = %.2fs, Count: %d' % (t, cnt))
-        adjointFile.write(dual_u, dual_e, time=t)
-        errorFile.write(epsilon, time=t)
-        cnt -= 1
+            # Print to screen, save data and increment counters
+            adjointFile.write(dual_u, dual_e, time=t)
+            errorFile.write(epsilon, time=t)
+            print('ADJOINT: t = %.2fs, Count: %d' % (t, cnt))
+            dumpn -= ndump
+            cnt -= 1
+        dumpn += 1
+        t -= dt
         if (t <= 0.) | (cnt == 0):
             break
-        t -= ndump
         save = False
     else:
         save = True

@@ -40,7 +40,6 @@ eta.rename("Free surface displacement")
 qt = TestFunction(Q)
 forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
 forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
-F = form.weakResidualSW(q, q_, qt, b, Dt)
 
 # Define Functions to hold residual and adjoint solution data
 rho = Function(Q)
