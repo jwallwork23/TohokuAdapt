@@ -2,12 +2,20 @@ from firedrake import *
 from firedrake_adjoint import *
 
 import numpy as np
+from time import clock
 
+import utils.adaptivity as adap
 import utils.forms as form
+import utils.options as opt
 import utils.storage as stor
 
-
+# Establish filenames
 dirName = "plots/advectionDiffusion/"
+forwardFile = File(dirName + "forwardAD.pvd")
+residualFile = File(dirName + "residualAD.pvd")
+adjointFile = File(dirName + "adjointAD.pvd")
+errorFile = File(dirName + "errorIndicatorAD.pvd")
+adaptiveFile = File(dirName + "goalBasedAD.pvd")
 
 # Define Mesh and FunctionSpace
 n = 16
@@ -27,7 +35,8 @@ dual = Function(V, name='Adjoint')
 rho = Function(V, name='Residual')
 
 # Specify physical and solver parameters
-dt = 0.025  # Timestep
+op = opt.Options(dt=0.025, T=2.5, hmin=5e-2, hmax=1., rm=5)
+dt = op.dt
 Dt = Constant(dt)
 w = Function(VectorFunctionSpace(mesh, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
 nu = 1e-3   # Diffusivity
@@ -38,11 +47,11 @@ bc = DirichletBC(V, 0., "on_boundary")
 
 # Initialise counters and time integrate
 t = 0.
-T = 2.5
+T = op.T
 cnt = 0
 finished = False
-forwardFile = File(dirName + "forwardAD.pvd")
-residualFile = File(dirName + "residualAD.pvd")
+print('Starting fixed mesh primal run (forwards in time)')
+primalTimer = clock()
 while t <= T:
     # Solve problem at current timestep
     solve(F == 0, phi_next, bc)
@@ -69,16 +78,18 @@ while t <= T:
     t += dt
     cnt += 1
 cnt -= 1
+primalTimer = clock() - primalTimer
+print('Primal run complete. Run time: %.2fs' % primalTimer)
 
 # Set up adjoint problem
 J = form.objectiveFunctionalAD(phi)
 parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
 t = T
 save = True
-adjointFile = File("plots/advectionDiffusion/adjointAD.pvd")
-errorFile = File("plots/advectionDiffusion/errorIndicatorAD.pvd")
 
 # Time integrate (backwards)
+print('Starting fixed mesh dual run (backwards in time)')
+dualTimer = clock()
 for (variable, solution) in compute_adjoint(J):
     try:
         dual.dat.data[:] = variable.dat.data
@@ -94,8 +105,13 @@ for (variable, solution) in compute_adjoint(J):
             epsilon.dat.data[:] = np.abs(epsilon.dat.data) * 1e10
             epsilon.rename("Error indicator")
 
+            # Save error indicator data to HDF5
+            with DumbCheckpoint(dirName + 'hdf5/error_' + stor.indexString(cnt), mode=FILE_CREATE) as chk:
+                chk.store(epsilon)
+                chk.close()
+
             # Print to screen, save data and increment counters
-            print('ADJOINT: t = %.2fs' % t)
+            print('t = %.2fs' % t)
             adjointFile.write(dual, time=t)
             errorFile.write(epsilon, time=t)
             t -= dt
@@ -107,3 +123,49 @@ for (variable, solution) in compute_adjoint(J):
             break
     except:
         continue
+dualTimer = clock() - dualTimer
+print('Adjoint run complete. Run time: %.2fs' % dualTimer)
+
+# Get adaptivity parameters
+hmin = op.hmin
+hmax = op.hmax
+rm = op.rm
+
+# Reset initial conditions for primal problem and recreate error indicator placeholder
+phi = ic.copy(deepcopy=True)
+phi.rename('Concentration')
+epsilon = Function(P0, name="Error indicator")
+
+print('Starting adaptive mesh primal run (forwards in time)')
+adaptTimer = clock()
+while t <= T:
+    # Load error indicator data from HDF5
+    with DumbCheckpoint(dirName + 'hdf5/error_' + stor.indexString(cnt), mode=FILE_READ) as chk:
+        chk.load(epsilon)   # Defined on a P0 field on the initial mesh
+        chk.close()
+
+    # Adapt mesh
+    V = TensorFunctionSpace(mesh, "CG", 1)
+    H = adap.constructHessian(mesh, V, phi, op=op)
+
+    # TODO: adapt mesh, interpolate
+    # TODO: redefine problem
+
+    # Solve problem at current timestep
+    solve(F == 0, phi_next, bc)
+    phi.assign(phi_next)
+
+    # Print to screen, save data and increment counters
+    print('t = %.2fs' % t)
+    adaptiveFile.write(phi, time=t)
+    t += dt
+    cnt += 1
+cnt -= 1
+adaptTimer = clock() - adaptTimer
+print('Primal run complete.')
+
+# Print to screen timing analyses
+print("""******** TIMINGS ********
+forward run   %5.2fs
+adjoint run   %5.2fs
+adaptive run  %5.2fs""" % (primalTimer, dualTimer, adaptTimer))

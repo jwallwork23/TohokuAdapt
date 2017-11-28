@@ -334,7 +334,7 @@ def pointwiseMax(f, g):
     return f
 
 
-def advectMetric(M_, w, dt, n=1, outfile=None):
+def advectMetric(M_, w, dt, n=1, outfile=None, bc=None):
     """
     'Advect' metric M with finest resolution in direction of fluid velocity/wind field w.
     
@@ -342,6 +342,8 @@ def advectMetric(M_, w, dt, n=1, outfile=None):
     :param w: (vector) velocity field on current mesh. Can be Function, list or ndarray.
     :param dt: timestep.
     :param n: number of timesteps to advect over.
+    :param outfile: toggle metric output and location.
+    :param bc: boundary condition on Tensor advection PDE problem.
     """
     if outfile != None:
         Mfile = File(outfile)
@@ -354,7 +356,7 @@ def advectMetric(M_, w, dt, n=1, outfile=None):
     M = Function(V)
     F = (inner(M - M_, sigma) + dt * inner(dot(w, nabla_grad(M)), sigma)) * dx
     prob = NonlinearVariationalProblem(F, M)
-    solv = NonlinearVariationalSolver(prob)
+    solv = NonlinearVariationalSolver(prob, bc=bc)
 
     # Time integrate
     for i in range(1, n+1):
