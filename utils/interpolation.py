@@ -66,4 +66,10 @@ def interp(mesh, *fields):
         fields_new += (f_new,)
     return fields_new
 
-# TODO: interpolation script for mixed spaces
+def mixedPairInterp(mesh, V, q):
+    p = Function(V)
+    p0, p1 = p.split()
+    q0, q1 = q.split()
+    q0, q1 = interp(mesh, q0, q1)
+    p0.assign(q0), p1.assign(q1)
+    return p

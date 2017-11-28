@@ -76,29 +76,30 @@ if useAdjoint:
     print('Starting fixed mesh primal run (forwards in time)')
     finished = False
     primalTimer = clock()
-    while t < T:
+    while not finished:
         # Solve problem at current timestep
         solve(F == 0, phi_next, bc)
         phi.assign(phi_next)
 
         # Tell dolfin about timesteps, so it can compute functionals including measures of time other than dt[FINISH_TIME]
-        if t >= T - dt:
+        if t > T:
             finished = True
         if t == 0.:
             adj_start_timestep()
         else:
             adj_inc_timestep(time=t, finished=finished)
 
-        # Approximate residual of forward equation and save to HDF5
-        rho.interpolate(form.strongResidualAD(phi_next, phi, w, Dt, nu=nu))
-        with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_CREATE) as saveResidual:
-            saveResidual.store(rho)
-            saveResidual.close()
+        if not cnt % rm:
+            # Approximate residual of forward equation and save to HDF5
+            rho.interpolate(form.strongResidualAD(phi_next, phi, w, Dt, nu=nu))
+            with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_CREATE) as saveResidual:
+                saveResidual.store(rho)
+                saveResidual.close()
 
-        # Print to screen, save data and increment counters
-        print('t = %.3fs' % t)
+            # Print to screen, save data and increment counters
+            residualFile.write(rho, time=t)
         forwardFile.write(phi, time=t)
-        residualFile.write(rho, time=t)
+        print('t = %.3fs' % t)
         t += dt
         cnt += 1
     cnt -= 1
@@ -122,32 +123,36 @@ if useAdjoint:
                 # Load adjoint data. NOTE the interpolation operator is overloaded
                 dual.dat.data[:] = variable.dat.data
 
-                # Load residual data from HDF5
-                with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_READ) as loadResidual:
-                    rho = Function(V, name='Residual')
-                    loadResidual.load(rho)
-                    loadResidual.close()
-
-                # Estimate error using forward residual
-                epsilon = assemble(v * rho * dual * dx)
-                epsilon.dat.data[:] = np.abs(epsilon.dat.data) / assemble(epsilon * dx)
-                epsilon.rename("Error indicator")
-
-                # Save error indicator data to HDF5
                 if not cnt % rm:
-                    with DumbCheckpoint(dirName + 'hdf5/error_' + stor.indexString(cnt), mode=FILE_CREATE) as saveError:
+                    indexStr = stor.indexString(cnt)
+
+                    # Load residual data from HDF5
+                    with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_READ) as loadResidual:
+                        rho = Function(V, name='Residual')
+                        loadResidual.load(rho)
+                        loadResidual.close()
+
+                    # Estimate error using forward residual
+                    epsilon = assemble(v * rho * dual * dx)
+                    epsilon.dat.data[:] = np.abs(epsilon.dat.data) / assemble(epsilon * dx)
+                    epsilon.rename("Error indicator")
+
+                    # Save error indicator data to HDF5
+                    with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_CREATE) as saveError:
                         saveError.store(epsilon)
                         saveError.close()
 
-                # Print to screen, save data and increment counters
-                print('t = %.3fs' % t)
+                    # Print to screen, save data and increment counters
+                    errorFile.write(epsilon, time=t)
                 adjointFile.write(dual, time=t)
-                errorFile.write(epsilon, time=t)
+                print('t = %.3fs' % t)
                 t -= dt
                 cnt -= 1
                 save = False
             else:
                 save = True
+            if (cnt == -1) | (t < -dt):
+                break
         except:
             continue
     dualTimer = clock() - dualTimer
@@ -184,7 +189,7 @@ while t <= T:
         if op.gradate:
             adap.metricGradation(mesh, M)
         if op.advect:
-            M = adap.advectMetric(M, w, dt, n=rm, nu=nu)
+            M = adap.advectMetric(M, w, Dt, n=rm, nu=nu)
         mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
         phi = inte.interp(mesh, phi)[0]
         phi.rename("Concentration")

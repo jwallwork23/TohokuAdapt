@@ -172,18 +172,19 @@ def weakResidualAD(c, c_, ct, u, Dt, nu=1e-3, timestepper='CrankNicolson'):
     return ((c - c_) * ct - Dt * inner(cm * u, grad(ct)) + Dt * Constant(nu) * inner(grad(cm), grad(ct))) * dx
 
 
-def weakMetricAdvection(M, M_, Mt, w, nu=0., timestepper='ImplicitEuler'):
+def weakMetricAdvection(M, M_, Mt, w, Dt, nu=0., timestepper='ImplicitEuler'):
     """
     :param M: metric at current timestep.
     :param M_: metric at previous timestep.
     :param Mt: test function.
     :param w: wind vector.
+    :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: diffusivity.
     :param timestepper: time integration scheme used.
     :return: weak residual for metric advection.
     """
     Mm = timestepScheme(M, M_, timestepper)
-    F = (inner(M - M_, Mt) + dt * inner(dot(w, nabla_grad(Mm)), Mt)) * dx
+    F = (inner(M - M_, Mt) + Dt * inner(dot(w, nabla_grad(Mm)), Mt)) * dx
     if nu != 0.:
         F += nu * inner(grad(M), grad(Mt)) * dx  # TODO: what does this mean?
     return F
