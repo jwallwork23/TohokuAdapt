@@ -18,6 +18,7 @@ class Options:
                  mtype='f',
                  iso=False,
                  advect=False,
+                 gradate=False,
                  hessMeth='dL2',
                  beta=1.4,
                  gamma=1.,
@@ -38,6 +39,7 @@ class Options:
         :param mtype: Adapt w.r.t 's'peed, 'f'ree surface or 'b'oth.
         :param iso: Toggle isotropic / anisotropic algorithm.
         :param advect: Toggle metric advection.
+        :param gradate: Toggle metric gradation.
         :param hessMeth: Method of Hessian reconstruction: 'dL2' or 'parts'.
         :param beta: metric gradation scaling parameter.
         :param gamma: metric rescaling parameter.
@@ -88,7 +90,8 @@ class Options:
             raise ValueError('Field for adaption ``%s`` not recognised.' % mtype)
         self.iso = iso
         self.advect = advect
-        assert(type(advect) == type(iso) == bool)
+        self.gradate = gradate
+        assert(type(advect) == type(gradate) == type(iso) == bool)
         self.hessMeth = hessMeth
         try:
             assert hessMeth in ('dL2', 'parts')

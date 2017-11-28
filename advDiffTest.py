@@ -6,6 +6,8 @@ from time import clock
 
 import utils.adaptivity as adap
 import utils.forms as form
+import utils.interpolation as inte
+import utils.mesh as msh
 import utils.options as opt
 import utils.storage as stor
 
@@ -35,11 +37,19 @@ dual = Function(V, name='Adjoint')
 rho = Function(V, name='Residual')
 
 # Specify physical and solver parameters
-op = opt.Options(dt=0.025, T=2.5, hmin=5e-2, hmax=1., rm=5)
+op = opt.Options(dt=0.04, T=2.4, hmin=5e-2, hmax=1., rm=5, vscale=0.4, gradate=False, advect=True)
 dt = op.dt
 Dt = Constant(dt)
 w = Function(VectorFunctionSpace(mesh, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
 nu = 1e-3   # Diffusivity
+
+# Get adaptivity parameters
+hmin = op.hmin
+hmax = op.hmax
+rm = op.rm
+nEle, nVer = msh.meshStats(mesh)
+N = [nEle, nEle]            # Min/max #Elements
+nVerT = nVer * op.vscale
 
 # Establish bilinear form and set boundary conditions
 F = form.weakResidualAD(phi_next, phi, psi, w, Dt, nu=nu)
@@ -67,19 +77,19 @@ while t <= T:
 
     # Approximate residual of forward equation and save to HDF5
     rho.interpolate(form.strongResidualAD(phi_next, phi, w, Dt, nu=nu))
-    with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_CREATE) as chk:
-        chk.store(rho)
-        chk.close()
+    with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_CREATE) as saveResidual:
+        saveResidual.store(rho)
+        saveResidual.close()
 
     # Print to screen, save data and increment counters
-    print('FORWARD: t = %.2fs' % t)
+    print('t = %.3fs' % t)
     forwardFile.write(phi, time=t)
     residualFile.write(rho, time=t)
     t += dt
     cnt += 1
 cnt -= 1
 primalTimer = clock() - primalTimer
-print('Primal run complete. Run time: %.2fs' % primalTimer)
+print('Primal run complete. Run time: %.3fs' % primalTimer)
 
 # Set up adjoint problem
 J = form.objectiveFunctionalAD(phi)
@@ -95,23 +105,25 @@ for (variable, solution) in compute_adjoint(J):
         dual.dat.data[:] = variable.dat.data
         if save:
             # Load residual data from HDF5
-            with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_READ) as chk:
+            with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_READ) as loadResidual:
                 rho = Function(V, name='Residual')
-                chk.load(rho)
-                chk.close()
+                loadResidual.load(rho)
+                loadResidual.close()
 
             # Estimate error using forward residual
             epsilon = assemble(v * rho * dual * dx)
-            epsilon.dat.data[:] = np.abs(epsilon.dat.data) * 1e10
+            norm = assemble(epsilon * dx)
+            epsilon.dat.data[:] = np.abs(epsilon.dat.data) / norm
             epsilon.rename("Error indicator")
 
             # Save error indicator data to HDF5
-            with DumbCheckpoint(dirName + 'hdf5/error_' + stor.indexString(cnt), mode=FILE_CREATE) as chk:
-                chk.store(epsilon)
-                chk.close()
+            if not cnt % rm:
+                with DumbCheckpoint(dirName + 'hdf5/error_' + stor.indexString(cnt), mode=FILE_CREATE) as saveError:
+                    saveError.store(epsilon)
+                    saveError.close()
 
             # Print to screen, save data and increment counters
-            print('t = %.2fs' % t)
+            print('t = %.3fs' % t)
             adjointFile.write(dual, time=t)
             errorFile.write(epsilon, time=t)
             t -= dt
@@ -119,17 +131,12 @@ for (variable, solution) in compute_adjoint(J):
             save = False
         else:
             save = True
-        if (t <= 0.) | (cnt == 0):
-            break
     except:
         continue
 dualTimer = clock() - dualTimer
-print('Adjoint run complete. Run time: %.2fs' % dualTimer)
-
-# Get adaptivity parameters
-hmin = op.hmin
-hmax = op.hmax
-rm = op.rm
+print('Adjoint run complete. Run time: %.3fs' % dualTimer)
+t += dt
+cnt += 1
 
 # Reset initial conditions for primal problem and recreate error indicator placeholder
 phi = ic.copy(deepcopy=True)
@@ -139,33 +146,49 @@ epsilon = Function(P0, name="Error indicator")
 print('Starting adaptive mesh primal run (forwards in time)')
 adaptTimer = clock()
 while t <= T:
-    # Load error indicator data from HDF5
-    with DumbCheckpoint(dirName + 'hdf5/error_' + stor.indexString(cnt), mode=FILE_READ) as chk:
-        chk.load(epsilon)   # Defined on a P0 field on the initial mesh
-        chk.close()
+    if not cnt % rm:
+        # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
+        with DumbCheckpoint(dirName + 'hdf5/error_' + stor.indexString(cnt), mode=FILE_READ) as loadError:
+            loadError.load(epsilon)   # P0 field on the initial mesh
+            loadError.close()
+        errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])
 
-    # Adapt mesh
-    V = TensorFunctionSpace(mesh, "CG", 1)
-    H = adap.constructHessian(mesh, V, phi, op=op)
+        # Adapt mesh and interpolate variables
+        W = TensorFunctionSpace(mesh, "CG", 1)
+        H = adap.constructHessian(mesh, W, phi, op=op)
+        for k in range(mesh.topology.num_vertices()):
+            H.dat.data[k] *= errEst.dat.data[k]  # Scale by error estimate
+        M = adap.computeSteadyMetric(mesh, W, H, phi, nVerT=nVerT, op=op)
+        if op.gradate:
+            adap.metricGradation(mesh, M)
+        if op.advect:
+            M = adap.advectMetric(M, w, dt, n=rm)
+        mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
+        phi = inte.interp(mesh, phi)[0]
+        phi.rename("Concentration")
+        V = FunctionSpace(mesh, "CG", 2)
+        phi_next = Function(V, name="Concentration next")
 
-    # TODO: adapt mesh, interpolate
-    # TODO: redefine problem
+        # Re-establish bilinear form and set boundary conditions
+        psi = TestFunction(V)
+        w = Function(VectorFunctionSpace(mesh, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
+        F = form.weakResidualAD(phi_next, phi, psi, w, Dt, nu=nu)
+        bc = DirichletBC(V, 0., "on_boundary")
 
     # Solve problem at current timestep
     solve(F == 0, phi_next, bc)
     phi.assign(phi_next)
 
     # Print to screen, save data and increment counters
-    print('t = %.2fs' % t)
+    print('t = %.3fs' % t)
     adaptiveFile.write(phi, time=t)
     t += dt
     cnt += 1
-cnt -= 1
 adaptTimer = clock() - adaptTimer
 print('Primal run complete.')
 
 # Print to screen timing analyses
 print("""******** TIMINGS ********
-forward run   %5.2fs
-adjoint run   %5.2fs
-adaptive run  %5.2fs""" % (primalTimer, dualTimer, adaptTimer))
+Forward run   %5.3fs
+Adjoint run   %5.3fs
+Adaptive run  %5.3fs""" % (primalTimer, dualTimer, adaptTimer))
