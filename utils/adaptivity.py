@@ -325,9 +325,9 @@ def pointwiseMax(f, g):
     try:
         assert(len(fdat) == len(gdat))
     except:
-        raise ValueError("Function space mismatch: ", f.function_space().ufl_element().family(),
-                         f.function_space().ufl_element().degree(), " vs. ", g.function_space().ufl_element().family(),
-                         g.function_space().ufl_element().degree())
+        fu = f.function_space().ufl_element()
+        gu = g.function_space().ufl_element()
+        raise ValueError("Function space mismatch: ", fu.family(), fu.degree(), " vs. ", gu.family(), gu.degree())
     for i in range(len(fdat)):
         if np.abs(gdat[i]) > np.abs(fdat[i]):
             f.dat.data[i] = gdat[i]
@@ -356,14 +356,11 @@ def advectMetric(M_, w, dt, n=1, outfile=None, bc=None, nu=0., timestepper='Impl
     # Get FunctionSpace data and select timestepping scheme
     V = M_.function_space()
     mesh = V.mesh()
-    sigma = TestFunction(V)
+    Mt = TestFunction(V)
     M = Function(V)
-    Mm = form.timestepScheme(M, M_, timestepper)
 
     # Set up Tensor advection FEM problem
-    F = (inner(M - M_, sigma) + dt * inner(dot(w, nabla_grad(Mm)), sigma)) * dx
-    if nu != 0.:
-        F += nu * inner(grad(M), grad(sigma)) * dx       # TODO: what does this mean?
+    F = form.weakMetricAdvection(M, M_, Mt, w, nu, timestepper=timestepper)
     prob = NonlinearVariationalProblem(F, M)
     solv = NonlinearVariationalSolver(prob, bc=bc)
 
@@ -375,8 +372,6 @@ def advectMetric(M_, w, dt, n=1, outfile=None, bc=None, nu=0., timestepper='Impl
             Mfile.write(M_, time=i)
 
     return M
-
-    # TODO: include metric advection form in forms.py
 
 
 if __name__ == '__main__':

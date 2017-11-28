@@ -41,16 +41,19 @@ T = op.T
 w = Function(VectorFunctionSpace(mesh, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
 nu = 1e-3 if diffusion else 0.
 
-# Specify and apply initial condition
+# Apply initial condition and define Functions
 ic = project(exp(- (pow(x - 0.5, 2) + pow(y - 0.5, 2)) / 0.04), V)
-fc = project(exp(- (pow(x - 0.5 - T, 2) + pow(y - 0.5, 2)) / 0.04), V)  # Final value in pure advection case
-File(dirName + "finalValueAD.pvd").write(fc)
 phi = ic.copy(deepcopy=True)
 phi.rename('Concentration')
 phi_next = Function(V, name='Concentration next')
 psi = TestFunction(V)
 dual = Function(V, name='Adjoint')
 rho = Function(V, name='Residual')
+
+# Analytic solution in pure advection case
+if not diffusion:
+    fc = project(exp(- (pow(x - 0.5 - T, 2) + pow(y - 0.5, 2)) / 0.04), V)  # Final value in pure advection case
+    File(dirName + "finalValueAD.pvd").write(fc)
 
 # Get adaptivity parameters
 hmin = op.hmin
@@ -59,7 +62,7 @@ rm = op.rm
 nEle, nVer = msh.meshStats(mesh)
 N = [nEle, nEle]            # Min/max #Elements
 Sn = nEle
-nVerT = nVer * op.vscale
+nVerT = nVer * op.vscale    # Target #Vertices
 
 # Establish bilinear form and set boundary conditions
 F = form.weakResidualAD(phi_next, phi, psi, w, Dt, nu=nu)
@@ -115,8 +118,10 @@ if useAdjoint:
     dualTimer = clock()
     for (variable, solution) in compute_adjoint(J):
         try:
-            dual.dat.data[:] = variable.dat.data
             if save:
+                # Load adjoint data. NOTE the interpolation operator is overloaded
+                dual.dat.data[:] = variable.dat.data
+
                 # Load residual data from HDF5
                 with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_READ) as loadResidual:
                     rho = Function(V, name='Residual')
@@ -215,6 +220,6 @@ finalAdapt = phi.copy(deepcopy=True)
 if useAdjoint:
     print("TIMINGS:         Forward run   %5.3fs, Adjoint run   %5.3fs, Adaptive run   %5.3fs" %
           (primalTimer, dualTimer, adaptTimer))
-    if nu == 0.:
+    if not diffusion:
         print("RELATIVE ERRORS: Fixed mesh run   %5.3f, Adaptive run   %5.3f"
               % (errornorm(finalFixed, fc) / norm(fc), errornorm(finalAdapt, inte.interp(mesh, fc)[0]) / norm(fc)))

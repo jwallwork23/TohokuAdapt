@@ -50,7 +50,7 @@ def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=416
     ku, ke = k.split()
     ke.interpolate(Expression(indicator))
 
-    # TODO: `smoothen` in time
+    # TODO: `smoothen` in time (?)
     # # Modify forcing term to 'smoothen' in time
     # coeff = Constant(1.)
     # if t.dat.data < Tstart + 1.5 * timestep:
@@ -63,7 +63,6 @@ def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=416
         File("plots/adjointBased/kernel.pvd").write(ke)
 
     return Functional(inner(q, k) * dx * dt[Tstart:Tend])
-    # return Functional(inner(q, k) * dx * dt)
 
 
 def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson', rotational=False):
@@ -80,7 +79,6 @@ def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson', rotationa
     :param rotational: toggle rotational / non-rotational equations.
     :return: strong residual for shallow water equations at current timestep.
     """
-
     (u, eta) = (as_vector((q[0], q[1])), q[2])
     (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
     um = timestepScheme(u, u_, timestepper)
@@ -173,4 +171,19 @@ def weakResidualAD(c, c_, ct, u, Dt, nu=1e-3, timestepper='CrankNicolson'):
     cm = timestepScheme(c, c_, timestepper)
     return ((c - c_) * ct - Dt * inner(cm * u, grad(ct)) + Dt * Constant(nu) * inner(grad(cm), grad(ct))) * dx
 
-# TODO: include forms for metric advection
+
+def weakMetricAdvection(M, M_, Mt, w, nu=0., timestepper='ImplicitEuler'):
+    """
+    :param M: metric at current timestep.
+    :param M_: metric at previous timestep.
+    :param Mt: test function.
+    :param w: wind vector.
+    :param nu: diffusivity.
+    :param timestepper: time integration scheme used.
+    :return: weak residual for metric advection.
+    """
+    Mm = timestepScheme(M, M_, timestepper)
+    F = (inner(M - M_, Mt) + dt * inner(dot(w, nabla_grad(Mm)), Mt)) * dx
+    if nu != 0.:
+        F += nu * inner(grad(M), grad(Mt)) * dx  # TODO: what does this mean?
+    return F

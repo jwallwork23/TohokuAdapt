@@ -1,12 +1,12 @@
 from firedrake import *
-from thetis import *
-from thetis.field_defs import field_metadata
+from firedrake_adjoint import *
 
 import numpy as np
 from time import clock
 
 import utils.adaptivity as adap
 import utils.error as err
+import utils.forms as form
 import utils.interpolation as inte
 import utils.mesh as msh
 import utils.options as opt
@@ -14,270 +14,163 @@ import utils.storage as stor
 
 print('\n*********************** SHALLOW WATER TEST PROBLEM ************************\n')
 print('Mesh adaptive solver initially defined on a square mesh')
-basic = bool(input('Hit anything but enter to use basic error estimators, as in DL16: '))
+useAdjoint = bool(input("Hit anything except enter to use adjoint equations to guide adaptive process. "))
 
-# Define inital mesh and function space
-n = 64
+# Establish filenames
+dirName = "plots/testSuite/"
+forwardFile = File(dirName + "forwardSW.pvd")
+residualFile = File(dirName + "residualSW.pvd")
+adjointFile = File(dirName + "adjointSW.pvd")
+errorFile = File(dirName + "errorIndicatorSW.pvd")
+adaptiveFile = File(dirName + "goalBasedSW.pvd") if useAdjoint else File(dirName + "simpleAdaptSW.pvd")
+
+# Define inital mesh and FunctionSpace
+n = 32
 lx = 2 * np.pi
 mesh = SquareMesh(n, n, lx, lx)
 x, y = SpatialCoordinate(mesh)
-W = VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "CG", 2)
-b = Function(W.sub(1), name="Bathymetry").assign(0.1)
-eta0 = Function(W.sub(1), name="Initial surface").interpolate(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))))
-nEle, nVer = msh.meshStats(mesh)
-N = [nEle, nEle]    # Min/max #Elements
-print('... with #Elements : %d. Initial #Vertices : %d. \n' % (nEle, nVer))
+V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
+P0 = FunctionSpace(mesh, "DG", 0)
+v = TestFunction(P0)
 
-# Set parameter values
-op = opt.Options(dt=0.05, hmin=5e-2, hmax=1., T=2, ndump=1, Ts=0.5)
-nVerT = op.vscale * nVer    # Target #Vertices
+# Specify physical and solver parameters
+op = opt.Options(dt=0.04, hmin=5e-2, hmax=1., T=2., rm=5, Ts=0.5, gradate=False, advect=True,
+                 vscale=0.4 if useAdjoint else 0.85)
+dt = op.dt
+Dt = Constant(dt)
 T = op.T
 Ts = op.Ts
-g = op.g
-dt = op.dt
+b = Constant(0.1)
 op.checkCFL(b)
-ndump = op.ndump
 
-# Save initial function space
-mesh0 = mesh
-W0 = VectorFunctionSpace(mesh0, op.space1, op.degree1) * FunctionSpace(mesh0, op.space2, op.degree2)
+# Apply initial condition and define Functions
+ic = project(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))), V)
+q_ = Function(V)
+u_, eta_ = q_.split()
+u_.interpolate(Expression([0, 0]))
+eta_.assign(ic)
+q = Function(V)
+u, eta = q.split()
+u.rename("Velocity")
+eta.rename("Elevation")
 
-# Run fixedMesh forward solver
-print('******************** FIXED MESH SHALLOW WATER TEST ********************\n')
-tic1 = clock()
-dirName = "plots/tests/fixedMesh"
-solver_obj = solver2d.FlowSolver2d(mesh, b)
-options = solver_obj.options
-options.element_family = op.family
-options.use_nonlinear_equations = False
-options.use_grad_depth_viscosity_term = False
-options.simulation_export_time = dt * ndump
-options.simulation_end_time = T
-options.timestepper_type = op.timestepper
-options.timestep = dt
-options.output_directory = dirName
-options.export_diagnostics = True
-options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-solver_obj.assign_initial_conditions(elev=eta0)
-solver_obj.iterate()
-fixedMeshTime = clock() - tic1
-print('Elapsed time for fixed mesh solver: %1.1fs (%1.2f mins) \n' % (fixedMeshTime, fixedMeshTime / 60))
+# Define Functions to hold residual and adjoint solution data
+rho = Function(V)
+rho_u, rho_e = rho.split()
+rho_u.rename("Velocity residual")
+rho_e.rename("Elevation residual")
+dual = Function(V)
+dual_u, dual_e = dual.split()
+dual_u.rename("Adjoint velocity")
+dual_e.rename("Adjoint elevation")
 
-print('************ "SIMPLE" MESH ADAPTIVE SHALLOW WATER TEST ****************\n')
-op.rm = rm = 5
-dirName = 'plots/tests/simpleAdapt/'
+# Get adaptivity parameters
+hmin = op.hmin
+hmax = op.hmax
+rm = op.rm
+nEle, nVer = msh.meshStats(mesh)
+N = [nEle, nEle]            # Min/max #Elements
+Sn = nEle
+nVerT = nVer * op.vscale    # Target #Vertices
+
+# Define variational problem
+qt = TestFunction(Q)
+forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
+forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
+
+# Initialise counters
 t = 0.
-mn = Sn = 0
-tic1 = clock()
+cnt = 0
 
-while mn < np.ceil(T / (dt * rm)):
-    tic2 = clock()
-    index = mn * int(rm / ndump)
-    elev_2d, uv_2d = op.loadFromDisk(mesh, index, dirName, elev0=eta0)      # Enforce ICs / load variables from disk
+if useAdjoint:
+    print('Starting fixed mesh primal run (forwards in time)')
+    finished = False
+    primalTimer = clock()
+    while t < T:
+        # Solve problem at current timestep
+        forwardSolver.solve()
+        q_.assign(q)
 
-    # Compute Hessian and metric, adapt mesh and interpolate variables
-    V = TensorFunctionSpace(mesh, 'CG', 1)
-    H = adap.constructHessian(mesh, V, elev_2d, op=op)
-    M = adap.computeSteadyMetric(mesh, V, H, elev_2d, nVerT=nVerT, op=op)
-    mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-    elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
-    if op.outputHessian:
-        H.rename("Hessian")
-        hfile.write(H, time=float(mn))
-
-    # Establish Thetis flow solver object
-    solver_obj = solver2d.FlowSolver2d(mesh, b)
-    options = solver_obj.options
-    options.element_family = op.family
-    options.use_nonlinear_equations = False
-    options.use_grad_depth_viscosity_term = False
-    options.simulation_export_time = dt * ndump
-    options.simulation_end_time = (mn + 1) * dt * rm
-    options.timestepper_type = op.timestepper
-    options.timestep = dt
-    options.output_directory = dirName
-    options.export_diagnostics = True
-    options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-    field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
-    e = exporter.ExportManager(dirName + 'hdf5', ['elev_2d', 'uv_2d'], field_dict, field_metadata, export_type='hdf5')
-    solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
-
-    # Timestepper bookkeeping for export time step and next export
-    solver_obj.i_export = index
-    solver_obj.next_export_t = solver_obj.i_export * options.simulation_export_time
-    solver_obj.iteration = int(np.ceil(solver_obj.next_export_t / dt))
-    solver_obj.simulation_time = solver_obj.iteration * dt
-    solver_obj.next_export_t += options.simulation_export_time  # For next export
-    for e in solver_obj.exporters.values():
-        e.set_next_export_ix(solver_obj.i_export)
-
-    # Time integrate and print
-    solver_obj.iterate()
-    nEle = msh.meshStats(mesh)[0]
-    N = [min(nEle, N[0]), max(nEle, N[1])]
-    Sn += nEle
-    mn += 1
-    op.printToScreen(mn, clock() - tic1, clock() - tic2, nEle, Sn, N)
-simpleAdaptTime = clock() - tic1
-print('Elapsed time for adaptive solver: %1.1fs (%1.2f mins)' % (simpleAdaptTime, (simpleAdaptTime) / 60))
-
-print('********** ADJOINT BASED MESH ADAPTIVE SHALLOW WATER TEST *************\n')
-op.rm = rm = 10
-t = T
-mn = int(T / dt)
-tic1 = clock()
-
-# Solver parameters
-params = {'mat_type': 'matfree',
-          'snes_type': 'ksponly',
-          'pc_type': 'python',
-          'pc_python_type': 'firedrake.AssembledPC',
-          'assembled_pc_type': 'lu',
-          'snes_lag_preconditioner': -1,
-          'snes_lag_preconditioner_persists': True}
-
-# Establish adjoint variables and apply initial conditions
-lam_ = Function(W0)
-lu_, le_ = lam_.split()
-lu_.interpolate(Expression([0, 0]))
-le_.interpolate(Expression(0))
-lam = Function(W0).assign(lam_)
-lu, le = lam.split()
-lu.rename("Adjoint velocity")
-le.rename("Adjoint free surface")
-adjointFile = File("plots/tests/adjointBased/adjoint.pvd")
-b = Function(W0.sub(1), name="Bathymetry").assign(0.1)
-coeff = Constant(0.)
-switch = True
-dirName = 'plots/tests/adjointBased'
-
-# Establish (smoothened) indicator function for adjoint equations
-x1 = 0.
-x2 = 0.4
-y1 = np.pi - 0.4
-y2 = np.pi + 0.4
-fexpr = "(x[0] >= %.2f) & (x[0] < %.2f) & (x[1] > %.2f) & (x[1] < %.2f) ? 1e-3 : 0." % (x1, x2, y1, y2)
-f = Function(W0.sub(1), name="Forcing term").interpolate(Expression(fexpr))
-
-# Set up the variational problem, using Crank Nicolson timestepping
-w, xi = TestFunctions(W0)
-lu, le = split(lam)
-lu_, le_ = split(lam_)
-L = ((le - le_) * xi + inner(lu - lu_, w)
-     - Constant(dt) * g * inner(0.5 * (lu + lu_), grad(xi)) - coeff * f * xi
-     + Constant(dt) * (b * inner(grad(0.5 * (le + le_)), w) + 0.5 * (le + le_) * inner(grad(b), w))) * dx
-adjointProblem = NonlinearVariationalProblem(L, lam)
-adjointSolver = NonlinearVariationalSolver(adjointProblem, solver_parameters=params)
-lu, le = lam.split()
-lu_, le_ = lam_.split()
-
-print('\nStarting fixed resolution adjoint run...')
-while mn > 0:
-    print("t = %5.2fs" % t)
-
-    # Modify forcing term
-    if (t < Ts + 1.5 * dt) & switch:
-        coeff.assign(0.5)
-    elif (t < Ts + 0.5 * dt) & switch:
-        switch = False
-        coeff.assign(0.)
-
-    # Solve the problem, update variables and dump to vtu and HDF5
-    if mn != int(T / dt):
-        adjointSolver.solve()
-        lam_.assign(lam)
-    adjointFile.write(lu, le, time=t)
-    stor.saveToDisk(lu, le, dirName, mn)
-    t -= dt
-    mn -= 1
-assert(mn == 0)
-adjointRunTime = clock() - tic1
-print('Elapsed time for fixed mesh adjoint solver: %1.1fs (%1.2f mins) \n' % (adjointRunTime, adjointRunTime / 60))
-
-# Set up forward problem
-iStart = int(Ts / (dt * rm))         # Index corresponding to tStart
-iEnd = int(np.ceil(T / (dt * rm)))      # Index corresponding to tEnd
-
-# Approximate isotropic metric at boundaries of initial mesh using circumradius
-h = Function(W0.sub(1)).interpolate(CellSize(mesh0))
-
-print('\nStarting mesh adaptive forward run...')
-while mn < iEnd:
-    tic2 = clock()
-    index = mn * int(rm / ndump)
-    i0 = max(mn, iStart)
-    elev_2d, uv_2d = op.loadFromDisk(mesh, index, dirName, elev0=eta0)  # Enforce ICs / load variables from disk
-    Wcomp = FunctionSpace(mesh, "CG", 1)                                # Computational space to match metric P1 space
-    if not basic:
-        hk = Function(Wcomp).interpolate(CellSize(mesh))                # Current sizes of mesh elements
-    if mn != 0:
-        print('#### Interpolating adjoint data...')
-        elev_2d_, uv_2d_ = op.loadFromDisk(mesh, index - 1, dirName, elev0=eta0)    # Load saved forward data
-    for j in range(i0, iEnd):
-        le, lu = op.loadFromDisk(mesh0, j, dirName, adjoint=True)                   # Load saved adjoint data
-        if mn != 0:
-            print('    #### Step %d / %d' % (j + 1 - i0, iEnd - i0))
-            lu, le = inte.interp(mesh, lu, le)                                      # Interpolate onto current mesh
-        rho = err.basicErrorEstimator(uv_2d, lu, elev_2d, le) if (basic or mn == 0) else \
-            err.explicitErrorEstimator(uv_2d_, uv_2d, elev_2d_, elev_2d, lu, le, b, dt, hk)     # Estimate error
-        if j == i0:
-            errEst = Function(Wcomp).assign(rho)
+        # Tell dolfin about timesteps, so it can compute functionals including measures of time other than dt[FINISH_TIME]
+        if t >= T - dt:
+            finished = True
+        if t == 0.:
+            adj_start_timestep()
         else:
-            errEst = adap.pointwiseMax(errEst, rho)     # Extract (pointwise) maximal values
-    errEst = assemble(sqrt(errEst * errEst))            # Take modulus (error estimator must be strictly positive)
-    errEst.rename("Local error indicators")             # TODO: how to use the ufl function `abs`?
+            adj_inc_timestep(time=t, finished=finished)
 
-    V = TensorFunctionSpace(mesh, "CG", 1)
-    M_ = adap.isotropicMetric(V, inte.interp(mesh, h)[0], bdy=True, op=op)  # Initial boundary metric
-    H = adap.constructHessian(mesh, V, elev_2d, op=op)                      # Construct Hessian
-    for k in range(mesh.topology.num_vertices()):
-        H.dat.data[k] *= errEst.dat.data[k]                                 # Scale by error estimate
-    M = adap.computeSteadyMetric(mesh, V, H, elev_2d, nVerT=nVerT, op=op)   # Generate metric
-    M = adap.metricIntersection(mesh, V, M, M_, bdy=True)                   # Intersect with initial bdy metric
-    adap.metricGradation(mesh, M, op.beta, iso=op.iso)                      # Gradate to 'smoothen' metric
-    mesh = AnisotropicAdaptation(mesh, M).adapted_mesh                      # Adapt mesh
-    elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
+        # Approximate residual of forward equation and save to HDF5
+        Au, Ae = form.strongResidualSW(q, q_, b, Dt)
+        rho_u.interpolate(Au)
+        rho_e.interpolate(Ae)
+        with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_CREATE) as chk:
+            chk.store(rho_u)
+            chk.store(rho_e)
+            chk.close()
 
-    # Establish Thetis flow solver object
-    solver_obj = solver2d.FlowSolver2d(mesh, b)
-    options = solver_obj.options
-    options.element_family = op.family
-    options.use_nonlinear_equations = False
-    options.use_grad_depth_viscosity_term = False
-    options.simulation_export_time = dt * ndump
-    options.simulation_end_time = (mn + 1) * dt * rm
-    options.timestepper_type = op.timestepper
-    options.timestep = dt
-    options.output_directory = dirName
-    options.export_diagnostics = True
-    options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-    field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
-    e = exporter.ExportManager(dirName + 'hdf5', ['elev_2d', 'uv_2d'], field_dict, field_metadata, export_type='hdf5')
-    solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
+        # Print to screen, save data and increment counters
+        print('t = %.3fs' % t)
+        forwardFile.write(phi, time=t)
+        residualFile.write(rho, time=t)
+        t += dt
+        cnt += 1
+    cnt -= 1
+    primalTimer = clock() - primalTimer
+    print('Primal run complete. Run time: %.3fs' % primalTimer)
 
-    # Timestepper bookkeeping for export time step
-    solver_obj.i_export = index
-    solver_obj.next_export_t = solver_obj.i_export * options.simulation_export_time
-    solver_obj.iteration = int(np.ceil(solver_obj.next_export_t / dt))
-    solver_obj.simulation_time = solver_obj.iteration * dt
-    solver_obj.next_export_t += options.simulation_export_time  # For next export
-    for e in solver_obj.exporters.values():
-        e.set_next_export_ix(solver_obj.i_export)
+    # Set up adjoint problem
+    J = form.objectiveFunctionalSW(q, Tstart=Ts, x1=0., x2=np.pi / 2, y1=0.5 * np.pi, y2=1.5 * np.pi, smooth=False)
+    parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
+    t = T
+    save = True
 
-    # Time integrate and print
-    solver_obj.iterate()
-    nEle = msh.meshStats(mesh)[0]
-    N = [min(nEle, N[0]), max(nEle, N[1])]
-    Sn += nEle
-    mn += 1
-    op.printToScreen(mn, clock() - tic1, clock() - tic2, nEle, Sn, N)
-adjointBasedRunTime = clock() - tic1
-print('Elapsed time for adjoint based solver: %1.1fs (%1.2f mins)' % (adjointBasedRunTime, adjointBasedRunTime / 60))
+    # Time integrate (backwards)
+    print('Starting fixed mesh dual run (backwards in time)')
+    dualTimer = clock()
+    for (variable, solution) in compute_adjoint(J):
+        try:
+            if save:
+                # Load adjoint data. NOTE the interpolation operator is overloaded
+                dual_u.dat.data[:] = variable.dat.data[0]
+                dual_e.dat.data[:] = variable.dat.data[1]
 
-# TODO: use firedrake-adjoint or create a custom modified solver_obj for adjoint LSWEs in Thetis
-# TODO: use explicit error estimators
+                # Load residual data from HDF5
+                with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_READ) as loadResidual:
+                    rho = Function(V, name='Residual')
+                    loadResidual.load(rho_u)
+                    loadResidual.load(rho_e)
+                    loadResidual.close()
 
-print("""\n************************* Times to solution ****************************
-Fixed mesh solver           %5.2fs  Simple adaptive solver      %5.2fs
-Fixed mesh adjoint solver   %5.2fs  Adjoint based solver        %5.2fs"""
-      % (fixedMeshTime, simpleAdaptTime, adjointRunTime, adjointBasedRunTime))
+                # Estimate error using forward residual
+                epsilon = assemble(v * inner(rho, dual) * dx)
+                epsilon.dat.data[:] = np.abs(epsilon.dat.data) / assemble(epsilon * dx)
+                epsilon.rename("Error indicator")
+
+                # Save error indicator data to HDF5
+                if not cnt % rm:
+                    with DumbCheckpoint(dirName + 'hdf5/error_' + stor.indexString(cnt), mode=FILE_CREATE) as saveError:
+                        saveError.store(epsilon)
+                        saveError.close()
+
+                # Print to screen, save data and increment counters
+                print('t = %.3fs' % t)
+                adjointFile.write(dual_u, dual_e, time=t)
+                errorFile.write(epsilon, time=t)
+                t -= dt
+                cnt -= 1
+                save = False
+            else:
+                save = True
+        except:
+            continue
+    dualTimer = clock() - dualTimer
+    print('Adjoint run complete. Run time: %.3fs' % dualTimer)
+    t += dt
+    cnt += 1
+
+    # Reset initial conditions for primal problem and recreate error indicator placeholder
+    u_.interpolate(Expression([0, 0]))
+    eta_.assign(ic)
+    epsilon = Function(P0, name="Error indicator")
+
+# TODO: adaptive run
