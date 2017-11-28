@@ -11,6 +11,12 @@ import utils.mesh as msh
 import utils.options as opt
 import utils.storage as stor
 
+print('\n******************************** ADVECTION-DIFFUSION TEST PROBLEM ********************************\n')
+print('Mesh adaptive solver initially defined on a rectangular mesh')
+useAdjoint = bool(input("Hit anything except enter to use adjoint equations to guide adaptive process. "))
+
+# TODO: merge with advectionDiffusionTest, using adjoint option
+
 # Establish filenames
 dirName = "plots/advectionDiffusion/"
 forwardFile = File(dirName + "forwardAD.pvd")
@@ -37,7 +43,8 @@ dual = Function(V, name='Adjoint')
 rho = Function(V, name='Residual')
 
 # Specify physical and solver parameters
-op = opt.Options(dt=0.04, T=2.4, hmin=5e-2, hmax=1., rm=5, vscale=0.4, gradate=False, advect=True)
+op = opt.Options(dt=0.04, T=2.4, hmin=5e-2, hmax=1., rm=5, vscale=0.4 if useAdjoint else 0.85, gradate=False,
+                 advect=True)
 dt = op.dt
 Dt = Constant(dt)
 w = Function(VectorFunctionSpace(mesh, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
@@ -162,7 +169,7 @@ while t <= T:
         if op.gradate:
             adap.metricGradation(mesh, M)
         if op.advect:
-            M = adap.advectMetric(M, w, dt, n=rm)
+            M = adap.advectMetric(M, w, dt, n=rm, nu=nu)
         mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
         phi = inte.interp(mesh, phi)[0]
         phi.rename("Concentration")

@@ -334,7 +334,7 @@ def pointwiseMax(f, g):
     return f
 
 
-def advectMetric(M_, w, dt, n=1, outfile=None, bc=None, diffusion=False, timestepper='ImplicitEuler'):
+def advectMetric(M_, w, dt, n=1, outfile=None, bc=None, nu=0., timestepper='ImplicitEuler'):
     """
     'Advect' metric with finest resolution in direction of fluid velocity/wind field.
     
@@ -343,7 +343,7 @@ def advectMetric(M_, w, dt, n=1, outfile=None, bc=None, diffusion=False, timeste
     :param dt: timestep.
     :param n: number of timesteps to advect over.
     :param outfile: toggle metric output and location.
-    :param diffusion: toggle inclusion of metric diffusion.
+    :param nu: toggle inclusion of metric diffusion by increasing diffusivity parameter.
     :param timestepper: time integration scheme used.
     :param bc: boundary condition on Tensor advection PDE problem.
     """
@@ -367,8 +367,8 @@ def advectMetric(M_, w, dt, n=1, outfile=None, bc=None, diffusion=False, timeste
 
     # Set up Tensor advection FEM problem
     F = (inner(M - M_, sigma) + dt * inner(dot(w, nabla_grad(Mm)), sigma)) * dx
-    if diffusion:
-        F -= inner(grad(M), grad(sigma)) * dx       # TODO: what does this mean?
+    if nu != 0.:
+        F += nu * inner(grad(M), grad(sigma)) * dx       # TODO: what does this mean?
     prob = NonlinearVariationalProblem(F, M)
     solv = NonlinearVariationalSolver(prob, bc=bc)
 
@@ -391,3 +391,5 @@ if __name__ == '__main__':
     M = Function(V, name="Metric").interpolate(Expression([['2+sin(pi * x[0] / 2)', 0], [0, '1']]))
     w = Function(VectorFunctionSpace(mesh, "CG", 1)).interpolate(Expression([1, 0]))
     advectMetric(M, w, 0.05, 20, outfile='plots/tests/utils/meshAdvect.pvd')
+
+    # TODO: test other functionalities
