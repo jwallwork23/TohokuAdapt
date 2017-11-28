@@ -34,7 +34,7 @@ b = Constant(0.1)
 op.checkCFL(b)
 
 # Define inital mesh and FunctionSpace
-n = 64
+n = 32
 lx = 2 * np.pi
 mesh = SquareMesh(n, n, lx, lx)
 x, y = SpatialCoordinate(mesh)
@@ -98,19 +98,21 @@ if useAdjoint:
         else:
             adj_inc_timestep(time=t, finished=finished)
 
-        # Approximate residual of forward equation and save to HDF5
-        Au, Ae = form.strongResidualSW(q, q_, b, Dt)
-        rho_u.interpolate(Au)
-        rho_e.interpolate(Ae)
-        with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_CREATE) as chk:
-            chk.store(rho_u)
-            chk.store(rho_e)
-            chk.close()
+        if not cnt % rm:
+            # Approximate residual of forward equation and save to HDF5
+            Au, Ae = form.strongResidualSW(q, q_, b, Dt)
+            rho_u.interpolate(Au)
+            rho_e.interpolate(Ae)
+            with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_CREATE) as chk:
+                chk.store(rho_u)
+                chk.store(rho_e)
+                chk.close()
 
-        # Print to screen, save data and increment counters
-        print('t = %.3fs' % t)
+            # Print to screen, save data and increment counters
+            residualFile.write(rho_u, rho_e, time=t)
         forwardFile.write(u, eta, time=t)
-        residualFile.write(rho_u, rho_e, time=t)
+        print('t = %.3fs' % t)
+
         t += dt
         cnt += 1
     cnt -= 1
@@ -133,27 +135,30 @@ if useAdjoint:
                 dual_u.dat.data[:] = variable.dat.data[0]
                 dual_e.dat.data[:] = variable.dat.data[1]
 
-                # Load residual data from HDF5
-                with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_READ) as loadResidual:
-                    loadResidual.load(rho_u)
-                    loadResidual.load(rho_e)
-                    loadResidual.close()
-
-                # Estimate error using forward residual
-                epsilon = assemble(v * inner(rho, dual) * dx)
-                epsilon.dat.data[:] = np.abs(epsilon.dat.data) # / assemble(epsilon * dx)
-                epsilon.rename("Error indicator")
-
-                # Save error indicator data to HDF5
                 if not cnt % rm:
-                    with DumbCheckpoint(dirName + 'hdf5/error_' + stor.indexString(cnt), mode=FILE_CREATE) as saveError:
+                    indexStr = stor.indexString(cnt)
+
+                    # Load residual data from HDF5
+                    with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_READ) as loadResidual:
+                        loadResidual.load(rho_u)
+                        loadResidual.load(rho_e)
+                        loadResidual.close()
+
+                    # Estimate error using forward residual
+                    epsilon = assemble(v * inner(rho, dual) * dx)
+                    epsilon.dat.data[:] = np.abs(epsilon.dat.data) # / assemble(epsilon * dx)
+                    epsilon.rename("Error indicator")
+
+                    # Save error indicator data to HDF5
+                    with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_CREATE) as saveError:
                         saveError.store(epsilon)
                         saveError.close()
 
-                # Print to screen, save data and increment counters
-                print('t = %.3fs' % t)
+                    # Print to screen, save data and increment counters
+                    errorFile.write(epsilon, time=t)
                 adjointFile.write(dual_u, dual_e, time=t)
-                errorFile.write(epsilon, time=t)
+                print('t = %.3fs' % t)
+
                 t -= dt
                 cnt -= 1
                 save = False
