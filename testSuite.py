@@ -24,17 +24,8 @@ adjointFile = File(dirName + "adjointSW.pvd")
 errorFile = File(dirName + "errorIndicatorSW.pvd")
 adaptiveFile = File(dirName + "goalBasedSW.pvd") if useAdjoint else File(dirName + "simpleAdaptSW.pvd")
 
-# Define inital mesh and FunctionSpace
-n = 32
-lx = 2 * np.pi
-mesh = SquareMesh(n, n, lx, lx)
-x, y = SpatialCoordinate(mesh)
-V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
-P0 = FunctionSpace(mesh, "DG", 0)
-v = TestFunction(P0)
-
 # Specify physical and solver parameters
-op = opt.Options(dt=0.04, hmin=5e-2, hmax=1., T=2., rm=5, Ts=0.5, gradate=False, advect=True,
+op = opt.Options(dt=0.05, hmin=5e-2, hmax=1., T=2.5, rm=5, Ts=0.5, gradate=False, advect=True,
                  vscale=0.4 if useAdjoint else 0.85)
 dt = op.dt
 Dt = Constant(dt)
@@ -43,8 +34,17 @@ Ts = op.Ts
 b = Constant(0.1)
 op.checkCFL(b)
 
+# Define inital mesh and FunctionSpace
+n = 16
+lx = 2 * np.pi
+mesh = SquareMesh(n, n, lx, lx)
+x, y = SpatialCoordinate(mesh)
+V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
+P0 = FunctionSpace(mesh, "DG", 0)
+v = TestFunction(P0)
+
 # Apply initial condition and define Functions
-ic = project(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))), V)
+ic = project(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))), V.sub(1))
 q_ = Function(V)
 u_, eta_ = q_.split()
 u_.interpolate(Expression([0, 0]))
@@ -74,7 +74,7 @@ Sn = nEle
 nVerT = nVer * op.vscale    # Target #Vertices
 
 # Define variational problem
-qt = TestFunction(Q)
+qt = TestFunction(V)
 forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
 forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
@@ -110,8 +110,8 @@ if useAdjoint:
 
         # Print to screen, save data and increment counters
         print('t = %.3fs' % t)
-        forwardFile.write(phi, time=t)
-        residualFile.write(rho, time=t)
+        forwardFile.write(u, eta, time=t)
+        residualFile.write(rho_u, rho_e, time=t)
         t += dt
         cnt += 1
     cnt -= 1
@@ -136,14 +136,13 @@ if useAdjoint:
 
                 # Load residual data from HDF5
                 with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_READ) as loadResidual:
-                    rho = Function(V, name='Residual')
                     loadResidual.load(rho_u)
                     loadResidual.load(rho_e)
                     loadResidual.close()
 
                 # Estimate error using forward residual
                 epsilon = assemble(v * inner(rho, dual) * dx)
-                epsilon.dat.data[:] = np.abs(epsilon.dat.data) / assemble(epsilon * dx)
+                epsilon.dat.data[:] = np.abs(epsilon.dat.data) # / assemble(epsilon * dx)
                 epsilon.rename("Error indicator")
 
                 # Save error indicator data to HDF5
