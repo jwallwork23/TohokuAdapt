@@ -8,6 +8,8 @@ import utils.options as opt
 import utils.storage as stor
 
 
+# TODO: integrate into testSuite
+
 dt_meas = dt
 dirName = "plots/tests/discreteAdjoint/"
 

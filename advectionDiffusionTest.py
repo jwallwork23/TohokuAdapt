@@ -14,6 +14,7 @@ import utils.storage as stor
 print('\n******************************** ADVECTION-DIFFUSION TEST PROBLEM ********************************\n')
 print('Mesh adaptive solver initially defined on a rectangular mesh')
 useAdjoint = bool(input("Hit anything except enter to use adjoint equations to guide adaptive process. "))
+diffusion = bool(input("Hit anything except enter to consider diffusion. "))
 
 # Establish filenames
 dirName = "plots/advectionDiffusion/"
@@ -31,22 +32,25 @@ V = FunctionSpace(mesh, "CG", 2)
 P0 = FunctionSpace(mesh, "DG", 0)
 v = TestFunction(P0)
 
+# Specify physical and solver parameters
+op = opt.Options(dt=0.04, T=2.4, hmin=5e-2, hmax=1., rm=5, gradate=False, advect=True,
+                 vscale=0.4 if useAdjoint else 0.85)
+dt = op.dt
+Dt = Constant(dt)
+T = op.T
+w = Function(VectorFunctionSpace(mesh, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
+nu = 1e-3 if diffusion else 0.
+
 # Specify and apply initial condition
 ic = project(exp(- (pow(x - 0.5, 2) + pow(y - 0.5, 2)) / 0.04), V)
+fc = project(exp(- (pow(x - 0.5 - T, 2) + pow(y - 0.5, 2)) / 0.04), V)  # Final value in pure advection case
+File(dirName + "finalValueAD.pvd").write(fc)
 phi = ic.copy(deepcopy=True)
 phi.rename('Concentration')
 phi_next = Function(V, name='Concentration next')
 psi = TestFunction(V)
 dual = Function(V, name='Adjoint')
 rho = Function(V, name='Residual')
-
-# Specify physical and solver parameters
-op = opt.Options(dt=0.04, T=2.4, hmin=5e-2, hmax=1., rm=5, vscale=0.4 if useAdjoint else 0.85, gradate=False,
-                 advect=True)
-dt = op.dt
-Dt = Constant(dt)
-w = Function(VectorFunctionSpace(mesh, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
-nu = 1e-3   # Diffusivity
 
 # Get adaptivity parameters
 hmin = op.hmin
@@ -63,14 +67,13 @@ bc = DirichletBC(V, 0., "on_boundary")
 
 # Initialise counters
 t = 0.
-T = op.T
 cnt = 0
 
 if useAdjoint:
     print('Starting fixed mesh primal run (forwards in time)')
     finished = False
     primalTimer = clock()
-    while t <= T:
+    while t < T:
         # Solve problem at current timestep
         solve(F == 0, phi_next, bc)
         phi.assign(phi_next)
@@ -98,6 +101,8 @@ if useAdjoint:
     cnt -= 1
     primalTimer = clock() - primalTimer
     print('Primal run complete. Run time: %.3fs' % primalTimer)
+    finalFixed = Function(V)
+    finalFixed.dat.data[:] = phi.dat.data   # NOTE assign, copy and interpolate functions are overloaded
 
     # Set up adjoint problem
     J = form.objectiveFunctionalAD(phi)
@@ -120,8 +125,7 @@ if useAdjoint:
 
                 # Estimate error using forward residual
                 epsilon = assemble(v * rho * dual * dx)
-                norm = assemble(epsilon * dx)
-                epsilon.dat.data[:] = np.abs(epsilon.dat.data) / norm
+                epsilon.dat.data[:] = np.abs(epsilon.dat.data) / assemble(epsilon * dx)
                 epsilon.rename("Error indicator")
 
                 # Save error indicator data to HDF5
@@ -204,11 +208,13 @@ while t <= T:
     t += dt
     cnt += 1
 adaptTimer = clock() - adaptTimer
-print('Adaptive primal run complete. Run time: %.3fs' % adaptTimer)
+print('Adaptive primal run complete. Run time: %.3fs \n' % adaptTimer)
+finalAdapt = phi.copy(deepcopy=True)
 
-# Print to screen timing analyses
+# Print to screen timing analyses (and error in pure advection case)
 if useAdjoint:
-    print("""******** TIMINGS ********
-Forward run   %5.3fs
-Adjoint run   %5.3fs
-Adaptive run  %5.3fs""" % (primalTimer, dualTimer, adaptTimer))
+    print("TIMINGS:         Forward run   %5.3fs, Adjoint run   %5.3fs, Adaptive run   %5.3fs" %
+          (primalTimer, dualTimer, adaptTimer))
+    if nu == 0.:
+        print("RELATIVE ERRORS: Fixed mesh run   %5.3f, Adaptive run   %5.3f"
+              % (errornorm(finalFixed, fc) / norm(fc), errornorm(finalAdapt, inte.interp(mesh, fc)[0]) / norm(fc)))
