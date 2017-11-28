@@ -347,6 +347,8 @@ def advectMetric(M_, w, dt, n=1, outfile=None, bc=None, nu=0., timestepper='Impl
     :param timestepper: time integration scheme used.
     :param bc: boundary condition on Tensor advection PDE problem.
     """
+    import utils.forms as form
+
     if outfile != None:
         Mfile = File(outfile)
         Mfile.write(M_, time=0)
@@ -356,14 +358,7 @@ def advectMetric(M_, w, dt, n=1, outfile=None, bc=None, nu=0., timestepper='Impl
     mesh = V.mesh()
     sigma = TestFunction(V)
     M = Function(V)
-    if timestepper == 'CrankNicolson':
-        Mm = 0.5 * (M + M_)
-    elif timestepper == 'ImplicitEuler':
-        Mm = M
-    elif timestepper == 'ExplicitEuler':
-        Mm = M_
-    else:
-        raise NotImplementedError
+    Mm = form.timestepScheme(M, M_, timestepper)
 
     # Set up Tensor advection FEM problem
     F = (inner(M - M_, sigma) + dt * inner(dot(w, nabla_grad(Mm)), sigma)) * dx

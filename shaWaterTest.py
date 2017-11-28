@@ -8,7 +8,7 @@ import utils.options as opt
 import utils.storage as stor
 
 
-# TODO: integrate into testSuite
+# TODO: integrate into testSuite, using format of advectionDiffusionTest
 
 dt_meas = dt
 dirName = "plots/tests/discreteAdjoint/"

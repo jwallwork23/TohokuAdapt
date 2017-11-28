@@ -2,6 +2,24 @@ from firedrake import *
 from firedrake_adjoint import dt, Functional
 
 
+def timestepScheme(u, u_, timestepper):
+    """
+    :param u: prognostic variable at current timestep. 
+    :param u_: prognostic variable at previous timestep. 
+    :param timestepper: scheme of choice.
+    :return: expression for prognostic variable to be used in scheme.
+    """
+    if timestepper == 'CrankNicolson':
+        um = 0.5 * (u + u_)
+    elif timestepper == 'ImplicitEuler':
+        um = u
+    elif timestepper == 'ExplicitEuler':
+        um = u_
+    else:
+        raise NotImplementedError("Timestepping scheme %s not yet considered." % timestepper)
+    return um
+
+
 def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=4160e3, y2=4360e3,
                           plot=False, smooth=True):
     """
@@ -65,18 +83,8 @@ def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson', rotationa
 
     (u, eta) = (as_vector((q[0], q[1])), q[2])
     (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
-
-    if timestepper == 'CrankNicolson':
-        um = 0.5 * (u + u_)
-        em = 0.5 * (eta + eta_)
-    elif timestepper == 'ImplicitEuler':
-        um = u
-        em = eta
-    elif timestepper == 'ExplicitEuler':
-        um = u_
-        em = eta_
-    else:
-        raise NotImplementedError
+    um = timestepScheme(u, u_, timestepper)
+    em = timestepScheme(eta, eta_, timestepper)
 
     Au = u - u_ + Dt * 9.81 * grad(em)
     Ae = eta - eta_ + Dt * div(b * um)
@@ -104,18 +112,8 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson', rotatio
     (u, eta) = (as_vector((q[0], q[1])), q[2])
     (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
     (w, xi) = (as_vector((qt[0], qt[1])), qt[2])
-
-    if timestepper == 'CrankNicolson':
-        um = 0.5 * (u + u_)
-        em = 0.5 * (eta + eta_)
-    elif timestepper == 'ImplicitEuler':
-        um = u
-        em = eta
-    elif timestepper == 'ExplicitEuler':
-        um = u_
-        em = eta_
-    else:
-        raise NotImplementedError
+    um = timestepScheme(u, u_, timestepper)
+    em = timestepScheme(eta, eta_, timestepper)
 
     F = (inner(u - u_, w) + inner(eta - eta_, xi) + Dt * (9.81 * inner(grad(em), w) - inner(b * um, grad(xi)))) * dx
     if nu != 0.:
@@ -157,14 +155,7 @@ def strongResidualAD(c, c_, u, Dt, nu=1e-3, timestepper='CrankNicolson'):
     :param timestepper: time integration scheme used.
     :return: weak residual for advection diffusion equation at current timestep.
     """
-    if timestepper == 'CrankNicolson':
-        cm = 0.5 * (c + c_)
-    elif timestepper == 'ImplicitEuler':
-        cm = c
-    elif timestepper == 'ExplicitEuler':
-        cm = c_
-    else:
-        raise NotImplementedError
+    cm = timestepScheme(c, c_, timestepper)
     return c - c_ + Dt * inner(u, grad(cm)) - Dt * Constant(nu) * div(grad(cm))
 
 
@@ -179,12 +170,7 @@ def weakResidualAD(c, c_, ct, u, Dt, nu=1e-3, timestepper='CrankNicolson'):
     :param timestepper: time integration scheme used.
     :return: weak residual for advection diffusion equation at current timestep.
     """
-    if timestepper == 'CrankNicolson':
-        cm = 0.5 * (c + c_)
-    elif timestepper == 'ImplicitEuler':
-        cm = c
-    elif timestepper == 'ExplicitEuler':
-        cm = c_
-    else:
-        raise NotImplementedError
+    cm = timestepScheme(c, c_, timestepper)
     return ((c - c_) * ct - Dt * inner(cm * u, grad(ct)) + Dt * Constant(nu) * inner(grad(cm), grad(ct))) * dx
+
+# TODO: include forms for metric advection
