@@ -334,27 +334,41 @@ def pointwiseMax(f, g):
     return f
 
 
-def advectMetric(M_, w, dt, n=1, outfile=None, bc=None):
+def advectMetric(M_, w, dt, n=1, outfile=None, bc=None, diffusion=False, timestepper='ImplicitEuler'):
     """
-    'Advect' metric M with finest resolution in direction of fluid velocity/wind field w.
+    'Advect' metric with finest resolution in direction of fluid velocity/wind field.
     
-    :param M: metric field defined on current mesh (to be advected).
+    :param M_: metric field defined on current mesh, at current timestep.
     :param w: (vector) velocity field on current mesh. Can be Function, list or ndarray.
     :param dt: timestep.
     :param n: number of timesteps to advect over.
     :param outfile: toggle metric output and location.
+    :param diffusion: toggle inclusion of metric diffusion.
+    :param timestepper: time integration scheme used.
     :param bc: boundary condition on Tensor advection PDE problem.
     """
     if outfile != None:
         Mfile = File(outfile)
         Mfile.write(M_, time=0)
 
-    # Set up Tensor advection FEM problem
+    # Get FunctionSpace data and select timestepping scheme
     V = M_.function_space()
     mesh = V.mesh()
     sigma = TestFunction(V)
     M = Function(V)
-    F = (inner(M - M_, sigma) + dt * inner(dot(w, nabla_grad(M)), sigma)) * dx
+    if timestepper == 'CrankNicolson':
+        Mm = 0.5 * (M + M_)
+    elif timestepper == 'ImplicitEuler':
+        Mm = M
+    elif timestepper == 'ExplicitEuler':
+        Mm = M_
+    else:
+        raise NotImplementedError
+
+    # Set up Tensor advection FEM problem
+    F = (inner(M - M_, sigma) + dt * inner(dot(w, nabla_grad(Mm)), sigma)) * dx
+    if diffusion:
+        F -= inner(grad(M), grad(sigma)) * dx       # TODO: what does this mean?
     prob = NonlinearVariationalProblem(F, M)
     solv = NonlinearVariationalSolver(prob, bc=bc)
 
@@ -367,8 +381,7 @@ def advectMetric(M_, w, dt, n=1, outfile=None, bc=None):
 
     return M
 
-    # TODO: include diffusion option
-    # TODO: include different timestepping options
+    # TODO: include metric advection form in forms.py
 
 
 if __name__ == '__main__':
