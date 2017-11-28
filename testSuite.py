@@ -120,7 +120,7 @@ if useAdjoint:
     print('Primal run complete. Run time: %.3fs' % primalTimer)
 
     # Set up adjoint problem
-    J = form.objectiveFunctionalSW(q, Tstart=Ts, x1=0., x2=np.pi / 2, y1=0.5 * np.pi, y2=1.5 * np.pi, smooth=False)
+    J = form.objectiveFunctionalSW(q, Tstart=Ts, x1=0., x2=np.pi/2, y1=0.5*np.pi, y2=1.5*np.pi, smooth=False)
     parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
     t = T
     save = True
@@ -146,7 +146,10 @@ if useAdjoint:
 
                     # Estimate error using forward residual
                     epsilon = assemble(v * inner(rho, dual) * dx)
-                    epsilon.dat.data[:] = np.abs(epsilon.dat.data) # / assemble(epsilon * dx)
+                    epsNorm = assemble(epsilon * dx)
+                    if epsNorm == 0.:
+                        epsNorm = 1.
+                    epsilon.dat.data[:] = np.abs(epsilon.dat.data) / epsNorm
                     epsilon.rename("Error indicator")
 
                     # Save error indicator data to HDF5

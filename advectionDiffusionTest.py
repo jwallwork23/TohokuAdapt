@@ -134,7 +134,10 @@ if useAdjoint:
 
                     # Estimate error using forward residual
                     epsilon = assemble(v * rho * dual * dx)
-                    epsilon.dat.data[:] = np.abs(epsilon.dat.data) / assemble(epsilon * dx)
+                    epsNorm = assemble(epsilon * dx)
+                    if epsNorm == 0.:
+                        epsNorm = 1.
+                    epsilon.dat.data[:] = np.abs(epsilon.dat.data) / epsNorm
                     epsilon.rename("Error indicator")
 
                     # Save error indicator data to HDF5
