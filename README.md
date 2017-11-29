@@ -23,7 +23,7 @@ equations, respectively, defined on model domains. In both cases, there is funct
 adaptive' or goal-oriented adaptive simulation.
 * Simulations on a realistic domain, which build upon the test script codes and apply the methodology to the 2011 Tohoku
 tsunami, which struck the Japanese coast at Fukushima and caused much destruction. These include:
-    * ``firedrake-tsunami``, which solves the shallow water equations (1) on a fixed mesh, (2) using 'simple` mesh
+    * ``firedrake-tsunami``, which solves the shallow water equations (1) on a fixed mesh, (2) using 'simple' mesh
      adaptivity and (3) using goal-oriented mesh adaptivity. The approach used encorporates automated differentiation 
      techniques to generate adjoint data in the discrete sense. The error indicators considered are formed of the 
      elementwise product of the primal residual and the adjoint solution.
