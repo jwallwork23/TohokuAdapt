@@ -19,8 +19,9 @@ adaptivity:
     * Time series data can be stored and plotted using ``storage``.
 * A ``resources`` directory, containing bathymetry and coastline data for the ocean domain surrounding Fukushima. Mesh
 files have been removed for copyright reasons, but may be made available upon request.
-* Test problems ``advDiffTest`` and ``testSuite`` for advection diffusion and linear shallow water equations, 
-respectively, defined on model domains.
+* Test problems ``advectionDiffusionTest`` and ``testSuite`` for advection diffusion and linear shallow water equations, 
+respectively, defined on model domains. In both cases, there is functionality to run a fixed mesh, 'simple adaptive' or
+goal-oriented adaptive simulation.
 * Simulations on a realistic domain, which build upon the test script codes and apply the methodology to the 2011 Tohoku
 tsunami, which struck the Japanese coast at Fukushima and caused much destruction. These include:
     * ``fixedMesh``, which solves the problem without mesh adaptivity.

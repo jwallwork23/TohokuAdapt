@@ -13,7 +13,7 @@ import utils.storage as stor
 
 print('\n******************************** ADVECTION-DIFFUSION TEST PROBLEM ********************************\n')
 print('Mesh adaptive solver initially defined on a rectangular mesh')
-useAdjoint = bool(input("Hit anything except enter to use adjoint equations to guide adaptive process. "))
+approach = input("Choose approach: 'fixdMesh', 'simpleAdapt' or 'goalBased': ") or 'simpleAdapt'
 diffusion = bool(input("Hit anything except enter to consider diffusion. "))
 
 # Establish filenames
@@ -22,7 +22,7 @@ forwardFile = File(dirName + "forwardAD.pvd")
 residualFile = File(dirName + "residualAD.pvd")
 adjointFile = File(dirName + "adjointAD.pvd")
 errorFile = File(dirName + "errorIndicatorAD.pvd")
-adaptiveFile = File(dirName + "goalBasedAD.pvd") if useAdjoint else File(dirName + "simpleAdaptAD.pvd")
+adaptiveFile = File(dirName + "goalBasedAD.pvd") if approach == 'goalBased' else File(dirName + "simpleAdaptAD.pvd")
 
 # Define Mesh and FunctionSpace
 n = 16
@@ -34,7 +34,7 @@ v = TestFunction(P0)
 
 # Specify physical and solver parameters
 op = opt.Options(dt=0.04, T=2.4, hmin=5e-2, hmax=1., rm=5, gradate=False, advect=True,
-                 vscale=0.4 if useAdjoint else 0.85)
+                 vscale=0.4 if approach == 'goalBased' else 0.85)
 dt = op.dt
 Dt = Constant(dt)
 T = op.T
@@ -72,7 +72,7 @@ bc = DirichletBC(V, 0., "on_boundary")
 t = 0.
 cnt = 0
 
-if useAdjoint:
+if approach in ('fixedMesh', 'goalBased'):
     print('Starting fixed mesh primal run (forwards in time)')
     finished = False
     primalTimer = clock()
@@ -108,6 +108,7 @@ if useAdjoint:
     finalFixed = Function(V)
     finalFixed.dat.data[:] = phi.dat.data   # NOTE assign, copy and interpolate functions are overloaded
 
+if approach == 'goalBased':
     # Set up adjoint problem
     J = form.objectiveFunctionalAD(phi)
     parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
@@ -168,64 +169,65 @@ if useAdjoint:
     phi.rename('Concentration')
     epsilon = Function(P0, name="Error indicator")
 
-print('Starting adaptive mesh primal run (forwards in time)')
-adaptTimer = clock()
-while t <= T:
-    if not cnt % rm:
-        stepTimer = clock()
+if approach in ('simpleAdapt', 'goalBased'):
+    print('Starting adaptive mesh primal run (forwards in time)')
+    adaptTimer = clock()
+    while t <= T:
+        if not cnt % rm:
+            stepTimer = clock()
 
-        # Reconstruct Hessian
-        W = TensorFunctionSpace(mesh, "CG", 1)
-        H = adap.constructHessian(mesh, W, phi, op=op)
+            # Reconstruct Hessian
+            W = TensorFunctionSpace(mesh, "CG", 1)
+            H = adap.constructHessian(mesh, W, phi, op=op)
 
-        # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
-        if useAdjoint:
-            with DumbCheckpoint(dirName + 'hdf5/error_' + stor.indexString(cnt), mode=FILE_READ) as loadError:
-                loadError.load(epsilon)  # P0 field on the initial mesh
-                loadError.close()
-            errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])
-            for k in range(mesh.topology.num_vertices()):
-                H.dat.data[k] *= errEst.dat.data[k]  # Scale by error estimate
+            # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
+            if approach == 'goalBased':
+                with DumbCheckpoint(dirName + 'hdf5/error_' + stor.indexString(cnt), mode=FILE_READ) as loadError:
+                    loadError.load(epsilon)  # P0 field on the initial mesh
+                    loadError.close()
+                errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])
+                for k in range(mesh.topology.num_vertices()):
+                    H.dat.data[k] *= errEst.dat.data[k]  # Scale by error estimate
 
-        # Adapt mesh and interpolate variables
-        M = adap.computeSteadyMetric(mesh, W, H, phi, nVerT=nVerT, op=op)
-        if op.gradate:
-            adap.metricGradation(mesh, M)
-        if op.advect:
-            M = adap.advectMetric(M, w, Dt, n=rm, nu=nu)
-        mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-        phi = inte.interp(mesh, phi)[0]
-        phi.rename("Concentration")
-        V = FunctionSpace(mesh, "CG", 2)
-        phi_next = Function(V, name="Concentration next")
+            # Adapt mesh and interpolate variables
+            M = adap.computeSteadyMetric(mesh, W, H, phi, nVerT=nVerT, op=op)
+            if op.gradate:
+                adap.metricGradation(mesh, M)
+            if op.advect:
+                M = adap.advectMetric(M, w, Dt, n=rm, nu=nu)
+            mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
+            phi = inte.interp(mesh, phi)[0]
+            phi.rename("Concentration")
+            V = FunctionSpace(mesh, "CG", 2)
+            phi_next = Function(V, name="Concentration next")
 
-        # Re-establish bilinear form and set boundary conditions
-        psi = TestFunction(V)
-        w = Function(VectorFunctionSpace(mesh, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
-        F = form.weakResidualAD(phi_next, phi, psi, w, Dt, nu=nu)
-        bc = DirichletBC(V, 0., "on_boundary")
+            # Re-establish bilinear form and set boundary conditions
+            psi = TestFunction(V)
+            w = Function(VectorFunctionSpace(mesh, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
+            F = form.weakResidualAD(phi_next, phi, psi, w, Dt, nu=nu)
+            bc = DirichletBC(V, 0., "on_boundary")
 
-        # Get mesh stats
-        nEle = msh.meshStats(mesh)[0]
-        N = [min(nEle, N[0]), max(nEle, N[1])]
-        Sn += nEle
-        op.printToScreen(cnt / rm + 1, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, N)
+            # Get mesh stats
+            nEle = msh.meshStats(mesh)[0]
+            N = [min(nEle, N[0]), max(nEle, N[1])]
+            Sn += nEle
+            op.printToScreen(cnt / rm + 1, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, N)
 
-    # Solve problem at current timestep
-    solve(F == 0, phi_next, bc)
-    phi.assign(phi_next)
+        # Solve problem at current timestep
+        solve(F == 0, phi_next, bc)
+        phi.assign(phi_next)
 
-    # Print to screen, save data and increment counters
-    print('t = %.3fs' % t)
-    adaptiveFile.write(phi, time=t)
-    t += dt
-    cnt += 1
-adaptTimer = clock() - adaptTimer
-print('Adaptive primal run complete. Run time: %.3fs \n' % adaptTimer)
-finalAdapt = phi.copy(deepcopy=True)
+        # Print to screen, save data and increment counters
+        print('t = %.3fs' % t)
+        adaptiveFile.write(phi, time=t)
+        t += dt
+        cnt += 1
+    adaptTimer = clock() - adaptTimer
+    print('Adaptive primal run complete. Run time: %.3fs \n' % adaptTimer)
+    finalAdapt = phi.copy(deepcopy=True)
 
 # Print to screen timing analyses (and error in pure advection case)
-if useAdjoint:
+if approach == 'goalBased':
     print("TIMINGS:         Forward run   %5.3fs, Adjoint run   %5.3fs, Adaptive run   %5.3fs" %
           (primalTimer, dualTimer, adaptTimer))
     if not diffusion:

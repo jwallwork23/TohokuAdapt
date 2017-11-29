@@ -13,7 +13,7 @@ import utils.storage as stor
 
 print('\n*********************** SHALLOW WATER TEST PROBLEM ************************\n')
 print('Mesh adaptive solver initially defined on a square mesh')
-useAdjoint = bool(input("Hit anything except enter to use adjoint equations to guide adaptive process. "))
+approach = input("Choose approach: 'fixdMesh', 'simpleAdapt' or 'goalBased': ") or 'simpleAdapt'
 
 # Establish filenames
 dirName = "plots/testSuite/"
@@ -21,11 +21,11 @@ forwardFile = File(dirName + "forwardSW.pvd")
 residualFile = File(dirName + "residualSW.pvd")
 adjointFile = File(dirName + "adjointSW.pvd")
 errorFile = File(dirName + "errorIndicatorSW.pvd")
-adaptiveFile = File(dirName + "goalBasedSW.pvd") if useAdjoint else File(dirName + "simpleAdaptSW.pvd")
+adaptiveFile = File(dirName + "goalBasedSW.pvd") if approach == 'goalBased' else File(dirName + "simpleAdaptSW.pvd")
 
 # Specify physical and solver parameters
 op = opt.Options(dt=0.05, hmin=5e-2, hmax=1., T=2.5, rm=5, Ts=0.5, gradate=False, advect=False,
-                 vscale=0.4 if useAdjoint else 0.85)
+                 vscale=0.4 if approach == 'goalBased' else 0.85)
 dt = op.dt
 Dt = Constant(dt)
 T = op.T
@@ -81,7 +81,7 @@ forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.
 t = 0.
 cnt = 0
 
-if useAdjoint:
+if approach in ('fixedMesh', 'goalBased'):
     print('\nStarting fixed mesh primal run (forwards in time)')
     finished = False
     primalTimer = clock()
@@ -119,6 +119,7 @@ if useAdjoint:
     primalTimer = clock() - primalTimer
     print('Primal run complete. Run time: %.3fs' % primalTimer)
 
+if approach == 'goalBased':
     # Set up adjoint problem
     J = form.objectiveFunctionalSW(q, Tstart=Ts, x1=0., x2=np.pi/2, y1=0.5*np.pi, y2=1.5*np.pi, smooth=False)
     parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
@@ -181,63 +182,64 @@ if useAdjoint:
     eta_.assign(ic)
     epsilon = Function(P0, name="Error indicator")
 
-print('\nStarting adaptive mesh primal run (forwards in time)')
-adaptTimer = clock()
-while t <= T:
-    if not cnt % rm:
-        stepTimer = clock()
+if approach in ('simpleAdapt', 'goalBased'):
+    print('\nStarting adaptive mesh primal run (forwards in time)')
+    adaptTimer = clock()
+    while t <= T:
+        if not cnt % rm:
+            stepTimer = clock()
 
-        # Reconstruct Hessian
-        W = TensorFunctionSpace(mesh, "CG", 1)
-        H = adap.constructHessian(mesh, W, eta, op=op)
+            # Reconstruct Hessian
+            W = TensorFunctionSpace(mesh, "CG", 1)
+            H = adap.constructHessian(mesh, W, eta, op=op)
 
-        # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
-        if useAdjoint:
-            with DumbCheckpoint(dirName + 'hdf5/error_' + stor.indexString(cnt), mode=FILE_READ) as loadError:
-                loadError.load(epsilon)                 # P0 field on the initial mesh
-                loadError.close()
-            errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])
-            for k in range(mesh.topology.num_vertices()):
-                H.dat.data[k] *= errEst.dat.data[k]     # Scale by error estimate
+            # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
+            if approach == 'goalBased':
+                with DumbCheckpoint(dirName + 'hdf5/error_' + stor.indexString(cnt), mode=FILE_READ) as loadError:
+                    loadError.load(epsilon)                 # P0 field on the initial mesh
+                    loadError.close()
+                errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])
+                for k in range(mesh.topology.num_vertices()):
+                    H.dat.data[k] *= errEst.dat.data[k]     # Scale by error estimate
 
-        # Adapt mesh and interpolate variables
-        M = adap.computeSteadyMetric(mesh, W, H, eta, nVerT=nVerT, op=op)
-        if op.gradate:
-            adap.metricGradation(mesh, M)
-        if op.advect:
-            M = adap.advectMetric(M, u, Dt, n=rm)
-        mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-        V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
-        q_ = inte.mixedPairInterp(mesh, V, q_)
-        q = Function(V)
-        u, eta = q.split()
-        u.rename("Velocity")
-        eta.rename("Elevation")
+            # Adapt mesh and interpolate variables
+            M = adap.computeSteadyMetric(mesh, W, H, eta, nVerT=nVerT, op=op)
+            if op.gradate:
+                adap.metricGradation(mesh, M)
+            if op.advect:
+                M = adap.advectMetric(M, u, Dt, n=rm)
+            mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
+            V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
+            q_ = inte.mixedPairInterp(mesh, V, q_)
+            q = Function(V)
+            u, eta = q.split()
+            u.rename("Velocity")
+            eta.rename("Elevation")
 
-        # Re-establish variational form
-        qt = TestFunction(V)
-        forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
-        forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
+            # Re-establish variational form
+            qt = TestFunction(V)
+            forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
+            forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
-        # Get mesh stats
-        nEle = msh.meshStats(mesh)[0]
-        N = [min(nEle, N[0]), max(nEle, N[1])]
-        Sn += nEle
-        op.printToScreen(cnt / rm + 1, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, N)
+            # Get mesh stats
+            nEle = msh.meshStats(mesh)[0]
+            N = [min(nEle, N[0]), max(nEle, N[1])]
+            Sn += nEle
+            op.printToScreen(cnt / rm + 1, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, N)
 
-    # Solve problem at current timestep
-    forwardSolver.solve()
-    q_.assign(q)
+        # Solve problem at current timestep
+        forwardSolver.solve()
+        q_.assign(q)
 
-    # Print to screen, save data and increment counters
-    print('t = %.3fs' % t)
-    adaptiveFile.write(u, eta, time=t)
-    t += dt
-    cnt += 1
-adaptTimer = clock() - adaptTimer
-print('Adaptive primal run complete. Run time: %.3fs \n' % adaptTimer)
+        # Print to screen, save data and increment counters
+        print('t = %.3fs' % t)
+        adaptiveFile.write(u, eta, time=t)
+        t += dt
+        cnt += 1
+    adaptTimer = clock() - adaptTimer
+    print('Adaptive primal run complete. Run time: %.3fs \n' % adaptTimer)
 
 # Print to screen timing analyses (and error in pure advection case)
-if useAdjoint:
+if approach == 'goalBased':
     print("TIMINGS:         Forward run   %5.3fs, Adjoint run   %5.3fs, Adaptive run   %5.3fs" %
           (primalTimer, dualTimer, adaptTimer))
