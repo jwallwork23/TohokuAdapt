@@ -7,7 +7,6 @@ from time import clock
 
 import utils.adaptivity as adap
 import utils.error as err
-import utils.forms as form
 import utils.interpolation as inte
 import utils.mesh as msh
 import utils.options as opt
@@ -56,29 +55,6 @@ else:
     tic1 = clock()
     coeff = Constant(1.)
     switch = True
-
-    # TODO: implement discrete adjoint
-    # currentTime = Constant(t)       # Re-assign this whenever changed
-    # q_ = Function(W0)
-    # u_, eta_ = q_.split()
-    # u_.interpolate(Expression([0, 0]))
-    # eta_.interpolate(eta0)
-    # q = Function(W0).assign(q_)
-    # qt = TestFunction(W0)
-    # ut, etat = qt.split()
-    # F = form.weakResidual(q, qt, b, Dt)
-    # a_adj = adjoint(derivative(F, q))
-    # L_adj = form.objectiveFunctional(etat, currentTime, dt)
-
-    # TODO: Then solve the problem using
-    #       solve(a_adj == L_adj, phi)
-
-    # TODO: then the error indicator `ei` can be expressed as
-    #       Z = FunctionSpace(mesh, 'DG', 0)
-    #       z = TestFunction(Z)
-    #       Lei = form.weakResidual(q, z*phi)
-    #       ei = Function(Z)
-    #       ei.vector()[:] = assemble(Lei).array()
 
     # Establish adjoint variables and apply initial conditions
     lam_ = Function(W0)
@@ -196,6 +172,7 @@ while mn < iEnd:
     if (not iso and op.outputHessian):
         H.rename("Hessian")
         hfile.write(H, time=float(mn))
+    msh.saveMesh(mesh, dirName + 'hdf5/mesh_' + stor.indexString(index))  # Save mesh to disk for timeseries analysis
 
     # Establish Thetis flow solver object
     solver_obj = solver2d.FlowSolver2d(mesh, b)

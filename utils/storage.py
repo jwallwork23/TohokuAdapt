@@ -4,6 +4,7 @@ import numpy as np
 import scipy.interpolate as si
 import matplotlib.pyplot as plt
 
+from . import mesh as msh
 from . import options
 
 
@@ -46,10 +47,15 @@ def gaugeTimeseries(gauge, dirName, iEnd):
     val = []
     t = np.linspace(0, 25, num=int(iEnd + 1))
     for i in range(iEnd + 1):
+        indexStr = indexString(i)
 
-        # Load data from HDF5 and get timeseries data TODO: how to define a function space if we do not know the mesh?
-        with DumbCheckpoint(dirName + '/Elevation2d_' + indexString(i), mode=FILE_READ) as el:
+        # Load mesh from file and set up Function to load into
+        elev_2d = Function(FunctionSpace(msh.loadMesh(dirName + 'mesh_' + indexStr + '.h5')))
+
+        # Load data from HDF5 and get timeseries data
+        with DumbCheckpoint(dirName + '/Elevation2d_' + indexStr, mode=FILE_READ) as el:
             el.load(elev_2d, name='elev_2d')
+            el.close()
         data = elev_2d.at(op.gaugeCoord(gauge))
         mVal = float(m(t[i]))
         if i == 0:
@@ -115,7 +121,7 @@ def plotGauges(gauge):
     setup = op.plotDir
     labels = op.labels
     styles = op.styles
-    measuredfile = open('timeseries/{y}_measured_dat_25mins.txt'.format(y=gauge), 'r')
+    measuredfile = open('timeseries/{}_measured_dat_25mins.txt'.format(gauge), 'r')
     p = np.linspace(0, 25, num=1501)
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
@@ -135,7 +141,7 @@ def plotGauges(gauge):
     # Deal with special cases and plot timeseries data
     T = 25
     for key in setup:
-        data = gaugeTimeseries(gauge, plotDir[key], 1501)
+        data = gaugeTimeseries(gauge, op.plotDir[key], 1501)
         plt.plot(np.linspace(0, T, 1501), data, label=labels[key], marker=styles[key], markevery=60, linewidth=0.5)
     plt.xlim([0, 25])
     plt.gcf()
@@ -146,13 +152,15 @@ def plotGauges(gauge):
     plt.savefig('plots/timeseries/' + gauge + '.pdf', bbox_inches='tight')
 
 
-def saveToDisk(lu, le, dirName, index):
+def saveToDisk(f, g, dirName, index, filename='adjoint_'):
     """
-    :param lu: adjoint velocity field.
-    :param le: adjoint free surface field.
+    :param f: first function to save.
+    :param g: second function to save.
     :param dirName: name of directory to save in.
     """
-    with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexString(index), mode=FILE_CREATE) as chk:
-        chk.store(lu)
-        chk.store(le)
+    with DumbCheckpoint(dirName + 'hdf5/' + filename + indexString(index), mode=FILE_CREATE) as chk:
+        chk.store(f)
+        chk.store(g)
         chk.close()
+
+    # TODO: include option for any number of functions to save using *args

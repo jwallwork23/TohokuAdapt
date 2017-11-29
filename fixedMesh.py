@@ -9,6 +9,8 @@ print('******************** FIXED MESH TSUNAMI SIMULATION ********************')
 res = 4     # Coarse resolution
 mesh, eta0, b = msh.TohokuDomain(res=res)
 print('...... mesh loaded. #Elements : %d. #Vertices : %d. \n' % msh.meshStats(mesh))
+dirName = 'plots/fixedMesh/'
+msh.saveMesh(mesh, dirName + 'hdf5/mesh')
 
 # Get solver parameter values and construct solver, with default dg1-dg1 space
 tic = clock()
@@ -23,7 +25,7 @@ options.simulation_export_time = op.dt * op.ndump
 options.simulation_end_time = op.T
 options.timestepper_type = op.timestepper
 options.timestep = op.dt
-options.output_directory = 'plots/fixedMesh/' + msh.MeshSetup(res).meshName
+options.output_directory = dirName + msh.MeshSetup(res).meshName
 options.export_diagnostics = True
 options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
 

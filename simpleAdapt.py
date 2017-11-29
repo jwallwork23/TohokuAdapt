@@ -8,6 +8,7 @@ import utils.adaptivity as adap
 import utils.interpolation as inte
 import utils.mesh as msh
 import utils.options as opt
+import utils.storage as stor
 
 
 # Define initial mesh and mesh statistics placeholders
@@ -67,6 +68,7 @@ while mn < np.ceil(T / (dt * rm)):
     if (not iso and op.outputHessian):
         H.rename("Hessian")
         hfile.write(H, time=float(mn))
+    msh.saveMesh(mesh, dirName + 'hdf5/mesh_' + stor.indexString(index))    # Save mesh to disk for timeseries analysis
 
     # Establish Thetis flow solver object
     solver_obj = solver2d.FlowSolver2d(mesh, b)

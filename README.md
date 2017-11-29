@@ -26,7 +26,12 @@ goal-oriented adaptive simulation.
 tsunami, which struck the Japanese coast at Fukushima and caused much destruction. These include:
     * ``fixedMesh``, which solves the problem without mesh adaptivity.
     * ``simpleAdapt``, which solves the problem using anisotropic mesh adaptivity.
-    * ``adjointBased``, which solve the problem as guided by adjoint problem solution data.
+    * ``adjointBased``, which solve the problem as guided by adjoint problem solution data. Errors are estimated using
+    the product of the primal and dual solution fields, as in Davis and LeVeque 2016. Here adjoint data is obtained by
+    solving the continuous adjoint shallow water equations.
+    * ``goalBased``, which solves the problem using goal-oriented mesh adaptivity. The approach used encorporates
+    automated differentiation techniques to generate adjoint data in the discrete sense. The error indicators considered
+     are formed of the elementwise product of the primal residual and the adjoint solution.
 
 For feedback, comments and questions, please email j.wallwork16@imperial.ac.uk.
 
