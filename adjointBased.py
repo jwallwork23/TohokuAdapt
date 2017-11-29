@@ -34,7 +34,6 @@ if iso:
 T = op.T
 dt = op.dt
 Dt = Constant(dt)
-cdt = op.hmin / np.sqrt(op.g * max(b.dat.data))
 op.checkCFL(b)
 ndump = op.ndump
 rm = op.rm
