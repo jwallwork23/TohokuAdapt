@@ -8,6 +8,7 @@ from . import storage
 
 class Options:
     def __init__(self,
+                 res=4,
                  family='dg-cg',
                  vscale=0.85,
                  hmin=500.,
@@ -29,6 +30,7 @@ class Options:
                  rm=30,
                  Ts=300.):
         """
+        :param res: mesh coarseness to use, where 1 is x-fine and 5 is x-coarse.
         :param family: mixed function space family, from {'dg-dg', 'dg-cg'}.
         :param vscale: Scaling parameter for target number of vertices.
         :param hmin: Minimal tolerated element size (m).
@@ -50,6 +52,12 @@ class Options:
         :param rm: Timesteps per remesh. (Should be an integer multiple of ndump.)
         :param Ts: Lower time range limit (s), before which we can assume the wave won't reach the shore.
         """
+        # Initial mesh parameters
+        self.res = res
+        try:
+            assert res in (1, 2, 3, 4, 5)
+        except:
+            raise ValueError('Please choose an integer between 1 and 5.')
 
         # Adaptivity parameters
         self.family = family

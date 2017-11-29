@@ -20,3 +20,6 @@ utils/.idea/
 # Files to be ignored:
 
 .README.md.swp
+explicitErrorEstimate.py
+fixedMesh.py
+simpleAdapt.py
