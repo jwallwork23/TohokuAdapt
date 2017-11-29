@@ -94,6 +94,7 @@ if __name__ == '__main__':
     ms.convertMesh()                                            # Convert to shapefile, for visualisation with QGIS
 else:
     from firedrake import *
+    from firedrake.petsc import PETSc
 
     import scipy.interpolate as si
     from scipy.io.netcdf import NetCDFFile
@@ -158,3 +159,22 @@ def meshStats(mesh):
     cStart, cEnd = plex.getHeightStratum(0)
     vStart, vEnd = plex.getDepthStratum(0)
     return cEnd - cStart, vEnd - vStart
+
+
+def saveMesh(mesh, filename):
+    """
+    :param mesh: mesh to be saved.
+    :param filename: name to be given, including directory location.
+    """
+    viewer = PETSc.Viewer().createHDF5(filename + '.h5', 'w')
+    viewer(mesh._plex)
+
+
+def loadMesh(filename):
+    """
+    :param filename: 
+    :return: mesh loaded from .h5.
+    """
+    plex = PETSc.DMPlex().create()
+    plex.createFromFile(filename + '.h5')
+    return Mesh(plex)
