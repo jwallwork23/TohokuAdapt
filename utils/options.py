@@ -8,7 +8,7 @@ from . import storage
 
 class Options:
     def __init__(self,
-                 res=4,
+                 coarseness=4,
                  family='dg-cg',
                  vscale=0.85,
                  hmin=500.,
@@ -30,7 +30,7 @@ class Options:
                  ndump=15,
                  rm=30):
         """
-        :param res: mesh coarseness to use, where 1 is x-fine and 5 is x-coarse.
+        :param coarseness: mesh coarseness to use, where 1 is x-fine and 5 is x-coarse.
         :param family: mixed function space family, from {'dg-dg', 'dg-cg'}.
         :param vscale: Scaling parameter for target number of vertices.
         :param hmin: Minimal tolerated element size (m).
@@ -53,9 +53,9 @@ class Options:
         :param rm: Timesteps per remesh. (Should be an integer multiple of ndump.)
         """
         # Initial mesh parameters
-        self.res = res
+        self.coarseness = coarseness
         try:
-            assert res in (1, 2, 3, 4, 5)
+            assert coarseness in (1, 2, 3, 4, 5)
         except:
             raise ValueError('Please choose an integer between 1 and 5.')
 

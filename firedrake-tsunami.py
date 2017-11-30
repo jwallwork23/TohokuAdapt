@@ -19,11 +19,11 @@ op = opt.Options(vscale=0.4 if approach == 'goalBased' else 0.85,
                  rm=60 if approach == 'goalBased' else 30,
                  gradate=False,
                  advect=False,
-                 res=4)     # TODO: Rename adaptivity parameters with clearer names
-mesh, eta0, b = msh.TohokuDomain(op.res)
+                 coarseness=5)
+mesh, eta0, b = msh.TohokuDomain(op.coarseness)
 
 # Establish filenames
-dirName = 'plots/' + approach + '/' + msh.MeshSetup(op.res).meshName + '/'
+dirName = 'plots/' + approach + '/' + msh.MeshSetup(op.coarseness).meshName + '/'
 msh.saveMesh(mesh, dirName + 'hdf5/mesh')
 forwardFile = File(dirName + "forward.pvd")
 residualFile = File(dirName + "residual.pvd")
@@ -88,14 +88,14 @@ if approach in ('fixedMesh', 'goalBased'):
     finished = False
     primalTimer = clock()
     forwardFile.write(u, eta, time=t)
-    while t < T:
+    while t < T + dt:
         # Solve problem at current timestep
         forwardSolver.solve()
         q_.assign(q)
 
         if approach == 'goalBased':
             # Mark timesteps to be used in adjoint simulation
-            if t >= T - dt:
+            if t >= T:
                 finished = True
             if t == 0.:
                 adj_start_timestep()
@@ -118,6 +118,7 @@ if approach in ('fixedMesh', 'goalBased'):
             print('t = %.2fs' % t)
         t += dt
         cnt += 1
+    cnt -=1
     primalTimer = clock() - primalTimer
     print('Primal run complete. Run time: %.3fs' % primalTimer)
 
@@ -132,49 +133,46 @@ if approach == 'goalBased':
     print('\nStarting fixed mesh dual run (backwards in time)')
     dualTimer = clock()
     for (variable, solution) in compute_adjoint(J):
-        try:
-            if save:
-                # Load adjoint data. NOTE the interpolation operator is overloaded
-                dual_u.dat.data[:] = variable.dat.data[0]
-                dual_e.dat.data[:] = variable.dat.data[1]
+        if save:
+            # Load adjoint data. NOTE the interpolation operator is overloaded
+            dual_u.dat.data[:] = variable.dat.data[0]
+            dual_e.dat.data[:] = variable.dat.data[1]
 
-                if not cnt % rm:
-                    indexStr = stor.indexString(cnt)
+            if not cnt % rm:
+                indexStr = stor.indexString(cnt)
 
-                    # Load residual data from HDF5
-                    with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_READ) as loadResidual:
-                        loadResidual.load(rho_u)
-                        loadResidual.load(rho_e)
-                        loadResidual.close()
+                # Load residual data from HDF5
+                with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_READ) as loadResidual:
+                    loadResidual.load(rho_u)
+                    loadResidual.load(rho_e)
+                    loadResidual.close()
 
-                    # Estimate error using forward residual
-                    epsilon = assemble(v * inner(rho, dual) * dx)
-                    epsNorm = assemble(epsilon * dx)
-                    if epsNorm == 0.:
-                        epsNorm = 1.
-                    epsilon.dat.data[:] = np.abs(epsilon.dat.data) / epsNorm
-                    epsilon.rename("Error indicator")
+                # Estimate error using forward residual
+                epsilon = assemble(v * inner(rho, dual) * dx)
+                epsNorm = assemble(epsilon * dx)
+                if epsNorm == 0.:
+                    epsNorm = 1.
+                epsilon.dat.data[:] = np.abs(epsilon.dat.data) / epsNorm
+                epsilon.rename("Error indicator")
 
-                    # Save error indicator data to HDF5
-                    with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_CREATE) as saveError:
-                        saveError.store(epsilon)
-                        saveError.close()
+                # Save error indicator data to HDF5
+                with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_CREATE) as saveError:
+                    saveError.store(epsilon)
+                    saveError.close()
 
-                    # Print to screen, save data and increment counters
-                    errorFile.write(epsilon, time=t)
+                # Print to screen, save data and increment counters
+                errorFile.write(epsilon, time=t)
 
-                if not cnt % ndump:
-                    adjointFile.write(dual_u, dual_e, time=t)
-                    print('t = %.2fs' % t)
-                t -= dt
-                cnt -= 1
-                save = False
-            else:
-                save = True
-            if (cnt == -1) | (t < -dt):
-                break
-        except:
-            continue
+            if not cnt % ndump:
+                adjointFile.write(dual_u, dual_e, time=t)
+                print('t = %.2fs' % t)
+            t -= dt
+            cnt -= 1
+            save = False
+        else:
+            save = True
+        if (cnt == -1) | (t < -dt):
+            break
     dualTimer = clock() - dualTimer
     print('Adjoint run complete. Run time: %.3fs' % dualTimer)
     t += dt
@@ -214,6 +212,7 @@ if approach in ('simpleAdapt', 'goalBased'):
             mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
             V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
             q_ = inte.mixedPairInterp(mesh, V, q_)
+            b = inte.interp(mesh, b)[0]     # Combine this in above interpolation for speed
             q = Function(V)
             u, eta = q.split()
             u.rename("Velocity")

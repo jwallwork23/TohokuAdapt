@@ -17,9 +17,13 @@ import utils.storage as stor
 # Define initial mesh and mesh statistics placeholders
 print('*********************** TOHOKU TSUNAMI SIMULATION *********************\n')
 approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'simpleAdapt'
-op = opt.Options(vscale=0.2, rm=60 if approach == 'goalBased' else 30)
-mesh, eta0, b = msh.TohokuDomain(op.res)
-dirName = 'plots/' + approach + '/' + msh.MeshSetup(op.res).meshName + '/'
+op = opt.Options(vscale=0.4 if approach == 'goalBased' else 0.85,
+                 rm=60 if approach == 'goalBased' else 30,
+                 gradate=False,
+                 advect=False,
+                 coarseness=4)
+mesh, eta0, b = msh.TohokuDomain(op.coarseness)
+dirName = 'plots/' + approach + '/' + msh.MeshSetup(op.coarseness).meshName + '/'
 msh.saveMesh(mesh, dirName + 'hdf5/mesh')
 
 # Get solver parameters
