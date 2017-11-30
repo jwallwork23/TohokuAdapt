@@ -24,12 +24,12 @@ errorFile = File(dirName + "errorIndicatorSW.pvd")
 adaptiveFile = File(dirName + "goalBasedSW.pvd") if approach == 'goalBased' else File(dirName + "simpleAdaptSW.pvd")
 
 # Specify physical and solver parameters
-op = opt.Options(dt=0.05, hmin=5e-2, hmax=1., T=2.5, rm=5, Ts=0.5, gradate=False, advect=False,
+op = opt.Options(dt=0.05, hmin=5e-2, hmax=1., Tend=2.5, rm=5, Tstart=0.5, gradate=False, advect=False,
                  vscale=0.4 if approach == 'goalBased' else 0.85)
 dt = op.dt
 Dt = Constant(dt)
-T = op.T
-Ts = op.Ts
+T = op.Tend
+Ts = op.Tstart
 b = Constant(0.1)
 op.checkCFL(b)
 

@@ -24,11 +24,11 @@ class Options:
                  beta=1.4,
                  gamma=1.,
                  outputHessian=False,
-                 T=1500.,
+                 Tstart=300.,
+                 Tend=1500.,
                  dt=1.,
                  ndump=15,
-                 rm=30,
-                 Ts=300.):
+                 rm=30):
         """
         :param res: mesh coarseness to use, where 1 is x-fine and 5 is x-coarse.
         :param family: mixed function space family, from {'dg-dg', 'dg-cg'}.
@@ -46,11 +46,11 @@ class Options:
         :param beta: metric gradation scaling parameter.
         :param gamma: metric rescaling parameter.
         :param outputHessian: toggle saving Hessian to .pvd.
-        :param T: Simulation duration (s).
+        :param Tstart: Lower time range limit (s), before which we can assume the wave won't reach the shore.
+        :param Tend: Simulation duration (s).
         :param dt: Timestep (s).
         :param ndump: Timesteps per data dump.
         :param rm: Timesteps per remesh. (Should be an integer multiple of ndump.)
-        :param Ts: Lower time range limit (s), before which we can assume the wave won't reach the shore.
         """
         # Initial mesh parameters
         self.res = res
@@ -117,11 +117,11 @@ class Options:
         self.g = 9.81           # Gravitational acceleration (m s^{-2})
 
         # Timestepping parameters
-        self.T = T
+        self.Tstart = Tstart
+        self.Tend = Tend
         self.dt = dt
         self.ndump = ndump
         self.rm = rm
-        self.Ts = Ts
         self.timestepper = 'CrankNicolson'
 
         # Solver parameters

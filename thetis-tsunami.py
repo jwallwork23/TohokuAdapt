@@ -23,7 +23,7 @@ dirName = 'plots/' + approach + '/' + msh.MeshSetup(op.res).meshName + '/'
 msh.saveMesh(mesh, dirName + 'hdf5/mesh')
 
 # Get solver parameters
-T = op.T
+T = op.Tend
 dt = op.dt
 Dt = Constant(dt)
 op.checkCFL(b)

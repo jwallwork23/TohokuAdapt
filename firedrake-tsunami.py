@@ -34,8 +34,8 @@ adaptiveFile = File(dirName + "goalBasedSW.pvd") if approach == 'goalBased' else
 # Specify physical and solver parameters
 dt = op.dt
 Dt = Constant(dt)
-T = op.T
-Ts = op.Ts
+T = op.Tend
+Ts = op.Tstart
 ndump = op.ndump
 op.checkCFL(b)
 
@@ -182,7 +182,7 @@ if approach == 'goalBased':
 
     # Reset initial conditions for primal problem and recreate error indicator placeholder
     u_.interpolate(Expression([0, 0]))
-    eta_.assign(eta0)
+    eta_.interpolate(eta0)
     epsilon = Function(P0, name="Error indicator")
 
 if approach in ('simpleAdapt', 'goalBased'):

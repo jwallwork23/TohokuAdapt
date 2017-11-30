@@ -33,11 +33,11 @@ P0 = FunctionSpace(mesh, "DG", 0)
 v = TestFunction(P0)
 
 # Specify physical and solver parameters
-op = opt.Options(dt=0.04, T=2.4, hmin=5e-2, hmax=1., rm=5, gradate=False, advect=True,
+op = opt.Options(dt=0.04, Tend=2.4, hmin=5e-2, hmax=1., rm=5, gradate=False, advect=True,
                  vscale=0.4 if approach == 'goalBased' else 0.85)
 dt = op.dt
 Dt = Constant(dt)
-T = op.T
+T = op.Tend
 w = Function(VectorFunctionSpace(mesh, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
 nu = 1e-3 if diffusion else 0.
 

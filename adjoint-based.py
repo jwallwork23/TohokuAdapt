@@ -31,7 +31,7 @@ if not basic:
 iso = op.iso
 if iso:
     dirName += 'isotropic/'
-T = op.T
+T = op.Tend
 dt = op.dt
 Dt = Constant(dt)
 op.checkCFL(b)
@@ -39,9 +39,9 @@ ndump = op.ndump
 rm = op.rm
 
 # Initialise counters, constants and function space
-Sn = meshn = 0                      # Sum over #Elements and mesh counter
-iStart = int(op.Ts / (dt * rm))     # Index corresponding to tStart
-iEnd = int(np.ceil(T / (dt * rm)))  # Index corresponding to tEnd
+Sn = meshn = 0                          # Sum over #Elements and mesh counter
+iStart = int(op.Tstart / (dt * rm))     # Index corresponding to start time
+iEnd = int(np.ceil(T / (dt * rm)))      # Index corresponding to end time
 mesh0 = mesh
 W0 = VectorFunctionSpace(mesh0, op.space1, op.degree1) * FunctionSpace(mesh0, op.space2, op.degree2)
 
@@ -86,9 +86,9 @@ else:
     while t > 0.5 * dt:
 
         # Modify forcing term
-        if (t < op.Ts + 1.5 * dt) & switch:
+        if (t < op.Tstart + 1.5 * dt) & switch:
             coeff.assign(0.5)
-        elif (t < op.Ts + 0.5 * dt) & switch:
+        elif (t < op.Tstart + 0.5 * dt) & switch:
             switch = False
             coeff.assign(0.)
 
