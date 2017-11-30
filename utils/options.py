@@ -217,4 +217,4 @@ class Options:
         print("""\n************************** Adaption step %d ****************************
 Percent complete  : %4.1f%%    Elapsed time : %4.2fs (This step : %4.2fs)     
 #Elements... Current : %d  Mean : %d  Minimum : %s  Maximum : %s\n""" %
-              (mn, (100 * mn * self.rm * self.dt) / self.T, outerTime, innerTime, nEle, Sn / mn, N[0], N[1]))
+              (mn, (100 * mn * self.rm * self.dt) / self.Tend, outerTime, innerTime, nEle, Sn / mn, N[0], N[1]))

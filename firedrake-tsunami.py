@@ -149,7 +149,7 @@ if approach == 'goalBased':
 
                 # Estimate error using forward residual
                 epsilon = assemble(v * inner(rho, dual) * dx)
-                epsNorm = assemble(epsilon * dx)
+                epsNorm = np.abs(assemble(epsilon * dx))
                 if epsNorm == 0.:
                     epsNorm = 1.
                 epsilon.dat.data[:] = np.abs(epsilon.dat.data) / epsNorm
