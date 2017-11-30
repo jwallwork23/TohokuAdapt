@@ -111,7 +111,7 @@ if approach in ('fixedMesh', 'goalBased'):
                     chk.store(rho_e)
                     chk.close()
 
-                # Print to screen, save data and increment counters
+                # Print to screen, save to .vtu and increment counters
                 residualFile.write(rho_u, rho_e, time=t)
         forwardFile.write(u, eta, time=t)
         print('t = %.3fs' % t)
@@ -164,7 +164,6 @@ if approach == 'goalBased':
                     errorFile.write(epsilon, time=t)
                 adjointFile.write(dual_u, dual_e, time=t)
                 print('t = %.3fs' % t)
-
                 t -= dt
                 cnt -= 1
                 save = False

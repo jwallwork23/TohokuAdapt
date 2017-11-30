@@ -16,9 +16,9 @@ import utils.storage as stor
 
 # Define initial mesh and mesh statistics placeholders
 print('*********************** TOHOKU TSUNAMI SIMULATION *********************\n')
-op = opt.Options(vscale=0.2, rm=60)
-mesh, eta0, b = msh.TohokuDomain(op.res)
 approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'simpleAdapt'
+op = opt.Options(vscale=0.2, rm=60 if approach == 'goalBased' else 30)
+mesh, eta0, b = msh.TohokuDomain(op.res)
 dirName = 'plots/' + approach + '/' + msh.MeshSetup(op.res).meshName + '/'
 msh.saveMesh(mesh, dirName + 'hdf5/mesh')
 
