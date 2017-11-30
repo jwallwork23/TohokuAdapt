@@ -148,7 +148,7 @@ if approach == 'goalBased':
                         loadResidual.close()
 
                     # Estimate error using forward residual
-                    epsilon = assemble(v * inner(rho, dual) * dx)
+                    epsilon = assemble(v * inner(rho, dual) * dx)   # TODO: consider DWR or other estimators?
                     epsNorm = np.abs(assemble(epsilon * dx))
                     if epsNorm == 0.:
                         epsNorm = 1.

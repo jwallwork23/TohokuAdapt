@@ -334,7 +334,9 @@ def pointwiseMax(f, g):
     return f
 
 
-def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, nu=0., timestepper='ImplicitEuler'):
+# TODO: more rigourous analysis of what `metric advection` is and how it is best implemented
+
+def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEuler'):
     """
     'Advect' metric with finest resolution in direction of fluid velocity/wind field.
     
@@ -343,7 +345,6 @@ def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, nu=0., timestepper='Impl
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param n: number of timesteps to advect over.
     :param outfile: toggle metric output and location.
-    :param nu: toggle inclusion of metric diffusion by increasing diffusivity parameter.
     :param timestepper: time integration scheme used.
     :param bc: boundary condition on Tensor advection PDE problem.
     """
@@ -360,7 +361,7 @@ def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, nu=0., timestepper='Impl
     M = Function(V)
 
     # Set up Tensor advection FEM problem
-    F = form.weakMetricAdvection(M, M_, Mt, w, Dt, nu, timestepper=timestepper)
+    F = form.weakMetricAdvection(M, M_, Mt, w, Dt, timestepper=timestepper)
     prob = NonlinearVariationalProblem(F, M)
     solv = NonlinearVariationalSolver(prob, bc=bc)
 

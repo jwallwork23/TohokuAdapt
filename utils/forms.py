@@ -65,7 +65,7 @@ def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=416
     return Functional(inner(q, k) * dx * dt[Tstart:Tend])
 
 
-def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson', rotational=False):
+def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson', rotational=False, momentum=False):
     """
     Construct the strong residual for linear shallow water equations at the current timestep, using Crank Nicolson
     timestepping to express as a 'stationary' PDE `Lq-s=0`, where the 'source term' s depends on the data from the
@@ -77,12 +77,22 @@ def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson', rotationa
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: coefficient for stress term.
     :param rotational: toggle rotational / non-rotational equations.
+    :param momentum: toggle momentum form of equations.
     :return: strong residual for shallow water equations at current timestep.
     """
+    # TODO: include optionality for BCs
+
+    # TODO: implement Galerkin Least Squares (GLS) stabilisation
+
     (u, eta) = (as_vector((q[0], q[1])), q[2])
     (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
     um = timestepScheme(u, u_, timestepper)
     em = timestepScheme(eta, eta_, timestepper)
+
+    # TODO: account for momentum form of SWEs, as used in Huang's test case
+    # if momentum:
+    #   ...
+    # else:
 
     Au = u - u_ + Dt * 9.81 * grad(em)
     Ae = eta - eta_ + Dt * div(b * um)
@@ -94,9 +104,7 @@ def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson', rotationa
     return Au, Ae
 
 
-# TODO: implement Galerkin Least Squares (GLS) stabilisation
-
-def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson', rotational=False):
+def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson', rotational=False, momentum=False):
     """
     :param q: solution tuple for linear shallow water equations.
     :param q_: solution tuple for linear shallow water equations at previous timestep.
@@ -105,13 +113,21 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson', rotatio
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: coefficient for stress term.
     :param rotational: toggle rotational / non-rotational equations.
+    :param momentum: toggle momentum form of equations.
     :return: weak residual for shallow water equations at current timestep.
     """
+    # TODO: include optionality for BCs
+
     (u, eta) = (as_vector((q[0], q[1])), q[2])
     (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
     (w, xi) = (as_vector((qt[0], qt[1])), qt[2])
     um = timestepScheme(u, u_, timestepper)
     em = timestepScheme(eta, eta_, timestepper)
+
+    # TODO: account for momentum form of SWEs, as used in Huang's test case
+    # if momentum:
+    #   ...
+    # else:
 
     F = (inner(u - u_, w) + inner(eta - eta_, xi) + Dt * (9.81 * inner(grad(em), w) - inner(b * um, grad(xi)))) * dx
     if nu != 0.:
@@ -172,19 +188,16 @@ def weakResidualAD(c, c_, ct, u, Dt, nu=1e-3, timestepper='CrankNicolson'):
     return ((c - c_) * ct - Dt * inner(cm * u, grad(ct)) + Dt * Constant(nu) * inner(grad(cm), grad(ct))) * dx
 
 
-def weakMetricAdvection(M, M_, Mt, w, Dt, nu=0., timestepper='ImplicitEuler'):
+def weakMetricAdvection(M, M_, Mt, w, Dt, timestepper='ImplicitEuler'):
     """
     :param M: metric at current timestep.
     :param M_: metric at previous timestep.
     :param Mt: test function.
     :param w: wind vector.
     :param Dt: timestep expressed as a FiredrakeConstant.
-    :param nu: diffusivity.
     :param timestepper: time integration scheme used.
     :return: weak residual for metric advection.
     """
     Mm = timestepScheme(M, M_, timestepper)
     F = (inner(M - M_, Mt) + Dt * inner(dot(w, nabla_grad(Mm)), Mt)) * dx
-    if nu != 0.:
-        F += nu * inner(grad(M), grad(Mt)) * dx  # TODO: what does this mean?
     return F
