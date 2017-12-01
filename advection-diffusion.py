@@ -179,10 +179,12 @@ if approach == 'goalBased':
     # Reset initial conditions for primal problem and recreate error indicator placeholder
     phi = ic.copy(deepcopy=True)
     phi.rename('Concentration')
-    epsilon_n = Function(P1_n, name="Error indicator")
 
 if approach in ('simpleAdapt', 'goalBased'):
     print('\nStarting adaptive mesh primal run (forwards in time)')
+    mesh_n0 = mesh_n
+    P1_n0 = FunctionSpace(mesh_n0, 'CG', 1)
+
     adaptTimer = clock()
     while t <= T:
         if not cnt % rm:
@@ -193,12 +195,14 @@ if approach in ('simpleAdapt', 'goalBased'):
             H = adap.constructHessian(mesh_n, W, phi, op=op)
 
             # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
+            epsilon_n = Function(P1_n0, name="Error indicator")
             if approach == 'goalBased':
                 with DumbCheckpoint(dirName + 'hdf5/error_' + stor.indexString(cnt), mode=FILE_READ) as loadError:
                     loadError.load(epsilon_n)
                     loadError.close()
+                errEst = inte.interp(mesh_n, epsilon_n)[0]
                 for k in range(mesh_n.topology.num_vertices()):
-                    H.dat.data[k] *= epsilon_n.dat.data[k]      # Scale by error estimate
+                    H.dat.data[k] *= errEst.dat.data[k]      # Scale by error estimate
 
             # Adapt mesh and interpolate variables
             M = adap.computeSteadyMetric(mesh_n, W, H, phi, nVerT=nVerT, op=op)
