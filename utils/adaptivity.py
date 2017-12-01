@@ -372,7 +372,7 @@ def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEul
         if outfile != None:
             Mfile.write(M_, time=i)
 
-    return M
+    return M_
 
 
 if __name__ == '__main__':

@@ -15,10 +15,12 @@ import utils.storage as stor
 # Define initial mesh and mesh statistics placeholders
 print('*********************** TOHOKU TSUNAMI SIMULATION *********************\n')
 approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'simpleAdapt'
-op = opt.Options(vscale=0.4 if approach == 'goalBased' else 0.85,
-                 rm=60 if approach == 'goalBased' else 30,
-                 gradate=False,
+useAdjoint = approach == 'goalBased'
+op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
+                 rm=60 if useAdjoint else 30,
+                 gradate=True if useAdjoint else False,
                  advect=False,
+                 outputHessian=True,
                  coarseness=5)
 mesh, eta0, b = msh.TohokuDomain(op.coarseness)
 
@@ -30,6 +32,7 @@ residualFile = File(dirName + "residual.pvd")
 adjointFile = File(dirName + "adjointSW.pvd")
 errorFile = File(dirName + "errorIndicatorSW.pvd")
 adaptiveFile = File(dirName + "goalBasedSW.pvd") if approach == 'goalBased' else File(dirName + "simpleAdaptSW.pvd")
+hessianFile = File(dirName + "hessian.pvd")
 
 # Specify physical and solver parameters
 dt = op.dt
@@ -70,7 +73,7 @@ if approach in ('fixedMesh', 'goalBased'):
     forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
     forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
-    if approach == 'goalBased':
+    if useAdjoint:
         P0 = FunctionSpace(mesh, "DG", 0)
         v = TestFunction(P0)
 
@@ -93,7 +96,7 @@ if approach in ('fixedMesh', 'goalBased'):
         forwardSolver.solve()
         q_.assign(q)
 
-        if approach == 'goalBased':
+        if useAdjoint:
             # Mark timesteps to be used in adjoint simulation
             if t >= T:
                 finished = True
@@ -149,10 +152,10 @@ if approach == 'goalBased':
 
                 # Estimate error using forward residual
                 epsilon = assemble(v * inner(rho, dual) * dx)
-                epsNorm = np.abs(assemble(epsilon * dx))
+                epsNorm = np.abs(assemble(inner(rho, dual) * dx))   # Normalise
                 if epsNorm == 0.:
                     epsNorm = 1.
-                epsilon.dat.data[:] = np.abs(epsilon.dat.data) / epsNorm
+                epsilon.dat.data[:] = np.abs(epsilon.dat.data) / epsNorm * 1e6      # TODO: fairly arbitrary scaling
                 epsilon.rename("Error indicator")
 
                 # Save error indicator data to HDF5
@@ -184,6 +187,10 @@ if approach == 'goalBased':
     epsilon = Function(P0, name="Error indicator")
 
 if approach in ('simpleAdapt', 'goalBased'):
+
+    if useAdjoint and op.gradate:
+        h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
+
     print('\nStarting adaptive mesh primal run (forwards in time)')
     adaptTimer = clock()
     while t <= T:
@@ -195,17 +202,23 @@ if approach in ('simpleAdapt', 'goalBased'):
             H = adap.constructHessian(mesh, W, eta, op=op)
 
             # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
-            if approach == 'goalBased':
+            if useAdjoint & (cnt != 0):
                 with DumbCheckpoint(dirName + 'hdf5/error_' + stor.indexString(cnt), mode=FILE_READ) as loadError:
                     loadError.load(epsilon)                 # P0 field on the initial mesh
                     loadError.close()
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])
                 for k in range(mesh.topology.num_vertices()):
                     H.dat.data[k] *= errEst.dat.data[k]     # Scale by error estimate
+            if op.outputHessian:
+                H.rename("Hessian")
+                hessianFile.write(H, time=t)
 
             # Adapt mesh and interpolate variables
             M = adap.computeSteadyMetric(mesh, W, H, eta, nVerT=nVerT, op=op)
             if op.gradate:
+                if useAdjoint:
+                    M_ = adap.isotropicMetric(W, inte.interp(mesh, h)[0], bdy=True, op=op)  # Initial boundary metric
+                    M = adap.metricIntersection(mesh, W, M, M_, bdy=True)
                 adap.metricGradation(mesh, M)
             if op.advect:
                 M = adap.advectMetric(M, u, Dt, n=rm)
@@ -242,6 +255,6 @@ if approach in ('simpleAdapt', 'goalBased'):
     print('Adaptive primal run complete. Run time: %.3fs \n' % adaptTimer)
 
 # Print to screen timing analyses (and error in pure advection case)
-if approach == 'goalBased':
+if useAdjoint:
     print("TIMINGS:         Forward run   %5.3fs, Adjoint run   %5.3fs, Adaptive run   %5.3fs" %
           (primalTimer, dualTimer, adaptTimer))
