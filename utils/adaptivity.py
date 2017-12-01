@@ -378,21 +378,26 @@ def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEul
 
     elif fieldToAdvect == 'li':
 
+        # TODO: fix this approach
+
         # Define trial and test functions
         W = VectorFunctionSpace(mesh, 'CG', 1)
         lt = TestFunction(W)
         l = Function(W)
         l_ = Function(W)    # Eigenvalues
         v = Function(V)     # Eigenvectors
+        b = Function(W)
 
         # Get eigenpairs on current mesh
         for i in range(mesh.topology.num_vertices()):
             l_.dat.data[i], v.dat.data[i] = la.eig(M_.dat.data[i])
+            if i in DirichletBC(W, 0, 'on_boundary').nodes:
+                b.dat.data[i] = l_.dat.data[i]
 
         # Set up vector advection FEM problem
         F = form.weakMetricAdvection(l, l_, lt, w, Dt, timestepper=timestepper)
         prob = NonlinearVariationalProblem(F, l)
-        solv = NonlinearVariationalSolver(prob, bc=bc)
+        solv = NonlinearVariationalSolver(prob, bc=DirichletBC(W, b, 'on_boundary'))
 
         for i in range(1, n+1):
             solv.solve()
