@@ -118,7 +118,7 @@ if approach in ('fixedMesh', 'goalBased'):
 
         if not cnt % ndump:
             forwardFile.write(u, eta, time=t)
-            print('t = %.2fs' % t)
+            print(cnt, ': t = %.2fs' % t)
         t += dt
         cnt += 1
     cnt -=1
@@ -168,7 +168,7 @@ if approach == 'goalBased':
 
             if not cnt % ndump:
                 adjointFile.write(dual_u, dual_e, time=t)
-                print('t = %.2fs' % t)
+                print(cnt, ': t = %.2fs' % t)
             t -= dt
             cnt -= 1
             save = False
@@ -248,7 +248,7 @@ if approach in ('simpleAdapt', 'goalBased'):
 
         if not cnt % ndump:
             adaptiveFile.write(u, eta, time=t)
-            print('t = %.2fs' % t)
+            print(cnt, ': t = %.2fs' % t)
         t += dt
         cnt += 1
     adaptTimer = clock() - adaptTimer

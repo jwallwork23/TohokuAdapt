@@ -190,6 +190,8 @@ def weakResidualAD(c, c_, ct, u, Dt, nu=1e-3, timestepper='CrankNicolson'):
 
 def weakMetricAdvection(M, M_, Mt, w, Dt, timestepper='ImplicitEuler'):
     """
+    Advect a metric. Also works for vector fields.
+    
     :param M: metric at current timestep.
     :param M_: metric at previous timestep.
     :param Mt: test function.

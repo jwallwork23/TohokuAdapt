@@ -197,7 +197,7 @@ if approach in ('simpleAdapt', 'goalBased'):
             if op.gradate:
                 adap.metricGradation(mesh, M)
             if op.advect:
-                M = adap.advectMetric(M, w, Dt, n=rm, nu=nu)
+                M = adap.advectMetric(M, w, Dt, n=rm, fieldToAdvect='li')
             mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
             phi = inte.interp(mesh, phi)[0]
             phi.rename("Concentration")

@@ -336,7 +336,7 @@ def pointwiseMax(f, g):
 
 # TODO: more rigourous analysis of what `metric advection` is and how it is best implemented
 
-def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEuler'):
+def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEuler', fieldToAdvect='M'):
     """
     'Advect' metric with finest resolution in direction of fluid velocity/wind field.
     
@@ -345,32 +345,70 @@ def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEul
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param n: number of timesteps to advect over.
     :param outfile: toggle metric output and location.
-    :param timestepper: time integration scheme used.
     :param bc: boundary condition on Tensor advection PDE problem.
+    :param timestepper: time integration scheme used.
+    :param fieldToAdvect: individial enties ('Mij') eigenvalues ('li'), eigenpairs ('ei') or metric itself ('M').
     """
     import utils.forms as form
+
+    V = M_.function_space()
+    mesh = V.mesh()
+    M = Function(V)
 
     if outfile != None:
         Mfile = File(outfile)
         Mfile.write(M_, time=0)
 
-    # Get FunctionSpace data and select timestepping scheme
-    V = M_.function_space()
-    mesh = V.mesh()
-    Mt = TestFunction(V)
-    M = Function(V)
+    if fieldToAdvect == 'M':
 
-    # Set up Tensor advection FEM problem
-    F = form.weakMetricAdvection(M, M_, Mt, w, Dt, timestepper=timestepper)
-    prob = NonlinearVariationalProblem(F, M)
-    solv = NonlinearVariationalSolver(prob, bc=bc)
+        # Define test function
+        Mt = TestFunction(V)
 
-    # Time integrate
-    for i in range(1, n+1):
-        solv.solve()
-        M_.assign(metricIntersection(mesh, V, M_, M))
-        if outfile != None:
-            Mfile.write(M_, time=i)
+        # Set up tensor advection FEM problem
+        F = form.weakMetricAdvection(M, M_, Mt, w, Dt, timestepper=timestepper)
+        prob = NonlinearVariationalProblem(F, M)
+        solv = NonlinearVariationalSolver(prob, bc=bc)
+
+        # Time integrate
+        for i in range(1, n+1):
+            solv.solve()
+            M_.assign(metricIntersection(mesh, V, M_, M))
+            if outfile != None:
+                Mfile.write(M_, time=i)
+
+    elif fieldToAdvect == 'li':
+
+        # Define trial and test functions
+        W = VectorFunctionSpace(mesh, 'CG', 1)
+        lt = TestFunction(W)
+        l = Function(W)
+        l_ = Function(W)    # Eigenvalues
+        v = Function(V)     # Eigenvectors
+
+        # Get eigenpairs on current mesh
+        for i in range(mesh.topology.num_vertices()):
+            l_.dat.data[i], v.dat.data[i] = la.eig(M_.dat.data[i])
+
+        # Set up vector advection FEM problem
+        F = form.weakMetricAdvection(l, l_, lt, w, Dt, timestepper=timestepper)
+        prob = NonlinearVariationalProblem(F, l)
+        solv = NonlinearVariationalSolver(prob, bc=bc)
+
+        for i in range(1, n+1):
+            solv.solve()
+            l_.assign(l)
+
+            # Reconstruct metric from advected eigenvalues and intersect
+            for i in range(mesh.topology.num_vertices()):
+                M.dat.data[i] = v.dat.data[i] * [[max(l.dat.data[i, 0], 1), 0], [0, max(l.dat.data[i, 1], 1)]] \
+                              * np.transpose(v.dat.data[i])
+            M_.assign(metricIntersection(mesh, V, M_, M))
+            if outfile != None:
+                Mfile.write(M_, time=i)
+
+    else:
+        raise NotImplementedError
+        # TODO: investigate and implement other methods. Check BCs work.
 
     return M_
 
