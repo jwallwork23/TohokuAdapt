@@ -14,15 +14,15 @@ import utils.storage as stor
 print('\n******************************** ADVECTION-DIFFUSION TEST PROBLEM ********************************\n')
 print('Mesh adaptive solver initially defined on a rectangular mesh')
 approach = input("Choose approach: 'fixdMesh', 'simpleAdapt' or 'goalBased': ") or 'goalBased'
+useAdjoint = approach == 'goalBased'
+diffusion = True
+
+# Cheat code to resume from saved data in goalBased case
 if approach == 'saved':
     approach = 'goalBased'
     getData = False
 else:
     getData = True
-diffusion = bool(input("Hit anything except enter to consider diffusion. "))
-
-# TODO: There seems to be an excessive amount of interpolation from mesh_n to mesh_N and then back to mesh_n.
-# TODO: It would be much more efficient to establish this transformation once and then just apply it.
 
 # Establish filenames
 dirName = "plots/advectionDiffusion/"
@@ -30,7 +30,7 @@ forwardFile = File(dirName + "forwardAD.pvd")
 residualFile = File(dirName + "residualAD.pvd")
 adjointFile = File(dirName + "adjointAD.pvd")
 errorFile = File(dirName + "errorIndicatorAD.pvd")
-adaptiveFile = File(dirName + "goalBasedAD.pvd") if approach == 'goalBased' else File(dirName + "simpleAdaptAD.pvd")
+adaptiveFile = File(dirName + "goalBasedAD.pvd") if useAdjoint else File(dirName + "simpleAdaptAD.pvd")
 
 # Define Mesh and FunctionSpace
 n = 16
@@ -41,7 +41,7 @@ x, y = SpatialCoordinate(mesh_n)
 V_n = FunctionSpace(mesh_n, "CG", 2)
 V_N = FunctionSpace(mesh_N, "CG", 2)
 
-if approach == 'goalBased':
+if useAdjoint:
     dual_n = Function(V_n, name='Adjoint')
     rho_N = Function(V_N, name='Residual')
     P0_N = FunctionSpace(mesh_N, "DG", 0)
@@ -50,7 +50,7 @@ if approach == 'goalBased':
 # Specify physical and solver parameters
 op = opt.Options(dt=0.04, Tend=2.4,
                  hmin=5e-2, hmax=1., rm=5, gradate=False, advect=False,
-                 vscale=0.4 if approach == 'goalBased' else 0.85)
+                 vscale=0.4 if useAdjoint else 0.85)
 dt = op.dt
 Dt = Constant(dt)
 T = op.Tend
@@ -96,7 +96,7 @@ if getData:
             solve(F == 0, phi_next, bc)
             phi.assign(phi_next)
 
-            if approach == 'goalBased':
+            if useAdjoint:
                 # Tell dolfin about timesteps
                 if t > T:
                     finished = True
@@ -125,7 +125,7 @@ if getData:
         finalFixed = Function(V_n)
         finalFixed.dat.data[:] = phi.dat.data   # NOTE assign, copy and interpolate functions are overloaded
 
-    if approach == 'goalBased':
+    if useAdjoint:
         # Set up adjoint problem
         J = form.objectiveFunctionalAD(phi)
         parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
@@ -195,7 +195,7 @@ if approach in ('simpleAdapt', 'goalBased'):
             H = adap.constructHessian(mesh_n, W, phi, op=op)
 
             # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
-            if approach == 'goalBased':
+            if useAdjoint:
                 epsilon_N = Function(P0_N, name="Error indicator")
                 with DumbCheckpoint(dirName + 'hdf5/error_' + stor.indexString(cnt), mode=FILE_READ) as loadError:
                     loadError.load(epsilon_N)
@@ -242,7 +242,7 @@ if approach in ('simpleAdapt', 'goalBased'):
     finalAdapt = phi.copy(deepcopy=True)
 
 # Print to screen timing analyses (and error in pure advection case)
-if getData and (approach == 'goalBased'):
+if getData and useAdjoint:
     print("TIMINGS:         Forward run   %5.3fs, Adjoint run   %5.3fs, Adaptive run   %5.3fs" %
           (primalTimer, dualTimer, adaptTimer))
     if not diffusion:

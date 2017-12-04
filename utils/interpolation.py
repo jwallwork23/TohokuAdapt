@@ -66,10 +66,21 @@ def interp(mesh, *fields):
         fields_new += (f_new,)
     return fields_new
 
-def mixedPairInterp(mesh, V, q):
-    p = Function(V)
-    p0, p1 = p.split()
-    q0, q1 = q.split()
-    q0, q1 = interp(mesh, q0, q1)
-    p0.assign(q0), p1.assign(q1)
-    return p
+def mixedPairInterp(mesh, V, *fields):
+    """
+    Interpolate mixed function space pairs onto a new mesh.
+    
+    :param mesh: new mesh to be interpolated onto.
+    :param V: mixed function space defined on new mesh, with same type as that on which fields are defined.
+    :param fields: fields to be interpolated.
+    :return: interpolated function pairs.
+    """
+    fields_new = ()
+    for q in fields:
+        p = Function(V)
+        p0, p1 = p.split()
+        q0, q1 = q.split()
+        q0, q1 = interp(mesh, q0, q1)
+        p0.assign(q0), p1.assign(q1)
+        fields_new += (p,)
+    return fields_new
