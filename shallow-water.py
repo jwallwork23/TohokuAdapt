@@ -13,7 +13,7 @@ import utils.storage as stor
 
 print('\n*********************** SHALLOW WATER TEST PROBLEM ************************\n')
 print('Mesh adaptive solver initially defined on a square mesh')
-approach = input("Choose approach: 'fixdMesh', 'simpleAdapt' or 'goalBased': ") or 'simpleAdapt'
+approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'simpleAdapt'
 
 # Establish filenames
 dirName = "plots/testSuite/"
@@ -24,7 +24,8 @@ errorFile = File(dirName + "errorIndicatorSW.pvd")
 adaptiveFile = File(dirName + "goalBasedSW.pvd") if approach == 'goalBased' else File(dirName + "simpleAdaptSW.pvd")
 
 # Specify physical and solver parameters
-op = opt.Options(dt=0.05, hmin=5e-2, hmax=1., Tend=2.5, rm=5, Tstart=0.5, gradate=False, advect=False,
+op = opt.Options(dt=0.05, Tstart=0.5, Tend=2.5, family='dg-cg',
+                 hmin=5e-2, hmax=1., rm=5, gradate=False, advect=False,
                  vscale=0.4 if approach == 'goalBased' else 0.85)
 dt = op.dt
 Dt = Constant(dt)
@@ -147,8 +148,8 @@ if approach == 'goalBased':
                         loadResidual.load(rho_e)
                         loadResidual.close()
 
-                    # Estimate error using forward residual
-                    epsilon = assemble(v * inner(rho, dual) * dx)       # TODO: consider DWR or other estimators?
+                    # Estimate error using forward residual (DWR)
+                    epsilon = assemble(v * inner(rho, dual) * dx)
                     epsNorm = np.abs(assemble(inner(rho, dual) * dx))   # Normalise
                     if epsNorm == 0.:
                         epsNorm = 1.

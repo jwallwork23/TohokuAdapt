@@ -21,7 +21,7 @@ op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
                  gradate=True if useAdjoint else False,
                  advect=False,
                  outputHessian=True,
-                 coarseness=5)
+                 coarseness=4)
 mesh, eta0, b = msh.TohokuDomain(op.coarseness)
 
 # Establish filenames
