@@ -83,7 +83,7 @@ cnt = 0
 
 if getData:
     if approach in ('fixedMesh', 'goalBased'):
-        # Establish bilinear form and set boundary conditions
+        # Define variational problem
         psi = TestFunction(V_n)
         F = form.weakResidualAD(phi_next, phi, psi, w, Dt, nu=nu)
         bc = DirichletBC(V_n, 0., "on_boundary")
@@ -95,8 +95,21 @@ if getData:
             # Solve problem at current timestep
             solve(F == 0, phi_next, bc)
 
+            # Approximate residual of forward equation and save to HDF5
             if useAdjoint:
-                # Tell dolfin about timesteps
+                if not cnt % rm:
+                    phi_next_N, phi_N, w_N = inte.interp(mesh_N, phi_next, phi, w)
+                    rho_N.interpolate(form.strongResidualAD(phi_next_N, phi_N, w_N, Dt, nu=nu))
+                    with DumbCheckpoint(dirName + 'hdf5/residual_AD' + stor.indexString(cnt), mode=FILE_CREATE) as saveRes:
+                        saveRes.store(rho_N)
+                        saveRes.close()
+                    residualFile.write(rho_N, time=t)
+
+            # Update solution at previous timestep
+            phi.assign(phi_next)
+
+            # Mark timesteps to be used in adjoint simulation
+            if useAdjoint:
                 if t > T:
                     finished = True
                 if t == 0.:
@@ -104,18 +117,6 @@ if getData:
                 else:
                     adj_inc_timestep(time=t, finished=finished)
 
-                if not cnt % rm:
-                    # Approximate residual of forward equation and save to HDF5
-                    phi_next_N, phi_N, w_N = inte.interp(mesh_N, phi_next, phi, w)
-                    rho_N.interpolate(form.strongResidualAD(phi_next_N, phi_N, w_N, Dt, nu=nu))
-                    with DumbCheckpoint(dirName + 'hdf5/residual_AD' + stor.indexString(cnt), mode=FILE_CREATE) as saveRes:
-                        saveRes.store(rho_N)
-                        saveRes.close()
-
-                    # Print to screen, save data and increment counters
-                    residualFile.write(rho_N, time=t)
-
-            phi.assign(phi_next)
             forwardFile.write(phi, time=t)
             print('t = %.3fs' % t)
             t += dt

@@ -44,7 +44,7 @@ forwardFile = File(dirName + "forward.pvd")
 residualFile = File(dirName + "residual.pvd")
 adjointFile = File(dirName + "adjoint.pvd")
 errorFile = File(dirName + "errorIndicator.pvd")
-adaptiveFile = File(dirName + "goalBased.pvd") if approach == 'goalBased' else File(dirName + "simpleAdapt.pvd")
+adaptiveFile = File(dirName + "goalBased.pvd") if useAdjoint else File(dirName + "simpleAdapt.pvd")
 hessianFile = File(dirName + "hessian.pvd")
 
 # Specify physical and solver parameters
@@ -85,7 +85,7 @@ hmin = op.hmin
 hmax = op.hmax
 rm = op.rm
 nEle, nVer = msh.meshStats(mesh)
-N = [nEle, nEle]            # Min/max #Elements
+mM = [nEle, nEle]            # Min/max #Elements
 Sn = nEle
 nVerT = nVer * op.vscale    # Target #Vertices
 
@@ -108,17 +108,9 @@ if getData:
             # Solve problem at current timestep
             forwardSolver.solve()
 
+            # Approximate residual of forward equation and save to HDF5
             if useAdjoint:
-                # Mark timesteps to be used in adjoint simulation
-                if t >= T:
-                    finished = True
-                if t == 0.:
-                    adj_start_timestep()
-                else:
-                    adj_inc_timestep(time=t, finished=finished)
-
                 if not cnt % rm:
-                    # Approximate residual of forward equation and save to HDF5
                     qN, q_N = inte.mixedPairInterp(mesh_N, V_N, q, q_)
                     Au, Ae = form.strongResidualSW(q, q_, b, Dt)
                     rho_u.interpolate(Au)
@@ -129,7 +121,18 @@ if getData:
                         chk.close()
                     residualFile.write(rho_u, rho_e, time=t)
 
+            # Update solution at previous timestep
             q_.assign(q)
+
+            # Mark timesteps to be used in adjoint simulation
+            if useAdjoint:
+                if t >= T:
+                    finished = True
+                if t == 0.:
+                    adj_start_timestep()
+                else:
+                    adj_inc_timestep(time=t, finished=finished)
+
             if not cnt % ndump:
                 forwardFile.write(u, eta, time=t)
                 print(cnt, ': t = %.2fs' % t)
@@ -139,7 +142,7 @@ if getData:
         primalTimer = clock() - primalTimer
         print('Primal run complete. Run time: %.3fs' % primalTimer)
 
-    if approach == 'goalBased':
+    if useAdjoint:
         # Set up adjoint problem
         J = form.objectiveFunctionalSW(q, plot=True)
         parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
@@ -154,6 +157,7 @@ if getData:
                 # Load adjoint data. NOTE the interpolation operator is overloaded
                 dual_u.dat.data[:] = variable.dat.data[0]
                 dual_e.dat.data[:] = variable.dat.data[1]
+                dual_N = inte.mixedPairInterp(mesh_N, V_N, dual)[0]
 
                 if not cnt % rm:
                     indexStr = stor.indexString(cnt)
@@ -165,8 +169,8 @@ if getData:
                         loadResidual.close()
 
                     # Estimate error using forward residual
-                    epsilon = assemble(v * inner(rho, dual) * dx)
-                    epsNorm = np.abs(assemble(inner(rho, dual) * dx))   # Normalise
+                    epsilon = assemble(v * inner(rho, dual_N) * dx)
+                    epsNorm = np.abs(assemble(inner(rho, dual_N) * dx))   # Normalise
                     if epsNorm == 0.:
                         epsNorm = 1.
                     epsilon.dat.data[:] = np.abs(epsilon.dat.data) / epsNorm * 1e6      # TODO: fairly arbitrary scaling
@@ -198,7 +202,7 @@ if getData:
         # Reset initial conditions for primal problem and recreate error indicator placeholder
         u_.interpolate(Expression([0, 0]))
         eta_.interpolate(eta0)
-        epsilon = Function(P0, name="Error indicator")
+        epsilon = Function(P0_N, name="Error indicator")
 
 if approach in ('simpleAdapt', 'goalBased'):
 
@@ -252,7 +256,7 @@ if approach in ('simpleAdapt', 'goalBased'):
 
             # Get mesh stats
             nEle = msh.meshStats(mesh)[0]
-            N = [min(nEle, N[0]), max(nEle, N[1])]
+            mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
             op.printToScreen(cnt / rm + 1, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, N)
 
@@ -269,6 +273,6 @@ if approach in ('simpleAdapt', 'goalBased'):
     print('Adaptive primal run complete. Run time: %.3fs \n' % adaptTimer)
 
 # Print to screen timing analyses (and error in pure advection case)
-if useAdjoint:
+if getData and useAdjoint:
     print("TIMINGS:         Forward run   %5.3fs, Adjoint run   %5.3fs, Adaptive run   %5.3fs" %
           (primalTimer, dualTimer, adaptTimer))
