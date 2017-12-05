@@ -13,7 +13,7 @@ import utils.storage as stor
 
 
 print('*********************** TOHOKU TSUNAMI SIMULATION *********************\n')
-approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'simpleAdapt'
+approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'goalBased'
 
 # Cheat code to resume from saved data in goalBased case
 if approach == 'saved':
@@ -33,13 +33,13 @@ op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
 
 mesh, eta0, b = msh.TohokuDomain(op.coarseness)
 if useAdjoint:
-    assert op.coarseness in (3, 4, 5)
-    mesh_N, b_N = msh.TohokuDomain(op.coarseness-2)[0::2]   # Get fine mesh and associated bathymetry
+    assert op.coarseness != 1
+    mesh_N, b_N = msh.TohokuDomain(op.coarseness-1)[0::2]   # Get finer mesh and associated bathymetry
 V_N = VectorFunctionSpace(mesh_N, op.space1, op.degree1) * FunctionSpace(mesh_N, op.space2, op.degree2)
 
 # Establish filenames
 dirName = 'plots/firedrake-tsunami/' + msh.MeshSetup(op.coarseness).meshName + '/'
-msh.saveMesh(mesh, dirName + 'hdf5/mesh')
+msh.saveMesh(mesh, dirName + 'hdf5/mesh_00000')
 forwardFile = File(dirName + "forward.pvd")
 residualFile = File(dirName + "residual.pvd")
 adjointFile = File(dirName + "adjoint.pvd")
@@ -112,7 +112,7 @@ if getData:
             if useAdjoint:
                 if not cnt % rm:
                     qN, q_N = inte.mixedPairInterp(mesh_N, V_N, q, q_)
-                    Au, Ae = form.strongResidualSW(q, q_, b, Dt)
+                    Au, Ae = form.strongResidualSW(qN, q_N, b_N, Dt)
                     rho_u.interpolate(Au)
                     rho_e.interpolate(Ae)
                     with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_CREATE) as chk:
@@ -135,7 +135,7 @@ if getData:
 
             if not cnt % ndump:
                 forwardFile.write(u, eta, time=t)
-                print(cnt, ': t = %.2fs' % t)
+                print('t = %.2fs' % t)
             t += dt
             cnt += 1
         cnt -=1
@@ -173,7 +173,7 @@ if getData:
                     epsNorm = np.abs(assemble(inner(rho, dual_N) * dx))   # Normalise
                     if epsNorm == 0.:
                         epsNorm = 1.
-                    epsilon.dat.data[:] = np.abs(epsilon.dat.data) / epsNorm * 1e6      # TODO: fairly arbitrary scaling
+                    epsilon.dat.data[:] = np.abs(epsilon.dat.data) / epsNorm
                     epsilon.rename("Error indicator")
 
                     # Save error indicator data to HDF5
@@ -186,7 +186,7 @@ if getData:
 
                 if not cnt % ndump:
                     adjointFile.write(dual_u, dual_e, time=t)
-                    print(cnt, ': t = %.2fs' % t)
+                    print('t = %.2fs' % t)
                 t -= dt
                 cnt -= 1
                 save = False
@@ -214,6 +214,7 @@ if approach in ('simpleAdapt', 'goalBased'):
     while t <= T:
         if not cnt % rm:
             stepTimer = clock()
+            indexStr = stor.indexString(cnt)
 
             # Reconstruct Hessian
             W = TensorFunctionSpace(mesh, "CG", 1)
@@ -221,7 +222,7 @@ if approach in ('simpleAdapt', 'goalBased'):
 
             # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
             if useAdjoint & (cnt != 0):
-                with DumbCheckpoint(dirName + 'hdf5/error_' + stor.indexString(cnt), mode=FILE_READ) as loadError:
+                with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_READ) as loadError:
                     loadError.load(epsilon)                 # P0 field on the initial mesh
                     loadError.close()
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])
@@ -231,7 +232,7 @@ if approach in ('simpleAdapt', 'goalBased'):
                 H.rename("Hessian")
                 hessianFile.write(H, time=t)
 
-            # Adapt mesh and interpolate variables
+            # Adapt mesh
             M = adap.computeSteadyMetric(mesh, W, H, eta, nVerT=nVerT, op=op)
             if op.gradate:
                 if useAdjoint:
@@ -241,6 +242,9 @@ if approach in ('simpleAdapt', 'goalBased'):
             if op.advect:
                 M = adap.advectMetric(M, u, Dt, n=rm)
             mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
+            msh.saveMesh(mesh, dirName + 'hdf5/mesh_' + indexStr)
+
+            # Interpolate variables
             V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
             q_ = inte.mixedPairInterp(mesh, V, q_)
             b = inte.interp(mesh, b)[0]     # Combine this in above interpolation for speed
@@ -266,7 +270,7 @@ if approach in ('simpleAdapt', 'goalBased'):
 
         if not cnt % ndump:
             adaptiveFile.write(u, eta, time=t)
-            print(cnt, ': t = %.2fs' % t)
+            print('t = %.2fs' % t)
         t += dt
         cnt += 1
     adaptTimer = clock() - adaptTimer

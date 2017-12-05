@@ -16,13 +16,14 @@ def indexString(index):
     return (5 - len(str(index))) * '0' + str(index)
 
 
-def gaugeTimeseries(gauge, dirName, iEnd):
+def gaugeTimeseries(gauge, dirName, iEnd, rm=60):
     """
     Store timeseries data for a particular gauge and calculate (L1, L2, L-infinity) error norms.
     
     :param gauge: gauge name string, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
     :param dirName: name of directory for locating HDF5 files, from the set {'fixedMesh', 'simpleAdapt', 'adjointBased'}
     :param iEnd: final HDF5 name string index.
+    :param rm: timesteps per remesh.
     :return: a list containing the timeseries data.
     """
     op = options.Options()
@@ -50,7 +51,8 @@ def gaugeTimeseries(gauge, dirName, iEnd):
         indexStr = indexString(i)
 
         # Load mesh from file and set up Function to load into
-        elev_2d = Function(FunctionSpace(msh.loadMesh(dirName + 'mesh_' + indexStr + '.h5')))
+        if not i % rm:
+            elev_2d = Function(FunctionSpace(msh.loadMesh(dirName + 'mesh_' + indexStr + '.h5')))
 
         # Load data from HDF5 and get timeseries data
         with DumbCheckpoint(dirName + '/Elevation2d_' + indexStr, mode=FILE_READ) as el:
@@ -164,3 +166,4 @@ def saveToDisk(f, g, dirName, index, filename='adjoint_'):
         chk.close()
 
     # TODO: include option for any number of functions to save using *args
+    # TODO: or possibly just remove this function.
