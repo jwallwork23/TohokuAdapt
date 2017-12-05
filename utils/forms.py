@@ -24,8 +24,6 @@ def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=416
                           plot=False, smooth=True):
     """
     :param q: forward solution tuple.
-    # :param t: current time value (s).
-    # :param timestep: time step (s).
     :param Tstart: first time considered as relevant (s).
     :param Tend: last time considered as relevant (s).
     :param x1: West-most coordinate for region A (m).
@@ -51,13 +49,6 @@ def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=416
     ke.interpolate(Expression(indicator))
 
     # TODO: `smoothen` in time (?)
-    # # Modify forcing term to 'smoothen' in time
-    # coeff = Constant(1.)
-    # if t.dat.data < Tstart + 1.5 * timestep:
-    #     coeff.assign(0.5)
-    # elif t.dat.data < Tstart + 0.5 * timestep:
-    #     coeff.assign(0.)
-    #  return (coeff * eta * iA) * dx * dt[Tstart:Tend]
 
     if plot:
         File("plots/adjointBased/kernel.pvd").write(ke)
@@ -98,6 +89,8 @@ def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson', rotationa
 
 def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson', rotational=False):
     """
+    Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
+    
     :param q: solution tuple for linear shallow water equations.
     :param q_: solution tuple for linear shallow water equations at previous timestep.
     :param qt: test function tuple.
@@ -107,7 +100,6 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson', rotatio
     :param rotational: toggle rotational / non-rotational equations.
     :return: weak residual for shallow water equations at current timestep.
     """
-    # TODO: include optionality for BCs
 
     (u, eta) = (as_vector((q[0], q[1])), q[2])
     (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
@@ -149,7 +141,7 @@ def objectiveFunctionalAD(c, x1=2.5, x2=3.5, y1=0.1, y2=0.9):
 def strongResidualMSW(q, q_, h, Dt, y, f0=0., beta=1., g=1., timestepper='CrankNicolson'):
     """
     Construct the strong residual for the semi-discrete linear shallow water equations at the current timestep, in the 
-    nonlinear momentum form used in Huang et al 2008.
+    nonlinear momentum form used in Huang et al 2008. No boundary conditions have been enforced at this stage.
 
     :param q: solution tuple for linear shallow water equations.
     :param q_: solution tuple for linear shallow water equations at previous timestep.
@@ -161,7 +153,6 @@ def strongResidualMSW(q, q_, h, Dt, y, f0=0., beta=1., g=1., timestepper='CrankN
     :param g: gravitiational acceleration.
     :return: strong residual for shallow water equations in momentum form at current timestep.
     """
-    # TODO: include optionality for BCs
 
     (u, v, eta) = (q[0], q[1], q[2])
     (u_, v_, eta_) = (q_[0], q_[1], q_[2])
@@ -196,7 +187,6 @@ def weakResidualMSW(q, q_, qt, h, Dt, y, f0=0., beta=1., g=1., timestepper='Cran
     :param g: gravitiational acceleration.
     :return: weak residual for shallow water equations in momentum form at current timestep.
     """
-    # TODO: include optionality for BCs
 
     (u, v, eta) = (q[0], q[1], q[2])
     (u_, v_, eta_) = (q_[0], q_[1], q_[2])
@@ -214,7 +204,7 @@ def weakResidualMSW(q, q_, qt, h, Dt, y, f0=0., beta=1., g=1., timestepper='Cran
 
     F = ((Hm * ((u - u_) * w + (v - v_) * z) + (H - H_) * (um * w + vm * z)) / Dt) * dx     # Time integrate u, v
     F += ((eta - eta_) * xi / Dt) * dx                                                      # Time integrate eta
-    F += (((Hu2.dx(0) + Huv.dx(1)) * w + (Huv.dx(0) + Hv2.dx(1)) * z) * dx                  # Nonlinear terms
+    F += ((Hu2.dx(0) + Huv.dx(1)) * w + (Huv.dx(0) + Hv2.dx(1)) * z) * dx                   # Nonlinear terms
     F += (f * Hm * (um * z - vm * q)) * dx                                                  # Coriolis effect
     F += (g * Hm * inner(grad(em), as_vector(w, z))) * dx                                   # Grad eta term
     F += (inner(div(as_vector(Hm * um, Hm * vm)), xi)) * dx                                 # div(Hu) term
