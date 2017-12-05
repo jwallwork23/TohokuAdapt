@@ -118,14 +118,14 @@ if __name__ == '__main__':
         x, y = SpatialCoordinate(fineMesh)
         eta0 = Function(FunctionSpace(fineMesh, "CG", 2)).interpolate(
             1e-3 * exp(- (pow(x - np.pi, 2) + pow(y - np.pi, 2))))
-        outfile = File("plots/analytic/freeSurface.pvd")
+        outfile = File("plots/testSuite/analytic_SW.pvd")
         print("Generating Fourier series solution to linear shallow water equations...")
         for i, t in zip(range(41), np.linspace(0., 2., 41)):
             print("t = %.2f" % t)
             eta = error.FourierSeriesSW(eta0, t, 0.1, trunc=10)
             eta.rename("Fourier series free surface")
             outfile.write(eta, time=t)
-            with DumbCheckpoint("plots/analytic/hdf5/freeSurface_" + storage.indexString(i), mode=FILE_CREATE) as chk:
+            with DumbCheckpoint("plots/testSuite/hdf5/analytic_SW" + storage.indexString(i), mode=FILE_CREATE) as chk:
                 chk.store(eta)
                 chk.close()
 
@@ -141,11 +141,9 @@ if __name__ == '__main__':
 
     for index, t in zip(range(41), np.linspace(0., 2., 41)):
         indexStr = storage.indexString(index)
-        with DumbCheckpoint("plots/analytic/hdf5/freeSurface_" + indexStr, mode=FILE_READ) as exact:
+        with DumbCheckpoint("plots/testSuite/hdf5/analytic_SW" + indexStr, mode=FILE_READ) as exact:
             exact.load(eta, name="Fourier series free surface")
             exact.close()
-        with DumbCheckpoint('plots/tests/' + mode + '/hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as approx:
-            approx.load(elev_2d, name="elev_2d")
-            approx.close()
+        # TODO: save hdf5 to load
         approxn = interpolation.interp(fineMesh, elev_2d)[0]
         print('t = %5.2fs, relative error = %8.6f' % (t, errornorm(approxn, eta) / norm(eta)))

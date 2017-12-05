@@ -14,7 +14,6 @@ import utils.storage as stor
 print('\n*********************** SHALLOW WATER TEST PROBLEM ************************\n')
 print('Mesh adaptive solver initially defined on a square mesh')
 approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'goalBased'
-useAdjoint = approach == 'goalBased'
 
 # Cheat code to resume from saved data in goalBased case
 if approach == 'saved':
@@ -22,6 +21,7 @@ if approach == 'saved':
     getData = False
 else:
     getData = True
+useAdjoint = approach == 'goalBased'
 
 # Establish filenames
 dirName = "plots/testSuite/"
@@ -98,10 +98,10 @@ if getData:
         print('\nStarting fixed mesh primal run (forwards in time)')
         finished = False
         primalTimer = clock()
+        forwardFile.write(u, eta, time=t)
         while t < T:
             # Solve problem at current timestep
             forwardSolver.solve()
-            q_.assign(q)
 
             if useAdjoint:
                 # Tell dolfin about timesteps, so it can compute functionals including measures of time other than dt[FINISH_TIME]
@@ -118,13 +118,13 @@ if getData:
                     Au, Ae = form.strongResidualSW(qN, q_N, b, Dt)
                     rho_u.interpolate(Au)
                     rho_e.interpolate(Ae)
-                    with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_CREATE) as chk:
+                    with DumbCheckpoint(dirName + 'hdf5/residual_SW' + stor.indexString(cnt), mode=FILE_CREATE) as chk:
                         chk.store(rho_u)
                         chk.store(rho_e)
                         chk.close()
-
-                    # Print to screen, save to .vtu and increment counters
                     residualFile.write(rho_u, rho_e, time=t)
+
+            q_.assign(q)
             forwardFile.write(u, eta, time=t)
             print('t = %.3fs' % t)
             t += dt
@@ -155,7 +155,7 @@ if getData:
                         indexStr = stor.indexString(cnt)
 
                         # Load residual data from HDF5
-                        with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_READ) as loadResidual:
+                        with DumbCheckpoint(dirName + 'hdf5/residual_SW' + indexStr, mode=FILE_READ) as loadResidual:
                             loadResidual.load(rho_u)
                             loadResidual.load(rho_e)
                             loadResidual.close()
@@ -169,7 +169,7 @@ if getData:
                         epsilon.rename("Error indicator")
 
                         # Save error indicator data to HDF5
-                        with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_CREATE) as saveError:
+                        with DumbCheckpoint(dirName + 'hdf5/error_SW' + indexStr, mode=FILE_CREATE) as saveError:
                             saveError.store(epsilon)
                             saveError.close()
 
@@ -209,7 +209,7 @@ if approach in ('simpleAdapt', 'goalBased'):
             # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
             if useAdjoint:
                 epsilon = Function(P0_N, name="Error indicator")
-                with DumbCheckpoint(dirName + 'hdf5/error_' + stor.indexString(cnt), mode=FILE_READ) as loadError:
+                with DumbCheckpoint(dirName + 'hdf5/error_SW' + stor.indexString(cnt), mode=FILE_READ) as loadError:
                     loadError.load(epsilon)                 # P0 field on the initial mesh
                     loadError.close()
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])

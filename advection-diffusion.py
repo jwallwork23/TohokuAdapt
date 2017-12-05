@@ -13,8 +13,7 @@ import utils.storage as stor
 
 print('\n******************************** ADVECTION-DIFFUSION TEST PROBLEM ********************************\n')
 print('Mesh adaptive solver initially defined on a rectangular mesh')
-approach = input("Choose approach: 'fixdMesh', 'simpleAdapt' or 'goalBased': ") or 'goalBased'
-useAdjoint = approach == 'goalBased'
+approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'goalBased'
 diffusion = True
 
 # Cheat code to resume from saved data in goalBased case
@@ -23,9 +22,10 @@ if approach == 'saved':
     getData = False
 else:
     getData = True
+useAdjoint = approach == 'goalBased'
 
 # Establish filenames
-dirName = "plots/advectionDiffusion/"
+dirName = "plots/testSuite/"
 forwardFile = File(dirName + "forwardAD.pvd")
 residualFile = File(dirName + "residualAD.pvd")
 adjointFile = File(dirName + "adjointAD.pvd")
@@ -94,7 +94,6 @@ if getData:
         while t < T:
             # Solve problem at current timestep
             solve(F == 0, phi_next, bc)
-            phi.assign(phi_next)
 
             if useAdjoint:
                 # Tell dolfin about timesteps
@@ -109,12 +108,14 @@ if getData:
                     # Approximate residual of forward equation and save to HDF5
                     phi_next_N, phi_N, w_N = inte.interp(mesh_N, phi_next, phi, w)
                     rho_N.interpolate(form.strongResidualAD(phi_next_N, phi_N, w_N, Dt, nu=nu))
-                    with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_CREATE) as saveRes:
+                    with DumbCheckpoint(dirName + 'hdf5/residual_AD' + stor.indexString(cnt), mode=FILE_CREATE) as saveRes:
                         saveRes.store(rho_N)
                         saveRes.close()
 
                     # Print to screen, save data and increment counters
                     residualFile.write(rho_N, time=t)
+
+            phi.assign(phi_next)
             forwardFile.write(phi, time=t)
             print('t = %.3fs' % t)
             t += dt
@@ -145,7 +146,7 @@ if getData:
                     indexStr = stor.indexString(cnt)
 
                     # Load residual data from HDF5
-                    with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_READ) as loadRes:
+                    with DumbCheckpoint(dirName + 'hdf5/residual_AD' + indexStr, mode=FILE_READ) as loadRes:
                         loadRes.load(rho_N)
                         loadRes.close()
 
@@ -158,7 +159,7 @@ if getData:
                     epsilon_N.rename("Error indicator")
 
                     # Save error indicator data to HDF5
-                    with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_CREATE) as saveError:
+                    with DumbCheckpoint(dirName + 'hdf5/error_AD' + indexStr, mode=FILE_CREATE) as saveError:
                         saveError.store(epsilon_N)
                         saveError.close()
 
@@ -197,7 +198,7 @@ if approach in ('simpleAdapt', 'goalBased'):
             # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
             if useAdjoint:
                 epsilon_N = Function(P0_N, name="Error indicator")
-                with DumbCheckpoint(dirName + 'hdf5/error_' + stor.indexString(cnt), mode=FILE_READ) as loadError:
+                with DumbCheckpoint(dirName + 'hdf5/error_AD' + stor.indexString(cnt), mode=FILE_READ) as loadError:
                     loadError.load(epsilon_N)
                     loadError.close()
                 errEst = Function(FunctionSpace(mesh_n, "CG", 1)).interpolate(inte.interp(mesh_n, epsilon_N)[0])

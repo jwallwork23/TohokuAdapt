@@ -12,26 +12,39 @@ import utils.options as opt
 import utils.storage as stor
 
 
-# Define initial mesh and mesh statistics placeholders
 print('*********************** TOHOKU TSUNAMI SIMULATION *********************\n')
 approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'simpleAdapt'
+
+# Cheat code to resume from saved data in goalBased case
+if approach == 'saved':
+    approach = 'goalBased'
+    getData = False
+else:
+    getData = True
 useAdjoint = approach == 'goalBased'
+
+# Define initial mesh and mesh statistics placeholders
 op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
                  rm=60 if useAdjoint else 30,
                  gradate=True if useAdjoint else False,
                  advect=False,
                  outputHessian=True,
-                 coarseness=4)
+                 coarseness=5)
+
 mesh, eta0, b = msh.TohokuDomain(op.coarseness)
+if useAdjoint:
+    assert op.coarseness in (3, 4, 5)
+    mesh_N, b_N = msh.TohokuDomain(op.coarseness-2)[0::2]   # Get fine mesh and associated bathymetry
+V_N = VectorFunctionSpace(mesh_N, op.space1, op.degree1) * FunctionSpace(mesh_N, op.space2, op.degree2)
 
 # Establish filenames
-dirName = 'plots/' + approach + '/' + msh.MeshSetup(op.coarseness).meshName + '/'
+dirName = 'plots/firedrake-tsunami/' + msh.MeshSetup(op.coarseness).meshName + '/'
 msh.saveMesh(mesh, dirName + 'hdf5/mesh')
 forwardFile = File(dirName + "forward.pvd")
 residualFile = File(dirName + "residual.pvd")
-adjointFile = File(dirName + "adjointSW.pvd")
-errorFile = File(dirName + "errorIndicatorSW.pvd")
-adaptiveFile = File(dirName + "goalBasedSW.pvd") if approach == 'goalBased' else File(dirName + "simpleAdaptSW.pvd")
+adjointFile = File(dirName + "adjoint.pvd")
+errorFile = File(dirName + "errorIndicator.pvd")
+adaptiveFile = File(dirName + "goalBased.pvd") if approach == 'goalBased' else File(dirName + "simpleAdapt.pvd")
 hessianFile = File(dirName + "hessian.pvd")
 
 # Specify physical and solver parameters
@@ -54,6 +67,19 @@ u, eta = q.split()
 u.rename("Fluid velocity")
 eta.rename("Free surface displacement")
 
+if useAdjoint:
+    # Define Function to hold residual data
+    rho = Function(V_N)
+    rho_u, rho_e = rho.split()
+    rho_u.rename("Velocity residual")
+    rho_e.rename("Elevation residual")
+    dual = Function(V)
+    dual_u, dual_e = dual.split()
+    dual_u.rename("Adjoint velocity")
+    dual_e.rename("Adjoint elevation")
+    P0_N = FunctionSpace(mesh_N, "DG", 0)
+    v = TestFunction(P0_N)
+
 # Get adaptivity parameters
 hmin = op.hmin
 hmax = op.hmax
@@ -67,124 +93,112 @@ nVerT = nVer * op.vscale    # Target #Vertices
 t = 0.
 cnt = 0
 
-if approach in ('fixedMesh', 'goalBased'):
-    # Define variational problem
-    qt = TestFunction(V)
-    forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
-    forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
+if getData:
+    if approach in ('fixedMesh', 'goalBased'):
+        # Define variational problem
+        qt = TestFunction(V)
+        forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
+        forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
-    if useAdjoint:
-        P0 = FunctionSpace(mesh, "DG", 0)
-        v = TestFunction(P0)
+        print('\nStarting fixed mesh primal run (forwards in time)')
+        finished = False
+        primalTimer = clock()
+        forwardFile.write(u, eta, time=t)
+        while t < T + dt:
+            # Solve problem at current timestep
+            forwardSolver.solve()
 
-        # Define Function to hold residual data
-        rho = Function(V)
-        rho_u, rho_e = rho.split()
-        rho_u.rename("Velocity residual")
-        rho_e.rename("Elevation residual")
-        dual = Function(V)
-        dual_u, dual_e = dual.split()
-        dual_u.rename("Adjoint velocity")
-        dual_e.rename("Adjoint elevation")
+            if useAdjoint:
+                # Mark timesteps to be used in adjoint simulation
+                if t >= T:
+                    finished = True
+                if t == 0.:
+                    adj_start_timestep()
+                else:
+                    adj_inc_timestep(time=t, finished=finished)
 
-    print('\nStarting fixed mesh primal run (forwards in time)')
-    finished = False
-    primalTimer = clock()
-    forwardFile.write(u, eta, time=t)
-    while t < T + dt:
-        # Solve problem at current timestep
-        forwardSolver.solve()
-        q_.assign(q)
+                if not cnt % rm:
+                    # Approximate residual of forward equation and save to HDF5
+                    qN, q_N = inte.mixedPairInterp(mesh_N, V_N, q, q_)
+                    Au, Ae = form.strongResidualSW(q, q_, b, Dt)
+                    rho_u.interpolate(Au)
+                    rho_e.interpolate(Ae)
+                    with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_CREATE) as chk:
+                        chk.store(rho_u)
+                        chk.store(rho_e)
+                        chk.close()
+                    residualFile.write(rho_u, rho_e, time=t)
 
-        if useAdjoint:
-            # Mark timesteps to be used in adjoint simulation
-            if t >= T:
-                finished = True
-            if t == 0.:
-                adj_start_timestep()
+            q_.assign(q)
+            if not cnt % ndump:
+                forwardFile.write(u, eta, time=t)
+                print(cnt, ': t = %.2fs' % t)
+            t += dt
+            cnt += 1
+        cnt -=1
+        primalTimer = clock() - primalTimer
+        print('Primal run complete. Run time: %.3fs' % primalTimer)
+
+    if approach == 'goalBased':
+        # Set up adjoint problem
+        J = form.objectiveFunctionalSW(q, plot=True)
+        parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
+        t = T
+        save = True
+
+        # Time integrate (backwards)
+        print('\nStarting fixed mesh dual run (backwards in time)')
+        dualTimer = clock()
+        for (variable, solution) in compute_adjoint(J):
+            if save:
+                # Load adjoint data. NOTE the interpolation operator is overloaded
+                dual_u.dat.data[:] = variable.dat.data[0]
+                dual_e.dat.data[:] = variable.dat.data[1]
+
+                if not cnt % rm:
+                    indexStr = stor.indexString(cnt)
+
+                    # Load residual data from HDF5
+                    with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_READ) as loadResidual:
+                        loadResidual.load(rho_u)
+                        loadResidual.load(rho_e)
+                        loadResidual.close()
+
+                    # Estimate error using forward residual
+                    epsilon = assemble(v * inner(rho, dual) * dx)
+                    epsNorm = np.abs(assemble(inner(rho, dual) * dx))   # Normalise
+                    if epsNorm == 0.:
+                        epsNorm = 1.
+                    epsilon.dat.data[:] = np.abs(epsilon.dat.data) / epsNorm * 1e6      # TODO: fairly arbitrary scaling
+                    epsilon.rename("Error indicator")
+
+                    # Save error indicator data to HDF5
+                    with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_CREATE) as saveError:
+                        saveError.store(epsilon)
+                        saveError.close()
+
+                    # Print to screen, save data and increment counters
+                    errorFile.write(epsilon, time=t)
+
+                if not cnt % ndump:
+                    adjointFile.write(dual_u, dual_e, time=t)
+                    print(cnt, ': t = %.2fs' % t)
+                t -= dt
+                cnt -= 1
+                save = False
             else:
-                adj_inc_timestep(time=t, finished=finished)
-
-            if not cnt % rm:
-                # Approximate residual of forward equation and save to HDF5
-                Au, Ae = form.strongResidualSW(q, q_, b, Dt)
-                rho_u.interpolate(Au)
-                rho_e.interpolate(Ae)
-                with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_CREATE) as chk:
-                    chk.store(rho_u)
-                    chk.store(rho_e)
-                    chk.close()
-                residualFile.write(rho_u, rho_e, time=t)
-
-        if not cnt % ndump:
-            forwardFile.write(u, eta, time=t)
-            print(cnt, ': t = %.2fs' % t)
+                save = True
+            if (cnt == -1) | (t < -dt):
+                break
+        dualTimer = clock() - dualTimer
+        print('Adjoint run complete. Run time: %.3fs' % dualTimer)
         t += dt
         cnt += 1
-    cnt -=1
-    primalTimer = clock() - primalTimer
-    print('Primal run complete. Run time: %.3fs' % primalTimer)
 
-if approach == 'goalBased':
-    # Set up adjoint problem
-    J = form.objectiveFunctionalSW(q, plot=True)
-    parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
-    t = T
-    save = True
-
-    # Time integrate (backwards)
-    print('\nStarting fixed mesh dual run (backwards in time)')
-    dualTimer = clock()
-    for (variable, solution) in compute_adjoint(J):
-        if save:
-            # Load adjoint data. NOTE the interpolation operator is overloaded
-            dual_u.dat.data[:] = variable.dat.data[0]
-            dual_e.dat.data[:] = variable.dat.data[1]
-
-            if not cnt % rm:
-                indexStr = stor.indexString(cnt)
-
-                # Load residual data from HDF5
-                with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_READ) as loadResidual:
-                    loadResidual.load(rho_u)
-                    loadResidual.load(rho_e)
-                    loadResidual.close()
-
-                # Estimate error using forward residual
-                epsilon = assemble(v * inner(rho, dual) * dx)
-                epsNorm = np.abs(assemble(inner(rho, dual) * dx))   # Normalise
-                if epsNorm == 0.:
-                    epsNorm = 1.
-                epsilon.dat.data[:] = np.abs(epsilon.dat.data) / epsNorm * 1e6      # TODO: fairly arbitrary scaling
-                epsilon.rename("Error indicator")
-
-                # Save error indicator data to HDF5
-                with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_CREATE) as saveError:
-                    saveError.store(epsilon)
-                    saveError.close()
-
-                # Print to screen, save data and increment counters
-                errorFile.write(epsilon, time=t)
-
-            if not cnt % ndump:
-                adjointFile.write(dual_u, dual_e, time=t)
-                print(cnt, ': t = %.2fs' % t)
-            t -= dt
-            cnt -= 1
-            save = False
-        else:
-            save = True
-        if (cnt == -1) | (t < -dt):
-            break
-    dualTimer = clock() - dualTimer
-    print('Adjoint run complete. Run time: %.3fs' % dualTimer)
-    t += dt
-    cnt += 1
-
-    # Reset initial conditions for primal problem and recreate error indicator placeholder
-    u_.interpolate(Expression([0, 0]))
-    eta_.interpolate(eta0)
-    epsilon = Function(P0, name="Error indicator")
+        # Reset initial conditions for primal problem and recreate error indicator placeholder
+        u_.interpolate(Expression([0, 0]))
+        eta_.interpolate(eta0)
+        epsilon = Function(P0, name="Error indicator")
 
 if approach in ('simpleAdapt', 'goalBased'):
 
