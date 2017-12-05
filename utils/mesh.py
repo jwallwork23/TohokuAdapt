@@ -101,11 +101,12 @@ else:
     from . import conversion
 
 
-def TohokuDomain(res=3):
+def TohokuDomain(res=3, output=False):
     """
     Load the mesh, initial condition and bathymetry profile for the 2D ocean domain of the Tohoku tsunami problem.
     
     :param res: mesh resolution value, ranging from 'extra coarse' (1) to extra fine (5).
+    :param output: toggle plotting of bathymetry and initial surface.
     :return: associated mesh, initial condition and bathymetry field. 
     """
 
@@ -144,8 +145,9 @@ def TohokuDomain(res=3):
 
     # Post-process the bathymetry to have a minimum depth of 30m and plot
     b.assign(conditional(lt(30, b), b, 30))
-    File('plots/initialisation/surf.pvd').write(eta0)
-    File('plots/initialisation/bathymetry.pvd').write(b)
+    if output:
+        File('plots/initialisation/surf.pvd').write(eta0)
+        File('plots/initialisation/bathymetry.pvd').write(b)
 
     return mesh, eta0, b
 
