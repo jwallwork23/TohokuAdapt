@@ -86,8 +86,8 @@ def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson', rotationa
     um = timestepScheme(u, u_, timestepper)
     em = timestepScheme(eta, eta_, timestepper)
 
-    Au = u - u_ + Dt * 9.81 * grad(em)
-    Ae = eta - eta_ + Dt * div(b * um)
+    Au = (u - u_) / Dt + 9.81 * grad(em)
+    Ae = (eta - eta_) / Dt + div(b * um)
     if nu != 0.:
         Au += div(nu * (grad(um) + transpose(grad(um))))
     if rotational:
@@ -115,9 +115,10 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson', rotatio
     um = timestepScheme(u, u_, timestepper)
     em = timestepScheme(eta, eta_, timestepper)
 
-    F = (inner(u - u_, w) + inner(eta - eta_, xi) + Dt * (9.81 * inner(grad(em), w) - inner(b * um, grad(xi)))) * dx
+    F = ((inner(u - u_, w) + inner(eta - eta_, xi)) / Dt) * dx
+    F += (9.81 * inner(grad(em), w) - inner(b * um, grad(xi))) * dx
     if nu != 0.:
-        F -= nu * inner(grad(um) + transpose(grad(um)), grad(w))
+        F -= nu * inner(grad(um) + transpose(grad(um)), grad(w)) * dx
     if rotational:
         F += inner(as_vector((-u[1], u[0])), w) * dx
 
@@ -175,9 +176,9 @@ def strongResidualMSW(q, q_, h, Dt, y, f0=0., beta=1., g=1., timestepper='CrankN
     Hv2 = Hm * vm * vm
     f = f0 + beta * y
 
-    Au = Hm * (u - u_) + (H - H_) * um + Dt * (Hu2.dx(0) + Huv.dx(1) - f * Hm * vm + g * Hm * em.dx(0))
-    Av = Hm * (v - v_) + (H - H_) * vm + Dt * (Huv.dx(0) + Hv2.dx(1) + f * Hm * um + g * Hm * em.dx(1))
-    Ae = eta - eta_ + Dt * div(as_vector(Hm * um, Hm * vm))
+    Au = (Hm * (u - u_) + (H - H_) * um) / Dt + Hu2.dx(0) + Huv.dx(1) - f * Hm * vm + g * Hm * em.dx(0)
+    Av = (Hm * (v - v_) + (H - H_) * vm) / Dt + Huv.dx(0) + Hv2.dx(1) + f * Hm * um + g * Hm * em.dx(1)
+    Ae = (eta - eta_) / Dt + div(as_vector(Hm * um, Hm * vm))
 
     return Au, Av, Ae
 
@@ -232,7 +233,7 @@ def strongResidualAD(c, c_, u, Dt, nu=1e-3, timestepper='CrankNicolson'):
     :return: weak residual for advection diffusion equation at current timestep.
     """
     cm = timestepScheme(c, c_, timestepper)
-    return c - c_ + Dt * inner(u, grad(cm)) - Dt * Constant(nu) * div(grad(cm))
+    return (c - c_) / Dt + inner(u, grad(cm)) - Constant(nu) * div(grad(cm))
 
 
 def weakResidualAD(c, c_, ct, u, Dt, nu=1e-3, timestepper='CrankNicolson'):
@@ -247,7 +248,7 @@ def weakResidualAD(c, c_, ct, u, Dt, nu=1e-3, timestepper='CrankNicolson'):
     :return: weak residual for advection diffusion equation at current timestep.
     """
     cm = timestepScheme(c, c_, timestepper)
-    return ((c - c_) * ct - Dt * inner(cm * u, grad(ct)) + Dt * Constant(nu) * inner(grad(cm), grad(ct))) * dx
+    return ((c - c_) * ct / Dt - inner(cm * u, grad(ct)) + Constant(nu) * inner(grad(cm), grad(ct))) * dx
 
 
 def weakMetricAdvection(M, M_, Mt, w, Dt, timestepper='ImplicitEuler'):
@@ -263,5 +264,5 @@ def weakMetricAdvection(M, M_, Mt, w, Dt, timestepper='ImplicitEuler'):
     :return: weak residual for metric advection.
     """
     Mm = timestepScheme(M, M_, timestepper)
-    F = (inner(M - M_, Mt) + Dt * inner(dot(w, nabla_grad(Mm)), Mt)) * dx
+    F = (inner(M - M_, Mt) / Dt + inner(dot(w, nabla_grad(Mm)), Mt)) * dx
     return F
