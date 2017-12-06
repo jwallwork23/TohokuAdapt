@@ -39,7 +39,6 @@ V_N = VectorFunctionSpace(mesh_N, op.space1, op.degree1) * FunctionSpace(mesh_N,
 
 # Establish filenames
 dirName = 'plots/firedrake-tsunami/' + msh.MeshSetup(op.coarseness).meshName + '/'
-msh.saveMesh(mesh, dirName + 'hdf5/mesh_00000')
 forwardFile = File(dirName + "forward.pvd")
 residualFile = File(dirName + "residual.pvd")
 adjointFile = File(dirName + "adjoint.pvd")
@@ -202,12 +201,13 @@ if getData:
         # Reset initial conditions for primal problem and recreate error indicator placeholder
         u_.interpolate(Expression([0, 0]))
         eta_.interpolate(eta0)
-        epsilon = Function(P0_N, name="Error indicator")
 
 if approach in ('simpleAdapt', 'goalBased'):
 
-    if useAdjoint and op.gradate:
-        h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
+    if useAdjoint:
+        epsilon = Function(P0_N, name="Error indicator")
+        if op.gradate:
+            h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
 
     print('\nStarting adaptive mesh primal run (forwards in time)')
     adaptTimer = clock()
@@ -223,14 +223,14 @@ if approach in ('simpleAdapt', 'goalBased'):
             # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
             if useAdjoint & (cnt != 0):
                 with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_READ) as loadError:
-                    loadError.load(epsilon)                 # P0 field on the initial mesh
+                    loadError.load(epsilon)                     # P0 field on the initial mesh
                     loadError.close()
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])
                 for k in range(mesh.topology.num_vertices()):
-                    H.dat.data[k] *= errEst.dat.data[k]     # Scale by error estimate
-            if op.outputHessian:
-                H.rename("Hessian")
-                hessianFile.write(H, time=t)
+                    H.dat.data[k] *= errEst.dat.data[k] * 1e4   # Scale by error estimate
+            if op.outputHessian:                                # TODO: Fairly arbitrary extra rescaling
+                H.rename("Hessian")                             # TODO:     No scaling renders all effort useless
+                hessianFile.write(H, time=t)                    # TODO:     1e5 scaling is probably too harsh
 
             # Adapt mesh
             M = adap.computeSteadyMetric(mesh, W, H, eta, nVerT=nVerT, op=op)
@@ -246,7 +246,7 @@ if approach in ('simpleAdapt', 'goalBased'):
 
             # Interpolate variables
             V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
-            q_ = inte.mixedPairInterp(mesh, V, q_)
+            q_ = inte.mixedPairInterp(mesh, V, q_)[0]
             b = inte.interp(mesh, b)[0]     # Combine this in above interpolation for speed
             q = Function(V)
             u, eta = q.split()
@@ -262,7 +262,7 @@ if approach in ('simpleAdapt', 'goalBased'):
             nEle = msh.meshStats(mesh)[0]
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
-            op.printToScreen(cnt / rm + 1, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, N)
+            op.printToScreen(cnt / rm + 1, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, mM)
 
         # Solve problem at current timestep
         adaptSolver.solve()
