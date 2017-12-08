@@ -9,7 +9,6 @@ import utils.forms as form
 import utils.interpolation as inte
 import utils.mesh as msh
 import utils.options as opt
-import utils.storage as stor
 
 print('\n***************** EQUATORIAL ROSSBY WAVE TEST PROBLEM *********************\n')
 print('Mesh adaptive solver defined on a rectangular mesh')
@@ -110,7 +109,7 @@ if getData:
                     Au, Ae = form.strongResidualSW(qN, q_N, b, Dt)
                     rho_u.interpolate(Au)
                     rho_e.interpolate(Ae)
-                    with DumbCheckpoint(dirName + 'hdf5/residual_RW' + stor.indexString(cnt), mode=FILE_CREATE) as chk:
+                    with DumbCheckpoint(dirName + 'hdf5/residual_RW' + op.indexString(cnt), mode=FILE_CREATE) as chk:
                         chk.store(rho_u)
                         chk.store(rho_e)
                         chk.close()

@@ -9,7 +9,6 @@ import utils.forms as form
 import utils.interpolation as inte
 import utils.mesh as msh
 import utils.options as opt
-import utils.storage as stor
 
 print('\n*********************** SHALLOW WATER TEST PROBLEM ************************\n')
 print('Mesh adaptive solver initially defined on a square mesh')

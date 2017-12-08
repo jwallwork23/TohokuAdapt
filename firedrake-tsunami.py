@@ -9,7 +9,7 @@ import utils.forms as form
 import utils.interpolation as inte
 import utils.mesh as msh
 import utils.options as opt
-import utils.storage as stor
+import utils.timeseries as tim
 
 
 print('*********************** TOHOKU TSUNAMI SIMULATION *********************\n')
@@ -288,6 +288,7 @@ if approach in ('simpleAdapt', 'goalBased'):
         cnt += 1
     adaptTimer = clock() - adaptTimer
     print('Adaptive primal run complete. Run time: %.3fs \n' % adaptTimer)
+    cnt -= 1
 
 # Print timing analyses
 if getData and useAdjoint:
@@ -297,4 +298,4 @@ if getData and useAdjoint:
 # Calculate and print timeseries error analyses
 if op.gauges:
     for gauge in ("P02", "P06"):
-        stor.gaugeTimeseries(gauge, dirName, int(cnt), op=op)
+        tim.gaugeTimeseries(gauge, dirName, int(cnt), op=op)

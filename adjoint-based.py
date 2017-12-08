@@ -98,7 +98,10 @@ else:
             lam_.assign(lam)
         if meshn == 0:
             print('t = %1.1fs' % t)
-            stor.saveToDisk(lu, le, dirName, mn)
+            with DumbCheckpoint(dirName + 'hdf5/adjoint_' + op.indexString(mn), mode=FILE_CREATE) as chk:
+                chk.store(lu)
+                chk.store(le)
+                chk.close()
             meshn += rm
             mn -= 1
         t -= dt

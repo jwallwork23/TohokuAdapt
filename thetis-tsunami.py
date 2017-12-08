@@ -11,7 +11,6 @@ import utils.forms as form
 import utils.interpolation as inte
 import utils.mesh as msh
 import utils.options as opt
-import utils.storage as stor
 
 
 # Define initial mesh and mesh statistics placeholders
@@ -103,7 +102,7 @@ if approach in ('fixedMesh', 'goalBased'):
     #         Au, Ae = form.strongResidualSW(q, q_, b, Dt)
     #         rho_u.interpolate(Au)
     #         rho_e.interpolate(Ae)
-    #         with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_CREATE) as chk:
+    #         with DumbCheckpoint(dirName + 'hdf5/residual_' + op.indexString(cnt), mode=FILE_CREATE) as chk:
     #             chk.store(rho_u)
     #             chk.store(rho_e)
     #             chk.close()
@@ -137,7 +136,7 @@ if approach in ('simpleAdapt', 'goalBased'):
 
         # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
         if approach == 'goalBased':
-            with DumbCheckpoint(dirName + 'hdf5/error_' + stor.indexString(cnt), mode=FILE_READ) as loadError:
+            with DumbCheckpoint(dirName + 'hdf5/error_' + op.indexString(cnt), mode=FILE_READ) as loadError:
                 loadError.load(epsilon)  # P0 field on the initial mesh
                 loadError.close()
             errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])
@@ -158,7 +157,7 @@ if approach in ('simpleAdapt', 'goalBased'):
             adap.advectMetric(M, uv_2d, dt, rm)  # Advect metric ahead in direction of velocity
         mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
         elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
-        msh.saveMesh(mesh, dirName + 'hdf5/mesh_' + stor.indexString(index))  # Save mesh to disk
+        msh.saveMesh(mesh, dirName + 'hdf5/mesh_' + op.indexString(index))  # Save mesh to disk
 
         # Establish Thetis flow solver object
         solver_obj = solver2d.FlowSolver2d(mesh, b)

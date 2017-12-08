@@ -132,20 +132,6 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options()):
     # plt.savefig('plots/timeseries/' + gauge + '.pdf', bbox_inches='tight')
 
 
-def saveToDisk(f, g, dirName, index, filename='adjoint_'):
-    """
-    :param f: first function to save.
-    :param g: second function to save.
-    :param dirName: name of directory to save in.
-    """
-    with DumbCheckpoint(dirName + 'hdf5/' + filename + op.indexString(index), mode=FILE_CREATE) as chk:
-        chk.store(f)
-        chk.store(g)
-        chk.close()
-
-    # TODO: include option for any number of functions to save using *args
-    # TODO: or possibly just remove this function.
-
 if __name__ == '__main__':
 
     for gauge in ("P02", "P06"):
