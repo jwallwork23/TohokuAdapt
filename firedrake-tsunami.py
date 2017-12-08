@@ -27,9 +27,11 @@ useAdjoint = approach == 'goalBased'
 op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
                  rm=60 if useAdjoint else 30,
                  gradate=True if useAdjoint else False,
+                 # gradate=False,
                  advect=False,
                  outputHessian=True,
-                 coarseness=5)
+                 coarseness=5,
+                 gauges=True)
 
 mesh, eta0, b = msh.TohokuDomain(op.coarseness)
 if useAdjoint:
@@ -208,6 +210,7 @@ if approach in ('simpleAdapt', 'goalBased'):
         epsilon = Function(P0_N, name="Error indicator")
         if op.gradate:
             h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
+            # TODO: always gradate to coast
 
     print('\nStarting adaptive mesh primal run (forwards in time)')
     adaptTimer = clock()
@@ -244,6 +247,7 @@ if approach in ('simpleAdapt', 'goalBased'):
             mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
             msh.saveMesh(mesh, dirName + 'hdf5/mesh_' + indexStr)
 
+
             # Interpolate variables
             V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
             q_ = inte.mixedPairInterp(mesh, V, q_)[0]
@@ -270,6 +274,10 @@ if approach in ('simpleAdapt', 'goalBased'):
 
         if not cnt % ndump:
             adaptiveFile.write(u, eta, time=t)
+            if op.gauges:
+                with DumbCheckpoint(dirName + 'hdf5/solution_' + stor.indexString(cnt), mode=FILE_CREATE) as chk:
+                    chk.store(eta)
+                    chk.close()
             print('t = %.2fs' % t)
         t += dt
         cnt += 1

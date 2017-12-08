@@ -24,6 +24,7 @@ class Options:
                  beta=1.4,
                  gamma=1.,
                  outputHessian=False,
+                 gauges=False,
                  Tstart=300.,
                  Tend=1500.,
                  dt=1.,
@@ -45,7 +46,8 @@ class Options:
         :param hessMeth: Method of Hessian reconstruction: 'dL2' or 'parts'.
         :param beta: metric gradation scaling parameter.
         :param gamma: metric rescaling parameter.
-        :param outputHessian: toggle saving Hessian to .pvd.
+        :param outputHessian: toggle saving Hessian to PVD.
+        :param gauges: toggle saving of elevation to HDF5 for timeseries analysis. 
         :param Tstart: Lower time range limit (s), before which we can assume the wave won't reach the shore.
         :param Tend: Simulation duration (s).
         :param dt: Timestep (s).
@@ -112,6 +114,7 @@ class Options:
         except:
             raise ValueError('Invalid value for scaling parameter.')
         self.outputHessian = outputHessian
+        self.gauges = gauges
 
         # Physical parameters
         self.g = 9.81           # Gravitational acceleration (m s^{-2})
