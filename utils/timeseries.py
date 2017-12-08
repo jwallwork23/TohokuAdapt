@@ -84,12 +84,12 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options(), output=False, name='
         if i in (0, iEnd):
             error[0] += val[-1]
             error[1] += val[-1] ** 2
-            norm[0] += mVal
+            norm[0] += np.abs(mVal)
             norm[1] += mVal ** 2
         else:
             error[0] += 2 * val[-1]
             error[1] += 2 * val[-1] ** 2
-            norm[0] += 2 * mVal
+            norm[0] += 2 * np.abs(mVal)
             norm[1] += 2 * mVal ** 2
         if val[-1] > error[2]:
             error[2] = val[-1]
@@ -196,7 +196,7 @@ def plotGauges(gauge, dirName, iEnd, op=opt.Options()):
                      linewidth=0.5)
     plt.xlim([0, T/60])
     plt.gcf()
-    plt.legend(bbox_to_anchor=(1.13, 1.1), loc=2)
+    plt.legend(bbox_to_anchor=(1.01, 1.), loc=2)
     plt.ylim([np.floor(mM[0]), np.ceil(mM[1])])
     plt.xlabel(r'Time elapsed (mins)')
     plt.ylabel(r'Free surface (m)')
