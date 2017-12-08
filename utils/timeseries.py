@@ -106,7 +106,6 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options(), output=False, name='
             sign = (diff - diff_) / np.abs(diff - diff_)
             mSign = (mVal - mVal_) / np.abs(mVal - mVal_)
             if (sign != sign_) | (i == iEnd):
-                # print("#### totalVariation DEBUG: i = ", i/60)
                 error[3] += np.abs(diff - sStart)
                 sStart = diff
             if (mSign != mSign_) | (i == iEnd):
@@ -119,10 +118,11 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options(), output=False, name='
     outfile.close()
 
     # Print errors to screen
-    error[0] /= (numStrips * 2)
-    norm[0] /= (numStrips * 2)
-    error[1] = np.sqrt(error[1] / (numStrips * 2))
-    norm[1] = np.sqrt(norm[1] / (numStrips * 2))
+    h = 1 / numStrips
+    error[0] *= h/2
+    norm[0] *= h/2
+    error[1] = np.sqrt(error[1] * h/2)
+    norm[1] = np.sqrt(norm[1] * h/2)
     print('\n' + gauge + """
 Absolute L1 norm :         %6.3f Relative L1 norm :         %6.3f
 Absolute L2 norm :         %6.3f Relative L2 norm :         %6.3f
@@ -151,6 +151,7 @@ def plotGauges(gauge, dirName, iEnd, op=opt.Options()):
     # Get plotting parameters
     labels = op.labels
     styles = op.styles
+    mM = [0, 0]     # Min/max for y-axis limits
 
     # Import data from the inversion analysis and interpolate
     measuredfile = open('outdata/timeseries/' + gauge + 'data_' + str(int(T/60)) + 'mins.txt', 'r')
@@ -164,19 +165,30 @@ def plotGauges(gauge, dirName, iEnd, op=opt.Options()):
     for line in measuredfile:
         xy = line.split()
         x.append(float(xy[0]))
-        y.append(float(xy[1]))
+        val = float(xy[1])
+        y.append(val)
+        if val < mM[0]:
+            mM[0] = val
+        elif val > mM[1]:
+            mM[1] = val
     m = si.interp1d(x, y, kind=1)
     plt.plot(p, m(p), label='Gauge measurement', linestyle='-', linewidth=2)
 
     # Plot timeseries data
+    print('\nGauge to plot: ' + gauge + '\n')
     for mesh in labels:
-        print('Timeseries to plot: ' + mesh)
+        print('Timeseries to plot: ', mesh)
         name = input("Filename (hit enter to skip): ")
         if name != '':
             infile = open('outdata/timeseries/' + gauge + name + '.txt', 'r')
             data = []
             for line in infile:
-                data.append(float(line))
+                val = float(line)
+                if val < mM[0]:
+                    mM[0] = val
+                elif val > mM[1]:
+                    mM[1] = val
+                data.append(val)
             plt.plot(np.linspace(0, T/60, numVals), data,
                      label=mesh,
                      marker=styles[mesh],
@@ -185,7 +197,7 @@ def plotGauges(gauge, dirName, iEnd, op=opt.Options()):
     plt.xlim([0, T/60])
     plt.gcf()
     plt.legend(bbox_to_anchor=(1.13, 1.1), loc=2)
-    plt.ylim([-2, 5] if gauge == 'P02' else [-1, 5])  # TODO: remove this special casing using int and np.ceil
+    plt.ylim([np.floor(mM[0]), np.ceil(mM[1])])
     plt.xlabel(r'Time elapsed (mins)')
     plt.ylabel(r'Free surface (m)')
     plt.savefig('outdata/timeseries/plots/' + gauge + '.pdf', bbox_inches='tight')
