@@ -21,7 +21,7 @@ def loadMesh(filename):
     return Mesh(plex)
 
 
-def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options()):
+def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options(), output=False, name='test'):
     """
     Store timeseries data for a particular gauge and calculate (L1, L2, L-infinity) error norms.
     
@@ -29,6 +29,7 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options()):
     :param dirName: name of directory for locating HDF5 files, from the set {'fixedMesh', 'simpleAdapt', 'adjointBased'}
     :param iEnd: final index.
     :param op: Options object holding parameter values.
+    :param output: toggle printing timeseries values to screen.
     """
 
     # Get solver parameters
@@ -37,18 +38,8 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options()):
     ndump = op.ndump
     rm = op.rm
 
-    # setup = op.plotDir
-    # labels = op.labels
-    # styles = op.styles
-    numVals = int(T / (ndump * dt)) + 1
-
     # Import data from the inversion analysis and interpolate
     measuredfile = open('outdata/timeseries/' + gauge + 'data_' + str(int(T)) + 'mins.txt', 'r')
-    p = np.linspace(0, T, num=numVals)
-    # plt.rc('text', usetex=True)
-    # plt.rc('font', family='serif')
-    # plt.rc('legend', fontsize='x-large')
-    # plt.clf()
     x = []
     y = []
     for line in measuredfile:
@@ -56,14 +47,12 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options()):
         x.append(float(xy[0]))
         y.append(float(xy[1]))
     m = si.interp1d(x, y, kind=1)
-    # plt.plot(p, m(p), label='Gauge measurement', linestyle='-', linewidth=2)
 
-    name = input("Enter a name for this time series (e.g. 'meanEle=5767'): ")
     error = [0, 0, 0, 0]
     norm = [0, 0, 0, 0]
 
     # Write timeseries to file and calculate errors
-    outfile = open('outdata/timeseries/' + gauge + '_' + name + '.txt', 'w+')
+    outfile = open('outdata/timeseries/' + gauge + name + '.txt', 'w+')
     val = []
     t = np.linspace(0, T, num=iEnd+1)
     for i in range(0, iEnd+1, ndump):
@@ -84,7 +73,10 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options()):
             v0 = data - mVal
             sStart = data
             mStart = mVal
-        val.append(np.abs(data - v0 - mVal))
+        toPlot = data - v0
+        val.append(np.abs(data - mVal))
+        if output:
+            print('Time %.2f mins : %.4fm' % (i/60, toPlot))
 
         # Compute L1, L2, L-infinity errors and norms of gauge data
         error[0] += val[-1]
@@ -114,7 +106,7 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options()):
         data_ = data
         mVal_ = mVal
 
-        outfile.write(str(data) + '\n')
+        outfile.write(str(toPlot) + '\n')
     outfile.close()
 
     # Print errors to screen
@@ -122,26 +114,70 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options()):
     norm[0] /= (iEnd + 1)
     error[1] = np.sqrt(error[1] / (iEnd + 1))
     norm[1] = np.sqrt(norm[1] / (iEnd + 1))
-    print("""Absolute L1 norm :         %5.2f Relative L1 norm :         %5.2f
-Absolute L2 norm :         %5.2f Relative L2 norm :         %5.2f
-Absolute L-infinity norm : %5.2f Relative L-infinity norm : %5.2f
-Absolute total variation : %5.2f Relative total variation : %5.2f""" %
+    print("""
+Absolute L1 norm :         %6.3f Relative L1 norm :         %6.3f
+Absolute L2 norm :         %6.3f Relative L2 norm :         %6.3f
+Absolute L-infinity norm : %6.3f Relative L-infinity norm : %6.3f
+Absolute total variation : %6.3f Relative total variation : %6.3f""" %
           (error[0], error[0] / norm[0], error[1], error[1] / norm[1],
            error[2], error[2] / norm[2], error[3], error[3] / norm[3],))
 
-    # TODO separate out plotting script
-    # # Plot timeseries data
-    # for key in setup:
-    #     data = gaugeTimeseries(gauge, op.plotDir[key], numVals)
-    #     plt.plot(np.linspace(0, T, numVals), data,
-    #              label=labels[key],
-    #              marker=styles[key],
-    #              markevery=60 / (ndump * dt),
-    #              linewidth=0.5)
-    # plt.xlim([0, T])
-    # plt.gcf()
-    # plt.legend(bbox_to_anchor=(1.13, 1.1), loc=2)
-    # plt.ylim([-2, 5] if gauge == 'P02' else [-1, 5])  # TODO: remove this special casing using int and np.ceil
-    # plt.xlabel(r'Time elapsed (mins)')
-    # plt.ylabel(r'Free surface (m)')
-    # plt.savefig('plots/timeseries/' + gauge + '.pdf', bbox_inches='tight')
+
+def plotGauges(gauge, dirName, iEnd, op=opt.Options()):
+    """
+    Store timeseries data for a particular gauge and calculate (L1, L2, L-infinity) error norms.
+
+    :param gauge: gauge name string, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
+    :param dirName: name of directory for locating HDF5 files, from the set {'fixedMesh', 'simpleAdapt', 'adjointBased'}
+    :param iEnd: final index.
+    :param op: Options object holding parameter values.
+    """
+
+    # Get solver parameters
+    T = op.Tend
+    dt = op.dt
+    ndump = op.ndump
+    numVals = int(T / (ndump * dt)) + 1
+
+    # Get plotting parameters
+    labels = op.labels
+    styles = op.styles
+
+    # Import data from the inversion analysis and interpolate
+    measuredfile = open('outdata/timeseries/' + gauge + 'data_' + str(int(T/60)) + 'mins.txt', 'r')
+    p = np.linspace(0, T/60, num=numVals)
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='serif')
+    plt.rc('legend', fontsize='x-large')
+    plt.clf()
+    x = []
+    y = []
+    for line in measuredfile:
+        xy = line.split()
+        x.append(float(xy[0]))
+        y.append(float(xy[1]))
+    m = si.interp1d(x, y, kind=1)
+    plt.plot(p, m(p), label='Gauge measurement', linestyle='-', linewidth=2)
+
+    # Plot timeseries data
+    for mesh in labels:
+        print('Timeseries to plot: ' + mesh)
+        name = input("Filename (hit enter to skip): ")
+        if name != '':
+            infile = open('outdata/timeseries/' + gauge + name + '.txt', 'r')
+            data = []
+            for line in infile:
+                data.append(float(line))
+            plt.plot(np.linspace(0, T/60, numVals), data,
+                     label=mesh,
+                     marker=styles[mesh],
+                     markevery=ndump,
+                     linewidth=0.5)
+    plt.xlim([0, T/60])
+    plt.gcf()
+    plt.legend(bbox_to_anchor=(1.13, 1.1), loc=2)
+    plt.ylim([-2, 5] if gauge == 'P02' else [-1, 5])  # TODO: remove this special casing using int and np.ceil
+    plt.xlabel(r'Time elapsed (mins)')
+    plt.ylabel(r'Free surface (m)')
+    plt.savefig('outdata/timeseries/plots/' + gauge + '.pdf', bbox_inches='tight')
+    plt.show()
