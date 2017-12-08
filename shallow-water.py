@@ -8,6 +8,7 @@ import utils.adaptivity as adap
 import utils.forms as form
 import utils.interpolation as inte
 import utils.mesh as msh
+import utils.misc as msc
 import utils.options as opt
 
 print('\n*********************** SHALLOW WATER TEST PROBLEM ************************\n')
@@ -109,7 +110,7 @@ if getData:
                     Au, Ae = form.strongResidualSW(qN, q_N, b, Dt)
                     rho_u.interpolate(Au)
                     rho_e.interpolate(Ae)
-                    with DumbCheckpoint(dirName + 'hdf5/residual_SW' + op.indexString(cnt), mode=FILE_CREATE) as chk:
+                    with DumbCheckpoint(dirName + 'hdf5/residual_SW' + msc.indexString(cnt), mode=FILE_CREATE) as chk:
                         chk.store(rho_u)
                         chk.store(rho_e)
                         chk.close()
@@ -153,7 +154,7 @@ if getData:
                 dual_N = inte.mixedPairInterp(mesh_N, V_N, dual)[0]
 
                 if not cnt % rm:
-                    indexStr = op.indexString(cnt)
+                    indexStr = msc.indexString(cnt)
 
                     # Load residual data from HDF5
                     with DumbCheckpoint(dirName + 'hdf5/residual_SW' + indexStr, mode=FILE_READ) as loadResidual:
@@ -208,7 +209,7 @@ if approach in ('simpleAdapt', 'goalBased'):
 
             # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
             if useAdjoint:
-                with DumbCheckpoint(dirName + 'hdf5/error_SW' + op.indexString(cnt), mode=FILE_READ) as loadError:
+                with DumbCheckpoint(dirName + 'hdf5/error_SW' + msc.indexString(cnt), mode=FILE_READ) as loadError:
                     loadError.load(epsilon)                 # P0 field on the initial mesh
                     loadError.close()
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])

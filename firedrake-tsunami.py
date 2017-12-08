@@ -8,6 +8,7 @@ import utils.adaptivity as adap
 import utils.forms as form
 import utils.interpolation as inte
 import utils.mesh as msh
+import utils.misc as msc
 import utils.options as opt
 import utils.timeseries as tim
 
@@ -108,7 +109,7 @@ if getData:
         while t < T + dt:
             # Solve problem at current timestep
             forwardSolver.solve()
-            indexStr = op.indexString(cnt)
+            indexStr = msc.indexString(cnt)
 
             # Approximate residual of forward equation and save to HDF5
             if useAdjoint:
@@ -166,7 +167,7 @@ if getData:
                 dual_N = inte.mixedPairInterp(mesh_N, V_N, dual)[0]
 
                 if not cnt % rm:
-                    indexStr = op.indexString(cnt)
+                    indexStr = msc.indexString(cnt)
 
                     # Load residual data from HDF5
                     with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_READ) as loadResidual:
@@ -220,7 +221,7 @@ if approach in ('simpleAdapt', 'goalBased'):
     print('\nStarting adaptive mesh primal run (forwards in time)')
     adaptTimer = clock()
     while t <= T:
-        indexStr = op.indexString(cnt)
+        indexStr = msc.indexString(cnt)
         if not cnt % rm:
             stepTimer = clock()
 
@@ -250,7 +251,8 @@ if approach in ('simpleAdapt', 'goalBased'):
             if op.advect:
                 M = adap.advectMetric(M, u, Dt, n=rm)
             mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-            msh.saveMesh(mesh, dirName + 'hdf5/mesh_' + indexStr)
+            if op.gauges:
+                msh.saveMesh(mesh, dirName + 'hdf5/mesh_' + indexStr)
 
 
             # Interpolate variables

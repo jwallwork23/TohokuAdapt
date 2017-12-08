@@ -1,11 +1,24 @@
 from firedrake import *
+from firedrake.petsc import PETSc
 
 import numpy as np
 import scipy.interpolate as si
 import matplotlib.pyplot as plt
 
-from . import mesh as msh
+from . import misc
 from . import options as opt
+
+
+def loadMesh(filename):
+    """
+    :param filename: mesh filename to load from, including directory location.
+    :return: Mesh, as loaded from HDF5.
+    """
+    filename += '.h5'
+    # print("### loadMesh DEBUG: attempting to load " + filename)
+    plex = PETSc.DMPlex().create()
+    plex.createFromFile(filename)
+    return Mesh(plex)
 
 
 def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options()):
@@ -17,11 +30,13 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options()):
     :param iEnd: final index.
     :param op: Options object holding parameter values.
     """
+
     # Get solver parameters
     T = op.Tend / 60
     dt = op.dt
-    rm = op.rm
     ndump = op.ndump
+    rm = op.rm
+
     # setup = op.plotDir
     # labels = op.labels
     # styles = op.styles
@@ -48,21 +63,21 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options()):
     norm = [0, 0, 0, 0]
 
     # Write timeseries to file and calculate errors
-    outfile = open('timeseries/' + gauge + '_' + name + '.txt', 'w+')
+    outfile = open('outdata/timeseries/' + gauge + '_' + name + '.txt', 'w+')
     val = []
     t = np.linspace(0, T, num=iEnd+1)
-    for i in range(iEnd+1):
-        indexStr = op.indexString(i)
+    for i in range(0, iEnd+1, ndump):
+        indexStr = misc.indexString(i)
 
         # Load mesh from file and set up Function to load into
         if not i % rm:
-            elev_2d = Function(FunctionSpace(msh.loadMesh(dirName + 'hdf5/mesh_' + indexStr + '.h5'),
-                                             op.space2, op.degree2))
+            elev_2d = Function(FunctionSpace(loadMesh(dirName + 'hdf5/mesh_' + indexStr), op.space2, op.degree2))
 
         # Load data from HDF5 and get timeseries data
         with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as loadElev:
             loadElev.load(elev_2d, name='elev_2d')
             loadElev.close()
+
         data = elev_2d.at(op.gaugeCoord(gauge))
         mVal = float(m(t[i]))
         if i == 0:
@@ -82,10 +97,10 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options()):
             norm[2] = mVal
 
         # Compute total variation of error and gauge data
-        if i == 1:
+        if i == ndump:
             sign = (data - data_) / np.abs(data - data_)
             mSign = (mVal - mVal_) / np.abs(mVal - mVal_)
-        elif i > 1:
+        elif i > ndump:
             sign_ = sign
             mSign_ = mSign
             sign = (data - data_) / np.abs(data - data_)
@@ -108,9 +123,9 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options()):
     error[1] = np.sqrt(error[1] / (iEnd + 1))
     norm[1] = np.sqrt(norm[1] / (iEnd + 1))
     print("""Absolute L1 norm :         %5.2f Relative L1 norm :         %5.2f
-             Absolute L2 norm :         %5.2f Relative L2 norm :         %5.2f
-             Absolute L-infinity norm : %5.2f Relative L-infinity norm : %5.2f
-             Absolute total variation : %5.2f Relative total variation : %5.2f""" %
+Absolute L2 norm :         %5.2f Relative L2 norm :         %5.2f
+Absolute L-infinity norm : %5.2f Relative L-infinity norm : %5.2f
+Absolute total variation : %5.2f Relative total variation : %5.2f""" %
           (error[0], error[0] / norm[0], error[1], error[1] / norm[1],
            error[2], error[2] / norm[2], error[3], error[3] / norm[3],))
 
@@ -130,20 +145,3 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options()):
     # plt.xlabel(r'Time elapsed (mins)')
     # plt.ylabel(r'Free surface (m)')
     # plt.savefig('plots/timeseries/' + gauge + '.pdf', bbox_inches='tight')
-
-
-if __name__ == '__main__':
-
-    for gauge in ("P02", "P06"):
-        dirName = input("dirName: ")
-        iEnd = int(input("iEnd: "))
-        useAdjoint = bool(input("useAdjoint?: "))
-        op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
-                             rm=60 if useAdjoint else 30,
-                             gradate=True if useAdjoint else False,
-                             # gradate=False,
-                             advect=False,
-                             outputHessian=True,
-                             coarseness=5,
-                             gauges=True)
-        gaugeTimeseries(gauge, dirName, iEnd, op=op)

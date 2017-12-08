@@ -3,7 +3,7 @@ from firedrake import *
 import numpy as np
 
 from . import conversion
-
+from . import misc
 
 class Options:
     def __init__(self,
@@ -181,7 +181,7 @@ class Options:
         :return: saved free surface elevation and fluid velocity, along with mesh index.
         """
         # Enforce initial conditions on discontinuous space / load variables from disk
-        indexStr = indexString(index)
+        indexStr = misc.indexString(index)
         if adjoint:
             with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_READ) as chk:
                 lu = Function(W.sub(0), name='Adjoint velocity')
@@ -220,10 +220,3 @@ class Options:
 Percent complete  : %4.1f%%    Elapsed time : %4.2fs (This step : %4.2fs)     
 #Elements... Current : %d  Mean : %d  Minimum : %s  Maximum : %s\n""" %
               (mn, (100 * mn * self.rm * self.dt) / self.Tend, outerTime, innerTime, nEle, Sn / mn, N[0], N[1]))
-
-def indexString(index):
-    """
-    :param index: integer form of index.
-    :return: five-digit string form of index.
-    """
-    return (5 - len(str(index))) * '0' + str(index)
