@@ -10,7 +10,6 @@ import utils.interpolation as inte
 import utils.mesh as msh
 import utils.misc as msc
 import utils.options as opt
-import utils.timeseries as tim
 
 
 print('*********************** TOHOKU TSUNAMI SIMULATION *********************\n')
@@ -34,12 +33,6 @@ op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
                  coarseness=5,
                  gauges=True)
 
-mesh, eta0, b = msh.TohokuDomain(op.coarseness)
-if useAdjoint:
-    assert op.coarseness != 1
-    mesh_N, b_N = msh.TohokuDomain(op.coarseness-1)[0::2]   # Get finer mesh and associated bathymetry
-V_N = VectorFunctionSpace(mesh_N, op.space1, op.degree1) * FunctionSpace(mesh_N, op.space2, op.degree2)
-
 # Establish filenames
 dirName = 'plots/firedrake-tsunami/' + msh.MeshSetup(op.coarseness).meshName + '/'
 forwardFile = File(dirName + "forward.pvd")
@@ -48,6 +41,15 @@ adjointFile = File(dirName + "adjoint.pvd")
 errorFile = File(dirName + "errorIndicator.pvd")
 adaptiveFile = File(dirName + "goalBased.pvd") if useAdjoint else File(dirName + "simpleAdapt.pvd")
 hessianFile = File(dirName + "hessian.pvd")
+
+# Generate mesh(es)
+mesh, eta0, b = msh.TohokuDomain(op.coarseness)
+if useAdjoint:
+    assert op.coarseness != 1
+    mesh_N, b_N = msh.TohokuDomain(op.coarseness-1)[0::2]   # Get finer mesh and associated bathymetry
+    V_N = VectorFunctionSpace(mesh_N, op.space1, op.degree1) * FunctionSpace(mesh_N, op.space2, op.degree2)
+elif approach == 'fixedMesh':
+    msh.saveMesh(mesh, dirName + 'hdf5/mesh_00000')
 
 # Specify physical and solver parameters
 dt = op.dt
@@ -296,8 +298,3 @@ if approach in ('simpleAdapt', 'goalBased'):
 if getData and useAdjoint:
     print("TIMINGS:         Forward run   %5.3fs, Adjoint run   %5.3fs, Adaptive run   %5.3fs" %
           (primalTimer, dualTimer, adaptTimer))
-
-# Calculate and print timeseries error analyses
-if op.gauges:
-    for gauge in ("P02", "P06"):
-        tim.gaugeTimeseries(gauge, dirName, int(cnt), op=op)

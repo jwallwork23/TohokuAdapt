@@ -34,5 +34,6 @@ fixedMesh.py
 # Old anisotropic mesh adaptive tsunami script
 simpleAdapt.py
 
-# Timings for simulations
-outdata/counts.txt
+# Timings and errors for simulations
+outdata/timings.txt
+outdata/errors.txt
