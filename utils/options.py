@@ -3,7 +3,6 @@ from firedrake import *
 import numpy as np
 
 from . import conversion
-from . import storage
 
 
 class Options:
@@ -148,7 +147,7 @@ class Options:
         self.glatlon = {'P02': (38.5002, 142.5016), 'P06': (38.6340, 142.5838), '801': (38.2, 141.7),
                         '802': (39.3, 142.1), '803': (38.9, 141.8), '804': (39.7, 142.2), '806': (37.0, 141.2)}
 
-        # Plotting dictionaries
+        # Plotting dictionaries TODO update
         self.plotDir = {1: 'fixedMesh/coarse', 2: 'fixedMesh/medium', 3: 'fixedMesh/fine',
                         4: 'simpleAdapt', 5: 'adjointBased'}
         self.labels = {1: 'Coarse mesh', 2: 'Medium mesh', 3: 'Fine mesh', 4: 'Simple adaptive', 5: 'Adjoint based'}
@@ -182,7 +181,7 @@ class Options:
         :return: saved free surface elevation and fluid velocity, along with mesh index.
         """
         # Enforce initial conditions on discontinuous space / load variables from disk
-        indexStr = storage.indexString(index)
+        indexStr = indexString(index)
         if adjoint:
             with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_READ) as chk:
                 lu = Function(W.sub(0), name='Adjoint velocity')
@@ -221,3 +220,10 @@ class Options:
 Percent complete  : %4.1f%%    Elapsed time : %4.2fs (This step : %4.2fs)     
 #Elements... Current : %d  Mean : %d  Minimum : %s  Maximum : %s\n""" %
               (mn, (100 * mn * self.rm * self.dt) / self.Tend, outerTime, innerTime, nEle, Sn / mn, N[0], N[1]))
+
+def indexString(index):
+    """
+    :param index: integer form of index.
+    :return: five-digit string form of index.
+    """
+    return (5 - len(str(index))) * '0' + str(index)

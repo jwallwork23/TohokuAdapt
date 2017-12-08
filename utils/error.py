@@ -3,13 +3,8 @@ from firedrake import *
 import numpy as np
 import cmath
 
-from . import error
 from . import interpolation
-from . import storage
-
-
-class OutOfRangeError(ValueError):
-    pass
+from . import options
 
 
 def explicitErrorEstimator(u_, u, eta_, eta, lu, le, b, dt, hk):
@@ -125,7 +120,7 @@ if __name__ == '__main__':
             eta = error.FourierSeriesSW(eta0, t, 0.1, trunc=10)
             eta.rename("Fourier series free surface")
             outfile.write(eta, time=t)
-            with DumbCheckpoint("plots/testSuite/hdf5/analytic_SW" + storage.indexString(i), mode=FILE_CREATE) as chk:
+            with DumbCheckpoint("plots/testSuite/hdf5/analytic_SW" + options.indexString(i), mode=FILE_CREATE) as chk:
                 chk.store(eta)
                 chk.close()
 
@@ -140,7 +135,7 @@ if __name__ == '__main__':
     # TODO: save meshes to compute other error norms
 
     for index, t in zip(range(41), np.linspace(0., 2., 41)):
-        indexStr = storage.indexString(index)
+        indexStr = options.indexString(index)
         with DumbCheckpoint("plots/testSuite/hdf5/analytic_SW" + indexStr, mode=FILE_READ) as exact:
             exact.load(eta, name="Fourier series free surface")
             exact.close()

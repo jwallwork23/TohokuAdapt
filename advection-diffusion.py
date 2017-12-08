@@ -100,7 +100,7 @@ if getData:
                 if not cnt % rm:
                     phi_next_N, phi_N, w_N = inte.interp(mesh_N, phi_next, phi, w)
                     rho_N.interpolate(form.strongResidualAD(phi_next_N, phi_N, w_N, Dt, nu=nu))
-                    with DumbCheckpoint(dirName + 'hdf5/residual_AD' + stor.indexString(cnt), mode=FILE_CREATE) as saveRes:
+                    with DumbCheckpoint(dirName + 'hdf5/residual_AD' + op.indexString(cnt), mode=FILE_CREATE) as saveRes:
                         saveRes.store(rho_N)
                         saveRes.close()
                     residualFile.write(rho_N, time=t)
@@ -144,7 +144,7 @@ if getData:
                 dual_N = inte.interp(mesh_N, dual_n)[0]
 
                 if not cnt % rm:
-                    indexStr = stor.indexString(cnt)
+                    indexStr = op.indexString(cnt)
 
                     # Load residual data from HDF5
                     with DumbCheckpoint(dirName + 'hdf5/residual_AD' + indexStr, mode=FILE_READ) as loadRes:
@@ -199,7 +199,7 @@ if approach in ('simpleAdapt', 'goalBased'):
             # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
             if useAdjoint:
                 epsilon_N = Function(P0_N, name="Error indicator")
-                with DumbCheckpoint(dirName + 'hdf5/error_AD' + stor.indexString(cnt), mode=FILE_READ) as loadError:
+                with DumbCheckpoint(dirName + 'hdf5/error_AD' + op.indexString(cnt), mode=FILE_READ) as loadError:
                     loadError.load(epsilon_N)
                     loadError.close()
                 errEst = Function(FunctionSpace(mesh_n, "CG", 1)).interpolate(inte.interp(mesh_n, epsilon_N)[0])

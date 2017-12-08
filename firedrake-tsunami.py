@@ -65,8 +65,8 @@ eta_.interpolate(eta0)
 q = Function(V)
 q.assign(q_)
 u, eta = q.split()
-u.rename("Fluid velocity")
-eta.rename("Free surface displacement")
+u.rename("uv_2d")
+eta.rename("elev_2d")
 
 if useAdjoint:
     # Define Function to hold residual data
@@ -108,6 +108,7 @@ if getData:
         while t < T + dt:
             # Solve problem at current timestep
             forwardSolver.solve()
+            indexStr = op.indexString(cnt)
 
             # Approximate residual of forward equation and save to HDF5
             if useAdjoint:
@@ -116,7 +117,7 @@ if getData:
                     Au, Ae = form.strongResidualSW(qN, q_N, b_N, Dt)
                     rho_u.interpolate(Au)
                     rho_e.interpolate(Ae)
-                    with DumbCheckpoint(dirName + 'hdf5/residual_' + stor.indexString(cnt), mode=FILE_CREATE) as chk:
+                    with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_CREATE) as chk:
                         chk.store(rho_u)
                         chk.store(rho_e)
                         chk.close()
@@ -136,6 +137,10 @@ if getData:
 
             if not cnt % ndump:
                 forwardFile.write(u, eta, time=t)
+                if op.gauges and not useAdjoint:
+                    with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_CREATE) as saveElev:
+                        saveElev.store(eta)
+                        saveElev.close()
                 print('t = %.2fs' % t)
             t += dt
             cnt += 1
@@ -161,7 +166,7 @@ if getData:
                 dual_N = inte.mixedPairInterp(mesh_N, V_N, dual)[0]
 
                 if not cnt % rm:
-                    indexStr = stor.indexString(cnt)
+                    indexStr = op.indexString(cnt)
 
                     # Load residual data from HDF5
                     with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_READ) as loadResidual:
@@ -215,9 +220,9 @@ if approach in ('simpleAdapt', 'goalBased'):
     print('\nStarting adaptive mesh primal run (forwards in time)')
     adaptTimer = clock()
     while t <= T:
+        indexStr = op.indexString(cnt)
         if not cnt % rm:
             stepTimer = clock()
-            indexStr = stor.indexString(cnt)
 
             # Reconstruct Hessian
             W = TensorFunctionSpace(mesh, "CG", 1)
@@ -254,8 +259,8 @@ if approach in ('simpleAdapt', 'goalBased'):
             b = inte.interp(mesh, b)[0]     # Combine this in above interpolation for speed
             q = Function(V)
             u, eta = q.split()
-            u.rename("Velocity")
-            eta.rename("Elevation")
+            u.rename("uv_2d")
+            eta.rename("elev_2d")
 
             # Re-establish variational form
             qt = TestFunction(V)
@@ -275,16 +280,21 @@ if approach in ('simpleAdapt', 'goalBased'):
         if not cnt % ndump:
             adaptiveFile.write(u, eta, time=t)
             if op.gauges:
-                with DumbCheckpoint(dirName + 'hdf5/solution_' + stor.indexString(cnt), mode=FILE_CREATE) as chk:
-                    chk.store(eta)
-                    chk.close()
+                with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_CREATE) as saveElev:
+                    saveElev.store(eta)
+                    saveElev.close()
             print('t = %.2fs' % t)
         t += dt
         cnt += 1
     adaptTimer = clock() - adaptTimer
     print('Adaptive primal run complete. Run time: %.3fs \n' % adaptTimer)
 
-# Print to screen timing analyses (and error in pure advection case)
+# Print timing analyses
 if getData and useAdjoint:
     print("TIMINGS:         Forward run   %5.3fs, Adjoint run   %5.3fs, Adaptive run   %5.3fs" %
           (primalTimer, dualTimer, adaptTimer))
+
+# Calculate and print timeseries error analyses
+if op.gauges:
+    for gauge in ("P02", "P06"):
+        stor.gaugeTimeseries(gauge, dirName, int(cnt), op=op)
