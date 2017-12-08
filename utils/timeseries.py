@@ -33,13 +33,14 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options(), output=False, name='
     """
 
     # Get solver parameters
-    T = op.Tend / 60
+    T = op.Tend
     dt = op.dt
     ndump = op.ndump
     rm = op.rm
+    numStrips = int(T / (ndump * dt))
 
     # Import data from the inversion analysis and interpolate
-    measuredfile = open('outdata/timeseries/' + gauge + 'data_' + str(int(T)) + 'mins.txt', 'r')
+    measuredfile = open('outdata/timeseries/' + gauge + 'data_' + str(int(T/60)) + 'mins.txt', 'r')
     x = []
     y = []
     for line in measuredfile:
@@ -54,7 +55,7 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options(), output=False, name='
     # Write timeseries to file and calculate errors
     outfile = open('outdata/timeseries/' + gauge + name + '.txt', 'w+')
     val = []
-    t = np.linspace(0, T, num=iEnd+1)
+    t = np.linspace(0, T/60, num=iEnd+1)
     for i in range(0, iEnd+1, ndump):
         indexStr = misc.indexString(i)
 
@@ -71,50 +72,58 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options(), output=False, name='
         mVal = float(m(t[i]))
         if i == 0:
             v0 = data - mVal
-            sStart = data
+            sStart = v0
             mStart = mVal
         toPlot = data - v0
-        val.append(np.abs(data - mVal))
+        diff = toPlot - mVal
+        val.append(np.abs(diff))
         if output:
             print('Time %.2f mins : %.4fm' % (i/60, toPlot))
 
-        # Compute L1, L2, L-infinity errors and norms of gauge data
-        error[0] += val[-1]
-        error[1] += val[-1] ** 2
+        # Compute L1, L2, L-infinity errors and norms of gauge data using trapezium rule
+        if i in (0, iEnd):
+            error[0] += val[-1]
+            error[1] += val[-1] ** 2
+            norm[0] += mVal
+            norm[1] += mVal ** 2
+        else:
+            error[0] += 2 * val[-1]
+            error[1] += 2 * val[-1] ** 2
+            norm[0] += 2 * mVal
+            norm[1] += 2 * mVal ** 2
         if val[-1] > error[2]:
             error[2] = val[-1]
-        norm[0] += mVal
-        norm[1] += mVal ** 2
         if mVal > norm[2]:
             norm[2] = mVal
 
         # Compute total variation of error and gauge data
         if i == ndump:
-            sign = (data - data_) / np.abs(data - data_)
+            sign = (diff - diff_) / np.abs(diff - diff_)
             mSign = (mVal - mVal_) / np.abs(mVal - mVal_)
         elif i > ndump:
             sign_ = sign
             mSign_ = mSign
-            sign = (data - data_) / np.abs(data - data_)
+            sign = (diff - diff_) / np.abs(diff - diff_)
             mSign = (mVal - mVal_) / np.abs(mVal - mVal_)
             if (sign != sign_) | (i == iEnd):
-                error[3] += np.abs(data - sStart)
-                sStart = data
+                # print("#### totalVariation DEBUG: i = ", i/60)
+                error[3] += np.abs(diff - sStart)
+                sStart = diff
             if (mSign != mSign_) | (i == iEnd):
                 norm[3] += np.abs(mVal - mStart)
                 mStart = mVal
-        data_ = data
+        diff_ = diff
         mVal_ = mVal
 
         outfile.write(str(toPlot) + '\n')
     outfile.close()
 
     # Print errors to screen
-    error[0] /= (iEnd + 1)
-    norm[0] /= (iEnd + 1)
-    error[1] = np.sqrt(error[1] / (iEnd + 1))
-    norm[1] = np.sqrt(norm[1] / (iEnd + 1))
-    print("""
+    error[0] /= (numStrips * 2)
+    norm[0] /= (numStrips * 2)
+    error[1] = np.sqrt(error[1] / (numStrips * 2))
+    norm[1] = np.sqrt(norm[1] / (numStrips * 2))
+    print('\n' + gauge + """
 Absolute L1 norm :         %6.3f Relative L1 norm :         %6.3f
 Absolute L2 norm :         %6.3f Relative L2 norm :         %6.3f
 Absolute L-infinity norm : %6.3f Relative L-infinity norm : %6.3f
