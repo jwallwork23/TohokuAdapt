@@ -30,6 +30,8 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options(), output=False, name='
     :param iEnd: final index.
     :param op: Options object holding parameter values.
     :param output: toggle printing timeseries values to screen.
+    :param name: name to give to timeseries.
+    :param adaptive: adaptive mesh?
     """
 
     # Import data from the inversion analysis and get first value
@@ -56,6 +58,35 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options(), output=False, name='
             v0 = data - float(m0)
         outfile.write(str(data - v0) + '\n')
     outfile.close()
+
+
+def extractTimeseries(gauges, eta, current, op=opt.Options()):
+    """
+    :param gauges: list of gauge name strings, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
+    :param eta: Function to extract timeseries from.
+    :param current: dictionary containing previous timeseries data. 
+    :param op: Options object holding parameter values.
+    :return: dictionary containing all timeseries data so far.
+    """
+    for gauge in gauges:
+        if current == {}:
+            current[gauge] = []
+        current[gauge].append(eta.at(op.gaugeCoord(gauge)))
+    return current
+
+
+def saveTimeseries(gauge, data, name='test'):
+    """
+    :param gauge: gauge name string, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
+    :param data: Timeseries data to save.
+    :param name: name to give to timeseries.    
+    """
+    outfile = open('outdata/timeseries/' + gauge + name + '.txt', 'w+')
+    for i in range(len(data)):
+        outfile.write(str(data[i]) + '\n')
+    outfile.close()
+
+    # TODO: use the above functions in code
 
 
 def plotGauges(gauge, dirName, iEnd, op=opt.Options()):
