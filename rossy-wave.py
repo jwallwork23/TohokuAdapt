@@ -43,13 +43,13 @@ b = Constant(1.)
 op.checkCFL(b)
 
 # Define inital mesh and FunctionSpace
-n = 8
+n = 2
 # N = 2 * n
 lx = 48
 ly = 24
 mesh = PeriodicRectangleMesh(lx * n, ly * n, lx, ly, direction="x")   # Computational mesh
-mesh.coordinates.dat.data[0] -= 24.
-mesh.coordinates.dat.data[1] -= 12.
+# mesh = RectangleMesh(lx * n, ly * n, lx, ly)   # Computational mesh
+
 # mesh_N = SquareMesh(N, N, lx, lx)   # Finer mesh (N > n) upon which to approximate error
 x, y = SpatialCoordinate(mesh)
 V_n = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
@@ -76,6 +76,7 @@ u, eta = q.split()
 u.rename("Velocity")
 eta.rename("Elevation")
 bc = DirichletBC(V_n.sub(0), [0, 0], [1, 2])  # No-slip on top and bottom of domain
+# bc = DirichletBC(V_n.sub(0), [0, 0], 'on_boundary')  # No-slip on top and bottom of domain
 
 # Get adaptivity parameters
 hmin = op.hmin
@@ -95,6 +96,7 @@ if getData or (approach == 'fixedMesh'):
     qt = TestFunction(V_n)
     forwardProblem = NonlinearVariationalProblem(form.weakResidualMSW(q, q_, qt, b, Dt, y), q, bcs=bc)
     forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
+                                                                # TODO: choose solver parameters
 
     print('\nStarting fixed mesh primal run (forwards in time)')
     finished = False
@@ -104,30 +106,30 @@ if getData or (approach == 'fixedMesh'):
         # Solve problem at current timestep
         forwardSolver.solve()
 
-        # Approximate residual of forward equation and save to HDF5
-        if useAdjoint:
-            if not cnt % rm:
-                qN, q_N = inte.mixedPairInterp(mesh_N, V_N, q, q_)
-                Au, Ae = form.strongResidualSW(qN, q_N, b, Dt)
-                rho_u.interpolate(Au)
-                rho_e.interpolate(Ae)
-                with DumbCheckpoint(dirName + 'hdf5/residual_RW' + op.indexString(cnt), mode=FILE_CREATE) as chk:
-                    chk.store(rho_u)
-                    chk.store(rho_e)
-                    chk.close()
-                residualFile.write(rho_u, rho_e, time=t)
+        # # Approximate residual of forward equation and save to HDF5
+        # if useAdjoint:
+        #     if not cnt % rm:
+        #         qN, q_N = inte.mixedPairInterp(mesh_N, V_N, q, q_)
+        #         Au, Ae = form.strongResidualSW(qN, q_N, b, Dt)
+        #         rho_u.interpolate(Au)
+        #         rho_e.interpolate(Ae)
+        #         with DumbCheckpoint(dirName + 'hdf5/residual_RW' + op.indexString(cnt), mode=FILE_CREATE) as chk:
+        #             chk.store(rho_u)
+        #             chk.store(rho_e)
+        #             chk.close()
+        #         residualFile.write(rho_u, rho_e, time=t)
 
         # Update solution at previous timestep
         q_.assign(q)
 
-        # Mark timesteps to be used in adjoint simulation
-        if useAdjoint:
-            if t >= T - dt:
-                finished = True
-            if t == 0.:
-                adj_start_timestep()
-            else:
-                adj_inc_timestep(time=t, finished=finished)
+        # # Mark timesteps to be used in adjoint simulation
+        # if useAdjoint:
+        #     if t >= T - dt:
+        #         finished = True
+        #     if t == 0.:
+        #         adj_start_timestep()
+        #     else:
+        #         adj_inc_timestep(time=t, finished=finished)
 
         forwardFile.write(u, eta, time=t)
         print('t = %.2fs' % t)

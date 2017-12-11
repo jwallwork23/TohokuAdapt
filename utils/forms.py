@@ -111,7 +111,7 @@ def strongResidualMSW(q, q_, h, Dt, y, f0=0., beta=1., g=1., timestepper='CrankN
 
     Au = (Hm * (u - u_) + (H - H_) * um) / Dt + Hu2.dx(0) + Huv.dx(1) - f * Hm * vm + g * Hm * em.dx(0)
     Av = (Hm * (v - v_) + (H - H_) * vm) / Dt + Huv.dx(0) + Hv2.dx(1) + f * Hm * um + g * Hm * em.dx(1)
-    Ae = (eta - eta_) / Dt + div(as_vector(Hm * um, Hm * vm))
+    Ae = (eta - eta_) / Dt + (Hm * um).dx(0) + (Hm * vm).dx(1)
 
     return Au, Av, Ae
 
@@ -149,7 +149,7 @@ def weakResidualMSW(q, q_, qt, h, Dt, y, f0=0., beta=1., g=1., timestepper='Cran
     F += ((Hu2.dx(0) + Huv.dx(1)) * w + (Huv.dx(0) + Hv2.dx(1)) * z) * dx                   # Nonlinear terms
     F += (f * Hm * (um * z - vm * w)) * dx                                                  # Coriolis effect
     F += (g * Hm * (em.dx(0) * w + em.dx(1) * z)) * dx                                      # Grad eta term
-    F += (((Hm * um).dx(0) +  (Hm * vm).dx(1)) * xi) * dx                                   # div(Hu) term
+    F += (((Hm * um).dx(0) + (Hm * vm).dx(1)) * xi) * dx                                   # div(Hu) term
 
     return F
 
@@ -162,15 +162,14 @@ def initialConditionMSW(V, B=0.395):
 
     # Establish phi functions
     q = Function(V)
-    W = FunctionSpace(V.mesh(), "DG", 1)    # TODO: make more general
-    x_phi = " * 0.771 * %f * %f / cosh(2 * %f * x[0])" % (B, B, B)
-    x_dphidx = " * -2 * %f * tanh(x[0] * %f)" % (B, B)
+    x_phi = " * 0.771 * %f * %f / cosh(2 * %f * (x[0] - 24.))" % (B, B, B)
+    x_dphidx = " * -2 * %f * tanh((x[0] - 24.) * %f)" % (B, B)
 
     # Set components of q
     u, eta = q.split()
-    u.interpolate(Expression(["(-9 + 6 * pow(x[1], 2)) * exp(-0.5 * pow(x[1], 2)) / 4" + x_phi,
-                              "2 * x[1] * exp(-0.5 * pow(x[1], 2))" + x_dphidx]))
-    eta.interpolate(Expression("(3 + 6 * pow(x[1], 2)) * exp(-0.5 * pow(x[1], 2)) / 4" + x_phi))
+    u.interpolate(Expression(["(-9 + 6 * pow((x[1] - 12.), 2)) * exp(-0.5 * pow((x[1] - 12.), 2)) / 4" + x_phi,
+                              "2 * (x[1] - 12.) * exp(-0.5 * pow((x[1] - 12.), 2))" + x_dphidx]))
+    eta.interpolate(Expression("(3 + 6 * pow((x[1] - 12.), 2)) * exp(-0.5 * pow((x[1] - 12.), 2)) / 4" + x_phi))
 
     return q
 
