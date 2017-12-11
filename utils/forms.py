@@ -1,5 +1,4 @@
 from firedrake import *
-from firedrake_adjoint import dt, Functional
 
 
 def timestepScheme(u, u_, timestepper):
@@ -18,42 +17,6 @@ def timestepScheme(u, u_, timestepper):
     else:
         raise NotImplementedError("Timestepping scheme %s not yet considered." % timestepper)
     return um
-
-
-def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=4160e3, y2=4360e3,
-                          plot=False, smooth=True):
-    """
-    :param q: forward solution tuple.
-    :param Tstart: first time considered as relevant (s).
-    :param Tend: last time considered as relevant (s).
-    :param x1: West-most coordinate for region A (m).
-    :param x2: East-most coordinate for region A (m).
-    :param y1: South-most coordinate for region A (m).
-    :param y2: North-most coordinate for region A (m).
-    :param plot: toggle plotting of indicator function.
-    :param smooth: toggle 'smoothening' of the indicator function.
-    :return: objective functional for shallow water equations. 
-    """
-
-    # Create a (possibly 'smoothened') indicator function for region A = [x1, x2] x [y1, y1]
-    if smooth:
-        xd = (x2 - x1) / 2
-        yd = (y2 - y1) / 2
-        indicator = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? ' \
-                    'exp(1. / (pow(x[0] - %f, 2) - pow(%f, 2))) * exp(1. / (pow(x[1] - %f, 2) - pow(%f, 2))) : 0.'\
-                    % (x1, x2, y1, y2, x1 + xd, xd, y1 + yd, yd)
-    else:
-        indicator = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' % (x1, x2, y1, y2)
-    k = Function(q.function_space())
-    ku, ke = k.split()
-    ke.interpolate(Expression(indicator))
-
-    # TODO: `smoothen` in time (?)
-
-    if plot:
-        File("plots/adjointBased/kernel.pvd").write(ke)
-
-    return Functional(inner(q, k) * dx * dt[Tstart:Tend])
 
 
 def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson', rotational=False):
@@ -115,27 +78,6 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson', rotatio
         F += inner(as_vector((-u[1], u[0])), w) * dx
 
     return F
-
-
-def objectiveFunctionalAD(c, x1=2.5, x2=3.5, y1=0.1, y2=0.9):
-    """
-    :param c: concentration.
-    :param x1: West-most coordinate for region A (m).
-    :param x2: East-most coordinate for region A (m).
-    :param y1: South-most coordinate for region A (m).
-    :param y2: North-most coordinate for region A (m).
-    :return: objective functional for advection diffusion problem. 
-    """
-
-    # Create a 'smoothened' indicator function for region A = [x1, x2] x [y1, y1]
-    xd = (x2 - x1) / 2
-    yd = (y2 - y1) / 2
-    indicator = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? ' \
-                'exp(1. / (pow(x[0] - %f, 2) - pow(%f, 2))) * exp(1. / (pow(x[1] - %f, 2) - pow(%f, 2))) : 0.'\
-                % (x1, x2, y1, y2, x1 + xd, xd, y1 + yd, yd)
-    iA = Function(c.function_space()).interpolate(Expression(indicator))
-
-    return  Functional(c * iA * dx * dt)
 
 
 def strongResidualMSW(q, q_, h, Dt, y, f0=0., beta=1., g=1., timestepper='CrankNicolson'):
@@ -205,11 +147,32 @@ def weakResidualMSW(q, q_, qt, h, Dt, y, f0=0., beta=1., g=1., timestepper='Cran
     F = ((Hm * ((u - u_) * w + (v - v_) * z) + (H - H_) * (um * w + vm * z)) / Dt) * dx     # Time integrate u, v
     F += ((eta - eta_) * xi / Dt) * dx                                                      # Time integrate eta
     F += ((Hu2.dx(0) + Huv.dx(1)) * w + (Huv.dx(0) + Hv2.dx(1)) * z) * dx                   # Nonlinear terms
-    F += (f * Hm * (um * z - vm * q)) * dx                                                  # Coriolis effect
-    F += (g * Hm * inner(grad(em), as_vector(w, z))) * dx                                   # Grad eta term
-    F += (inner(div(as_vector(Hm * um, Hm * vm)), xi)) * dx                                 # div(Hu) term
+    F += (f * Hm * (um * z - vm * w)) * dx                                                  # Coriolis effect
+    F += (g * Hm * (em.dx(0) * w + em.dx(1) * z)) * dx                                      # Grad eta term
+    F += (((Hm * um).dx(0) +  (Hm * vm).dx(1)) * xi) * dx                                   # div(Hu) term
 
     return F
+
+def initialConditionMSW(V, B=0.395):
+    """
+    :param V: Mixed function space upon which to define solutions.
+    :param B: Parameter controlling amplitude of soliton.
+    :return: Initial condition for test problem of Huang.
+    """
+
+    # Establish phi functions
+    q = Function(V)
+    W = FunctionSpace(V.mesh(), "DG", 1)    # TODO: make more general
+    x_phi = " * 0.771 * %f * %f / cosh(2 * %f * x[0])" % (B, B, B)
+    x_dphidx = " * -2 * %f * tanh(x[0] * %f)" % (B, B)
+
+    # Set components of q
+    u, eta = q.split()
+    u.interpolate(Expression(["(-9 + 6 * pow(x[1], 2)) * exp(-0.5 * pow(x[1], 2)) / 4" + x_phi,
+                              "2 * x[1] * exp(-0.5 * pow(x[1], 2))" + x_dphidx]))
+    eta.interpolate(Expression("(3 + 6 * pow(x[1], 2)) * exp(-0.5 * pow(x[1], 2)) / 4" + x_phi))
+
+    return q
 
 
 def strongResidualAD(c, c_, u, Dt, nu=1e-3, timestepper='CrankNicolson'):
@@ -256,3 +219,63 @@ def weakMetricAdvection(M, M_, Mt, w, Dt, timestepper='ImplicitEuler'):
     Mm = timestepScheme(M, M_, timestepper)
     F = (inner(M - M_, Mt) / Dt + inner(dot(w, nabla_grad(Mm)), Mt)) * dx
     return F
+
+
+from firedrake_adjoint import dt, Functional
+
+
+def objectiveFunctionalAD(c, x1=2.5, x2=3.5, y1=0.1, y2=0.9):
+    """
+    :param c: concentration.
+    :param x1: West-most coordinate for region A (m).
+    :param x2: East-most coordinate for region A (m).
+    :param y1: South-most coordinate for region A (m).
+    :param y2: North-most coordinate for region A (m).
+    :return: objective functional for advection diffusion problem. 
+    """
+
+    # Create a 'smoothened' indicator function for region A = [x1, x2] x [y1, y1]
+    xd = (x2 - x1) / 2
+    yd = (y2 - y1) / 2
+    indicator = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? ' \
+                'exp(1. / (pow(x[0] - %f, 2) - pow(%f, 2))) * exp(1. / (pow(x[1] - %f, 2) - pow(%f, 2))) : 0.'\
+                % (x1, x2, y1, y2, x1 + xd, xd, y1 + yd, yd)
+    iA = Function(c.function_space()).interpolate(Expression(indicator))
+
+    return  Functional(c * iA * dx * dt)
+
+
+def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=4160e3, y2=4360e3,
+                          plot=False, smooth=True):
+    """
+    :param q: forward solution tuple.
+    :param Tstart: first time considered as relevant (s).
+    :param Tend: last time considered as relevant (s).
+    :param x1: West-most coordinate for region A (m).
+    :param x2: East-most coordinate for region A (m).
+    :param y1: South-most coordinate for region A (m).
+    :param y2: North-most coordinate for region A (m).
+    :param plot: toggle plotting of indicator function.
+    :param smooth: toggle 'smoothening' of the indicator function.
+    :return: objective functional for shallow water equations. 
+    """
+
+    # Create a (possibly 'smoothened') indicator function for region A = [x1, x2] x [y1, y1]
+    if smooth:
+        xd = (x2 - x1) / 2
+        yd = (y2 - y1) / 2
+        indicator = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? ' \
+                    'exp(1. / (pow(x[0] - %f, 2) - pow(%f, 2))) * exp(1. / (pow(x[1] - %f, 2) - pow(%f, 2))) : 0.'\
+                    % (x1, x2, y1, y2, x1 + xd, xd, y1 + yd, yd)
+    else:
+        indicator = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' % (x1, x2, y1, y2)
+    k = Function(q.function_space())
+    ku, ke = k.split()
+    ke.interpolate(Expression(indicator))
+
+    # TODO: `smoothen` in time (?)
+
+    if plot:
+        File("plots/adjointBased/kernel.pvd").write(ke)
+
+    return Functional(inner(q, k) * dx * dt[Tstart:Tend])
