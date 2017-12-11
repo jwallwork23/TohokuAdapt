@@ -144,8 +144,8 @@ class Options:
             self.space2 = 'DG'
 
         # Gauge locations in latitude-longitude coordinates
-        self.glatlon = {'P02': (38.5002, 142.5016), 'P06': (38.6340, 142.5838), '801': (38.2, 141.7),
-                        '802': (39.3, 142.1), '803': (38.9, 141.8), '804': (39.7, 142.2), '806': (37.0, 141.2)}
+        self.glatlon = {"P02": (38.5002, 142.5016), "P06": (38.6340, 142.5838), "801": (38.2, 141.7),
+                        "802": (39.3, 142.1), "803": (38.9, 141.8), "804": (39.7, 142.2), "806": (37.0, 141.2)}
 
         # Plotting dictionaries
         labels = ('Coarse mesh', 'Medium mesh', 'Fine mesh', 'Simple adaptive', 'Adjoint based', 'Goal based')

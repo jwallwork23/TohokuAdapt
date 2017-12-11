@@ -10,6 +10,7 @@ import utils.interpolation as inte
 import utils.mesh as msh
 import utils.misc as msc
 import utils.options as opt
+import utils.timeseries as tim
 
 
 print('*********************** TOHOKU TSUNAMI SIMULATION *********************\n')
@@ -48,8 +49,6 @@ if useAdjoint:
     assert op.coarseness != 1
     mesh_N, b_N = msh.TohokuDomain(op.coarseness-1)[0::2]   # Get finer mesh and associated bathymetry
     V_N = VectorFunctionSpace(mesh_N, op.space1, op.degree1) * FunctionSpace(mesh_N, op.space2, op.degree2)
-elif approach == 'fixedMesh':
-    msh.saveMesh(mesh, dirName + 'hdf5/mesh_00000')
 
 # Specify physical and solver parameters
 dt = op.dt
@@ -93,9 +92,11 @@ mM = [nEle, nEle]            # Min/max #Elements
 Sn = nEle
 nVerT = nVer * op.vscale    # Target #Vertices
 
-# Initialise counters
+# Initialise counters and dictionary to contain timeseries
 t = 0.
 cnt = 0
+gaugeData = {}
+gauges = ("P02", "P06")
 
 if getData or (approach == 'fixedMesh'):
     # Define variational problem
@@ -140,9 +141,7 @@ if getData or (approach == 'fixedMesh'):
         if not cnt % ndump:
             forwardFile.write(u, eta, time=t)
             if op.gauges and not useAdjoint:
-                with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_CREATE) as saveElev:
-                    saveElev.store(eta)
-                    saveElev.close()
+                gaugeData = tim.extractTimeseries(gauges, eta, gaugeData, op=op)
             print('t = %.2fs' % t)
         t += dt
         cnt += 1
@@ -252,8 +251,6 @@ if approach in ('simpleAdapt', 'goalBased'):
             if op.advect:
                 M = adap.advectMetric(M, u, Dt, n=rm)
             mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-            if op.gauges:
-                msh.saveMesh(mesh, dirName + 'hdf5/mesh_' + indexStr)
 
 
             # Interpolate variables
@@ -283,9 +280,7 @@ if approach in ('simpleAdapt', 'goalBased'):
         if not cnt % ndump:
             adaptiveFile.write(u, eta, time=t)
             if op.gauges:
-                with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_CREATE) as saveElev:
-                    saveElev.store(eta)
-                    saveElev.close()
+                gaugeData = tim.extractTimeseries(gauges, eta, gaugeData, op=op)
             print('t = %.2fs' % t)
         t += dt
         cnt += 1
@@ -297,3 +292,9 @@ if approach in ('simpleAdapt', 'goalBased'):
 if getData and useAdjoint:
     print("TIMINGS:         Forward run   %5.3fs, Adjoint run   %5.3fs, Adaptive run   %5.3fs" %
           (primalTimer, dualTimer, adaptTimer))
+name = input("Enter a name for these time series (e.g. 'goalBased8-12-17'): ") or 'test'
+
+# Save and plot timeseries
+for gauge in gauges:
+    tim.saveTimeseries(gauge, gaugeData[gauge], name=name)
+    tim.plotGauges(gauge, dirName, int(T), op=op)
