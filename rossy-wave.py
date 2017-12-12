@@ -31,7 +31,7 @@ errorFile = File(dirName + "errorIndicatorRW.pvd")
 adaptiveFile = File(dirName + "goalBasedRW.pvd") if useAdjoint else File(dirName + "simpleAdaptRW.pvd")
 
 # Specify physical and solver parameters
-op = opt.Options(dt=1, Tend=120, family='dg-cg',
+op = opt.Options(dt=0.5, Tend=120, family='dg-cg',
                  # Tstart=0.5, hmin=5e-2, hmax=1., rm=5, gradate=False, advect=False,
                  # vscale=0.4 if useAdjoint else 0.85
                  )
@@ -68,7 +68,7 @@ if useAdjoint:
     v = TestFunction(P0_N)
 
 # Apply initial and boundary conditions
-q_ = form.initialConditionMSW(V_n)
+q_ = form.analyticHuang(V_n)
 u_, eta_ = q_.split()
 q = Function(V_n)
 q.assign(q_)

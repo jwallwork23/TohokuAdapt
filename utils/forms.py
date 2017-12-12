@@ -50,7 +50,7 @@ def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson', rotationa
     return Au, Ae
 
 
-def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson', rotational=False):
+def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson', rotational=False, g=9.81):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
     
@@ -71,7 +71,7 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson', rotatio
     em = timestepScheme(eta, eta_, timestepper)
 
     F = ((inner(u - u_, w) + inner(eta - eta_, xi)) / Dt) * dx
-    F += (9.81 * inner(grad(em), w) - inner(b * um, grad(xi))) * dx
+    F += (g * inner(grad(em), w) - inner(b * um, grad(xi))) * dx
     if nu != 0.:
         F -= nu * inner(grad(um) + transpose(grad(um)), grad(w)) * dx
     if rotational:
@@ -149,21 +149,23 @@ def weakResidualMSW(q, q_, qt, h, Dt, y, f0=0., beta=1., g=1., timestepper='Cran
     F += ((Hu2.dx(0) + Huv.dx(1)) * w + (Huv.dx(0) + Hv2.dx(1)) * z) * dx                   # Nonlinear terms
     F += (f * Hm * (um * z - vm * w)) * dx                                                  # Coriolis effect
     F += (g * Hm * (em.dx(0) * w + em.dx(1) * z)) * dx                                      # Grad eta term
-    F += (((Hm * um).dx(0) + (Hm * vm).dx(1)) * xi) * dx                                   # div(Hu) term
+    F += (((Hm * um).dx(0) + (Hm * vm).dx(1)) * xi) * dx                                    # div(Hu) term
 
     return F
 
-def initialConditionMSW(V, B=0.395):
+
+def analyticHuang(V, B=0.395, t=0.):
     """
     :param V: Mixed function space upon which to define solutions.
     :param B: Parameter controlling amplitude of soliton.
+    :param t: current time.
     :return: Initial condition for test problem of Huang.
     """
 
     # Establish phi functions
     q = Function(V)
-    x_phi = " * 0.771 * %f * %f / cosh(2 * %f * (x[0] - 24.))" % (B, B, B)
-    x_dphidx = " * -2 * %f * tanh((x[0] - 24.) * %f)" % (B, B)
+    x_phi = " * 0.771 * %f * %f / pow(cosh(%f * (x[0] - 24. + 0.395 * %f * %f * %f)), 2)" % (B, B, B, B, B, t)
+    x_dphidx = " * -2 * %f * tanh(%f * (x[0] - 24. + 0.395 * %f * %f * %f))" % (B, B, B, B, t)
 
     # Set components of q
     u, eta = q.split()
