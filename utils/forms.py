@@ -50,7 +50,7 @@ def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson', rotationa
     return Au, Ae
 
 
-def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson', rotational=False, g=9.81):
+def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson', rotational=False, g=9.81, f0=0., beta=1.):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
     
@@ -75,12 +75,14 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson', rotatio
     if nu != 0.:
         F -= nu * inner(grad(um) + transpose(grad(um)), grad(w)) * dx
     if rotational:
-        F += inner(as_vector((-u[1], u[0])), w) * dx
+        x, y = SpatialCoordinate(q.function_space().mesh())
+        f = f0 + beta * y
+        F += f * inner(as_vector((-u[1], u[0])), w) * dx
 
     return F
 
 
-def strongResidualMSW(q, q_, h, Dt, y, f0=0., beta=1., g=1., timestepper='CrankNicolson'):
+def strongResidualMSW(q, q_, h, Dt, f0=0., beta=1., g=1., timestepper='CrankNicolson'):
     """
     Construct the strong residual for the semi-discrete linear shallow water equations at the current timestep, in the 
     nonlinear momentum form used in Huang et al 2008. No boundary conditions have been enforced at this stage.
@@ -107,6 +109,7 @@ def strongResidualMSW(q, q_, h, Dt, y, f0=0., beta=1., g=1., timestepper='CrankN
     Hu2 = Hm * um * um
     Huv = Hm * um * vm
     Hv2 = Hm * vm * vm
+    x, y = SpatialCoordinate(q.function_space().mesh())
     f = f0 + beta * y
 
     Au = (Hm * (u - u_) + (H - H_) * um) / Dt + Hu2.dx(0) + Huv.dx(1) - f * Hm * vm + g * Hm * em.dx(0)
@@ -142,7 +145,10 @@ def weakResidualMSW(q, q_, qt, h, Dt, y, f0=0., beta=1., g=1., timestepper='Cran
     Hu2 = Hm * um * um
     Huv = Hm * um * vm
     Hv2 = Hm * vm * vm
-    f = f0 + beta * y
+    if beta == 0.:
+        f = Constant(f0)
+    else:
+        f = f0 + beta * y
 
     F = ((Hm * ((u - u_) * w + (v - v_) * z) + (H - H_) * (um * w + vm * z)) / Dt) * dx     # Time integrate u, v
     F += ((eta - eta_) * xi / Dt) * dx                                                      # Time integrate eta
@@ -164,14 +170,14 @@ def analyticHuang(V, B=0.395, t=0.):
 
     # Establish phi functions
     q = Function(V)
-    x_phi = " * 0.771 * %f * %f / pow(cosh(%f * (x[0] - 24. + 0.395 * %f * %f * %f)), 2)" % (B, B, B, B, B, t)
-    x_dphidx = " * -2 * %f * tanh(%f * (x[0] - 24. + 0.395 * %f * %f * %f))" % (B, B, B, B, t)
+    x_phi = " * 0.771 * %f * %f / pow(cosh(%f * (x[0] + 0.395 * %f * %f * %f)), 2)" % (B, B, B, B, B, t)
+    x_dphidx = " * -2 * %f * tanh(%f * (x[0] + 0.395 * %f * %f * %f))" % (B, B, B, B, t)
 
     # Set components of q
     u, eta = q.split()
-    u.interpolate(Expression(["(-9 + 6 * pow((x[1] - 12.), 2)) * exp(-0.5 * pow((x[1] - 12.), 2)) / 4" + x_phi,
-                              "2 * (x[1] - 12.) * exp(-0.5 * pow((x[1] - 12.), 2))" + x_dphidx]))
-    eta.interpolate(Expression("(3 + 6 * pow((x[1] - 12.), 2)) * exp(-0.5 * pow((x[1] - 12.), 2)) / 4" + x_phi))
+    u.interpolate(Expression(["(-9 + 6 * pow(x[1], 2)) * exp(-0.5 * pow(x[1], 2)) / 4" + x_phi,
+                              "2 * x[1] * exp(-0.5 * pow(x[1], 2))" + x_dphidx]))
+    eta.interpolate(Expression("(3 + 6 * pow(x[1], 2)) * exp(-0.5 * pow(x[1], 2)) / 4" + x_phi))
 
     return q
 

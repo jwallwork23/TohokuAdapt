@@ -13,7 +13,7 @@ import utils.options as opt
 
 print('\n*********************** SHALLOW WATER TEST PROBLEM ************************\n')
 print('Mesh adaptive solver initially defined on a square mesh')
-approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'goalBased'
+approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'fixedMesh'
 
 # Cheat code to resume from saved data in goalBased case
 if approach == 'saved':
@@ -47,6 +47,7 @@ n = 32
 N = 2 * n
 lx = 2 * np.pi
 mesh = SquareMesh(n, n, lx, lx)   # Computational mesh
+x, y = SpatialCoordinate(mesh)
 mesh_N = SquareMesh(N, N, lx, lx)   # Finer mesh (N > n) upon which to approximate error
 x, y = SpatialCoordinate(mesh)
 V_n = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
@@ -94,6 +95,9 @@ if getData:
         # Define variational problem
         qt = TestFunction(V_n)
         forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
+        # forwardProblem = NonlinearVariationalProblem(
+        #     form.weakResidualMSW(q, q_, qt, b, Dt, y, f0=0., beta=0., g=9.81), q)
+                                                                # TODO: how to solve for (Hu, Hv, eta)?
         forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
         print('\nStarting fixed mesh primal run (forwards in time)')

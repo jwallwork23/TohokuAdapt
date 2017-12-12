@@ -42,12 +42,16 @@ Ts = op.Tstart
 b = Constant(1.)
 op.checkCFL(b)
 
-# Define inital mesh and FunctionSpace
+# Define initial mesh and FunctionSpace
 n = 2
 # N = 2 * n
 lx = 48
 ly = 24
 mesh = PeriodicRectangleMesh(lx * n, ly * n, lx, ly, direction="x")   # Computational mesh
+xy = Function(mesh.coordinates)
+xy.dat.data[:, 0] -= 24.
+xy.dat.data[:, 1] -= 12.
+mesh.coordinates.assign(xy)
 # mesh = RectangleMesh(lx * n, ly * n, lx, ly)   # Computational mesh
 
 # mesh_N = SquareMesh(N, N, lx, lx)   # Finer mesh (N > n) upon which to approximate error
@@ -94,9 +98,12 @@ cnt = 0
 if getData or (approach == 'fixedMesh'):
     # Define variational problem
     qt = TestFunction(V_n)
-    forwardProblem = NonlinearVariationalProblem(form.weakResidualMSW(q, q_, qt, b, Dt, y), q, bcs=bc)
+    # forwardProblem = NonlinearVariationalProblem(form.weakResidualMSW(q, q_, qt, b, Dt), q, bcs=bc)
+                                                                # TODO: how to solve for (Hu, Hv, eta)?
+    forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, rotational=True, g=1., f0=0.,
+                                                                      beta=1.), q, bcs=bc)
+
     forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
-                                                                # TODO: choose solver parameters
 
     print('\nStarting fixed mesh primal run (forwards in time)')
     finished = False
