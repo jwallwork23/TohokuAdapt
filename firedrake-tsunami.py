@@ -70,6 +70,13 @@ u, eta = q.split()
 u.rename("uv_2d")
 eta.rename("elev_2d")
 
+# Get initial gauge values
+gaugeData = {}
+gauges = ("P02", "P06")
+v0 = {}
+for gauge in gauges:
+    v0[gauge] = float(eta.at(op.gaugeCoord(gauge)))
+
 if useAdjoint:
     # Define Function to hold residual data
     rho = Function(V_N)
@@ -92,11 +99,9 @@ mM = [nEle, nEle]            # Min/max #Elements
 Sn = nEle
 nVerT = nVer * op.vscale    # Target #Vertices
 
-# Initialise counters and dictionary to contain timeseries
+# Initialise counters
 t = 0.
 cnt = 0
-gaugeData = {}
-gauges = ("P02", "P06")
 
 if getData or (approach == 'fixedMesh'):
     # Define variational problem
@@ -141,7 +146,7 @@ if getData or (approach == 'fixedMesh'):
         if not cnt % ndump:
             forwardFile.write(u, eta, time=t)
             if op.gauges and not useAdjoint:
-                gaugeData = tim.extractTimeseries(gauges, eta, gaugeData, op=op)
+                gaugeData = tim.extractTimeseries(gauges, eta, gaugeData, v0, op=op)
             print('t = %.2fs' % t)
         t += dt
         cnt += 1
@@ -280,7 +285,7 @@ if approach in ('simpleAdapt', 'goalBased'):
         if not cnt % ndump:
             adaptiveFile.write(u, eta, time=t)
             if op.gauges:
-                gaugeData = tim.extractTimeseries(gauges, eta, gaugeData, op=op)
+                gaugeData = tim.extractTimeseries(gauges, eta, gaugeData, v0, op=op)
             print('t = %.2fs' % t)
         t += dt
         cnt += 1

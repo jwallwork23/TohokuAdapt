@@ -62,11 +62,12 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options(), output=False, name='
     # TODO: the above is sadly redundant
 
 
-def extractTimeseries(gauges, eta, v0, current, op=opt.Options()):
+def extractTimeseries(gauges, eta, current, v0, op=opt.Options()):
     """
     :param gauges: list of gauge name strings, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
     :param eta: Function to extract timeseries from.
-    :param current: dictionary containing previous timeseries data. 
+    :param current: dictionary containing previous timeseries data.
+    :param v0: dictionary containing initial gauge values.
     :param op: Options object holding parameter values.
     :return: dictionary containing all timeseries data so far.
     """
@@ -74,13 +75,10 @@ def extractTimeseries(gauges, eta, v0, current, op=opt.Options()):
     for gauge in gauges:
         if gauge not in current.keys():
             current[gauge] = []
-            v0 = float(eta.at(op.gaugeCoord(gauge)))
             current[gauge].append(0.)
         else:
-            current[gauge].append(float(eta.at(op.gaugeCoord(gauge) - v0)))
-    return current, v0
-
-# TODO; sort out this v0 business
+            current[gauge].append(float(eta.at(op.gaugeCoord(gauge)) - v0[gauge]))
+    return current
 
 
 def saveTimeseries(gauge, data, name='test'):

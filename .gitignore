@@ -37,3 +37,6 @@ simpleAdapt.py
 # Timings and errors for simulations
 outdata/timings.txt
 outdata/errors.txt
+
+# Generate timeseries at a later time
+generateTimeseries.py
