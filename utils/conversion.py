@@ -373,3 +373,26 @@ def xy2barycentric(crdM, crdTri, i):
     res = res1 / res2
 
     return res
+
+
+def rescaleMesh(mesh):
+    """
+    :param mesh: mesh to be converted.
+    :return: mesh rescaled to [-1, 1] x [-1, 1]. 
+    """
+    xy = Function(mesh.coordinates)
+    xmin = min(xy.dat.data[:, 0])
+    xmax = max(xy.dat.data[:, 0])
+    ymin = min(xy.dat.data[:, 1])
+    ymax = max(xy.dat.data[:, 1])
+    xdiff = xmax - xmin
+    ydiff = ymax - ymin
+    cx = (xmax + xmin) / xdiff
+    cy = (ymax + ymin) / ydiff
+
+    for i in range(len(xy.dat.data)):
+        xy.dat.data[i, 0] = 2 * xy.dat.data[i, 0] / xdiff - cx
+        xy.dat.data[i, 1] = 2 * xy.dat.data[i, 1] / ydiff - cy
+    mesh.coordinates.assign(xy)
+
+    return mesh
