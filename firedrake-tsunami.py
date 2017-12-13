@@ -33,17 +33,20 @@ op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
                  # gradate=False,
                  advect=False,
                  outputHessian=False,
+                 plotpvd=False,
                  coarseness=2,
                  gauges=True)
 
 # Establish filenames
-dirName = 'plots/firedrake-tsunami/'
-forwardFile = File(dirName + "forward.pvd")
-residualFile = File(dirName + "residual.pvd")
-adjointFile = File(dirName + "adjoint.pvd")
-errorFile = File(dirName + "errorIndicator.pvd")
-adaptiveFile = File(dirName + "goalBased.pvd") if useAdjoint else File(dirName + "simpleAdapt.pvd")
-hessianFile = File(dirName + "hessian.pvd")
+if op.plotpvd:
+    dirName = 'plots/firedrake-tsunami/'
+    forwardFile = File(dirName + "forward.pvd")
+    residualFile = File(dirName + "residual.pvd")
+    adjointFile = File(dirName + "adjoint.pvd")
+    errorFile = File(dirName + "errorIndicator.pvd")
+    adaptiveFile = File(dirName + "goalBased.pvd") if useAdjoint else File(dirName + "simpleAdapt.pvd")
+if op.outputHessian:
+    hessianFile = File(dirName + "hessian.pvd")
 
 # Generate mesh(es)
 mesh, eta0, b = msh.TohokuDomain(op.coarseness)
@@ -114,7 +117,8 @@ if getData or (approach == 'fixedMesh'):
     print('\nStarting fixed mesh primal run (forwards in time)')
     finished = False
     primalTimer = clock()
-    forwardFile.write(u, eta, time=t)
+    if op.plotpvd:
+        forwardFile.write(u, eta, time=t)
     while t < T + dt:
         # Solve problem at current timestep
         forwardSolver.solve()
@@ -131,7 +135,8 @@ if getData or (approach == 'fixedMesh'):
                     chk.store(rho_u)
                     chk.store(rho_e)
                     chk.close()
-                residualFile.write(rho_u, rho_e, time=t)
+                if op.plotpvd:
+                    residualFile.write(rho_u, rho_e, time=t)
 
         # Update solution at previous timestep
         q_.assign(q)
@@ -146,7 +151,8 @@ if getData or (approach == 'fixedMesh'):
                 adj_inc_timestep(time=t, finished=finished)
 
         if not cnt % ndump:
-            forwardFile.write(u, eta, time=t)
+            if op.plotpvd:
+                forwardFile.write(u, eta, time=t)
             if op.gauges and not useAdjoint:
                 gaugeData = tim.extractTimeseries(gauges, eta, gaugeData, v0, op=op)
             print('t = %.2fs' % t)
@@ -196,10 +202,12 @@ if getData and useAdjoint:
                     saveError.close()
 
                 # Print to screen, save data and increment counters
-                errorFile.write(epsilon, time=t)
+                if op.plotpvd:
+                    errorFile.write(epsilon, time=t)
 
             if not cnt % ndump:
-                adjointFile.write(dual_u, dual_e, time=t)
+                if op.plotpvd:
+                    adjointFile.write(dual_u, dual_e, time=t)
                 print('t = %.2fs' % t)
             t -= dt
             cnt -= 1
@@ -285,7 +293,8 @@ if approach in ('simpleAdapt', 'goalBased'):
         q_.assign(q)
 
         if not cnt % ndump:
-            adaptiveFile.write(u, eta, time=t)
+            if op.plotpvd:
+                adaptiveFile.write(u, eta, time=t)
             if op.gauges:
                 gaugeData = tim.extractTimeseries(gauges, eta, gaugeData, v0, op=op)
             print('t = %.2fs' % t)

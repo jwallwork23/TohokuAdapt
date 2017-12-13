@@ -23,6 +23,7 @@ class Options:
                  beta=1.4,
                  gamma=1.,
                  outputHessian=False,
+                 plotpvd=True,
                  gauges=False,
                  Tstart=300.,
                  Tend=1500.,
@@ -46,6 +47,7 @@ class Options:
         :param beta: metric gradation scaling parameter.
         :param gamma: metric rescaling parameter.
         :param outputHessian: toggle saving Hessian to PVD.
+        :param plotpvd: toggle saving solution fields to PVD.
         :param gauges: toggle saving of elevation to HDF5 for timeseries analysis. 
         :param Tstart: Lower time range limit (s), before which we can assume the wave won't reach the shore.
         :param Tend: Simulation duration (s).
@@ -113,6 +115,7 @@ class Options:
         except:
             raise ValueError('Invalid value for scaling parameter.')
         self.outputHessian = outputHessian
+        self.plotpvd=plotpvd
         self.gauges = gauges
 
         # Physical parameters
