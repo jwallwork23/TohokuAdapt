@@ -93,12 +93,11 @@ def saveTimeseries(gauge, data, name='test'):
     outfile.close()
 
 
-def plotGauges(gauge, dirName, iEnd, op=opt.Options()):
+def plotGauges(gauge, iEnd, op=opt.Options()):
     """
     Store timeseries data for a particular gauge and calculate (L1, L2, L-infinity and TV) error norms.
 
     :param gauge: gauge name string, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
-    :param dirName: name of directory for locating HDF5 files, from the set {'fixedMesh', 'simpleAdapt', 'adjointBased'}
     :param iEnd: final index.
     :param op: Options object holding parameter values.
     """

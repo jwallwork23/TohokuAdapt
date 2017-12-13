@@ -32,12 +32,12 @@ op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
                  gradate=True if useAdjoint else False,
                  # gradate=False,
                  advect=False,
-                 outputHessian=True,
-                 coarseness=5,
+                 outputHessian=False,
+                 coarseness=2,
                  gauges=True)
 
 # Establish filenames
-dirName = 'plots/firedrake-tsunami/' + msh.MeshSetup(op.coarseness).meshName + '/'
+dirName = 'plots/firedrake-tsunami/'
 forwardFile = File(dirName + "forward.pvd")
 residualFile = File(dirName + "residual.pvd")
 adjointFile = File(dirName + "adjoint.pvd")
@@ -304,4 +304,4 @@ name = input("Enter a name for these time series (e.g. 'goalBased8-12-17'): ") o
 # Save and plot timeseries
 for gauge in gauges:
     tim.saveTimeseries(gauge, gaugeData[gauge], name=name)
-    tim.plotGauges(gauge, dirName, int(T), op=op)
+    tim.plotGauges(gauge, int(T), op=op)
