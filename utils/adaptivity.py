@@ -5,6 +5,8 @@ import numpy
 from numpy import linalg as la
 from scipy import linalg as sla
 
+import utils.forms as form
+
 
 def constructHessian(mesh, V, sol, op=None):
     """
@@ -334,6 +336,35 @@ def pointwiseMax(f, g):
     return f
 
 
+def isotropicAdvection(M_, h_, w, Dt, n=1, timestepper='ImplicitEuler'):
+    """
+    'Advect' an isotropic metric with finest resolution in direction of fluid velocity/wind field.
+
+    :param M_: metric field defined on current mesh, at current timestep.
+    :param h_: scalar field determining metric.
+    :param w: (vector) velocity field on current mesh. Can be Function, list or ndarray.
+    :param Dt: timestep expressed as a FiredrakeConstant.
+    :param n: number of timesteps to advect over.
+    :param timestepper: time integration scheme used.
+    """
+
+    # Set up variational problem
+    V = M_.function_space()
+    W = h_.function_space()
+    mesh = W.mesh()
+    h = Function(W)
+    ht = TestFunction(W)
+    F = form.weakResidualAD(h, h_, ht, w, Dt, nu=0., timestepper=timestepper)
+
+    # Time integrate
+    for i in range(1, n + 1):
+        solve(F == 0, h)
+        M_.assign(metricIntersection(mesh, V, M_, isotropicMetric(V, h)))
+        h_.assign(h)
+
+    return M_
+
+
 # TODO: more rigourous analysis of what `metric advection` is and how it is best implemented
 
 def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEuler', fieldToAdvect='M'):
@@ -349,7 +380,6 @@ def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEul
     :param timestepper: time integration scheme used.
     :param fieldToAdvect: individial enties ('Mij') eigenvalues ('li'), eigenpairs ('ei') or metric itself ('M').
     """
-    import utils.forms as form
 
     V = M_.function_space()
     mesh = V.mesh()

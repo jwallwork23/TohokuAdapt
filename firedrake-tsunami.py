@@ -122,10 +122,10 @@ if getData or (approach == 'fixedMesh'):
     while t < T + dt:
         # Solve problem at current timestep
         forwardSolver.solve()
-        indexStr = msc.indexString(cnt)
 
         # Approximate residual of forward equation and save to HDF5
         if useAdjoint:
+            indexStr = msc.indexString(cnt)
             if not cnt % rm:
                 qN, q_N = inte.mixedPairInterp(mesh_N, V_N, q, q_)
                 Au, Ae = form.strongResidualSW(qN, q_N, b_N, Dt)
