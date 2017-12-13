@@ -20,6 +20,8 @@ approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ")
 if approach == 'saved':
     approach = 'goalBased'
     getData = False
+elif approach == 'simpleAdapt':
+    getData = False
 else:
     getData = True
 useAdjoint = approach == 'goalBased'

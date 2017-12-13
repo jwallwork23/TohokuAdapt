@@ -95,7 +95,7 @@ def saveTimeseries(gauge, data, name='test'):
 
 def plotGauges(gauge, dirName, iEnd, op=opt.Options()):
     """
-    Store timeseries data for a particular gauge and calculate (L1, L2, L-infinity) error norms.
+    Store timeseries data for a particular gauge and calculate (L1, L2, L-infinity and TV) error norms.
 
     :param gauge: gauge name string, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
     :param dirName: name of directory for locating HDF5 files, from the set {'fixedMesh', 'simpleAdapt', 'adjointBased'}
@@ -225,3 +225,34 @@ Absolute total variation : %6.3f Relative total variation : %6.3f""" %
     plt.ylabel(r'Free surface (m)')
     plt.savefig('outdata/timeseries/plots/' + gauge + '.pdf', bbox_inches='tight')
     plt.show()
+
+
+def errorVsTime(op=opt.Options()):
+    """
+    :param op: Options object holding parameter values. 
+    :return: plot of relative total variation versus simulation run time.
+    """
+
+    # Get plotting parameters
+    # labels = op.labels
+    labels = ("Coarse mesh", "Simple adaptive", "Goal based")
+    styles = op.styles
+    t = []
+    e = []
+
+    for mesh in labels:
+        for gauge in ("P02", "P06"):
+            print('Datum to plot: ', mesh, gauge)
+            t.append(input("Run time to solution: "))
+            e.append(input("Corresponding error: "))
+            plt.plot(t, e, label=mesh, marker=styles[mesh], linewidth=0.)
+
+    plt.gcf()
+    plt.legend(bbox_to_anchor=(1.01, 1.), loc=2)
+    plt.xlabel(r'Time elapsed (s)')
+    plt.ylabel(r'Relative total variation')
+    plt.xlim([0, 50000])
+    plt.ylim([0, 1])
+    plt.savefig('outdata/errorPlots/errorVsTime.pdf', bbox_inches='tight')
+    plt.show()
+
