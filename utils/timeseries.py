@@ -40,13 +40,14 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options(), output=False, name='
 
     # Write timeseries to file and calculate errors
     outfile = open('outdata/timeseries/' + gauge + name + '.txt', 'w+')
-    for i in range(0, iEnd+1, op.ndump):
+    # for i in range(0, iEnd+1, op.ndump):
+    for i in range(0, iEnd+1):
         indexStr = misc.indexString(i)
 
         # Load mesh from file and set up Function to load into
         if ((not i % op.rm) & adaptive) | (i == 0):
             # mesh = loadMesh(dirName + 'hdf5/mesh_' + indexStr)    # TODO: save meshes to avoid this
-            mesh = Mesh('resources/meshes/TohokuXCoarse.msh')
+            mesh = Mesh('resources/meshes/TohokuCoarse.msh')
             elev_2d = Function(FunctionSpace(mesh, op.space2, op.degree2))
 
         # Load data from HDF5 and get timeseries data
@@ -196,8 +197,8 @@ def plotGauges(gauge, iEnd, op=opt.Options()):
                 elif val > mM[1]:
                     mM[1] = val
                 data.append(val)
-                i += ndump
-                # i += 1
+                # i += ndump
+                i += 1
             plt.plot(np.linspace(0, T/60, numVals), data,
                      label=mesh,
                      marker=styles[mesh],

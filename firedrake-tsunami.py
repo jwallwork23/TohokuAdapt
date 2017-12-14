@@ -240,33 +240,28 @@ if approach in ('simpleAdapt', 'goalBased'):
         if not cnt % rm:
             stepTimer = clock()
 
-            # Reconstruct Hessian
+            # Construct metric
             W = TensorFunctionSpace(mesh, "CG", 1)
-            H = adap.constructHessian(mesh, W, eta, op=op)
-
-            # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
             if useAdjoint & (cnt != 0):
+
+                # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
                 with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_READ) as loadError:
-                    loadError.load(epsilon)                     # P0 field on the initial mesh
+                    loadError.load(epsilon)
                     loadError.close()
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])
-                for k in range(mesh.topology.num_vertices()):
-                    H.dat.data[k] *= errEst.dat.data[k] * 1e4   # Scale by error estimate
-            if op.outputHessian:                                # TODO: Fairly arbitrary extra rescaling
-                H.rename("Hessian")                             # TODO:     No scaling renders all effort useless
-                hessianFile.write(H, time=t)                    # TODO:     1e5 scaling is probably too harsh
+                M = adap.isotropicMetric(W, errEst, op=op, invert=False)
+            else:
+                H = adap.constructHessian(mesh, W, eta, op=op)
+                M = adap.computeSteadyMetric(mesh, W, H, eta, nVerT=nVerT, op=op)
 
-            # Adapt mesh
-            M = adap.computeSteadyMetric(mesh, W, H, eta, nVerT=nVerT, op=op)
+            # Gradate or advect metric and adapt mesh
             if op.gradate:
-                if useAdjoint:
-                    M_ = adap.isotropicMetric(W, inte.interp(mesh, h)[0], bdy=True, op=op)  # Initial boundary metric
-                    M = adap.metricIntersection(mesh, W, M, M_, bdy=True)
+                M_ = adap.isotropicMetric(W, inte.interp(mesh, h)[0], bdy=True, op=op)  # Initial boundary metric
+                M = adap.metricIntersection(mesh, W, M, M_, bdy=True)
                 adap.metricGradation(mesh, M)
             if op.advect:
                 M = adap.advectMetric(M, u, Dt, n=rm)
             mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-
 
             # Interpolate variables
             V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)

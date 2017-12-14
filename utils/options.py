@@ -154,7 +154,7 @@ class Options:
         labels = ('Coarse mesh', 'Medium mesh', 'Fine mesh', 'Simple adaptive', 'Adjoint based', 'Goal based')
         self.labels = labels
         self.styles = {labels[0]: 's', labels[1]: '^', labels[2]: 'x', labels[3]: 'o', labels[4]: '--', labels[5]: '*'}
-        self.stamps = {labels[0]: 'fixedMeshXC', labels[1]: 'fixedMeshM', labels[2]: 'fixedMeshF',
+        self.stamps = {labels[0]: 'fixedMeshXC', labels[1]: 'fixedMeshC', labels[2]: 'fixedMeshM',
                        labels[3]: 'simpleAdapt', labels[4]: 'adjointBased', labels[5]: 'goalBased'}
 
     def gaugeCoord(self, gauge):
