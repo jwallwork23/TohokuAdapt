@@ -108,7 +108,7 @@ nVerT = nVer * op.vscale    # Target #Vertices
 t = 0.
 cnt = 0
 
-if getData or (approach == 'fixedMesh'):
+if getData:
     # Define variational problem
     qt = TestFunction(V)
     forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
@@ -308,9 +308,9 @@ if approach in ('simpleAdapt', 'goalBased'):
 if getData and useAdjoint:
     print("TIMINGS:         Forward run   %5.3fs, Adjoint run   %5.3fs, Adaptive run   %5.3fs" %
           (primalTimer, dualTimer, adaptTimer))
-name = input("Enter a name for these time series (e.g. 'goalBased8-12-17'): ") or 'test'
 
 # Save and plot timeseries
+name = input("Enter a name for these time series (e.g. 'goalBased8-12-17'): ") or 'test'
 for gauge in gauges:
     tim.saveTimeseries(gauge, gaugeData[gauge], name=name)
     tim.plotGauges(gauge, int(T), op=op)

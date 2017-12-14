@@ -45,7 +45,9 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options(), output=False, name='
 
         # Load mesh from file and set up Function to load into
         if ((not i % op.rm) & adaptive) | (i == 0):
-            elev_2d = Function(FunctionSpace(loadMesh(dirName + 'hdf5/mesh_' + indexStr), op.space2, op.degree2))
+            # mesh = loadMesh(dirName + 'hdf5/mesh_' + indexStr)    # TODO: save meshes to avoid this
+            mesh = Mesh('resources/meshes/TohokuXCoarse.msh')
+            elev_2d = Function(FunctionSpace(mesh, op.space2, op.degree2))
 
         # Load data from HDF5 and get timeseries data
         with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as loadElev:
@@ -58,8 +60,6 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options(), output=False, name='
             v0 = data - float(m0)
         outfile.write(str(data - v0) + '\n')
     outfile.close()
-
-    # TODO: the above is sadly redundant
 
 
 def extractTimeseries(gauges, eta, current, v0, op=opt.Options()):
@@ -197,6 +197,7 @@ def plotGauges(gauge, iEnd, op=opt.Options()):
                     mM[1] = val
                 data.append(val)
                 i += ndump
+                # i += 1
             plt.plot(np.linspace(0, T/60, numVals), data,
                      label=mesh,
                      marker=styles[mesh],

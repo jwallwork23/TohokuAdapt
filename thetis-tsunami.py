@@ -11,59 +11,92 @@ import utils.forms as form
 import utils.interpolation as inte
 import utils.mesh as msh
 import utils.options as opt
+import utils.timeseries as tim
 
+
+print('*********************** TOHOKU TSUNAMI SIMULATION *********************\n')
+approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'goalBased'
+
+# Cheat code to resume from saved data in goalBased case
+if approach == 'saved':
+    approach = 'goalBased'
+    getData = False
+elif approach == 'simpleAdapt':
+    getData = False
+else:
+    getData = True
+useAdjoint = approach == 'goalBased'
 
 # Define initial mesh and mesh statistics placeholders
-print('*********************** TOHOKU TSUNAMI SIMULATION *********************\n')
-approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'simpleAdapt'
-op = opt.Options(vscale=0.4 if approach == 'goalBased' else 0.85,
-                 rm=60 if approach == 'goalBased' else 30,
-                 gradate=False,
+op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
+                 rm=60 if useAdjoint else 30,
+                 gradate=True if useAdjoint else False,
+                 # gradate=False,
                  advect=False,
-                 coarseness=4)
-mesh, eta0, b = msh.TohokuDomain(op.coarseness)
-dirName = 'plots/' + approach + '/' + msh.MeshSetup(op.coarseness).meshName + '/'
-msh.saveMesh(mesh, dirName + 'hdf5/mesh')
+                 outputHessian=False,
+                 plotpvd=False,
+                 coarseness=5,
+                 gauges=True)
 
-# Get solver parameters
-T = op.Tend
+# Establish filenames
+dirName = 'plots/thetis-tsunami/'
+if op.plotpvd:
+    residualFile = File(dirName + "residual.pvd")
+    errorFile = File(dirName + "errorIndicator.pvd")
+    adaptiveFile = File(dirName + "goalBased.pvd") if useAdjoint else File(dirName + "simpleAdapt.pvd")
+if op.outputHessian:
+    hessianFile = File(dirName + "hessian.pvd")
+
+# Generate mesh(es)
+mesh, eta0, b = msh.TohokuDomain(op.coarseness)
+if useAdjoint:
+    assert op.coarseness != 1
+    mesh_N, b_N = msh.TohokuDomain(op.coarseness-1)[0::2]   # Get finer mesh and associated bathymetry
+    V_N = VectorFunctionSpace(mesh_N, op.space1, op.degree1) * FunctionSpace(mesh_N, op.space2, op.degree2)
+
+# Specify physical and solver parameters
 dt = op.dt
 Dt = Constant(dt)
-op.checkCFL(b)
+T = op.Tend
+Ts = op.Tstart
 ndump = op.ndump
+op.checkCFL(b)
+
+# Get initial gauge values
+gaugeData = {}
+gauges = ("P02", "P06")
+v0 = {}
+for gauge in gauges:
+    v0[gauge] = float(eta0.at(op.gaugeCoord(gauge)))
+
+if useAdjoint:
+    V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
+
+    # Define Function to hold residual data
+    rho = Function(V_N)
+    rho_u, rho_e = rho.split()
+    rho_u.rename("Velocity residual")
+    rho_e.rename("Elevation residual")
+    dual = Function(V)
+    dual_u, dual_e = dual.split()
+    dual_u.rename("Adjoint velocity")
+    dual_e.rename("Adjoint elevation")
+    P0_N = FunctionSpace(mesh_N, "DG", 0)
+    v = TestFunction(P0_N)
 
 # Get adaptivity parameters
-iso = op.iso
-if iso:
-    dirName += 'isotropic/'
 hmin = op.hmin
 hmax = op.hmax
 rm = op.rm
 nEle, nVer = msh.meshStats(mesh)
-N = [nEle, nEle]            # Min/max #Elements
+mM = [nEle, nEle]           # Min/max #Elements
 Sn = nEle
 nVerT = nVer * op.vscale    # Target #Vertices
 
 # Initialise counters
 cnt = 0
 
-if approach in ('fixedMesh', 'goalBased'):
-
-    if approach == 'goalBased':
-        # Create FunctionSpace upon which to define forms and residuals
-        V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
-        P0 = FunctionSpace(mesh, "DG", 0)
-        v = TestFunction(P0)
-
-        # Define Functions to hold residual and adjoint solution data
-        rho = Function(V)
-        rho_u, rho_e = rho.split()
-        rho_u.rename("Velocity residual")
-        rho_e.rename("Elevation residual")
-        dual = Function(V)
-        dual_u, dual_e = dual.split()
-        dual_u.rename("Adjoint velocity")
-        dual_e.rename("Adjoint elevation")
+if getData:
 
     # Get solver parameter values and construct solver, with default dg1-dg1 space
     tic = clock()
@@ -73,12 +106,12 @@ if approach in ('fixedMesh', 'goalBased'):
     options.use_nonlinear_equations = False
     options.use_grad_depth_viscosity_term = False
     options.simulation_export_time = op.dt * op.ndump
-    options.simulation_end_time = op.T
+    options.simulation_end_time = T
     options.timestepper_type = op.timestepper
     options.timestep = op.dt
     options.output_directory = dirName
     options.export_diagnostics = True
-    options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+    options.fields_to_export_hdf5 = ['elev_2d']
 
     # Apply ICs and time integrate
     solver_obj.assign_initial_conditions(elev=eta0)
@@ -197,3 +230,10 @@ if approach in ('simpleAdapt', 'goalBased'):
     print('Elapsed time for adaptive solver: %1.1fs (%1.2f mins)' % (toc1 - tic1, (toc1 - tic1) / 60))
 
 # TODO: test ``simpleAdapt`` script
+
+
+# # Save and plot timeseries
+# name = input("Enter a name for these time series (e.g. 'goalBased8-12-17'): ") or 'test'
+# for gauge in gauges:
+#     tim.saveTimeseries(gauge, gaugeData[gauge], name=name)
+#     tim.plotGauges(gauge, int(T), op=op)

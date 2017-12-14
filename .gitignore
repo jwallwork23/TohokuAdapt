@@ -18,6 +18,7 @@
 plots/
 resources/meshes/
 utils/.idea/
+outdata/errorPlots/
 
 
 ## Files to be ignored:
