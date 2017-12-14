@@ -222,6 +222,9 @@ if approach in ('simpleAdapt', 'goalBased'):
                     loadError.close()
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])
                 M = adap.isotropicMetric(W, errEst, op=op, invert=True)
+
+                # TODO: what is the best way to do this?
+
             else:
                 H = adap.constructHessian(mesh, W, eta, op=op)
                 M = adap.computeSteadyMetric(mesh, W, H, eta, nVerT=nVerT, op=op)

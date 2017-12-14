@@ -31,6 +31,7 @@ residualFile = File(dirName + "residualAD.pvd")
 adjointFile = File(dirName + "adjointAD.pvd")
 errorFile = File(dirName + "errorIndicatorAD.pvd")
 adaptiveFile = File(dirName + "goalBasedAD.pvd") if useAdjoint else File(dirName + "simpleAdaptAD.pvd")
+metricFile = File(dirName + "metricAD.pvd")
 
 # Define Mesh and FunctionSpace
 n = 16
@@ -51,7 +52,7 @@ if useAdjoint:
 op = opt.Options(dt=0.04,
                  Tend=2.4,
                  hmin=5e-2,
-                 hmax=1.,
+                 hmax=0.8,
                  rm=5,
                  gradate=False,
                  advect=False,
@@ -193,7 +194,8 @@ if approach in ('simpleAdapt', 'goalBased'):
     print('\nStarting adaptive mesh primal run (forwards in time)')
 
     adaptTimer = clock()
-    epsilon_N = Function(P0_N, name="Error indicator")
+    if useAdjoint:
+        epsilon_N = Function(P0_N, name="Error indicator")
 
     while t <= T:
         if not cnt % rm:
@@ -209,10 +211,16 @@ if approach in ('simpleAdapt', 'goalBased'):
                     loadError.load(epsilon_N)
                     loadError.close()
                 errEst = Function(FunctionSpace(mesh_n, "CG", 1)).interpolate(inte.interp(mesh_n, epsilon_N)[0])
+                # errEst.dat.data[:] *= 2000
                 M = adap.isotropicMetric(W, errEst, op=op, invert=False)
+
+                # TODO: what is the best way to do this?
+
             else:
                 H = adap.constructHessian(mesh_n, W, phi, op=op)
                 M = adap.computeSteadyMetric(mesh_n, W, H, phi, nVerT=nVerT, op=op)
+            M.rename("Metric")
+            metricFile.write(M)
 
             # Adapt mesh and interpolate variables
             if op.gradate:

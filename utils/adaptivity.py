@@ -174,7 +174,8 @@ get a degree 1 Lagrange metric.""" % (deg, family))
         if invert:
             alpha = 1. / max(hmin2, min(pow(g.dat.data[i], 2), hmax2))
         else:
-            alpha = max(op.hmin, min(g.dat.data[i], op.hmax))
+            alpha = max(1. / hmax2, min(g.dat.data[i], 1. / hmin2))
+            # alpha = 1. / max(hmin2, min(pow(1. / g.dat.data[i], 2), hmax2))
         M.dat.data[i][0, 0] = alpha
         M.dat.data[i][1, 1] = alpha
     return M

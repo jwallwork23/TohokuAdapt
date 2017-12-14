@@ -100,8 +100,6 @@ cnt = 0
 if getData or (approach == 'fixedMesh'):
     # Define variational problem
     qt = TestFunction(V_n)
-    # forwardProblem = NonlinearVariationalProblem(form.weakResidualMSW(q, q_, qt, b, Dt), q, bcs=bc)
-                                                                # TODO: how to solve for (Hu, Hv, eta)?
     forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, rotational=True, g=1., f0=0.,
                                                                       beta=1.), q, bcs=bc)
 
