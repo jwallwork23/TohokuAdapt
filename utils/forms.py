@@ -246,9 +246,6 @@ def weakMetricAdvection(M, M_, Mt, w, Dt, timestepper='ImplicitEuler'):
     return F
 
 
-from firedrake_adjoint import dt, Functional
-
-
 def indicator(V, x1=2.5, x2=3.5, y1=0.1, y2=0.9, smooth=False):
     """
     :param V: Function space to use.
@@ -269,6 +266,9 @@ def indicator(V, x1=2.5, x2=3.5, y1=0.1, y2=0.9, smooth=False):
         ind = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' % (x1, x2, y1, y2)
 
     return Function(V).interpolate(Expression(ind))
+
+
+from firedrake_adjoint import dt, Functional
 
 
 def objectiveFunctionalAD(c, x1=2.5, x2=3.5, y1=0.1, y2=0.9):
