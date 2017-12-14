@@ -60,7 +60,7 @@ def strongResidualSW(q, q_, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=Fal
 
 
 def weakResidualSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, nonlinear=False,
-                   noNormalFlow=True, timestepper='CrankNicolson'):
+                   allowNormalFlow=True, timestepper='CrankNicolson'):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
     
@@ -87,7 +87,7 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=F
 
     F = ((inner(u - u_, w) + inner(eta - eta_, xi)) / Dt) * dx          # Time derivative component
     F += (g * inner(grad(em), w) - inner(b * um, grad(xi))) * dx        # Linear spatial derivative components
-    if not noNormalFlow:
+    if allowNormalFlow:
         F += b * xi * dot(um, FacetNormal(mesh)) * ds
     if nu != 0.:
         F -= nu * inner(grad(um) + transpose(grad(um)), grad(w)) * dx
@@ -249,6 +249,28 @@ def weakMetricAdvection(M, M_, Mt, w, Dt, timestepper='ImplicitEuler'):
 from firedrake_adjoint import dt, Functional
 
 
+def indicator(V, x1=2.5, x2=3.5, y1=0.1, y2=0.9, smooth=False):
+    """
+    :param V: Function space to use.
+    :param x1: West-most coordinate for region A (m).
+    :param x2: East-most coordinate for region A (m).
+    :param y1: South-most coordinate for region A (m).
+    :param y2: North-most coordinate for region A (m).
+    :param smooth: toggle smoothening.
+    :return: ('Smoothened') indicator function for region A = [x1, x2] x [y1, y1]
+    """
+    if smooth:
+        xd = (x2 - x1) / 2
+        yd = (y2 - y1) / 2
+        ind = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? ' \
+              'exp(1. / (pow(x[0] - %f, 2) - pow(%f, 2))) * exp(1. / (pow(x[1] - %f, 2) - pow(%f, 2))) : 0.'\
+              % (x1, x2, y1, y2, x1 + xd, xd, y1 + yd, yd)
+    else:
+        ind = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' % (x1, x2, y1, y2)
+
+    return Function(V).interpolate(Expression(ind))
+
+
 def objectiveFunctionalAD(c, x1=2.5, x2=3.5, y1=0.1, y2=0.9):
     """
     :param c: concentration.
@@ -258,16 +280,7 @@ def objectiveFunctionalAD(c, x1=2.5, x2=3.5, y1=0.1, y2=0.9):
     :param y2: North-most coordinate for region A (m).
     :return: objective functional for advection diffusion problem. 
     """
-
-    # Create a 'smoothened' indicator function for region A = [x1, x2] x [y1, y1]
-    xd = (x2 - x1) / 2
-    yd = (y2 - y1) / 2
-    indicator = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? ' \
-                'exp(1. / (pow(x[0] - %f, 2) - pow(%f, 2))) * exp(1. / (pow(x[1] - %f, 2) - pow(%f, 2))) : 0.'\
-                % (x1, x2, y1, y2, x1 + xd, xd, y1 + yd, yd)
-    iA = Function(c.function_space()).interpolate(Expression(indicator))
-
-    return  Functional(c * iA * dx * dt)
+    return  Functional(c * indicator(c.function_space(), x1, x2, y1, y2) * dx * dt)
 
 
 def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=4160e3, y2=4360e3,
@@ -284,19 +297,10 @@ def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=416
     :param smooth: toggle 'smoothening' of the indicator function.
     :return: objective functional for shallow water equations. 
     """
-
-    # Create a (possibly 'smoothened') indicator function for region A = [x1, x2] x [y1, y1]
-    if smooth:
-        xd = (x2 - x1) / 2
-        yd = (y2 - y1) / 2
-        indicator = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? ' \
-                    'exp(1. / (pow(x[0] - %f, 2) - pow(%f, 2))) * exp(1. / (pow(x[1] - %f, 2) - pow(%f, 2))) : 0.'\
-                    % (x1, x2, y1, y2, x1 + xd, xd, y1 + yd, yd)
-    else:
-        indicator = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' % (x1, x2, y1, y2)
-    k = Function(q.function_space())
+    V = q.function_space()
+    k = Function(V)
     ku, ke = k.split()
-    ke.interpolate(Expression(indicator))
+    ke.assign(indicator(V.sub(1), x1, x2, y1, y2))
 
     # TODO: `smoothen` in time (?)
 

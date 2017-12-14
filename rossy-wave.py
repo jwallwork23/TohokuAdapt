@@ -103,7 +103,7 @@ if getData or (approach == 'fixedMesh'):
     # Define variational problem
     qt = TestFunction(V_n)
     F = form.weakResidualSW(q, q_, qt, b, Dt, g=1., f0=0., beta=1.,
-                            rotational=True, nonlinear=False, noNormalFlow=False)
+                            rotational=True, nonlinear=False, allowNormalFlow=True)
     forwardProblem = NonlinearVariationalProblem(F, q, bcs=bc)
     forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 

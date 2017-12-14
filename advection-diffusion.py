@@ -1,7 +1,6 @@
 from firedrake import *
 from firedrake_adjoint import *
 
-import numpy as np
 from time import clock
 
 import utils.adaptivity as adap
@@ -11,9 +10,11 @@ import utils.mesh as msh
 import utils.misc as msc
 import utils.options as opt
 
+dt_meas = dt
+
 print('\n******************************** ADVECTION-DIFFUSION TEST PROBLEM ********************************\n')
 print('Mesh adaptive solver initially defined on a rectangular mesh')
-approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'goalBased'
+approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'fixedMesh'
 diffusion = True
 
 # Cheat code to resume from saved data in goalBased case
@@ -94,6 +95,9 @@ if getData:
         F = form.weakResidualAD(phi_next, phi, psi, w, Dt, nu=nu)
         bc = DirichletBC(V_n, 0., "on_boundary")
 
+        iA = form.indicator(V_n)
+        J_trap = assemble(phi * iA * dx)
+
         print('\nStarting fixed mesh primal run (forwards in time)')
         finished = False
         primalTimer = clock()
@@ -101,27 +105,34 @@ if getData:
             # Solve problem at current timestep
             solve(F == 0, phi_next, bc)
 
-            # Approximate residual of forward equation and save to HDF5
-            if useAdjoint:
-                if not cnt % rm:
-                    phi_next_N, phi_N, w_N = inte.interp(mesh_N, phi_next, phi, w)
-                    rho_N.interpolate(form.strongResidualAD(phi_next_N, phi_N, w_N, Dt, nu=nu))
-                    with DumbCheckpoint(dirName + 'hdf5/residual_AD' + msc.indexString(cnt), mode=FILE_CREATE) as saveRes:
-                        saveRes.store(rho_N)
-                        saveRes.close()
-                    # residualFile.write(rho_N, time=t)
+            # # Approximate residual of forward equation and save to HDF5
+            # if useAdjoint:
+            #     if not cnt % rm:
+            #         phi_next_N, phi_N, w_N = inte.interp(mesh_N, phi_next, phi, w)
+            #         rho_N.interpolate(form.strongResidualAD(phi_next_N, phi_N, w_N, Dt, nu=nu))
+            #         with DumbCheckpoint(dirName + 'hdf5/residual_AD' + msc.indexString(cnt), mode=FILE_CREATE) as saveRes:
+            #             saveRes.store(rho_N)
+            #             saveRes.close()
+            #         # residualFile.write(rho_N, time=t)
 
             # Update solution at previous timestep
             phi.assign(phi_next)
 
             # Mark timesteps to be used in adjoint simulation
+            if t > T:
+                finished = True
             if useAdjoint:
-                if t > T:
-                    finished = True
                 if t == 0.:
                     adj_start_timestep()
                 else:
                     adj_inc_timestep(time=t, finished=finished)
+
+            # Estimate OF using trapezium rule
+            step = assemble(phi * iA * dx)
+            if finished:
+                J_trap += step
+            else:
+                J_trap += 2 * step
 
             # forwardFile.write(phi, time=t)
             print('t = %.3fs' % t)
@@ -132,6 +143,8 @@ if getData:
         print('Primal run complete. Run time: %.3fs' % primalTimer)
         finalFixed = Function(V_n)
         finalFixed.dat.data[:] = phi.dat.data   # NOTE assign, copy and interpolate functions are overloaded
+
+        print("Trapezium rule estimate of J = ", J_trap * dt)  # TODO: how to calculate this more elegantly?
 
     if useAdjoint:
         # Set up adjoint problem
@@ -147,31 +160,31 @@ if getData:
             if save:
                 # Load adjoint data. NOTE the interpolation operator is overloaded
                 dual_n.dat.data[:] = variable.dat.data
-                dual_N = inte.interp(mesh_N, dual_n)[0]
+                # dual_N = inte.interp(mesh_N, dual_n)[0]
 
-                if not cnt % rm:
-                    indexStr = msc.indexString(cnt)
-
-                    # Load residual data from HDF5
-                    with DumbCheckpoint(dirName + 'hdf5/residual_AD' + indexStr, mode=FILE_READ) as loadRes:
-                        loadRes.load(rho_N)
-                        loadRes.close()
-
-                    # Estimate error using forward residual
-                    epsilon_N = assemble(v * rho_N * dual_N * dx)   # Currently a P0 field
-                    epsNorm = np.abs(assemble(rho_N * dual_N * dx))
-                    if epsNorm == 0.:
-                        epsNorm = 1.
-                    epsilon_N.dat.data[:] = np.abs(epsilon_N.dat.data) / epsNorm
-                    epsilon_N.rename("Error indicator")
-
-                    # Save error indicator data to HDF5
-                    with DumbCheckpoint(dirName + 'hdf5/error_AD' + indexStr, mode=FILE_CREATE) as saveError:
-                        saveError.store(epsilon_N)
-                        saveError.close()
-
-                    # Print to screen, save data and increment counters
-                    errorFile.write(epsilon_N, time=t)
+                # if not cnt % rm:
+                #     indexStr = msc.indexString(cnt)
+                #
+                #     # Load residual data from HDF5
+                #     with DumbCheckpoint(dirName + 'hdf5/residual_AD' + indexStr, mode=FILE_READ) as loadRes:
+                #         loadRes.load(rho_N)
+                #         loadRes.close()
+                #
+                #     # Estimate error using forward residual
+                #     epsilon_N = assemble(v * rho_N * dual_N * dx)   # Currently a P0 field
+                #     epsNorm = np.abs(assemble(rho_N * dual_N * dx))
+                #     if epsNorm == 0.:
+                #         epsNorm = 1.
+                #     epsilon_N.dat.data[:] = np.abs(epsilon_N.dat.data) / epsNorm
+                #     epsilon_N.rename("Error indicator")
+                #
+                #     # Save error indicator data to HDF5
+                #     with DumbCheckpoint(dirName + 'hdf5/error_AD' + indexStr, mode=FILE_CREATE) as saveError:
+                #         saveError.store(epsilon_N)
+                #         saveError.close()
+                #
+                #     # Print to screen, save data and increment counters
+                #     errorFile.write(epsilon_N, time=t)
                 # adjointFile.write(dual_n, time=t)
                 print('t = %.3fs' % t)
                 t -= dt
