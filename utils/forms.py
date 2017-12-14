@@ -60,7 +60,7 @@ def strongResidualSW(q, q_, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=Fal
 
 
 def weakResidualSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, nonlinear=False,
-                   timestepper='CrankNicolson'):
+                   noNormalFlow=True, timestepper='CrankNicolson'):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
     
@@ -78,7 +78,7 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=F
     :param timestepper: scheme of choice.
     :return: weak residual for shallow water equations at current timestep.
     """
-
+    mesh = q.function_space().mesh()
     (u, eta) = (as_vector((q[0], q[1])), q[2])
     (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
     (w, xi) = (as_vector((qt[0], qt[1])), qt[2])
@@ -87,10 +87,12 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=F
 
     F = ((inner(u - u_, w) + inner(eta - eta_, xi)) / Dt) * dx          # Time derivative component
     F += (g * inner(grad(em), w) - inner(b * um, grad(xi))) * dx        # Linear spatial derivative components
+    if not noNormalFlow:
+        F += b * xi * dot(um, FacetNormal(mesh)) * ds
     if nu != 0.:
         F -= nu * inner(grad(um) + transpose(grad(um)), grad(w)) * dx
     if rotational:
-        f = f0 + beta * SpatialCoordinate(q.function_space().mesh())[1]
+        f = f0 + beta * SpatialCoordinate(mesh)[1]
         F += f * inner(as_vector((-u[1], u[0])), w) * dx
     if nonlinear:
         F += inner(dot(u, nabla_grad(u)), w) * dx

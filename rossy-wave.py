@@ -31,7 +31,8 @@ errorFile = File(dirName + "errorIndicatorRW.pvd")
 adaptiveFile = File(dirName + "goalBasedRW.pvd") if useAdjoint else File(dirName + "simpleAdaptRW.pvd")
 
 # Specify physical and solver parameters
-op = opt.Options(dt=0.5,
+op = opt.Options(dt=0.25,
+                 ndump=4,
                  Tend=120,
                  family='dg-cg',
                  # Tstart=0.5, hmin=5e-2, hmax=1., rm=5, gradate=False, advect=False,
@@ -41,20 +42,21 @@ dt = op.dt
 Dt = Constant(dt)
 T = op.Tend
 Ts = op.Tstart
+ndump = op.ndump
 b = Constant(1.)
 op.checkCFL(b)
 
 # Define initial mesh and FunctionSpace
-n = 2
+n = 4
 # N = 2 * n
 lx = 48
 ly = 24
 mesh = PeriodicRectangleMesh(lx * n, ly * n, lx, ly, direction="x")   # Computational mesh
+# mesh = RectangleMesh(lx * n, ly * n, lx, ly)   # Computational mesh
 xy = Function(mesh.coordinates)
 xy.dat.data[:, 0] -= 24.
 xy.dat.data[:, 1] -= 12.
 mesh.coordinates.assign(xy)
-# mesh = RectangleMesh(lx * n, ly * n, lx, ly)   # Computational mesh
 
 # mesh_N = SquareMesh(N, N, lx, lx)   # Finer mesh (N > n) upon which to approximate error
 x, y = SpatialCoordinate(mesh)
@@ -100,9 +102,9 @@ cnt = 0
 if getData or (approach == 'fixedMesh'):
     # Define variational problem
     qt = TestFunction(V_n)
-    forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, rotational=True, g=1., f0=0.,
-                                                                      beta=1.), q, bcs=bc)
-
+    F = form.weakResidualSW(q, q_, qt, b, Dt, g=1., f0=0., beta=1.,
+                            rotational=True, nonlinear=False, noNormalFlow=False)
+    forwardProblem = NonlinearVariationalProblem(F, q, bcs=bc)
     forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
     print('\nStarting fixed mesh primal run (forwards in time)')
@@ -138,8 +140,9 @@ if getData or (approach == 'fixedMesh'):
         #     else:
         #         adj_inc_timestep(time=t, finished=finished)
 
-        forwardFile.write(u, eta, time=t)
-        print('t = %.2fs' % t)
+        if not cnt % ndump:
+            forwardFile.write(u, eta, time=t)
+            print('t = %.2fs' % t)
         t += dt
         cnt += 1
     cnt -= 1
