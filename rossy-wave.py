@@ -31,7 +31,9 @@ errorFile = File(dirName + "errorIndicatorRW.pvd")
 adaptiveFile = File(dirName + "goalBasedRW.pvd") if useAdjoint else File(dirName + "simpleAdaptRW.pvd")
 
 # Specify physical and solver parameters
-op = opt.Options(dt=0.5, Tend=120, family='dg-cg',
+op = opt.Options(dt=0.5,
+                 Tend=120,
+                 family='dg-cg',
                  # Tstart=0.5, hmin=5e-2, hmax=1., rm=5, gradate=False, advect=False,
                  # vscale=0.4 if useAdjoint else 0.85
                  )

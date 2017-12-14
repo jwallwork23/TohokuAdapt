@@ -174,8 +174,7 @@ get a degree 1 Lagrange metric.""" % (deg, family))
         if invert:
             alpha = 1. / max(hmin2, min(pow(g.dat.data[i], 2), hmax2))
         else:
-            alpha = max(op.hmin, min(g.dat.data[i]), op.hmax)
-        # print('#### istropicMetic DEBUG: 1/g^2 = ', ig2)
+            alpha = max(op.hmin, min(g.dat.data[i], op.hmax))
         M.dat.data[i][0, 0] = alpha
         M.dat.data[i][1, 1] = alpha
     return M

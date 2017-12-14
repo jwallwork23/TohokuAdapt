@@ -33,13 +33,13 @@ op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
                  # gradate=False,
                  advect=False,
                  outputHessian=False,
-                 plotpvd=False,
-                 coarseness=2,
+                 plotpvd=True,
+                 coarseness=5,
                  gauges=True)
 
 # Establish filenames
+dirName = 'plots/firedrake-tsunami/'
 if op.plotpvd:
-    dirName = 'plots/firedrake-tsunami/'
     forwardFile = File(dirName + "forward.pvd")
     residualFile = File(dirName + "residual.pvd")
     adjointFile = File(dirName + "adjoint.pvd")
@@ -249,7 +249,7 @@ if approach in ('simpleAdapt', 'goalBased'):
                     loadError.load(epsilon)
                     loadError.close()
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])
-                M = adap.isotropicMetric(W, errEst, op=op, invert=False)
+                M = adap.isotropicMetric(W, errEst, op=op, invert=True)
             else:
                 H = adap.constructHessian(mesh, W, eta, op=op)
                 M = adap.computeSteadyMetric(mesh, W, H, eta, nVerT=nVerT, op=op)

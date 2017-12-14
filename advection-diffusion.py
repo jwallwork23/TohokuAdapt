@@ -8,8 +8,8 @@ import utils.adaptivity as adap
 import utils.forms as form
 import utils.interpolation as inte
 import utils.mesh as msh
+import utils.misc as msc
 import utils.options as opt
-import utils.storage as stor
 
 print('\n******************************** ADVECTION-DIFFUSION TEST PROBLEM ********************************\n')
 print('Mesh adaptive solver initially defined on a rectangular mesh')
@@ -48,8 +48,13 @@ if useAdjoint:
     v = TestFunction(P0_N)
 
 # Specify physical and solver parameters
-op = opt.Options(dt=0.04, Tend=2.4,
-                 hmin=5e-2, hmax=1., rm=5, gradate=False, advect=False,
+op = opt.Options(dt=0.04,
+                 Tend=2.4,
+                 hmin=5e-2,
+                 hmax=1.,
+                 rm=5,
+                 gradate=False,
+                 advect=False,
                  vscale=0.4 if useAdjoint else 0.85)
 dt = op.dt
 Dt = Constant(dt)
@@ -100,10 +105,10 @@ if getData:
                 if not cnt % rm:
                     phi_next_N, phi_N, w_N = inte.interp(mesh_N, phi_next, phi, w)
                     rho_N.interpolate(form.strongResidualAD(phi_next_N, phi_N, w_N, Dt, nu=nu))
-                    with DumbCheckpoint(dirName + 'hdf5/residual_AD' + op.indexString(cnt), mode=FILE_CREATE) as saveRes:
+                    with DumbCheckpoint(dirName + 'hdf5/residual_AD' + msc.indexString(cnt), mode=FILE_CREATE) as saveRes:
                         saveRes.store(rho_N)
                         saveRes.close()
-                    residualFile.write(rho_N, time=t)
+                    # residualFile.write(rho_N, time=t)
 
             # Update solution at previous timestep
             phi.assign(phi_next)
@@ -117,7 +122,7 @@ if getData:
                 else:
                     adj_inc_timestep(time=t, finished=finished)
 
-            forwardFile.write(phi, time=t)
+            # forwardFile.write(phi, time=t)
             print('t = %.3fs' % t)
             t += dt
             cnt += 1
@@ -144,7 +149,7 @@ if getData:
                 dual_N = inte.interp(mesh_N, dual_n)[0]
 
                 if not cnt % rm:
-                    indexStr = op.indexString(cnt)
+                    indexStr = msc.indexString(cnt)
 
                     # Load residual data from HDF5
                     with DumbCheckpoint(dirName + 'hdf5/residual_AD' + indexStr, mode=FILE_READ) as loadRes:
@@ -166,7 +171,7 @@ if getData:
 
                     # Print to screen, save data and increment counters
                     errorFile.write(epsilon_N, time=t)
-                adjointFile.write(dual_n, time=t)
+                # adjointFile.write(dual_n, time=t)
                 print('t = %.3fs' % t)
                 t -= dt
                 cnt -= 1
@@ -188,26 +193,28 @@ if approach in ('simpleAdapt', 'goalBased'):
     print('\nStarting adaptive mesh primal run (forwards in time)')
 
     adaptTimer = clock()
+    epsilon_N = Function(P0_N, name="Error indicator")
+
     while t <= T:
         if not cnt % rm:
             stepTimer = clock()
 
-            # Reconstruct Hessian
+            # Construct metric
             W = TensorFunctionSpace(mesh_n, "CG", 1)
-            H = adap.constructHessian(mesh_n, W, phi, op=op)
 
-            # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
-            if useAdjoint:
-                epsilon_N = Function(P0_N, name="Error indicator")
-                with DumbCheckpoint(dirName + 'hdf5/error_AD' + op.indexString(cnt), mode=FILE_READ) as loadError:
+            if useAdjoint & (cnt != 0):
+
+                # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
+                with DumbCheckpoint(dirName + 'hdf5/error_AD' + msc.indexString(cnt), mode=FILE_READ) as loadError:
                     loadError.load(epsilon_N)
                     loadError.close()
                 errEst = Function(FunctionSpace(mesh_n, "CG", 1)).interpolate(inte.interp(mesh_n, epsilon_N)[0])
-                for k in range(mesh_n.topology.num_vertices()):
-                    H.dat.data[k] *= errEst.dat.data[k]      # Scale by error estimate
+                M = adap.isotropicMetric(W, errEst, op=op, invert=False)
+            else:
+                H = adap.constructHessian(mesh_n, W, phi, op=op)
+                M = adap.computeSteadyMetric(mesh_n, W, H, phi, nVerT=nVerT, op=op)
 
             # Adapt mesh and interpolate variables
-            M = adap.computeSteadyMetric(mesh_n, W, H, phi, nVerT=nVerT, op=op)
             if op.gradate:
                 adap.metricGradation(mesh_n, M)
             if op.advect:

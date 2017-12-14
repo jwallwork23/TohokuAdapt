@@ -19,7 +19,8 @@ def timestepScheme(u, u_, timestepper):
     return um
 
 
-def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson', rotational=False):
+def strongResidualSW(q, q_, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, nonlinear=False,
+                   timestepper='CrankNicolson'):
     """
     Construct the strong residual for the semi-discrete linear shallow water equations at the current timestep.
     
@@ -28,7 +29,12 @@ def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson', rotationa
     :param b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: coefficient for stress term.
+    :param g: gravitational acceleration.
+    :param f0: 0th order coefficient for asymptotic Coriolis expansion.
+    :param beta: 1st order coefficient for asymptotic Coriolis expansion.
     :param rotational: toggle rotational / non-rotational equations.
+    :param nonlinear: toggle nonlinear / linear equations.
+    :param timestepper: scheme of choice.
     :return: strong residual for shallow water equations at current timestep.
     """
     # TODO: include optionality for BCs
@@ -40,17 +46,21 @@ def strongResidualSW(q, q_, b, Dt, nu=0., timestepper='CrankNicolson', rotationa
     um = timestepScheme(u, u_, timestepper)
     em = timestepScheme(eta, eta_, timestepper)
 
-    Au = (u - u_) / Dt + 9.81 * grad(em)
+    Au = (u - u_) / Dt + g * grad(em)
     Ae = (eta - eta_) / Dt + div(b * um)
     if nu != 0.:
         Au += div(nu * (grad(um) + transpose(grad(um))))
     if rotational:
-        Au += as_vector((-u[1], u[0]))
+        f = f0 + beta * SpatialCoordinate(q.function_space().mesh())[1]
+        Au += f * as_vector((-u[1], u[0]))
+    if nonlinear:
+        Au += dot(u, nabla_grad(u))
 
     return Au, Ae
 
 
-def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson', rotational=False, g=9.81, f0=0., beta=1.):
+def weakResidualSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, nonlinear=False,
+                   timestepper='CrankNicolson'):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
     
@@ -60,7 +70,12 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson', rotatio
     :param b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: coefficient for stress term.
+    :param g: gravitational acceleration.
+    :param f0: 0th order coefficient for asymptotic Coriolis expansion.
+    :param beta: 1st order coefficient for asymptotic Coriolis expansion.
     :param rotational: toggle rotational / non-rotational equations.
+    :param nonlinear: toggle nonlinear / linear equations.
+    :param timestepper: scheme of choice.
     :return: weak residual for shallow water equations at current timestep.
     """
 
@@ -70,94 +85,95 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., timestepper='CrankNicolson', rotatio
     um = timestepScheme(u, u_, timestepper)
     em = timestepScheme(eta, eta_, timestepper)
 
-    F = ((inner(u - u_, w) + inner(eta - eta_, xi)) / Dt) * dx
-    F += (g * inner(grad(em), w) - inner(b * um, grad(xi))) * dx
+    F = ((inner(u - u_, w) + inner(eta - eta_, xi)) / Dt) * dx          # Time derivative component
+    F += (g * inner(grad(em), w) - inner(b * um, grad(xi))) * dx        # Linear spatial derivative components
     if nu != 0.:
         F -= nu * inner(grad(um) + transpose(grad(um)), grad(w)) * dx
     if rotational:
-        x, y = SpatialCoordinate(q.function_space().mesh())
-        f = f0 + beta * y
+        f = f0 + beta * SpatialCoordinate(q.function_space().mesh())[1]
         F += f * inner(as_vector((-u[1], u[0])), w) * dx
+    if nonlinear:
+        F += inner(dot(u, nabla_grad(u)), w) * dx
 
     return F
 
 
-def strongResidualMSW(q, q_, h, Dt, f0=0., beta=1., g=1., timestepper='CrankNicolson'):
-    """
-    Construct the strong residual for the semi-discrete linear shallow water equations at the current timestep, in the 
-    nonlinear momentum form used in Huang et al 2008. No boundary conditions have been enforced at this stage.
-
-    :param q: solution tuple for linear shallow water equations.
-    :param q_: solution tuple for linear shallow water equations at previous timestep.
-    :param h: water depth.
-    :param Dt: timestep expressed as a FiredrakeConstant.
-    :param y: azimuthal coordinate field.
-    :param f0: constant coefficient of Coriolis parameter.
-    :param beta: linear coefficient of Coriolis parameter.
-    :param g: gravitiational acceleration.
-    :return: strong residual for shallow water equations in momentum form at current timestep.
-    """
-
-    (u, v, eta) = (q[0], q[1], q[2])
-    (u_, v_, eta_) = (q_[0], q_[1], q_[2])
-    um = timestepScheme(u, u_, timestepper)
-    vm = timestepScheme(v, v_, timestepper)
-    em = timestepScheme(eta, eta_, timestepper)
-    H = h + eta
-    H_ = h + eta_
-    Hm = h + em
-    Hu2 = Hm * um * um
-    Huv = Hm * um * vm
-    Hv2 = Hm * vm * vm
-    x, y = SpatialCoordinate(q.function_space().mesh())
-    f = f0 + beta * y
-
-    Au = (Hm * (u - u_) + (H - H_) * um) / Dt + Hu2.dx(0) + Huv.dx(1) - f * Hm * vm + g * Hm * em.dx(0)
-    Av = (Hm * (v - v_) + (H - H_) * vm) / Dt + Huv.dx(0) + Hv2.dx(1) + f * Hm * um + g * Hm * em.dx(1)
-    Ae = (eta - eta_) / Dt + (Hm * um).dx(0) + (Hm * vm).dx(1)
-
-    return Au, Av, Ae
-
-
-def weakResidualMSW(q, q_, qt, h, Dt, y, f0=0., beta=1., g=1., timestepper='CrankNicolson'):
-    """
-    :param q: solution tuple for linear shallow water equations.
-    :param q_: solution tuple for linear shallow water equations at previous timestep.
-    :param qt: test function tuple.
-    :param h: water depth.
-    :param Dt: timestep expressed as a FiredrakeConstant.
-    :param y: azimuthal coordinate field.
-    :param f0: constant coefficient of Coriolis parameter.
-    :param beta: linear coefficient of Coriolis parameter.
-    :param g: gravitiational acceleration.
-    :return: weak residual for shallow water equations in momentum form at current timestep.
-    """
-
-    (u, v, eta) = (q[0], q[1], q[2])
-    (u_, v_, eta_) = (q_[0], q_[1], q_[2])
-    (w, z, xi) = (qt[0], qt[1], qt[2])
-    um = timestepScheme(u, u_, timestepper)
-    vm = timestepScheme(v, v_, timestepper)
-    em = timestepScheme(eta, eta_, timestepper)
-    H = h + eta
-    H_ = h + eta_
-    Hm = h + em
-    Hu2 = Hm * um * um
-    Huv = Hm * um * vm
-    Hv2 = Hm * vm * vm
-    if beta == 0.:
-        f = Constant(f0)
-    else:
-        f = f0 + beta * y
-
-    F = ((Hm * ((u - u_) * w + (v - v_) * z) + (H - H_) * (um * w + vm * z)) / Dt) * dx     # Time integrate u, v
-    F += ((eta - eta_) * xi / Dt) * dx                                                      # Time integrate eta
-    F += ((Hu2.dx(0) + Huv.dx(1)) * w + (Huv.dx(0) + Hv2.dx(1)) * z) * dx                   # Nonlinear terms
-    F += (f * Hm * (um * z - vm * w)) * dx                                                  # Coriolis effect
-    F += (g * Hm * (em.dx(0) * w + em.dx(1) * z)) * dx                                      # Grad eta term
-    F += (((Hm * um).dx(0) + (Hm * vm).dx(1)) * xi) * dx                                    # div(Hu) term
-
-    return F
+# def strongResidualMSW(q, q_, h, Dt, f0=0., beta=1., g=1., timestepper='CrankNicolson'):
+#     """
+#     Construct the strong residual for the semi-discrete linear shallow water equations at the current timestep, in the
+#     nonlinear momentum form used in Huang et al 2008. No boundary conditions have been enforced at this stage.
+#
+#     :param q: solution tuple for linear shallow water equations.
+#     :param q_: solution tuple for linear shallow water equations at previous timestep.
+#     :param h: water depth.
+#     :param Dt: timestep expressed as a FiredrakeConstant.
+#     :param y: azimuthal coordinate field.
+#     :param f0: constant coefficient of Coriolis parameter.
+#     :param beta: linear coefficient of Coriolis parameter.
+#     :param g: gravitiational acceleration.
+#     :return: strong residual for shallow water equations in momentum form at current timestep.
+#     """
+#
+#     (u, v, eta) = (q[0], q[1], q[2])
+#     (u_, v_, eta_) = (q_[0], q_[1], q_[2])
+#     um = timestepScheme(u, u_, timestepper)
+#     vm = timestepScheme(v, v_, timestepper)
+#     em = timestepScheme(eta, eta_, timestepper)
+#     H = h + eta
+#     H_ = h + eta_
+#     Hm = h + em
+#     Hu2 = Hm * um * um
+#     Huv = Hm * um * vm
+#     Hv2 = Hm * vm * vm
+#     x, y = SpatialCoordinate(q.function_space().mesh())
+#     f = f0 + beta * y
+#
+#     Au = (Hm * (u - u_) + (H - H_) * um) / Dt + Hu2.dx(0) + Huv.dx(1) - f * Hm * vm + g * Hm * em.dx(0)
+#     Av = (Hm * (v - v_) + (H - H_) * vm) / Dt + Huv.dx(0) + Hv2.dx(1) + f * Hm * um + g * Hm * em.dx(1)
+#     Ae = (eta - eta_) / Dt + (Hm * um).dx(0) + (Hm * vm).dx(1)
+#
+#     return Au, Av, Ae
+#
+#
+# def weakResidualMSW(q, q_, qt, h, Dt, y, f0=0., beta=1., g=1., timestepper='CrankNicolson'):
+#     """
+#     :param q: solution tuple for linear shallow water equations.
+#     :param q_: solution tuple for linear shallow water equations at previous timestep.
+#     :param qt: test function tuple.
+#     :param h: water depth.
+#     :param Dt: timestep expressed as a FiredrakeConstant.
+#     :param y: azimuthal coordinate field.
+#     :param f0: constant coefficient of Coriolis parameter.
+#     :param beta: linear coefficient of Coriolis parameter.
+#     :param g: gravitiational acceleration.
+#     :return: weak residual for shallow water equations in momentum form at current timestep.
+#     """
+#
+#     (u, v, eta) = (q[0], q[1], q[2])
+#     (u_, v_, eta_) = (q_[0], q_[1], q_[2])
+#     (w, z, xi) = (qt[0], qt[1], qt[2])
+#     um = timestepScheme(u, u_, timestepper)
+#     vm = timestepScheme(v, v_, timestepper)
+#     em = timestepScheme(eta, eta_, timestepper)
+#     H = h + eta
+#     H_ = h + eta_
+#     Hm = h + em
+#     Hu2 = Hm * um * um
+#     Huv = Hm * um * vm
+#     Hv2 = Hm * vm * vm
+#     if beta == 0.:
+#         f = Constant(f0)
+#     else:
+#         f = f0 + beta * y
+#
+#     F = ((Hm * ((u - u_) * w + (v - v_) * z) + (H - H_) * (um * w + vm * z)) / Dt) * dx     # Time integrate u, v
+#     F += ((eta - eta_) * xi / Dt) * dx                                                      # Time integrate eta
+#     F += ((Hu2.dx(0) + Huv.dx(1)) * w + (Huv.dx(0) + Hv2.dx(1)) * z) * dx                   # Nonlinear terms
+#     F += (f * Hm * (um * z - vm * w)) * dx                                                  # Coriolis effect
+#     F += (g * Hm * (em.dx(0) * w + em.dx(1) * z)) * dx                                      # Grad eta term
+#     F += (((Hm * um).dx(0) + (Hm * vm).dx(1)) * xi) * dx                                    # div(Hu) term
+#
+#     return F
 
 
 def analyticHuang(V, B=0.395, t=0.):

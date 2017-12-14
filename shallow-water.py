@@ -32,8 +32,15 @@ errorFile = File(dirName + "errorIndicatorSW.pvd")
 adaptiveFile = File(dirName + "goalBasedSW.pvd") if useAdjoint else File(dirName + "simpleAdaptSW.pvd")
 
 # Specify physical and solver parameters
-op = opt.Options(dt=0.05, Tstart=0.5, Tend=2.5, family='dg-cg',
-                 hmin=5e-2, hmax=1., rm=5, gradate=False, advect=False,
+op = opt.Options(dt=0.05,
+                 Tstart=0.5,
+                 Tend=2.5,
+                 family='dg-cg',
+                 hmin=5e-2,
+                 hmax=1.,
+                 rm=5,
+                 gradate=False,
+                 advect=False,
                  vscale=0.4 if useAdjoint else 0.85)
 dt = op.dt
 Dt = Constant(dt)
@@ -95,15 +102,12 @@ if getData:
         # Define variational problem
         qt = TestFunction(V_n)
         forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
-        # forwardProblem = NonlinearVariationalProblem(
-        #     form.weakResidualMSW(q, q_, qt, b, Dt, y, f0=0., beta=0., g=9.81), q)
-                                                                # TODO: how to solve for (Hu, Hv, eta)?
         forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
         print('\nStarting fixed mesh primal run (forwards in time)')
         finished = False
         primalTimer = clock()
-        forwardFile.write(u, eta, time=t)
+        # forwardFile.write(u, eta, time=t)
         while t < T:
             # Solve problem at current timestep
             forwardSolver.solve()
@@ -119,7 +123,7 @@ if getData:
                         chk.store(rho_u)
                         chk.store(rho_e)
                         chk.close()
-                    residualFile.write(rho_u, rho_e, time=t)
+                    # residualFile.write(rho_u, rho_e, time=t)
 
             # Update solution at previous timestep
             q_.assign(q)
@@ -133,7 +137,7 @@ if getData:
                 else:
                     adj_inc_timestep(time=t, finished=finished)
 
-            forwardFile.write(u, eta, time=t)
+            # forwardFile.write(u, eta, time=t)
             print('t = %.3fs' % t)
             t += dt
             cnt += 1
@@ -182,7 +186,7 @@ if getData:
 
                     # Print to screen, save data and increment counters
                     errorFile.write(epsilon, time=t)
-                adjointFile.write(dual_u, dual_e, time=t)
+                # adjointFile.write(dual_u, dual_e, time=t)
                 print('t = %.3fs' % t)
                 t -= dt
                 cnt -= 1
@@ -208,18 +212,19 @@ if approach in ('simpleAdapt', 'goalBased'):
         if not cnt % rm:
             stepTimer = clock()
 
-            # Reconstruct Hessian
+            # Construct metric
             W = TensorFunctionSpace(mesh, "CG", 1)
-            H = adap.constructHessian(mesh, W, eta, op=op)
+            if useAdjoint & (cnt != 0):
 
-            # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
-            if useAdjoint:
+                # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
                 with DumbCheckpoint(dirName + 'hdf5/error_SW' + msc.indexString(cnt), mode=FILE_READ) as loadError:
-                    loadError.load(epsilon)                 # P0 field on the initial mesh
+                    loadError.load(epsilon)
                     loadError.close()
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])
-                for k in range(mesh.topology.num_vertices()):
-                    H.dat.data[k] *= errEst.dat.data[k]     # Scale by error estimate
+                M = adap.isotropicMetric(W, errEst, op=op, invert=True)
+            else:
+                H = adap.constructHessian(mesh, W, eta, op=op)
+                M = adap.computeSteadyMetric(mesh, W, H, eta, nVerT=nVerT, op=op)
 
             # Adapt mesh and interpolate variables
             M = adap.computeSteadyMetric(mesh, W, H, eta, nVerT=nVerT, op=op)
