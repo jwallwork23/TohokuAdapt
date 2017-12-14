@@ -95,7 +95,7 @@ def saveTimeseries(gauge, data, name='test'):
 
 def plotGauges(gauge, iEnd, op=opt.Options()):
     """
-    Store timeseries data for a particular gauge and calculate (L1, L2, L-infinity and TV) error norms.
+    Read timeseries data for a particular gauge and calculate (L1, L2, L-infinity and TV) error norms.
 
     :param gauge: gauge name string, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
     :param iEnd: final index.
@@ -112,6 +112,7 @@ def plotGauges(gauge, iEnd, op=opt.Options()):
     # Get plotting parameters
     labels = op.labels
     styles = op.styles
+    stamps = op.stamps
     mM = [0, 0]     # Min/max for y-axis limits
 
     # Import data from the inversion analysis and interpolate
@@ -142,8 +143,8 @@ def plotGauges(gauge, iEnd, op=opt.Options()):
         norm = [0, 0, 0, 0]
         t = np.linspace(0, T / 60, num=iEnd + 1)
         print('Timeseries to plot: ', mesh)
-        name = input("Filename (hit enter to skip): ")
-        if name != '':
+        name = stamps[mesh] + input("Version (hit enter to skip): ")
+        if name != stamps[mesh]:
             infile = open('outdata/timeseries/' + gauge + name + '.txt', 'r')
             data = []
             i = 0
@@ -199,8 +200,8 @@ def plotGauges(gauge, iEnd, op=opt.Options()):
             plt.plot(np.linspace(0, T/60, numVals), data,
                      label=mesh,
                      marker=styles[mesh],
-                     markevery=ndump,
-                     linewidth=0.5)
+                     markevery=10,
+                     linewidth=0.75)
 
             # Print errors to screen
             h = 1 / numStrips
@@ -220,8 +221,8 @@ Absolute total variation : %6.3f Relative total variation : %6.3f""" %
     plt.gcf()
     plt.legend(bbox_to_anchor=(1.01, 1.), loc=2)
     plt.ylim([np.floor(mM[0]), np.ceil(mM[1])])
-    plt.xlabel(r'Time elapsed (mins)')
-    plt.ylabel(r'Free surface (m)')
+    plt.xlabel(r'Time elapsed (minutes)')
+    plt.ylabel(r'Free surface displacement (m)')
     plt.savefig('outdata/timeseries/plots/' + gauge + '.pdf', bbox_inches='tight')
     plt.show()
 

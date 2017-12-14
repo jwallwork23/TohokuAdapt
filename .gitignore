@@ -38,5 +38,5 @@ simpleAdapt.py
 outdata/timings.txt
 outdata/errors.txt
 
-# Generate timeseries at a later time
-generateTimeseries.py
+# Plot timeseries at a later time
+quickPlot.py
