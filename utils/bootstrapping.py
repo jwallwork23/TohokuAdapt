@@ -1,6 +1,9 @@
 from firedrake import *
 
+import numpy as np
+
 import utils.forms as form
+import utils.mesh as msh
 import utils.options as opt
 
 
@@ -10,6 +13,7 @@ def solverAD(n, op = opt.Options(dt=0.04, Tend=2.4)):
 
     # Define Mesh and FunctionSpace
     mesh = RectangleMesh(4 * n, n, 4, 1)  # Computational mesh
+    nEle = msh.meshStats(mesh)[0]
     x, y = SpatialCoordinate(mesh)
     V = FunctionSpace(mesh, "CG", 2)
 
@@ -44,14 +48,15 @@ def solverAD(n, op = opt.Options(dt=0.04, Tend=2.4)):
             J_trap += 2 * step
         t += op.dt
 
-    return J_trap * op.dt
+    return J_trap * op.dt, nEle
 
 
 def solverSW(n, op=opt.Options(dt=0.05, Tstart=0.5, Tend=2.5, family='dg-cg',)):
 
     # Define Mesh and FunctionSpace
-    lx = 6
-    mesh = SquareMesh(lx*n, lx*n, lx, lx)
+    lx = 2 * np.pi
+    mesh = SquareMesh(2*n, 2*n, lx, lx)
+    nEle = msh.meshStats(mesh)[0]
     x, y = SpatialCoordinate(mesh)
     V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
 
@@ -60,7 +65,7 @@ def solverSW(n, op=opt.Options(dt=0.05, Tstart=0.5, Tend=2.5, family='dg-cg',)):
     b = Constant(0.1)
 
     # Apply initial condition and define Functions
-    ic = project(1e-3*exp(-(pow(x-3., 2) + pow(y-3., 2))), V.sub(1))
+    ic = project(exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))), V.sub(1))
     q_ = Function(V)
     u_, eta_ = q_.split()
     u_.interpolate(Expression([0, 0]))
@@ -73,7 +78,7 @@ def solverSW(n, op=opt.Options(dt=0.05, Tstart=0.5, Tend=2.5, family='dg-cg',)):
     qt = TestFunction(V)
     forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
     forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
-    iA = form.indicator(V.sub(1), x1=0., x2=1.5, y1=1.5, y2=4.5, smooth=False)
+    iA = form.indicator(V.sub(1), x1=0., x2=0.5*np.pi, y1=0.5*np.pi, y2=1.5*np.pi, smooth=False)
 
     started = False
     t = 0.
@@ -94,4 +99,4 @@ def solverSW(n, op=opt.Options(dt=0.05, Tstart=0.5, Tend=2.5, family='dg-cg',)):
             J_trap += step
         t += op.dt
 
-    return J_trap * op.dt
+    return J_trap * op.dt, nEle
