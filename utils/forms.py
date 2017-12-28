@@ -150,6 +150,48 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=F
     return B - L
 
 
+def localProblemSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, nonlinear=False,
+                   allowNormalFlow=True, timestepper='CrankNicolson'):
+    """
+    Semi-discrete (time-discretised) local variational problem for the shallow water equations with no normal flow 
+    boundary conditions, under the element residual method.
+
+    :param q: solution tuple for linear shallow water equations.
+    :param q_: solution tuple for linear shallow water equations at previous timestep.
+    :param qt: test function tuple.
+    :param b: bathymetry profile.
+    :param Dt: timestep expressed as a FiredrakeConstant.
+    :param nu: coefficient for stress term.
+    :param g: gravitational acceleration.
+    :param f0: 0th order coefficient for asymptotic Coriolis expansion.
+    :param beta: 1st order coefficient for asymptotic Coriolis expansion.
+    :param rotational: toggle rotational / non-rotational equations.
+    :param nonlinear: toggle nonlinear / linear equations.
+    :param timestepper: scheme of choice.
+    :return: residual of local problem.
+    """
+    V = q.function_space()
+
+    # Establish variational form for residual equation
+    B_, L = formsSW(q, q_, qt, b, Dt, nu=nu, g=g, f0=f0, beta=beta, rotational=rotational, nonlinear=nonlinear,
+                   allowNormalFlow=allowNormalFlow, timestepper=timestepper)
+    phi = Function(V, name='Local solution')
+    B = formsSW(phi, q_, qt, b, Dt, nu=nu, g=g, f0=f0, beta=beta, rotational=rotational, nonlinear=nonlinear,
+                   allowNormalFlow=allowNormalFlow, timestepper=timestepper)[0]
+    F = B + B_ - L
+
+    # Establish inter-element flux term
+    (u, eta) = (as_vector((q[0], q[1])), q[2])
+    gradu = grad(u)
+    grade = grad(eta)
+    n = FacetNormal(V.mesh())
+
+    # TODO: subtract flow over boundary term
+    # TODO: how to solve problem in a local sense?
+
+    return F
+
+
 def analyticHuang(V, B=0.395, t=0.):
     """
     :param V: Mixed function space upon which to define solutions.

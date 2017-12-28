@@ -221,7 +221,7 @@ Absolute total variation : %6.3f Relative total variation : %6.3f""" %
 
     plt.xlim([0, T/60])
     plt.gcf()
-    plt.legend(bbox_to_anchor=(1.01, 1.), loc=2)
+    plt.legend(bbox_to_anchor=(0.6, 1.), loc=2)
     plt.ylim([np.floor(mM[0]), np.ceil(mM[1])])
     plt.xlabel(r'Time elapsed (minutes)')
     plt.ylabel(r'Free surface displacement (m)')
