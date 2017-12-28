@@ -33,8 +33,8 @@ op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
                  # gradate=False,
                  advect=False,
                  outputHessian=False,
-                 plotpvd=True,
-                 coarseness=5,
+                 plotpvd=False if approach == 'fixedMesh' else True,
+                 coarseness=2,
                  gauges=True)
 
 # Establish filenames

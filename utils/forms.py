@@ -100,11 +100,11 @@ def formsSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, n
 
     # LHS bilinear form
     B = (inner(u, w) + inner(eta, xi)) / Dt * dx                            # Time derivative component
-    B += a1 * (g * inner(grad(eta), w) - inner(b * u, grad(xi))) * dx    # Linear spatial derivative components
+    B += a1 * (g * inner(grad(eta), w) - inner(b * u, grad(xi))) * dx       # Linear spatial derivative components
 
     # RHS linear functional
     L = (inner(u_, w) + inner(eta_, xi)) / Dt * dx                          # Time derivative component
-    L -= a2 * (g * inner(grad(eta_), w) - inner(b * u_, grad(xi))) * dx   # Linear spatial derivative components
+    L -= a2 * (g * inner(grad(eta_), w) - inner(b * u_, grad(xi))) * dx     # Linear spatial derivative components
     # TODO: try NOT applying Neumann condition ^^^ in RHS functional
 
     if allowNormalFlow:
@@ -120,7 +120,7 @@ def formsSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, n
         L -= a2 * f * inner(as_vector((-u_[1], u_[0])), w) * dx
     if nonlinear:
         B += a1 * inner(dot(u, nabla_grad(u)), w) * dx
-        L += a2 * inner(dot(u_, nabla_grad(u_)), w) * dx
+        L -= a2 * inner(dot(u_, nabla_grad(u_)), w) * dx
 
     return B, L
 

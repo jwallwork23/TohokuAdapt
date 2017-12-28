@@ -105,15 +105,15 @@ if getData:
             # Solve problem at current timestep
             solve(F == 0, phi_next, bc)
 
-            # # Approximate residual of forward equation and save to HDF5
-            # if useAdjoint:
-            #     if not cnt % rm:
-            #         phi_next_N, phi_N, w_N = inte.interp(mesh_N, phi_next, phi, w)
-            #         rho_N.interpolate(form.strongResidualAD(phi_next_N, phi_N, w_N, Dt, nu=nu))
-            #         with DumbCheckpoint(dirName + 'hdf5/residual_AD' + msc.indexString(cnt), mode=FILE_CREATE) as saveRes:
-            #             saveRes.store(rho_N)
-            #             saveRes.close()
-            #         # residualFile.write(rho_N, time=t)
+            # Approximate residual of forward equation and save to HDF5
+            if useAdjoint:
+                if not cnt % rm:
+                    phi_next_N, phi_N, w_N = inte.interp(mesh_N, phi_next, phi, w)
+                    rho_N.interpolate(form.strongResidualAD(phi_next_N, phi_N, w_N, Dt, nu=nu))
+                    with DumbCheckpoint(dirName + 'hdf5/residual_AD' + msc.indexString(cnt), mode=FILE_CREATE) as saveRes:
+                        saveRes.store(rho_N)
+                        saveRes.close()
+                    # residualFile.write(rho_N, time=t)
 
             # Update solution at previous timestep
             phi.assign(phi_next)
@@ -160,31 +160,31 @@ if getData:
             if save:
                 # Load adjoint data. NOTE the interpolation operator is overloaded
                 dual_n.dat.data[:] = variable.dat.data
-                # dual_N = inte.interp(mesh_N, dual_n)[0]
+                dual_N = inte.interp(mesh_N, dual_n)[0]
 
-                # if not cnt % rm:
-                #     indexStr = msc.indexString(cnt)
-                #
-                #     # Load residual data from HDF5
-                #     with DumbCheckpoint(dirName + 'hdf5/residual_AD' + indexStr, mode=FILE_READ) as loadRes:
-                #         loadRes.load(rho_N)
-                #         loadRes.close()
-                #
-                #     # Estimate error using forward residual
-                #     epsilon_N = assemble(v * rho_N * dual_N * dx)   # Currently a P0 field
-                #     epsNorm = np.abs(assemble(rho_N * dual_N * dx))
-                #     if epsNorm == 0.:
-                #         epsNorm = 1.
-                #     epsilon_N.dat.data[:] = np.abs(epsilon_N.dat.data) / epsNorm
-                #     epsilon_N.rename("Error indicator")
-                #
-                #     # Save error indicator data to HDF5
-                #     with DumbCheckpoint(dirName + 'hdf5/error_AD' + indexStr, mode=FILE_CREATE) as saveError:
-                #         saveError.store(epsilon_N)
-                #         saveError.close()
-                #
-                #     # Print to screen, save data and increment counters
-                #     errorFile.write(epsilon_N, time=t)
+                if not cnt % rm:
+                    indexStr = msc.indexString(cnt)
+
+                    # Load residual data from HDF5
+                    with DumbCheckpoint(dirName + 'hdf5/residual_AD' + indexStr, mode=FILE_READ) as loadRes:
+                        loadRes.load(rho_N)
+                        loadRes.close()
+
+                    # Estimate error using forward residual
+                    epsilon_N = assemble(v * rho_N * dual_N * dx)   # Currently a P0 field
+                    epsNorm = np.abs(assemble(rho_N * dual_N * dx))
+                    if epsNorm == 0.:
+                        epsNorm = 1.
+                    epsilon_N.dat.data[:] = np.abs(epsilon_N.dat.data) / epsNorm
+                    epsilon_N.rename("Error indicator")
+
+                    # Save error indicator data to HDF5
+                    with DumbCheckpoint(dirName + 'hdf5/error_AD' + indexStr, mode=FILE_CREATE) as saveError:
+                        saveError.store(epsilon_N)
+                        saveError.close()
+
+                    # Print to screen, save data and increment counters
+                    errorFile.write(epsilon_N, time=t)
                 # adjointFile.write(dual_n, time=t)
                 print('t = %.3fs' % t)
                 t -= dt
@@ -217,14 +217,14 @@ if approach in ('simpleAdapt', 'goalBased'):
             # Construct metric
             W = TensorFunctionSpace(mesh_n, "CG", 1)
 
-            if useAdjoint & (cnt != 0):
+            if useAdjoint:
 
                 # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
                 with DumbCheckpoint(dirName + 'hdf5/error_AD' + msc.indexString(cnt), mode=FILE_READ) as loadError:
                     loadError.load(epsilon_N)
                     loadError.close()
                 errEst = Function(FunctionSpace(mesh_n, "CG", 1)).interpolate(inte.interp(mesh_n, epsilon_N)[0])
-                # errEst.dat.data[:] *= 2000
+                errEst.dat.data[:] /= assemble(errEst * dx)
                 M = adap.isotropicMetric(W, errEst, op=op, invert=False)
 
                 # TODO: what is the best way to do this?
@@ -239,7 +239,10 @@ if approach in ('simpleAdapt', 'goalBased'):
             if op.gradate:
                 adap.metricGradation(mesh_n, M)
             if op.advect:
-                M = adap.advectMetric(M, w, Dt, n=rm, fieldToAdvect='M')
+                if useAdjoint:
+                    M = adap.isotropicAdvection(M, errEst, w, Dt, n=3*rm)
+                else:
+                    M = adap.advectMetric(M, w, Dt, n=3*rm)
             mesh_n = AnisotropicAdaptation(mesh_n, M).adapted_mesh
             phi = inte.interp(mesh_n, phi)[0]
             phi.rename("Concentration")
