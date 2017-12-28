@@ -1,6 +1,7 @@
 from firedrake import *
 from firedrake_adjoint import *
 
+import numpy as np
 from time import clock
 
 import utils.adaptivity as adap
@@ -138,6 +139,7 @@ if getData:
             print('t = %.3fs' % t)
             t += dt
             cnt += 1
+        cntT = cnt
         cnt -= 1
         primalTimer = clock() - primalTimer
         print('Primal run complete. Run time: %.3fs' % primalTimer)
@@ -162,29 +164,13 @@ if getData:
                 dual_n.dat.data[:] = variable.dat.data
                 dual_N = inte.interp(mesh_N, dual_n)[0]
 
+                # Save adjoint data to HDF5
                 if not cnt % rm:
-                    indexStr = msc.indexString(cnt)
+                    with DumbCheckpoint(dirName + 'hdf5/adjoint_AD' + msc.indexString(cnt), mode=FILE_CREATE) as saveAdj:
+                        saveAdj.store(dual_N)
+                        saveAdj.close()
 
-                    # Load residual data from HDF5
-                    with DumbCheckpoint(dirName + 'hdf5/residual_AD' + indexStr, mode=FILE_READ) as loadRes:
-                        loadRes.load(rho_N)
-                        loadRes.close()
-
-                    # Estimate error using forward residual
-                    epsilon_N = assemble(v * rho_N * dual_N * dx)   # Currently a P0 field
-                    epsNorm = np.abs(assemble(rho_N * dual_N * dx))
-                    if epsNorm == 0.:
-                        epsNorm = 1.
-                    epsilon_N.dat.data[:] = np.abs(epsilon_N.dat.data) / epsNorm
-                    epsilon_N.rename("Error indicator")
-
-                    # Save error indicator data to HDF5
-                    with DumbCheckpoint(dirName + 'hdf5/error_AD' + indexStr, mode=FILE_CREATE) as saveError:
-                        saveError.store(epsilon_N)
-                        saveError.close()
-
-                    # Print to screen, save data and increment counters
-                    errorFile.write(epsilon_N, time=t)
+                # Print to screen, save data and increment counters
                 # adjointFile.write(dual_n, time=t)
                 print('t = %.3fs' % t)
                 t -= dt
@@ -202,6 +188,45 @@ if getData:
         # Reset initial conditions for primal problem and recreate error indicator placeholder
         phi = ic.copy(deepcopy=True)
         phi.rename('Concentration')
+
+        # Loop back over times to generate error estimators
+        for k in range(0, cntT, rm):
+
+            print('Generating error estimates %.2f %%' % (100*k/cntT))
+            indexStr = msc.indexString(k)
+
+            # Load residual and adjoint data from HDF5
+            with DumbCheckpoint(dirName + 'hdf5/residual_AD' + indexStr, mode=FILE_READ) as loadRes:
+                loadRes.load(rho_N)
+                loadRes.close()
+            with DumbCheckpoint(dirName + 'hdf5/adjoint_AD' + indexStr, mode=FILE_READ) as loadAdj:
+                loadAdj.load(dual_N)
+                loadAdj.close()
+
+            # Estimate error using dual weighted residual
+            epsilon_N = assemble(v * rho_N * dual_N * dx)  # Currently a P0 field
+
+            # Loop over relevant time window
+            for i in range(0, cnt, rm):
+                with DumbCheckpoint(dirName + 'hdf5/adjoint_AD' + msc.indexString(i), mode=FILE_READ) as loadAdj:
+                    loadAdj.load(dual_N)
+                    loadAdj.close()
+                epsilon_N_ = assemble(v * rho_N * dual_N * dx)
+                for j in range(len(epsilon_N.dat.data)):
+                    epsilon_N.dat.data[j] = max(epsilon_N.dat.data[j], epsilon_N_.dat.data[j])
+
+            # Normalise error estimate
+            epsNorm = np.abs(assemble(epsilon_N * dx))
+            if epsNorm == 0.:
+                epsNorm = 1.
+            epsilon_N.dat.data[:] = np.abs(epsilon_N.dat.data) / epsNorm
+            epsilon_N.rename("Error indicator")
+
+            # Store error estimates
+            with DumbCheckpoint(dirName + 'hdf5/error_AD' + indexStr, mode=FILE_CREATE) as saveErr:
+                saveErr.store(epsilon_N)
+                saveErr.close()
+            errorFile.write(epsilon_N, time=t)
 
 if approach in ('simpleAdapt', 'goalBased'):
     print('\nStarting adaptive mesh primal run (forwards in time)')
