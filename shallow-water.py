@@ -257,7 +257,7 @@ if approach in ('simpleAdapt', 'goalBased'):
     print('\nStarting adaptive mesh primal run (forwards in time)')
     adaptTimer = clock()
     while t <= T:
-        if (t != T) and not (cnt % rm):
+        if (cnt % rm == 0) & (np.abs(t-T) > 0.5 * dt):
             stepTimer = clock()
 
             # Construct metric

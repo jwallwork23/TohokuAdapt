@@ -237,7 +237,7 @@ if approach in ('simpleAdapt', 'goalBased'):
     adaptTimer = clock()
     while t <= T:
         indexStr = msc.indexString(cnt)
-        if not cnt % rm:
+        if (cnt % rm == 0) & (np.abs(t-T) > 0.5 * dt):
             stepTimer = clock()
 
             # Construct metric
