@@ -96,8 +96,7 @@ iEnd = np.ceil(T / dt)
 nEle, nVer = msh.meshStats(mesh_n)
 mM = [nEle, nEle]           # Min/max #Elements
 Sn = nEle
-nVerT = nVer * op.vscale    # Target #Vertices in simpleAdapt case
-gamma = nEle / assemble(Function(V_n).interpolate(Expression(1)) * dx)  # Elements per unit area
+nVerT = nVer * op.vscale    # Target #Vertices
 
 # Initialise counters
 t = 0.
@@ -236,7 +235,7 @@ if approach in ('simpleAdapt', 'goalBased'):
     print('\nStarting adaptive mesh primal run (forwards in time)')
     adaptTimer = clock()
     while t <= T:
-        if not cnt % rm:
+        if (t != T) and not (cnt % rm):
             stepTimer = clock()
 
             # Construct metric
@@ -247,7 +246,7 @@ if approach in ('simpleAdapt', 'goalBased'):
                     loadError.load(epsilon)
                     loadError.close()
                 errEst = Function(FunctionSpace(mesh_n, "CG", 1)).interpolate(inte.interp(mesh_n, epsilon)[0])
-                errEst.dat.data[:] *= gamma
+                errEst.dat.data[:] *= nVerT
                 M = adap.isotropicMetric(W, errEst, op=op, invert=False)
             else:
                 H = adap.constructHessian(mesh_n, W, phi, op=op)
