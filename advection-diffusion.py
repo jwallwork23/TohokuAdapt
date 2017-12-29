@@ -5,6 +5,7 @@ import numpy as np
 from time import clock
 
 import utils.adaptivity as adap
+import utils.bootstrapping as boot
 import utils.forms as form
 import utils.interpolation as inte
 import utils.mesh as msh
@@ -42,8 +43,14 @@ adjointFile = File(dirName + "adjointAD.pvd")
 errorFile = File(dirName + "errorIndicatorAD.pvd")
 adaptiveFile = File(dirName + "goalBasedAD.pvd") if useAdjoint else File(dirName + "simpleAdaptAD.pvd")
 
-# Define Mesh and FunctionSpace
-n = 16
+# Establish initial mesh resolution
+bootTimer = clock()
+print('\nBootstrapping to establish optimal mesh resolution')
+n = boot.bootstrap(True, tol=2.5e-3)[0]
+bootTimer = clock() - bootTimer
+print('Bootstrapping run time: %.3fs' % bootTimer)
+
+# Define initial Meshes and FunctionSpaces
 N = 2 * n
 mesh_n = RectangleMesh(4 * n, n, 4, 1)  # Computational mesh
 mesh_N = RectangleMesh(4 * N, N, 4, 1)  # Finer mesh (N > n) upon which to approximate error
@@ -51,6 +58,7 @@ x, y = SpatialCoordinate(mesh_n)
 V_n = FunctionSpace(mesh_n, "CG", 2)
 V_N = FunctionSpace(mesh_N, "CG", 2)
 
+# Define Functions relating to goalBased approach
 if useAdjoint:
     dual_n = Function(V_n, name='Adjoint')
     dual_N = Function(V_N, name='Fine mesh adjoint')
@@ -84,14 +92,12 @@ phi_next = Function(V_n, name='Concentration next')
 hmin = op.hmin
 hmax = op.hmax
 rm = op.rm
-iEnd = int(T / dt)
+iEnd = np.ceil(T / dt)
 nEle, nVer = msh.meshStats(mesh_n)
-mM = [nEle, nEle]            # Min/max #Elements
+mM = [nEle, nEle]           # Min/max #Elements
 Sn = nEle
-nVerT = nVer * op.vscale    # Target #Vertices
-
-# TODO: Mystical scaling parameter
-gamma = 2000
+nVerT = nVer * op.vscale    # Target #Vertices in simpleAdapt case
+gamma = nEle / assemble(Function(V_n).interpolate(Expression(1)) * dx)  # Elements per unit area
 
 # Initialise counters
 t = 0.
@@ -104,10 +110,7 @@ if getData:
         F = form.weakResidualAD(phi_next, phi, psi, w, Dt, nu=nu)
         bc = DirichletBC(V_n, 0., "on_boundary")
 
-        iA = form.indicator(V_n)
-        J_trap = assemble(phi * iA * dx)
-
-        print('\nStarting fixed mesh primal run (forwards in time)')
+        print('\nStarting primal run (forwards in time) on a fixed mesh with %d elements' % nEle)
         finished = False
         primalTimer = clock()
         while t < T:
@@ -136,13 +139,6 @@ if getData:
                 else:
                     adj_inc_timestep(time=t, finished=finished)
 
-            # Estimate OF using trapezium rule
-            step = assemble(phi * iA * dx)
-            if finished:
-                J_trap += step
-            else:
-                J_trap += 2 * step
-
             # forwardFile.write(phi, time=t)
             print('t = %.3fs' % t)
             t += dt
@@ -150,10 +146,6 @@ if getData:
         cnt -= 1
         primalTimer = clock() - primalTimer
         print('Primal run complete. Run time: %.3fs' % primalTimer)
-        finalFixed = Function(V_n)
-        finalFixed.dat.data[:] = phi.dat.data   # NOTE assign, copy and interpolate functions are overloaded
-
-        print("Trapezium rule estimate of J = ", J_trap * dt)  # TODO: how to calculate this more elegantly?
 
     if useAdjoint:
         # Set up adjoint problem
@@ -199,6 +191,7 @@ if getData:
 
 # Loop back over times to generate error estimators
 if getError:
+    errorTimer = clock()
     for k in range(0, iEnd, rm):
 
         print('Generating error estimate %d / %d' % (k / rm + 1, iEnd / rm))
@@ -236,6 +229,8 @@ if getError:
             saveErr.store(epsilon)
             saveErr.close()
         errorFile.write(epsilon, time=t)
+    errorTimer = clock() - errorTimer
+    print('Errors estimated. Run time: %.3fs' % errorTimer)
 
 if approach in ('simpleAdapt', 'goalBased'):
     print('\nStarting adaptive mesh primal run (forwards in time)')
@@ -296,7 +291,11 @@ if approach in ('simpleAdapt', 'goalBased'):
     adaptTimer = clock() - adaptTimer
     print('Adaptive primal run complete. Run time: %.3fs \n' % adaptTimer)
 
-# Print to screen timing analyses (and error in pure advection case)
+# Print to screen timing analyses
 if getData and useAdjoint:
-    print("TIMINGS:         Forward run   %5.3fs, Adjoint run   %5.3fs, Adaptive run   %5.3fs" %
-          (primalTimer, dualTimer, adaptTimer))
+    print("""TIMINGS:
+            Bootstrap run  %5.3fs
+            Forward run    %5.3fs,
+            Adjoint run    %5.3fs, 
+            Error run      %5.3fs,
+            Adaptive run   %5.3fs""" % (bootTimer, primalTimer, dualTimer, errorTimer, adaptTimer))

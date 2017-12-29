@@ -59,17 +59,18 @@ Ts = op.Tstart
 b = Constant(0.1)
 op.checkCFL(b)
 
-# Define inital mesh and FunctionSpace
+# Define initial Meshes and FunctionSpaces
 n = 32
 N = 2 * n
 lx = 2 * np.pi
-mesh = SquareMesh(n, n, lx, lx)   # Computational mesh
+mesh = SquareMesh(n, n, lx, lx)     # Computational mesh
 x, y = SpatialCoordinate(mesh)
 mesh_N = SquareMesh(N, N, lx, lx)   # Finer mesh (N > n) upon which to approximate error
 x, y = SpatialCoordinate(mesh)
 V_n = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
 V_N = VectorFunctionSpace(mesh_N, op.space1, op.degree1) * FunctionSpace(mesh_N, op.space2, op.degree2)
 
+# Define Functions relating to goalBased approach
 if useAdjoint:
     rho = Function(V_N)
     rho_u, rho_e = rho.split()
@@ -101,14 +102,13 @@ eta.rename("Elevation")
 hmin = op.hmin
 hmax = op.hmax
 rm = op.rm
-iEnd = int(T / dt)
+iStart = int(op.Tstart / dt)
+iEnd = np.ceil(T / dt)
 nEle, nVer = msh.meshStats(mesh)
 mM = [nEle, nEle]           # Min/max #Elements
 Sn = nEle
-nVerT = nVer * op.vscale    # Target #Vertices
-
-# TODO: Mystical scaling parameter
-gamma = 2000
+nVerT = nVer * op.vscale    # Target #Vertices in simpleAdapt case
+gamma = nEle / assemble(Function(V_n.sub(1)).interpolate(Expression(1)) * dx)  # Elements per unit area
 
 # Initialise counters
 t = 0.
@@ -210,6 +210,7 @@ if getData:
 
 # Loop back over times to generate error estimators
 if getError:
+    errorTimer = clock()
     for k in range(0, iEnd, rm):
 
         print('Generating error estimate %d / %d' % (k / rm + 1, iEnd / rm))
@@ -229,7 +230,7 @@ if getError:
         epsilon = assemble(v * (inner(rho_u, dual_N_u) + rho_e * dual_N_e) * dx)      # Currently a P0 field
 
         # Loop over relevant time window
-        for i in range(0, cnt, rm):
+        for i in range(iStart, cnt, rm):
             with DumbCheckpoint(dirName + 'hdf5/adjoint_SW' + msc.indexString(i), mode=FILE_READ) as loadAdj:
                 loadAdj.load(dual_N_u)
                 loadAdj.load(dual_N_e)
@@ -250,6 +251,8 @@ if getError:
             saveErr.store(epsilon)
             saveErr.close()
         errorFile.write(epsilon, time=t)
+    errorTimer = clock() - errorTimer
+    print('Errors estimated. Run time: %.3fs' % errorTimer)
 
 if approach in ('simpleAdapt', 'goalBased'):
     print('\nStarting adaptive mesh primal run (forwards in time)')
@@ -273,7 +276,6 @@ if approach in ('simpleAdapt', 'goalBased'):
                 M = adap.computeSteadyMetric(mesh, W, H, eta, nVerT=nVerT, op=op)
 
             # Adapt mesh and interpolate variables
-            M = adap.computeSteadyMetric(mesh, W, H, eta, nVerT=nVerT, op=op)
             if op.gradate:
                 adap.metricGradation(mesh, M)
             if op.advect:
@@ -309,7 +311,11 @@ if approach in ('simpleAdapt', 'goalBased'):
     adaptTimer = clock() - adaptTimer
     print('Adaptive primal run complete. Run time: %.3fs \n' % adaptTimer)
 
-# Print to screen timing analyses (and error in pure advection case)
+# Print to screen timing analyses
 if getData and useAdjoint:
-    print("TIMINGS:         Forward run   %5.3fs, Adjoint run   %5.3fs, Adaptive run   %5.3fs" %
-          (primalTimer, dualTimer, adaptTimer))
+    print("""TIMINGS:
+            Forward run   %5.3fs,
+            Adjoint run   %5.3fs, 
+            Error run     %5.3fs,
+            Adaptive run   %5.3fs""" %
+          (primalTimer, dualTimer, errorTimer, adaptTimer))

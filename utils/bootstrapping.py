@@ -7,8 +7,6 @@ import utils.mesh as msh
 import utils.options as opt
 
 
-# TODO: how to calculate J more elegantly?
-
 def solverAD(n, op = opt.Options(dt=0.04, Tend=2.4)):
 
     # Define Mesh and FunctionSpace
@@ -100,3 +98,26 @@ def solverSW(n, op=opt.Options(dt=0.05, Tstart=0.5, Tend=2.5, family='dg-cg',)):
         t += op.dt
 
     return J_trap * op.dt, nEle
+
+
+def bootstrap(advDiff, maxIter=8, tol=1e-3):
+    Js = []         # Container for objective functional values
+    nEls = []       # Container for element counts
+    diff = 1        # Initialise 'difference of differences'
+    iOpt = maxIter  # Optimal index
+    for i in range(maxIter):
+        n = pow(2, i)
+        J, nEle = solverAD(n) if advDiff else solverSW(n)
+        Js.append(J)
+        nEls.append(nEle)
+        toPrint = "n = %3d, nEle = %6d, J = %6.4f, " % (n, nEle, Js[-1])
+        if i > 1:
+            diff = np.abs(np.abs(Js[-2] - Js[-3]) - np.abs(Js[-1] - Js[-2]))
+            toPrint += "diff : %6.4f" % diff
+        print(toPrint)
+
+        if diff < tol:
+            print("Converged to J = %.4f in %d iterations" % (Js[-1], i))
+            iOpt = i
+            break
+    return pow(2, iOpt), Js, nEls
