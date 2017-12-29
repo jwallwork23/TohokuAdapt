@@ -188,7 +188,6 @@ if getData:
                         saveAdj.store(dual_N_e)
                         saveAdj.close()
 
-                # Print to screen, save data and increment counters
                 # adjointFile.write(dual_u, dual_e, time=t)
                 print('t = %.3fs' % t)
                 t -= dt
@@ -273,12 +272,13 @@ if approach in ('simpleAdapt', 'goalBased'):
             else:
                 H = adap.constructHessian(mesh, W, eta, op=op)
                 M = adap.computeSteadyMetric(mesh, W, H, eta, nVerT=nVerT, op=op)
-
-            # Adapt mesh and interpolate variables
             if op.gradate:
                 adap.metricGradation(mesh, M)
             if op.advect:
-                M = adap.advectMetric(M, u, Dt, n=rm)
+                M = adap.advectMetric(M, u, 2*Dt, n=3*rm)
+                # TODO: isotropic advection?
+
+            # Adapt mesh and interpolate variables
             mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
             V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
             q_ = inte.mixedPairInterp(mesh, V, q_)[0]
@@ -296,7 +296,7 @@ if approach in ('simpleAdapt', 'goalBased'):
             nEle = msh.meshStats(mesh)[0]
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
-            op.printToScreen(cnt / rm + 1, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, mM)
+            op.printToScreen(cnt/rm+1, clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM)
 
         # Solve problem at current timestep
         adaptSolver.solve()

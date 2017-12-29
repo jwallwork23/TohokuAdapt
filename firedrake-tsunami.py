@@ -16,14 +16,21 @@ import utils.timeseries as tim
 print('*********************** TOHOKU TSUNAMI SIMULATION *********************\n')
 approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'goalBased'
 
-# Cheat code to resume from saved data in goalBased case
-if approach == 'saved':
+# Cheat codes to resume from saved data in goalBased case
+if approach == 'goalBased':
+    getData = True
+    getError = True
+elif approach == 'saved':
     approach = 'goalBased'
     getData = False
-elif approach == 'simpleAdapt':
+    getError = False
+elif approach == 'regen':
+    approach = 'goalBased'
     getData = False
+    getError = True
 else:
     getData = True
+    getError = False
 useAdjoint = approach == 'goalBased'
 
 # Define initial mesh and mesh statistics placeholders
@@ -34,8 +41,10 @@ op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
                  advect=False,
                  outputHessian=False,
                  plotpvd=False if approach == 'fixedMesh' else True,
-                 coarseness=2,
+                 coarseness=5,
                  gauges=True)
+
+# TODO: bootstrap to establish initial mesh resolution
 
 # Establish filenames
 dirName = 'plots/firedrake-tsunami/'
@@ -48,10 +57,13 @@ if op.plotpvd:
 if op.outputHessian:
     hessianFile = File(dirName + "hessian.pvd")
 
-# Generate mesh(es)
+# Load Meshes
 mesh, eta0, b = msh.TohokuDomain(op.coarseness)
 if useAdjoint:
-    assert op.coarseness != 1
+    try:
+        assert op.coarseness != 1
+    except:
+        raise NotImplementedError("Requested mesh resolution not yet available.")
     mesh_N, b_N = msh.TohokuDomain(op.coarseness-1)[0::2]   # Get finer mesh and associated bathymetry
     V_N = VectorFunctionSpace(mesh_N, op.space1, op.degree1) * FunctionSpace(mesh_N, op.space2, op.degree2)
 
@@ -82,25 +94,30 @@ v0 = {}
 for gauge in gauges:
     v0[gauge] = float(eta.at(op.gaugeCoord(gauge)))
 
+# Define Functions relating to goalBased approach
 if useAdjoint:
-    # Define Function to hold residual data
     rho = Function(V_N)
     rho_u, rho_e = rho.split()
     rho_u.rename("Velocity residual")
     rho_e.rename("Elevation residual")
     dual = Function(V)
     dual_u, dual_e = dual.split()
-    dual_u.rename("Adjoint velocity")
-    dual_e.rename("Adjoint elevation")
+    dual_N = Function(V_N)
+    dual_N_u, dual_N_e = dual_N.split()
+    dual_N_u.rename("Adjoint velocity")
+    dual_N_e.rename("Adjoint elevation")
     P0_N = FunctionSpace(mesh_N, "DG", 0)
     v = TestFunction(P0_N)
+    epsilon = Function(P0_N, name="Error indicator")
 
 # Get adaptivity parameters
 hmin = op.hmin
 hmax = op.hmax
 rm = op.rm
+iStart = int(op.Tstart / dt)
+iEnd = np.ceil(T / dt)
 nEle, nVer = msh.meshStats(mesh)
-mM = [nEle, nEle]            # Min/max #Elements
+mM = [nEle, nEle]           # Min/max #Elements
 Sn = nEle
 nVerT = nVer * op.vscale    # Target #Vertices
 
@@ -162,114 +179,139 @@ if getData:
     primalTimer = clock() - primalTimer
     print('Primal run complete. Run time: %.3fs' % primalTimer)
 
-if getData and useAdjoint:
-    # Set up adjoint problem
-    J = form.objectiveFunctionalSW(q, plot=True)
-    parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
-    t = T
-    save = True
+    if useAdjoint:
+        # Set up adjoint problem
+        J = form.objectiveFunctionalSW(q, plot=True)
+        parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
+        t = T
+        save = True
 
-    # Time integrate (backwards)
-    print('\nStarting fixed mesh dual run (backwards in time)')
-    dualTimer = clock()
-    for (variable, solution) in compute_adjoint(J):
-        if save:
-            # Load adjoint data. NOTE the interpolation operator is overloaded
-            dual_u.dat.data[:] = variable.dat.data[0]
-            dual_e.dat.data[:] = variable.dat.data[1]
-            dual_N = inte.mixedPairInterp(mesh_N, V_N, dual)[0]
+        # Time integrate (backwards)
+        print('\nStarting fixed mesh dual run (backwards in time)')
+        dualTimer = clock()
+        for (variable, solution) in compute_adjoint(J):
+            if save:
+                # Load adjoint data. NOTE the interpolation operator is overloaded
+                dual_u.dat.data[:] = variable.dat.data[0]
+                dual_e.dat.data[:] = variable.dat.data[1]
+                dual_N = inte.mixedPairInterp(mesh_N, V_N, dual)[0]
+                dual_N_u, dual_N_e = dual_N.split()
+                dual_N_u.rename('Adjoint velocity')
+                dual_N_e.rename('Adjoint elevation')
 
-            if not cnt % rm:
-                indexStr = msc.indexString(cnt)
+                # Save adjoint data to HDF5
+                if not cnt % rm:
+                    with DumbCheckpoint(dirName + 'hdf5/adjoint_' + msc.indexString(cnt), mode=FILE_CREATE) as saveAdj:
+                        saveAdj.store(dual_N_u)
+                        saveAdj.store(dual_N_e)
+                        saveAdj.close()
 
-                # Load residual data from HDF5
-                with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_READ) as loadResidual:
-                    loadResidual.load(rho_u)
-                    loadResidual.load(rho_e)
-                    loadResidual.close()
+                if not cnt % ndump:
+                    if op.plotpvd:
+                        adjointFile.write(dual_u, dual_e, time=t)
+                    print('t = %.2fs' % t)
+                t -= dt
+                cnt -= 1
+                save = False
+            else:
+                save = True
+            if (cnt == -1) | (t < -dt):
+                break
+        dualTimer = clock() - dualTimer
+        print('Adjoint run complete. Run time: %.3fs' % dualTimer)
+        t += dt
+        cnt += 1
 
-                # Estimate error using forward residual
-                epsilon = assemble(v * inner(rho, dual_N) * dx)
-                epsNorm = np.abs(assemble(inner(rho, dual_N) * dx))   # Normalise
-                if epsNorm == 0.:
-                    epsNorm = 1.
-                epsilon.dat.data[:] = np.abs(epsilon.dat.data) / epsNorm
-                epsilon.rename("Error indicator")
+        # Reset initial conditions for primal problem and recreate error indicator placeholder
+        u_.interpolate(Expression([0, 0]))
+        eta_.interpolate(eta0)
 
-                # Save error indicator data to HDF5
-                with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_CREATE) as saveError:
-                    saveError.store(epsilon)
-                    saveError.close()
+# Loop back over times to generate error estimators
+if getError:
+    errorTimer = clock()
+    for k in range(0, iEnd, rm):
 
-                # Print to screen, save data and increment counters
-                if op.plotpvd:
-                    errorFile.write(epsilon, time=t)
+        print('Generating error estimate %d / %d' % (k / rm + 1, iEnd / rm))
+        indexStr = msc.indexString(k)
 
-            if not cnt % ndump:
-                if op.plotpvd:
-                    adjointFile.write(dual_u, dual_e, time=t)
-                print('t = %.2fs' % t)
-            t -= dt
-            cnt -= 1
-            save = False
-        else:
-            save = True
-        if (cnt == -1) | (t < -dt):
-            break
-    dualTimer = clock() - dualTimer
-    print('Adjoint run complete. Run time: %.3fs' % dualTimer)
-    t += dt
-    cnt += 1
+        # Load residual and adjoint data from HDF5
+        with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_READ) as loadRes:
+            loadRes.load(rho_u)
+            loadRes.load(rho_e)
+            loadRes.close()
+        with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_READ) as loadAdj:
+            loadAdj.load(dual_N_u)
+            loadAdj.load(dual_N_e)
+            loadAdj.close()
 
-    # Reset initial conditions for primal problem and recreate error indicator placeholder
-    u_.interpolate(Expression([0, 0]))
-    eta_.interpolate(eta0)
+        # Estimate error using dual weighted residual
+        epsilon = assemble(v * (inner(rho_u, dual_N_u) + rho_e * dual_N_e) * dx)      # Currently a P0 field
+
+        # Loop over relevant time window
+        for i in range(iStart, cnt, rm):
+            with DumbCheckpoint(dirName + 'hdf5/adjoint_' + msc.indexString(i), mode=FILE_READ) as loadAdj:
+                loadAdj.load(dual_N_u)
+                loadAdj.load(dual_N_e)
+                loadAdj.close()
+            epsilon_ = assemble(v * (inner(rho_u, dual_N_u) + rho_e * dual_N_e) * dx)
+            for j in range(len(epsilon.dat.data)):
+                epsilon.dat.data[j] = max(epsilon.dat.data[j], epsilon_.dat.data[j])
+
+        # Normalise error estimate
+        epsNorm = np.abs(assemble(epsilon * dx))
+        if epsNorm == 0.:
+            epsNorm = 1.
+        epsilon.dat.data[:] = np.abs(epsilon.dat.data) / epsNorm
+        epsilon.rename("Error indicator")
+
+        # Store error estimates
+        with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_CREATE) as saveErr:
+            saveErr.store(epsilon)
+            saveErr.close()
+        if op.plotpvd:
+            errorFile.write(epsilon, time=t)
+    errorTimer = clock() - errorTimer
+    print('Errors estimated. Run time: %.3fs' % errorTimer)
 
 if approach in ('simpleAdapt', 'goalBased'):
 
+    # TODO: always gradate to coast
     if useAdjoint:
-        epsilon = Function(P0_N, name="Error indicator")
         if op.gradate:
             h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
-            # TODO: always gradate to coast
 
     print('\nStarting adaptive mesh primal run (forwards in time)')
     adaptTimer = clock()
     while t <= T:
-        indexStr = msc.indexString(cnt)
         if (cnt % rm == 0) & (np.abs(t-T) > 0.5 * dt):
             stepTimer = clock()
 
             # Construct metric
             W = TensorFunctionSpace(mesh, "CG", 1)
             if useAdjoint & (cnt != 0):
-
                 # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
-                with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_READ) as loadError:
+                with DumbCheckpoint(dirName + 'hdf5/error_' + msc.indexString(cnt), mode=FILE_READ) as loadError:
                     loadError.load(epsilon)
                     loadError.close()
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])
-                M = adap.isotropicMetric(W, errEst, op=op, invert=True)
-
-                # TODO: what is the best way to do this?
-
+                errEst.dat.data[:] *= nVerT
+                M = adap.isotropicMetric(W, errEst, op=op, invert=False)
             else:
                 H = adap.constructHessian(mesh, W, eta, op=op)
                 M = adap.computeSteadyMetric(mesh, W, H, eta, nVerT=nVerT, op=op)
-
-            # Gradate or advect metric and adapt mesh
             if op.gradate:
                 M_ = adap.isotropicMetric(W, inte.interp(mesh, h)[0], bdy=True, op=op)  # Initial boundary metric
                 M = adap.metricIntersection(mesh, W, M, M_, bdy=True)
                 adap.metricGradation(mesh, M)
             if op.advect:
-                M = adap.advectMetric(M, u, Dt, n=rm)
-            mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
+                M = adap.advectMetric(M, u, 2*Dt, n=3*rm)
+                # TODO: isotropic advection?
 
-            # Interpolate variables
+            # Adapt mesh and interpolate variables
+            mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
             V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
             q_ = inte.mixedPairInterp(mesh, V, q_)[0]
-            b = inte.interp(mesh, b)[0]     # Combine this in above interpolation for speed
+            b = inte.interp(mesh, b)[0]     # TODO: Combine this in above interpolation for speed
             q = Function(V)
             u, eta = q.split()
             u.rename("uv_2d")
@@ -284,7 +326,7 @@ if approach in ('simpleAdapt', 'goalBased'):
             nEle = msh.meshStats(mesh)[0]
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
-            op.printToScreen(cnt / rm + 1, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, mM)
+            op.printToScreen(cnt/rm+1, clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM)
 
         # Solve problem at current timestep
         adaptSolver.solve()
@@ -302,10 +344,14 @@ if approach in ('simpleAdapt', 'goalBased'):
     print('Adaptive primal run complete. Run time: %.3fs \n' % adaptTimer)
     cnt -= 1
 
-# Print timing analyses
+# Print to screen timing analyses
 if getData and useAdjoint:
-    print("TIMINGS:         Forward run   %5.3fs, Adjoint run   %5.3fs, Adaptive run   %5.3fs" %
-          (primalTimer, dualTimer, adaptTimer))
+    print("""TIMINGS:
+            Forward run   %5.3fs,
+            Adjoint run   %5.3fs, 
+            Error run     %5.3fs,
+            Adaptive run   %5.3fs\n""" %
+          (primalTimer, dualTimer, errorTimer, adaptTimer))
 
 # Save and plot timeseries
 name = input("Enter a name for these time series (e.g. 'goalBased8-12-17'): ") or 'test'
