@@ -11,16 +11,26 @@ import utils.mesh as msh
 import utils.misc as msc
 import utils.options as opt
 
+
 print('\n*********************** SHALLOW WATER TEST PROBLEM ************************\n')
 print('Mesh adaptive solver initially defined on a square mesh')
 approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'fixedMesh'
 
-# Cheat code to resume from saved data in goalBased case
-if approach == 'saved':
+# Cheat codes to resume from saved data in goalBased case
+if approach == 'goalBased':
+    getData = True
+    getError = True
+elif approach == 'saved':
     approach = 'goalBased'
     getData = False
+    getError = False
+elif approach == 'regen':
+    approach = 'goalBased'
+    getData = False
+    getError = True
 else:
     getData = True
+    getError = False
 useAdjoint = approach == 'goalBased'
 
 # Establish filenames
@@ -67,10 +77,13 @@ if useAdjoint:
     rho_e.rename("Elevation residual")
     dual = Function(V_n)
     dual_u, dual_e = dual.split()
-    dual_u.rename("Adjoint velocity")
-    dual_e.rename("Adjoint elevation")
+    dual_N = Function(V_N)
+    dual_N_u, dual_N_e = dual_N.split()
+    dual_N_u.rename("Adjoint velocity")
+    dual_N_e.rename("Adjoint elevation")
     P0_N = FunctionSpace(mesh_N, "DG", 0)
     v = TestFunction(P0_N)
+    epsilon = Function(P0_N, name="Error indicator")
 
 # Apply initial condition and define Functions
 ic = project(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))), V_n.sub(1))
@@ -88,10 +101,14 @@ eta.rename("Elevation")
 hmin = op.hmin
 hmax = op.hmax
 rm = op.rm
+iEnd = int(T / dt)
 nEle, nVer = msh.meshStats(mesh)
 mM = [nEle, nEle]           # Min/max #Elements
 Sn = nEle
 nVerT = nVer * op.vscale    # Target #Vertices
+
+# TODO: Mystical scaling parameter
+gamma = 2000
 
 # Initialise counters
 t = 0.
@@ -161,31 +178,18 @@ if getData:
                 dual_u.dat.data[:] = variable.dat.data[0]
                 dual_e.dat.data[:] = variable.dat.data[1]
                 dual_N = inte.mixedPairInterp(mesh_N, V_N, dual)[0]
+                dual_N_u, dual_N_e = dual_N.split()
+                dual_N_u.rename('Adjoint velocity')
+                dual_N_e.rename('Adjoint elevation')
 
+                # Save adjoint data to HDF5
                 if not cnt % rm:
-                    indexStr = msc.indexString(cnt)
+                    with DumbCheckpoint(dirName+'hdf5/adjoint_SW'+msc.indexString(cnt), mode=FILE_CREATE) as saveAdj:
+                        saveAdj.store(dual_N_u)
+                        saveAdj.store(dual_N_e)
+                        saveAdj.close()
 
-                    # Load residual data from HDF5
-                    with DumbCheckpoint(dirName + 'hdf5/residual_SW' + indexStr, mode=FILE_READ) as loadResidual:
-                        loadResidual.load(rho_u)
-                        loadResidual.load(rho_e)
-                        loadResidual.close()
-
-                    # Estimate error using forward residual (DWR)
-                    epsilon = assemble(v * inner(rho, dual_N) * dx)
-                    epsNorm = np.abs(assemble(inner(rho, dual_N) * dx))   # Normalise
-                    if epsNorm == 0.:
-                        epsNorm = 1.
-                    epsilon.dat.data[:] = np.abs(epsilon.dat.data) / epsNorm
-                    epsilon.rename("Error indicator")
-
-                    # Save error indicator data to HDF5
-                    with DumbCheckpoint(dirName + 'hdf5/error_SW' + indexStr, mode=FILE_CREATE) as saveError:
-                        saveError.store(epsilon)
-                        saveError.close()
-
-                    # Print to screen, save data and increment counters
-                    errorFile.write(epsilon, time=t)
+                # Print to screen, save data and increment counters
                 # adjointFile.write(dual_u, dual_e, time=t)
                 print('t = %.3fs' % t)
                 t -= dt
@@ -203,7 +207,49 @@ if getData:
         # Reset initial conditions for primal problem
         u_.interpolate(Expression([0, 0]))
         eta_.assign(ic)
-        epsilon = Function(P0_N, name="Error indicator")
+
+# Loop back over times to generate error estimators
+if getError:
+    for k in range(0, iEnd, rm):
+
+        print('Generating error estimate %d / %d' % (k / rm + 1, iEnd / rm))
+        indexStr = msc.indexString(k)
+
+        # Load residual and adjoint data from HDF5
+        with DumbCheckpoint(dirName + 'hdf5/residual_SW' + indexStr, mode=FILE_READ) as loadRes:
+            loadRes.load(rho_u)
+            loadRes.load(rho_e)
+            loadRes.close()
+        with DumbCheckpoint(dirName + 'hdf5/adjoint_SW' + indexStr, mode=FILE_READ) as loadAdj:
+            loadAdj.load(dual_N_u)
+            loadAdj.load(dual_N_e)
+            loadAdj.close()
+
+        # Estimate error using dual weighted residual
+        epsilon = assemble(v * (inner(rho_u, dual_N_u) + rho_e * dual_N_e) * dx)      # Currently a P0 field
+
+        # Loop over relevant time window
+        for i in range(0, cnt, rm):
+            with DumbCheckpoint(dirName + 'hdf5/adjoint_SW' + msc.indexString(i), mode=FILE_READ) as loadAdj:
+                loadAdj.load(dual_N_u)
+                loadAdj.load(dual_N_e)
+                loadAdj.close()
+            epsilon_ = assemble(v * (inner(rho_u, dual_N_u) + rho_e * dual_N_e) * dx)
+            for j in range(len(epsilon.dat.data)):
+                epsilon.dat.data[j] = max(epsilon.dat.data[j], epsilon_.dat.data[j])
+
+        # Normalise error estimate
+        epsNorm = np.abs(assemble(epsilon * dx))
+        if epsNorm == 0.:
+            epsNorm = 1.
+        epsilon.dat.data[:] = np.abs(epsilon.dat.data) / epsNorm
+        epsilon.rename("Error indicator")
+
+        # Store error estimates
+        with DumbCheckpoint(dirName + 'hdf5/error_SW' + indexStr, mode=FILE_CREATE) as saveErr:
+            saveErr.store(epsilon)
+            saveErr.close()
+        errorFile.write(epsilon, time=t)
 
 if approach in ('simpleAdapt', 'goalBased'):
     print('\nStarting adaptive mesh primal run (forwards in time)')
@@ -214,17 +260,14 @@ if approach in ('simpleAdapt', 'goalBased'):
 
             # Construct metric
             W = TensorFunctionSpace(mesh, "CG", 1)
-            if useAdjoint & (cnt != 0):
-
+            if useAdjoint:
                 # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
                 with DumbCheckpoint(dirName + 'hdf5/error_SW' + msc.indexString(cnt), mode=FILE_READ) as loadError:
                     loadError.load(epsilon)
                     loadError.close()
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])
-                M = adap.isotropicMetric(W, errEst, op=op, invert=True)
-
-                # TODO: what is the best way to do this?
-
+                errEst.dat.data[:] *= gamma
+                M = adap.isotropicMetric(W, errEst, op=op, invert=False)
             else:
                 H = adap.constructHessian(mesh, W, eta, op=op)
                 M = adap.computeSteadyMetric(mesh, W, H, eta, nVerT=nVerT, op=op)
