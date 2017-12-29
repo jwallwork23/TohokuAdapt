@@ -18,12 +18,21 @@ print('Mesh adaptive solver initially defined on a rectangular mesh')
 approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'fixedMesh'
 diffusion = True
 
-# Cheat code to resume from saved data in goalBased case
-if approach == 'saved':
+# Cheat codes to resume from saved data in goalBased case
+if approach == 'goalBased':
+    getData = True
+    getError = True
+elif approach == 'saved':
     approach = 'goalBased'
     getData = False
+    getError = False
+elif approach == 'regen':
+    approach = 'goalBased'
+    getData = False
+    getError = True
 else:
     getData = True
+    getError = False
 useAdjoint = approach == 'goalBased'
 
 # Establish filenames
@@ -46,6 +55,7 @@ V_N = FunctionSpace(mesh_N, "CG", 2)
 
 if useAdjoint:
     dual_n = Function(V_n, name='Adjoint')
+    dual_N = Function(V_N, name='Fine mesh adjoint')
     rho_N = Function(V_N, name='Residual')
     P0_N = FunctionSpace(mesh_N, "DG", 0)
     v = TestFunction(P0_N)
@@ -80,6 +90,7 @@ if not diffusion:
 hmin = op.hmin
 hmax = op.hmax
 rm = op.rm
+iEnd = int(T / dt)
 nEle, nVer = msh.meshStats(mesh_n)
 mM = [nEle, nEle]            # Min/max #Elements
 Sn = nEle
@@ -139,7 +150,6 @@ if getData:
             print('t = %.3fs' % t)
             t += dt
             cnt += 1
-        cntT = cnt
         cnt -= 1
         primalTimer = clock() - primalTimer
         print('Primal run complete. Run time: %.3fs' % primalTimer)
@@ -163,6 +173,7 @@ if getData:
                 # Load adjoint data. NOTE the interpolation operator is overloaded
                 dual_n.dat.data[:] = variable.dat.data
                 dual_N = inte.interp(mesh_N, dual_n)[0]
+                dual_N.rename('Fine mesh adjoint')
 
                 # Save adjoint data to HDF5
                 if not cnt % rm:
@@ -189,44 +200,45 @@ if getData:
         phi = ic.copy(deepcopy=True)
         phi.rename('Concentration')
 
-        # Loop back over times to generate error estimators
-        for k in range(0, cntT, rm):
+# Loop back over times to generate error estimators
+if getError:
+    for k in range(0, iEnd, rm):
 
-            print('Generating error estimates %.2f %%' % (100*k/cntT))
-            indexStr = msc.indexString(k)
+        print('Generating error estimate %d / %d' % (k / rm + 1, iEnd / rm))
+        indexStr = msc.indexString(k)
 
-            # Load residual and adjoint data from HDF5
-            with DumbCheckpoint(dirName + 'hdf5/residual_AD' + indexStr, mode=FILE_READ) as loadRes:
-                loadRes.load(rho_N)
-                loadRes.close()
-            with DumbCheckpoint(dirName + 'hdf5/adjoint_AD' + indexStr, mode=FILE_READ) as loadAdj:
+        # Load residual and adjoint data from HDF5
+        with DumbCheckpoint(dirName + 'hdf5/residual_AD' + indexStr, mode=FILE_READ) as loadRes:
+            loadRes.load(rho_N)
+            loadRes.close()
+        with DumbCheckpoint(dirName + 'hdf5/adjoint_AD' + indexStr, mode=FILE_READ) as loadAdj:
+            loadAdj.load(dual_N)
+            loadAdj.close()
+
+        # Estimate error using dual weighted residual
+        epsilon_N = assemble(v * rho_N * dual_N * dx)  # Currently a P0 field
+
+        # Loop over relevant time window
+        for i in range(0, cnt, rm):
+            with DumbCheckpoint(dirName + 'hdf5/adjoint_AD' + msc.indexString(i), mode=FILE_READ) as loadAdj:
                 loadAdj.load(dual_N)
                 loadAdj.close()
+            epsilon_N_ = assemble(v * rho_N * dual_N * dx)
+            for j in range(len(epsilon_N.dat.data)):
+                epsilon_N.dat.data[j] = max(epsilon_N.dat.data[j], epsilon_N_.dat.data[j])
 
-            # Estimate error using dual weighted residual
-            epsilon_N = assemble(v * rho_N * dual_N * dx)  # Currently a P0 field
+        # Normalise error estimate
+        epsNorm = np.abs(assemble(epsilon_N * dx))
+        if epsNorm == 0.:
+            epsNorm = 1.
+        epsilon_N.dat.data[:] = np.abs(epsilon_N.dat.data) / epsNorm
+        epsilon_N.rename("Error indicator")
 
-            # Loop over relevant time window
-            for i in range(0, cnt, rm):
-                with DumbCheckpoint(dirName + 'hdf5/adjoint_AD' + msc.indexString(i), mode=FILE_READ) as loadAdj:
-                    loadAdj.load(dual_N)
-                    loadAdj.close()
-                epsilon_N_ = assemble(v * rho_N * dual_N * dx)
-                for j in range(len(epsilon_N.dat.data)):
-                    epsilon_N.dat.data[j] = max(epsilon_N.dat.data[j], epsilon_N_.dat.data[j])
-
-            # Normalise error estimate
-            epsNorm = np.abs(assemble(epsilon_N * dx))
-            if epsNorm == 0.:
-                epsNorm = 1.
-            epsilon_N.dat.data[:] = np.abs(epsilon_N.dat.data) / epsNorm
-            epsilon_N.rename("Error indicator")
-
-            # Store error estimates
-            with DumbCheckpoint(dirName + 'hdf5/error_AD' + indexStr, mode=FILE_CREATE) as saveErr:
-                saveErr.store(epsilon_N)
-                saveErr.close()
-            errorFile.write(epsilon_N, time=t)
+        # Store error estimates
+        with DumbCheckpoint(dirName + 'hdf5/error_AD' + indexStr, mode=FILE_CREATE) as saveErr:
+            saveErr.store(epsilon_N)
+            saveErr.close()
+        errorFile.write(epsilon_N, time=t)
 
 if approach in ('simpleAdapt', 'goalBased'):
     print('\nStarting adaptive mesh primal run (forwards in time)')
@@ -249,7 +261,7 @@ if approach in ('simpleAdapt', 'goalBased'):
                     loadError.load(epsilon_N)
                     loadError.close()
                 errEst = Function(FunctionSpace(mesh_n, "CG", 1)).interpolate(inte.interp(mesh_n, epsilon_N)[0])
-                errEst.dat.data[:] /= assemble(errEst * dx)
+                errEst.dat.data[:] *= 2000 / assemble(errEst * dx)
                 M = adap.isotropicMetric(W, errEst, op=op, invert=False)
 
                 # TODO: what is the best way to do this?
