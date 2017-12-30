@@ -16,23 +16,7 @@ import utils.options as opt
 
 print('\n*********************** SHALLOW WATER TEST PROBLEM ************************\n')
 print('Mesh adaptive solver initially defined on a square mesh')
-approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'fixedMesh'
-
-# Cheat codes to resume from saved data in goalBased case
-if approach == 'goalBased':
-    getData = True
-    getError = True
-elif approach == 'saved':
-    approach = 'goalBased'
-    getData = False
-    getError = False
-elif approach == 'regen':
-    approach = 'goalBased'
-    getData = False
-    getError = True
-else:
-    getData = True
-    getError = False
+approach, getData, getError = msc.cheatCodes(input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': "))
 useAdjoint = approach == 'goalBased'
 
 # Establish filenames
@@ -42,6 +26,13 @@ residualFile = File(dirName + "residualSW.pvd")
 adjointFile = File(dirName + "adjointSW.pvd")
 errorFile = File(dirName + "errorIndicatorSW.pvd")
 adaptiveFile = File(dirName + "goalBasedSW.pvd") if useAdjoint else File(dirName + "simpleAdaptSW.pvd")
+
+# Establish initial mesh resolution
+bootTimer = clock()
+print('\nBootstrapping to establish optimal mesh resolution')
+n = boot.bootstrap(False, tol=2.5e-3)[0]
+bootTimer = clock() - bootTimer
+print('Bootstrapping run time: %.3fs' % bootTimer)
 
 # Specify physical and solver parameters
 op = opt.Options(dt=0.05,
@@ -63,7 +54,6 @@ b = Constant(0.1)
 op.checkCFL(b)
 
 # Define initial Meshes and FunctionSpaces
-n = 32
 N = 2 * n
 lx = 2 * np.pi
 mesh = SquareMesh(n, n, lx, lx)     # Computational mesh
@@ -117,53 +107,51 @@ t = 0.
 cnt = 0
 
 if getData:
-    if approach in ('fixedMesh', 'goalBased'):
-        # Define variational problem
-        qt = TestFunction(V_n)
-        forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
-        forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
+    # Define variational problem
+    qt = TestFunction(V_n)
+    forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
+    forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
-        print('\nStarting fixed mesh primal run (forwards in time)')
-        finished = False
-        primalTimer = clock()
+    print('\nStarting fixed mesh primal run (forwards in time)')
+    finished = False
+    primalTimer = clock()
+    # forwardFile.write(u, eta, time=t)
+    while t < T:
+        # Solve problem at current timestep
+        forwardSolver.solve()
+
+        # Approximate residual of forward equation and save to HDF5
+        if useAdjoint:
+            if not cnt % rm:
+                qN, q_N = inte.mixedPairInterp(mesh_N, V_N, q, q_)
+                Au, Ae = form.strongResidualSW(qN, q_N, b, Dt)
+                rho_u.interpolate(Au)
+                rho_e.interpolate(Ae)
+                with DumbCheckpoint(dirName + 'hdf5/residual_SW' + msc.indexString(cnt), mode=FILE_CREATE) as saveRes:
+                    saveRes.store(rho_u)
+                    saveRes.store(rho_e)
+                    saveRes.close()
+                # residualFile.write(rho_u, rho_e, time=t)
+
+        # Update solution at previous timestep
+        q_.assign(q)
+
+        # Mark timesteps to be used in adjoint simulation
+        if useAdjoint:
+            if t >= T - dt:
+                finished = True
+            if t == 0.:
+                adj_start_timestep()
+            else:
+                adj_inc_timestep(time=t, finished=finished)
+
         # forwardFile.write(u, eta, time=t)
-        while t < T:
-            # Solve problem at current timestep
-            forwardSolver.solve()
-
-            # Approximate residual of forward equation and save to HDF5
-            if useAdjoint:
-                if not cnt % rm:
-                    qN, q_N = inte.mixedPairInterp(mesh_N, V_N, q, q_)
-                    Au, Ae = form.strongResidualSW(qN, q_N, b, Dt)
-                    rho_u.interpolate(Au)
-                    rho_e.interpolate(Ae)
-                    with DumbCheckpoint(dirName + 'hdf5/residual_SW' + msc.indexString(cnt), mode=FILE_CREATE) \
-                            as saveRes:
-                        saveRes.store(rho_u)
-                        saveRes.store(rho_e)
-                        saveRes.close()
-                    # residualFile.write(rho_u, rho_e, time=t)
-
-            # Update solution at previous timestep
-            q_.assign(q)
-
-            # Mark timesteps to be used in adjoint simulation
-            if useAdjoint:
-                if t >= T - dt:
-                    finished = True
-                if t == 0.:
-                    adj_start_timestep()
-                else:
-                    adj_inc_timestep(time=t, finished=finished)
-
-            # forwardFile.write(u, eta, time=t)
-            print('t = %.3fs' % t)
-            t += dt
-            cnt += 1
-        cnt -= 1
-        primalTimer = clock() - primalTimer
-        print('Primal run complete. Run time: %.3fs' % primalTimer)
+        print('t = %.3fs' % t)
+        t += dt
+        cnt += 1
+    cnt -= 1
+    primalTimer = clock() - primalTimer
+    print('Primal run complete. Run time: %.3fs' % primalTimer)
 
     if useAdjoint:
         # Set up adjoint problem
@@ -313,9 +301,4 @@ if approach in ('simpleAdapt', 'goalBased'):
 
 # Print to screen timing analyses
 if getData and useAdjoint:
-    print("""TIMINGS:
-            Forward run   %5.3fs,
-            Adjoint run   %5.3fs, 
-            Error run     %5.3fs,
-            Adaptive run   %5.3fs""" %
-          (primalTimer, dualTimer, errorTimer, adaptTimer))
+    msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer, bootTimer=bootTimer)

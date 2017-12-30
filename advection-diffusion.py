@@ -16,25 +16,9 @@ import utils.options as opt
 
 print('\n******************** ADVECTION-DIFFUSION TEST PROBLEM *********************\n')
 print('Mesh adaptive solver initially defined on a rectangular mesh')
-approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'fixedMesh'
-diffusion = True
-
-# Cheat codes to resume from saved data in goalBased case
-if approach == 'goalBased':
-    getData = True
-    getError = True
-elif approach == 'saved':
-    approach = 'goalBased'
-    getData = False
-    getError = False
-elif approach == 'regen':
-    approach = 'goalBased'
-    getData = False
-    getError = True
-else:
-    getData = True
-    getError = False
+approach, getData, getError = msc.cheatCodes(input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': "))
 useAdjoint = approach == 'goalBased'
+diffusion = True
 
 # Establish filenames
 dirName = "plots/testSuite/"
@@ -105,49 +89,47 @@ t = 0.
 cnt = 0
 
 if getData:
-    if approach in ('fixedMesh', 'goalBased'):
-        # Define variational problem
-        psi = TestFunction(V_n)
-        F = form.weakResidualAD(phi_next, phi, psi, w, Dt, nu=nu)
-        bc = DirichletBC(V_n, 0., "on_boundary")
+    # Define variational problem
+    psi = TestFunction(V_n)
+    F = form.weakResidualAD(phi_next, phi, psi, w, Dt, nu=nu)
+    bc = DirichletBC(V_n, 0., "on_boundary")
 
-        print('\nStarting primal run (forwards in time) on a fixed mesh with %d elements' % nEle)
-        finished = False
-        primalTimer = clock()
-        while t < T:
-            # Solve problem at current timestep
-            solve(F == 0, phi_next, bc)
+    print('\nStarting primal run (forwards in time) on a fixed mesh with %d elements' % nEle)
+    finished = False
+    primalTimer = clock()
+    while t < T:
+        # Solve problem at current timestep
+        solve(F == 0, phi_next, bc)
 
-            # Approximate residual of forward equation and save to HDF5
-            if useAdjoint:
-                if not cnt % rm:
-                    phi_next_N, phi_N, w_N = inte.interp(mesh_N, phi_next, phi, w)
-                    rho.interpolate(form.strongResidualAD(phi_next_N, phi_N, w_N, Dt, nu=nu))
-                    with DumbCheckpoint(dirName + 'hdf5/residual_AD' + msc.indexString(cnt), mode=FILE_CREATE) \
-                            as saveRes:
-                        saveRes.store(rho)
-                        saveRes.close()
-                    # residualFile.write(rho, time=t)
+        # Approximate residual of forward equation and save to HDF5
+        if useAdjoint:
+            if not cnt % rm:
+                phi_next_N, phi_N, w_N = inte.interp(mesh_N, phi_next, phi, w)
+                rho.interpolate(form.strongResidualAD(phi_next_N, phi_N, w_N, Dt, nu=nu))
+                with DumbCheckpoint(dirName + 'hdf5/residual_AD' + msc.indexString(cnt), mode=FILE_CREATE) as saveRes:
+                    saveRes.store(rho)
+                    saveRes.close()
+                # residualFile.write(rho, time=t)
 
-            # Update solution at previous timestep
-            phi.assign(phi_next)
+        # Update solution at previous timestep
+        phi.assign(phi_next)
 
-            # Mark timesteps to be used in adjoint simulation
-            if t > T:
-                finished = True
-            if useAdjoint:
-                if t == 0.:
-                    adj_start_timestep()
-                else:
-                    adj_inc_timestep(time=t, finished=finished)
+        # Mark timesteps to be used in adjoint simulation
+        if t > T:
+            finished = True
+        if useAdjoint:
+            if t == 0.:
+                adj_start_timestep()
+            else:
+                adj_inc_timestep(time=t, finished=finished)
 
-            # forwardFile.write(phi, time=t)
-            print('t = %.3fs' % t)
-            t += dt
-            cnt += 1
-        cnt -= 1
-        primalTimer = clock() - primalTimer
-        print('Primal run complete. Run time: %.3fs' % primalTimer)
+        # forwardFile.write(phi, time=t)
+        print('t = %.3fs' % t)
+        t += dt
+        cnt += 1
+    cnt -= 1
+    primalTimer = clock() - primalTimer
+    print('Primal run complete. Run time: %.3fs' % primalTimer)
 
     if useAdjoint:
         # Set up adjoint problem
@@ -292,9 +274,4 @@ if approach in ('simpleAdapt', 'goalBased'):
 
 # Print to screen timing analyses
 if getData and useAdjoint:
-    print("""TIMINGS:
-            Bootstrap run  %5.3fs
-            Forward run    %5.3fs,
-            Adjoint run    %5.3fs, 
-            Error run      %5.3fs,
-            Adaptive run   %5.3fs""" % (bootTimer, primalTimer, dualTimer, errorTimer, adaptTimer))
+    msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer, bootTimer=bootTimer)

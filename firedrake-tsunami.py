@@ -15,26 +15,7 @@ import utils.timeseries as tim
 
 
 print('*********************** TOHOKU TSUNAMI SIMULATION *********************\n')
-approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'goalBased'
-
-# Cheat codes to resume from saved data in goalBased case
-if approach == 'goalBased':
-    getData = True
-    getError = True
-elif approach == 'saved':
-    approach = 'goalBased'
-    getData = False
-    getError = False
-elif approach == 'regen':
-    approach = 'goalBased'
-    getData = False
-    getError = True
-elif approach == 'simpleAdapt':
-    getData = False
-    getError = False
-else:
-    getData = True
-    getError = False
+approach, getData, getError = msc.cheatCodes(input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': "))
 useAdjoint = approach == 'goalBased'
 
 # Define initial mesh and mesh statistics placeholders
@@ -124,6 +105,7 @@ nEle, nVer = msh.meshStats(mesh)
 mM = [nEle, nEle]           # Min/max #Elements
 Sn = nEle
 nVerT = nVer * op.vscale    # Target #Vertices
+nVerT0 = nVerT
 
 # Initialise counters
 t = 0.
@@ -262,6 +244,8 @@ if getError:
                     epsilon.dat.data[j] = max(epsilon.dat.data[j], epsilon_.dat.data[j])
 
         # Normalise error estimate
+        # if k != 0:
+        #     nVerT = 0.1 * nVerT0
         epsilon.dat.data[:] = np.abs(epsilon.dat.data) * nVerT / (np.abs(assemble(epsilon * dx)) or 1.)
         epsilon.rename("Error indicator")
 
@@ -270,17 +254,13 @@ if getError:
             saveErr.store(epsilon)
             saveErr.close()
         if op.plotpvd:
-            errorFile.write(epsilon, time=t)
+            errorFile.write(epsilon, time=float(k))
     errorTimer = clock() - errorTimer
     print('Errors estimated. Run time: %.3fs' % errorTimer)
 
 if approach in ('simpleAdapt', 'goalBased'):
-
-    # TODO: always gradate to coast
-    if useAdjoint:
-        if op.gradate:
-            h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
-
+    if useAdjoint & op.gradate:
+        h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
     print('\nStarting adaptive mesh primal run (forwards in time)')
     adaptTimer = clock()
     while t <= T:
@@ -303,6 +283,7 @@ if approach in ('simpleAdapt', 'goalBased'):
                 M_ = adap.isotropicMetric(W, inte.interp(mesh, h)[0], bdy=True, op=op)  # Initial boundary metric
                 M = adap.metricIntersection(mesh, W, M, M_, bdy=True)
                 adap.metricGradation(mesh, M)
+                # TODO: always gradate to coast
             if op.advect:
                 M = adap.advectMetric(M, u, 2*Dt, n=3*rm)
                 # TODO: isotropic advection?
@@ -346,12 +327,7 @@ if approach in ('simpleAdapt', 'goalBased'):
 
 # Print to screen timing analyses
 if getData and useAdjoint:
-    print("""TIMINGS:
-            Forward run   %5.3fs,
-            Adjoint run   %5.3fs, 
-            Error run     %5.3fs,
-            Adaptive run   %5.3fs\n""" %
-          (primalTimer, dualTimer, errorTimer, adaptTimer))
+    msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer)
 
 # Save and plot timeseries
 name = input("Enter a name for these time series (e.g. 'goalBased8-12-17'): ") or 'test'
