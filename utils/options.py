@@ -19,6 +19,7 @@ class Options:
                  iso=False,
                  advect=False,
                  gradate=False,
+                 window=False,
                  hessMeth='dL2',
                  beta=1.4,
                  gamma=1.,
@@ -43,6 +44,7 @@ class Options:
         :param iso: Toggle isotropic / anisotropic algorithm.
         :param advect: Toggle metric advection.
         :param gradate: Toggle metric gradation.
+        :param window: generate error estimators over a time window of relevance.
         :param hessMeth: Method of Hessian reconstruction: 'dL2' or 'parts'.
         :param beta: metric gradation scaling parameter.
         :param gamma: metric rescaling parameter.
@@ -102,7 +104,8 @@ class Options:
         self.iso = iso
         self.advect = advect
         self.gradate = gradate
-        assert(type(advect) == type(gradate) == type(iso) == bool)
+        self.window = window
+        assert(type(advect) == type(gradate) == type(window) == type(iso) == bool)
         self.hessMeth = hessMeth
         try:
             assert hessMeth in ('dL2', 'parts')

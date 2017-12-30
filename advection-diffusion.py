@@ -6,6 +6,7 @@ from time import clock
 
 import utils.adaptivity as adap
 import utils.bootstrapping as boot
+import utils.error as err
 import utils.forms as form
 import utils.interpolation as inte
 import utils.mesh as msh
@@ -75,6 +76,7 @@ op = opt.Options(dt=0.04,
                  rm=5,
                  gradate=False,
                  advect=False,
+                 window=True,
                  vscale=0.4 if useAdjoint else 0.85)
 dt = op.dt
 Dt = Constant(dt)
@@ -121,7 +123,8 @@ if getData:
                 if not cnt % rm:
                     phi_next_N, phi_N, w_N = inte.interp(mesh_N, phi_next, phi, w)
                     rho.interpolate(form.strongResidualAD(phi_next_N, phi_N, w_N, Dt, nu=nu))
-                    with DumbCheckpoint(dirName + 'hdf5/residual_AD' + msc.indexString(cnt), mode=FILE_CREATE) as saveRes:
+                    with DumbCheckpoint(dirName + 'hdf5/residual_AD' + msc.indexString(cnt), mode=FILE_CREATE) \
+                            as saveRes:
                         saveRes.store(rho)
                         saveRes.close()
                     # residualFile.write(rho, time=t)
@@ -192,7 +195,6 @@ if getData:
 if getError:
     errorTimer = clock()
     for k in range(0, iEnd, rm):
-
         print('Generating error estimate %d / %d' % (k / rm + 1, iEnd / rm))
         indexStr = msc.indexString(k)
 
@@ -205,22 +207,21 @@ if getError:
             loadAdj.close()
 
         # Estimate error using dual weighted residual
-        epsilon = assemble(v * rho * dual_N * dx)  # Currently a P0 field
+        epsilon = err.DWR(rho, dual_N, v)  # Currently a P0 field
+        # TODO: include functionality for other error estimators
 
         # Loop over relevant time window
-        for i in range(0, cnt, rm):
-            with DumbCheckpoint(dirName + 'hdf5/adjoint_AD' + msc.indexString(i), mode=FILE_READ) as loadAdj:
-                loadAdj.load(dual_N)
-                loadAdj.close()
-            epsilon_ = assemble(v * rho * dual_N * dx)
-            for j in range(len(epsilon.dat.data)):
-                epsilon.dat.data[j] = max(epsilon.dat.data[j], epsilon_.dat.data[j])
+        if op.window:
+            for i in range(0, cnt, rm):
+                with DumbCheckpoint(dirName + 'hdf5/adjoint_AD' + msc.indexString(i), mode=FILE_READ) as loadAdj:
+                    loadAdj.load(dual_N)
+                    loadAdj.close()
+                epsilon_ = err.DWR(rho, dual_N, v)
+                for j in range(len(epsilon.dat.data)):
+                    epsilon.dat.data[j] = max(epsilon.dat.data[j], epsilon_.dat.data[j])
 
         # Normalise error estimate
-        epsNorm = np.abs(assemble(epsilon * dx))
-        if epsNorm == 0.:
-            epsNorm = 1.
-        epsilon.dat.data[:] = np.abs(epsilon.dat.data) / epsNorm
+        epsilon.dat.data[:] = np.abs(epsilon.dat.data) * nVerT / (np.abs(assemble(epsilon * dx)) or 1.)
         epsilon.rename("Error indicator")
 
         # Store error estimates
@@ -246,7 +247,6 @@ if approach in ('simpleAdapt', 'goalBased'):
                     loadError.load(epsilon)
                     loadError.close()
                 errEst = Function(FunctionSpace(mesh_n, "CG", 1)).interpolate(inte.interp(mesh_n, epsilon)[0])
-                errEst.dat.data[:] *= nVerT
                 M = adap.isotropicMetric(W, errEst, op=op, invert=False)
             else:
                 H = adap.constructHessian(mesh_n, W, phi, op=op)

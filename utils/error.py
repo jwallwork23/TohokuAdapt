@@ -62,6 +62,22 @@ def basicErrorEstimator(u, lu, eta, le):
     return rho
 
 
+def DWR(residual, adjoint, v):
+    """
+    :param residual: approximation of residual for primal equations. 
+    :param adjoint: approximate solution of adjoint equations.
+    :param v: P0 test function over the same function space.
+    :return: dual weighted residual.
+    """
+    m = len(residual.function_space().dof_count)
+    n = len(adjoint.function_space().dof_count)
+    assert(m == n)
+    if n == 1:
+        return assemble(v * inner(residual, adjoint) * dx)
+    else:
+        return assemble(v * sum([inner(residual.split()[k], adjoint.split()[k]) for k in range(n)]) * dx)
+
+
 def totalVariation(data):
     """
     :param data: (one-dimensional) timeseries record.
