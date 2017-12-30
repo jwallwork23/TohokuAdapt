@@ -31,7 +31,7 @@ adaptiveFile = File(dirName + "goalBasedAD.pvd") if useAdjoint else File(dirName
 # Establish initial mesh resolution
 bootTimer = clock()
 print('\nBootstrapping to establish optimal mesh resolution')
-n = boot.bootstrap(True, tol=2.5e-3)[0]
+n = boot.bootstrap(True, tol=0.05)[0]
 bootTimer = clock() - bootTimer
 print('Bootstrapping run time: %.3fs' % bootTimer)
 
