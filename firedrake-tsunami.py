@@ -34,7 +34,7 @@ else:
 useAdjoint = approach == 'goalBased'
 
 # Define initial mesh and mesh statistics placeholders
-op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
+op = opt.Options(vscale=0.1 if useAdjoint else 0.85,
                  rm=60 if useAdjoint else 30,
                  gradate=True if useAdjoint else False,
                  # gradate=False,
@@ -115,7 +115,7 @@ hmin = op.hmin
 hmax = op.hmax
 rm = op.rm
 iStart = int(op.Tstart / dt)
-iEnd = np.ceil(T / dt)
+iEnd = int(np.ceil(T / dt))
 nEle, nVer = msh.meshStats(mesh)
 mM = [nEle, nEle]           # Min/max #Elements
 Sn = nEle
@@ -248,7 +248,7 @@ if getError:
         epsilon = assemble(v * (inner(rho_u, dual_N_u) + rho_e * dual_N_e) * dx)      # Currently a P0 field
 
         # Loop over relevant time window
-        for i in range(iStart, cnt, rm):
+        for i in range(max(iStart, cnt), min(iEnd, cnt), rm):
             with DumbCheckpoint(dirName + 'hdf5/adjoint_' + msc.indexString(i), mode=FILE_READ) as loadAdj:
                 loadAdj.load(dual_N_u)
                 loadAdj.load(dual_N_e)
