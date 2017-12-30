@@ -242,6 +242,8 @@ def weakResidualAD(c, c_, ct, u, Dt, nu=1e-3, timestepper='CrankNicolson'):
     cm = timestepScheme(c, c_, timestepper)
     return ((c - c_) * ct / Dt - inner(cm * u, grad(ct)) + Constant(nu) * inner(grad(cm), grad(ct))) * dx
 
+# TODO: appear to be applying too many BCs here. How about just no-normal flow with
+# TODO: F = ((c - c_) * ct / Dt + inner(grad(cm), w * ct) + Constant(nu) * inner(grad(cm), grad(ct))) * dx
 
 def weakMetricAdvection(M, M_, Mt, w, Dt, timestepper='ImplicitEuler'):
     """

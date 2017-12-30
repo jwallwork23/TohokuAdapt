@@ -35,23 +35,6 @@ n = boot.bootstrap(True, tol=0.05)[0]
 bootTimer = clock() - bootTimer
 print('Bootstrapping run time: %.3fs' % bootTimer)
 
-# Define initial Meshes and FunctionSpaces
-N = 2 * n
-mesh_n = RectangleMesh(4 * n, n, 4, 1)  # Computational mesh
-mesh_N = RectangleMesh(4 * N, N, 4, 1)  # Finer mesh (N > n) upon which to approximate error
-x, y = SpatialCoordinate(mesh_n)
-V_n = FunctionSpace(mesh_n, "CG", 2)
-V_N = FunctionSpace(mesh_N, "CG", 2)
-
-# Define Functions relating to goalBased approach
-if useAdjoint:
-    dual_n = Function(V_n, name='Adjoint')
-    dual_N = Function(V_N, name='Fine mesh adjoint')
-    rho = Function(V_N, name='Residual')
-    P0_N = FunctionSpace(mesh_N, "DG", 0)
-    v = TestFunction(P0_N)
-    epsilon = Function(P0_N, name="Error indicator")
-
 # Specify physical and solver parameters
 op = opt.Options(dt=0.04,
                  Tend=2.4,
@@ -65,8 +48,25 @@ op = opt.Options(dt=0.04,
 dt = op.dt
 Dt = Constant(dt)
 T = op.Tend
-w = Function(VectorFunctionSpace(mesh_n, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
 nu = 1e-3 if diffusion else 0.
+
+# Define initial Meshes and FunctionSpaces
+N = 2 * n
+mesh_n = RectangleMesh(4 * n, n, 4, 1)  # Computational mesh
+mesh_N = RectangleMesh(4 * N, N, 4, 1)  # Finer mesh (N > n) upon which to approximate error
+x, y = SpatialCoordinate(mesh_n)
+V_n = FunctionSpace(mesh_n, "CG", 2)
+V_N = FunctionSpace(mesh_N, "CG", 2)
+w = Function(VectorFunctionSpace(mesh_n, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
+
+# Define Functions relating to goalBased approach
+if useAdjoint:
+    dual_n = Function(V_n, name='Adjoint')
+    dual_N = Function(V_N, name='Fine mesh adjoint')
+    rho = Function(V_N, name='Residual')
+    P0_N = FunctionSpace(mesh_N, "DG", 0)
+    v = TestFunction(P0_N)
+    epsilon = Function(P0_N, name="Error indicator")
 
 # Apply initial condition and define Functions
 ic = project(exp(- (pow(x - 0.5, 2) + pow(y - 0.5, 2)) / 0.04), V_n)
@@ -143,8 +143,8 @@ if getData:
         dualTimer = clock()
         for (variable, solution) in compute_adjoint(J):
             if save:
-                # Load adjoint data. NOTE the interpolation operator is overloaded
-                dual_n.dat.data[:] = variable.dat.data
+                # Load adjoint data
+                dual_n.interpolate(variable, annotate=False)
                 dual_N = inte.interp(mesh_N, dual_n)[0]
                 dual_N.rename('Fine mesh adjoint')
 
@@ -233,8 +233,6 @@ if approach in ('simpleAdapt', 'goalBased'):
             else:
                 H = adap.constructHessian(mesh_n, W, phi, op=op)
                 M = adap.computeSteadyMetric(mesh_n, W, H, phi, nVerT=nVerT, op=op)
-
-            # Adapt mesh and interpolate variables
             if op.gradate:
                 adap.metricGradation(mesh_n, M)
             if op.advect:
@@ -242,11 +240,13 @@ if approach in ('simpleAdapt', 'goalBased'):
                     M = adap.isotropicAdvection(M, errEst, w, 2*Dt, n=3*rm)
                 else:
                     M = adap.advectMetric(M, w, 2*Dt, n=3*rm)
+
+            # Adapt mesh and interpolate variables
             mesh_n = AnisotropicAdaptation(mesh_n, M).adapted_mesh
             phi = inte.interp(mesh_n, phi)[0]
             phi.rename("Concentration")
             V_n = FunctionSpace(mesh_n, "CG", 2)
-            phi_next = Function(V_n, name="Concentration next")
+            phi_next = Function(V_n)
 
             # Re-establish bilinear form and set boundary conditions
             psi = TestFunction(V_n)

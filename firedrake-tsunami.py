@@ -176,9 +176,8 @@ if getData:
         dualTimer = clock()
         for (variable, solution) in compute_adjoint(J):
             if save:
-                # Load adjoint data. NOTE the interpolation operator is overloaded
-                dual_u.dat.data[:] = variable.dat.data[0]
-                dual_e.dat.data[:] = variable.dat.data[1]
+                # Load adjoint data
+                dual.assign(variable, annotate=False)
                 dual_N = inte.mixedPairInterp(mesh_N, V_N, dual)[0]
                 dual_N_u, dual_N_e = dual_N.split()
                 dual_N_u.rename('Adjoint velocity')
