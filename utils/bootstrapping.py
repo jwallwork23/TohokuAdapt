@@ -228,7 +228,7 @@ def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10.):
             toPrint = 'coarseness = %2d, ' % (5-i)
         else:
             toPrint = 'n = %3d, ' % n
-        toPrint += "nEle = %6d, J = %6.4e, run time : %5.3f, " % (nEle, Js[-1], t)
+        toPrint += "nEle = %6d, J = %6.4e, run time : %6.3f, " % (nEle, Js[-1], t)
         if i > 0:
             slowdown = ts[-1] / ts[-2]
             toPrint += "slowdown : %5.3f, " % slowdown
@@ -250,4 +250,4 @@ def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10.):
             break
 
     print("Converged to J = %6.4e in %d iterations, due to %s" % (Js[-1], iOpt, reason))
-    return pow(2, iOpt), Js, nEls
+    return pow(2, iOpt), Js, nEls, ts
