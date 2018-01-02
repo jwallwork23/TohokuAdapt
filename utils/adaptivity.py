@@ -452,6 +452,32 @@ def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEul
     return M_
 
 
+def adaptTimestepSW(mesh, b, sigma=0.9, g=9.81):
+    """
+    :param mesh: Current (recently adapted) mesh.
+    :param b: bathymetry profile.
+    :param sigma: scaling parameter in range (0,1).
+    :param g: gravitational acceleration.
+    :return: near-optimal numerically stable timestep.
+    """
+    h = Function(FunctionSpace(mesh, 'DG', 0)).interpolate(CellSize(mesh))
+    if isinstance(b, float):
+        return sigma * min(h.dat.data) / np.sqrt(g * b)
+    else:
+        return sigma * min(h.dat.data) / np.sqrt(g * max(b.dat.data))
+
+
+def adaptTimestepAD(w, sigma=0.9):
+    """
+    :param w: wind-field used in advection-diffusion eqn.
+    :param sigma: scaling parameter in range (0,1).
+    :return: near-optimal numerically stable timestep.
+    """
+    mesh = w.function_space().mesh()
+    h = Function(FunctionSpace(mesh, 'DG', 0)).interpolate(CellSize(mesh))
+    return sigma * min(h.dat.data) / max(w.dat.data)
+
+
 if __name__ == '__main__':
 
     mesh = RectangleMesh(64, 16, 4, 1)
