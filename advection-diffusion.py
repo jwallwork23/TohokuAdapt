@@ -42,7 +42,7 @@ mesh_n = RectangleMesh(4 * n, n, 4, 1)  # Computational mesh
 mesh_N = RectangleMesh(4 * N, N, 4, 1)  # Finer mesh (N > n) upon which to approximate error
 x, y = SpatialCoordinate(mesh_n)
 
-# Specify physical and solver parameters
+# Define FunctionSpaces and specify physical and solver parameters
 op = opt.Options(dt=0.04,
                  Tend=2.4,
                  hmin=5e-2,
@@ -52,17 +52,14 @@ op = opt.Options(dt=0.04,
                  advect=False,
                  window=True,
                  vscale=0.4 if useAdjoint else 0.85)
-h = Function(FunctionSpace(mesh_n, "CG", 1)).interpolate(CellSize(mesh_n))
-dt = 0.9 * min(h.dat.data)
+V_n = FunctionSpace(mesh_n, "CG", 2)
+V_N = FunctionSpace(mesh_N, "CG", 2)
+w = Function(VectorFunctionSpace(mesh_n, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
+dt = adap.adaptTimestepAD(w)
 print('     #### Using initial timestep = %4.3fs\n' % dt)
 Dt = Constant(dt)
 T = op.Tend
 nu = 1e-3 if diffusion else 0.
-
-# Define FunctionSpaces
-V_n = FunctionSpace(mesh_n, "CG", 2)
-V_N = FunctionSpace(mesh_N, "CG", 2)
-w = Function(VectorFunctionSpace(mesh_n, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
 
 # Define Functions relating to goalBased approach
 if useAdjoint:
@@ -266,8 +263,7 @@ if approach in ('simpleAdapt', 'goalBased'):
             op.printToScreen(cnt / rm + 1, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, mM, t)
 
         if tAdapt:
-            h = Function(FunctionSpace(mesh_n, "CG", 1)).interpolate(CellSize(mesh_n))
-            dt = 0.9 * min(h.dat.data)
+            dt = adap.adaptTimestepAD(w)
             Dt.assign(dt)
             print('     #### New timestep = %4.3fs' % dt)
 

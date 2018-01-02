@@ -54,8 +54,7 @@ if useAdjoint:
     V_N = VectorFunctionSpace(mesh_N, op.space1, op.degree1) * FunctionSpace(mesh_N, op.space2, op.degree2)
 
 # Specify physical and solver parameters
-h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
-dt = 0.9 * min(h.dat.data) / np.sqrt(op.g * max(b.dat.data))
+dt = adap.adaptTimestepSW(mesh, b)
 print('     #### Using initial timestep = %4.3fs\n' % dt)
 Dt = Constant(dt)
 T = op.Tend
@@ -312,8 +311,7 @@ if approach in ('simpleAdapt', 'goalBased'):
             op.printToScreen(cnt/rm+1, clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, t)
 
         if tAdapt & (cnt % rm == 1):
-            h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
-            dt = 0.9 * min(h.dat.data) / np.sqrt(op.g * 0.1)
+            dt = adap.adaptTimestepSW(mesh, b)
             Dt.assign(dt)
             print('     #### New timestep = %4.3fs' % dt)
 

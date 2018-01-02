@@ -43,7 +43,7 @@ x, y = SpatialCoordinate(mesh)
 mesh_N = SquareMesh(N, N, lx, lx)   # Finer mesh (N > n) upon which to approximate error
 x, y = SpatialCoordinate(mesh)
 
-# Specify physical and solver parameters
+# Define FunctionSpaces and specify physical and solver parameters
 op = opt.Options(dt=0.05,
                  Tstart=0.5,
                  Tend=2.5,
@@ -55,17 +55,15 @@ op = opt.Options(dt=0.05,
                  advect=False,
                  window=True,
                  vscale=0.4 if useAdjoint else 0.85)
+V_n = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
+V_N = VectorFunctionSpace(mesh_N, op.space1, op.degree1) * FunctionSpace(mesh_N, op.space2, op.degree2)
 b = Constant(0.1)
 h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
-dt = 0.9 * min(h.dat.data) / np.sqrt(op.g * max(b.dat.data))
+dt = adap.adaptTimestepSW(mesh, b)
 print('     #### Using initial timestep = %4.3fs\n' % dt)
 Dt = Constant(dt)
 T = op.Tend
 Ts = op.Tstart
-
-# Define FunctionSpaces
-V_n = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
-V_N = VectorFunctionSpace(mesh_N, op.space1, op.degree1) * FunctionSpace(mesh_N, op.space2, op.degree2)
 
 # Define Functions relating to goalBased approach
 if useAdjoint:
@@ -291,8 +289,7 @@ if approach in ('simpleAdapt', 'goalBased'):
             op.printToScreen(cnt/rm+1, clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, t)
 
         if tAdapt & (cnt % rm == 1):
-            h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
-            dt = 0.9 * min(h.dat.data) / np.sqrt(op.g * 0.1)
+            dt = adap.adaptTimestepSW(mesh, b)
             Dt.assign(dt)
             print('     #### New timestep = %4.3fs' % dt)
 
