@@ -32,7 +32,7 @@ adaptiveFile = File(dirName + "goalBasedAD.pvd") if useAdjoint else File(dirName
 # Establish initial mesh resolution
 bootTimer = clock()
 print('\nBootstrapping to establish optimal mesh resolution')
-n = boot.bootstrap(True, tol=0.05)[0]
+n = boot.bootstrap('advection-diffusion', tol=0.01)[0]
 bootTimer = clock() - bootTimer
 print('Bootstrapping run time: %.3fs' % bootTimer)
 
@@ -54,6 +54,7 @@ op = opt.Options(dt=0.04,
                  vscale=0.4 if useAdjoint else 0.85)
 h = Function(FunctionSpace(mesh_n, "CG", 1)).interpolate(CellSize(mesh_n))
 dt = 0.9 * min(h.dat.data)
+print('     #### Using initial timestep = %4.3fs\n' % dt)
 Dt = Constant(dt)
 T = op.Tend
 nu = 1e-3 if diffusion else 0.
@@ -225,10 +226,6 @@ if approach in ('simpleAdapt', 'goalBased'):
         if (cnt % rm == 0) & (np.abs(t-T) > 0.5 * dt):
             stepTimer = clock()
 
-            if tAdapt:
-                h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
-                dt = 0.9 * min(h.dat.data)
-
             # Construct metric
             W = TensorFunctionSpace(mesh_n, "CG", 1)
             if useAdjoint:
@@ -266,7 +263,13 @@ if approach in ('simpleAdapt', 'goalBased'):
             nEle = msh.meshStats(mesh_n)[0]
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
-            op.printToScreen(cnt / rm + 1, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, mM)
+            op.printToScreen(cnt / rm + 1, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, mM, t)
+
+        if tAdapt:
+            h = Function(FunctionSpace(mesh_n, "CG", 1)).interpolate(CellSize(mesh_n))
+            dt = 0.9 * min(h.dat.data)
+            Dt.assign(dt)
+            print('     #### New timestep = %4.3fs' % dt)
 
         # Solve problem at current timestep
         solve(F == 0, phi_next, bc)

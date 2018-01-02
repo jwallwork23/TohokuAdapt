@@ -214,7 +214,7 @@ class Options:
 
         # TODO: make more general
 
-    def printToScreen(self, mn, outerTime, innerTime, nEle, Sn, N):
+    def printToScreen(self, mn, outerTime, innerTime, nEle, Sn, N, t):
         """
         :param mn: mesh number.
         :param outerTime: time taken so far.
@@ -222,8 +222,9 @@ class Options:
         :param nEle: current number of elements.
         :param Sn: sum over #Elements.
         :param N: tuple of min and max #Elements.
+        :param t: current simuation time.
         """
         print("""\n************************** Adaption step %d ****************************
 Percent complete  : %4.1f%%    Elapsed time : %4.2fs (This step : %4.2fs)     
-#Elements... Current : %d  Mean : %d  Minimum : %s  Maximum : %s\n""" %
-              (mn, (100 * mn * self.rm * self.dt) / self.Tend, outerTime, innerTime, nEle, Sn / (mn+1), N[0], N[1]))
+#Elements... Current : %d  Mean : %d  Minimum : %s  Maximum : %s""" %
+              (mn, 100 * t / self.Tend, outerTime, innerTime, nEle, Sn / (mn+1), N[0], N[1]))

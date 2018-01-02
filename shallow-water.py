@@ -31,7 +31,7 @@ adaptiveFile = File(dirName + "goalBasedSW.pvd") if useAdjoint else File(dirName
 # Establish initial mesh resolution
 bootTimer = clock()
 print('\nBootstrapping to establish optimal mesh resolution')
-n = boot.bootstrap(False, tol=0.05)[0]
+n = boot.bootstrap('shallow-water', tol=0.01)[0]
 bootTimer = clock() - bootTimer
 print('Bootstrapping run time: %.3fs' % bootTimer)
 
@@ -58,6 +58,7 @@ op = opt.Options(dt=0.05,
 b = Constant(0.1)
 h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
 dt = 0.9 * min(h.dat.data) / np.sqrt(op.g * max(b.dat.data))
+print('     #### Using initial timestep = %4.3fs\n' % dt)
 Dt = Constant(dt)
 T = op.Tend
 Ts = op.Tstart
@@ -251,10 +252,6 @@ if approach in ('simpleAdapt', 'goalBased'):
         if (cnt % rm == 0) & (np.abs(t-T) > 0.5 * dt):
             stepTimer = clock()
 
-            if tAdapt:
-                h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
-                dt = 0.9 * min(h.dat.data) / np.sqrt(op.g * max(b.dat.data))
-
             # Construct metric
             W = TensorFunctionSpace(mesh, "CG", 1)
             if useAdjoint:
@@ -291,7 +288,13 @@ if approach in ('simpleAdapt', 'goalBased'):
             nEle = msh.meshStats(mesh)[0]
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
-            op.printToScreen(cnt/rm+1, clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM)
+            op.printToScreen(cnt/rm+1, clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, t)
+
+        if tAdapt & (cnt % rm == 1):
+            h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
+            dt = 0.9 * min(h.dat.data) / np.sqrt(op.g * 0.1)
+            Dt.assign(dt)
+            print('     #### New timestep = %4.3fs' % dt)
 
         # Solve problem at current timestep
         adaptSolver.solve()
