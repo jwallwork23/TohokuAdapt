@@ -46,7 +46,6 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options(), output=False, name='
 
         # Load mesh from file and set up Function to load into
         if ((not i % op.rm) & adaptive) | (i == 0):
-            # mesh = loadMesh(dirName + 'hdf5/mesh_' + indexStr)    # TODO: save meshes to avoid this
             mesh = Mesh('resources/meshes/TohokuCoarse.msh')
             elev_2d = Function(FunctionSpace(mesh, op.space2, op.degree2))
 

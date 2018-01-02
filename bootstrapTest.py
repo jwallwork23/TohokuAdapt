@@ -34,6 +34,9 @@ else:
     raise ValueError("Problem not recognised.")
 plt.xlabel(r'\#Elements')
 plt.ylabel(ylab)
-plt.semilogx(nEls, Js, basex=10, marker='o')
+if problem in ('firedrake-tsunami', 'thetis-tsunami'):
+    plt.loglog(nEls, Js, basex=10, basey=10, marker='o')
+else:
+    plt.semilogx(nEls, Js, basex=10, marker='o')
 plt.savefig("outdata/bootstrapping/" + problem + ".pdf", bbox_inches='tight')
 plt.show()

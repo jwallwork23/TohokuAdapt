@@ -9,7 +9,7 @@ import utils.mesh as msh
 import utils.options as opt
 
 
-def solverAD(n, op = opt.Options(dt=0.04, Tend=2.4)):
+def solverAD(n, op = opt.Options(Tend=2.4)):
 
     # Define Mesh and FunctionSpace
     mesh = RectangleMesh(4 * n, n, 4, 1)  # Computational mesh
@@ -18,8 +18,10 @@ def solverAD(n, op = opt.Options(dt=0.04, Tend=2.4)):
     V = FunctionSpace(mesh, "CG", 2)
 
     # Specify physical and solver parameters
-    Dt = Constant(op.dt)
     w = Function(VectorFunctionSpace(mesh, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
+    h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
+    dt = min(0.8 * min(h.dat.data), op.Tend / 2)
+    Dt = Constant(op.dt)
 
     # Apply initial condition and define Functions
     ic = project(exp(- (pow(x - 0.5, 2) + pow(y - 0.5, 2)) / 0.04), V)
@@ -51,7 +53,7 @@ def solverAD(n, op = opt.Options(dt=0.04, Tend=2.4)):
     return J_trap * op.dt, nEle
 
 
-def solverSW(n, op=opt.Options(dt=0.05, Tstart=0.5, Tend=2.5, family='dg-cg',)):
+def solverSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg',)):
 
     # Define Mesh and FunctionSpace
     lx = 2 * np.pi
@@ -61,8 +63,10 @@ def solverSW(n, op=opt.Options(dt=0.05, Tstart=0.5, Tend=2.5, family='dg-cg',)):
     V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
 
     # Specify solver parameters
-    Dt = Constant(op.dt)
     b = Constant(0.1)
+    h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
+    dt = min(0.8 * min(h.dat.data) / np.sqrt(op.g * 0.1), op.Tend/2)
+    Dt = Constant(dt)
 
     # Apply initial condition and define Functions
     ic = project(exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))), V.sub(1))
@@ -97,9 +101,9 @@ def solverSW(n, op=opt.Options(dt=0.05, Tstart=0.5, Tend=2.5, family='dg-cg',)):
             J_trap += 2 * step
         if t >= op.Tend:
             J_trap += step
-        t += op.dt
+        t += dt
 
-    return J_trap * op.dt, nEle
+    return J_trap * dt, nEle
 
 
 # TODO: Rossby Wave test problem
@@ -108,12 +112,15 @@ def solverSW(n, op=opt.Options(dt=0.05, Tstart=0.5, Tend=2.5, family='dg-cg',)):
 def solverFiredrake(coarseness, op=opt.Options()):
 
     # Define Mesh and FunctionSpace
-    mesh, eta0, b = msh.TohokuDomain(op.coarseness)
+    mesh, eta0, b = msh.TohokuDomain(coarseness)
     nEle = msh.meshStats(mesh)[0]
     V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
 
     # Specify solver parameters
-    Dt = Constant(op.dt)
+    h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
+    dt = min(0.8 * min(h.dat.data) / np.sqrt(op.g * max(b.dat.data)), op.Tend / 2)
+    Dt = Constant(dt)
+    print("     Using dt = ", dt)
 
     # Apply initial condition and define Functions
     q_ = Function(V)
@@ -147,9 +154,9 @@ def solverFiredrake(coarseness, op=opt.Options()):
             J_trap += 2 * step
         if t >= op.Tend:
             J_trap += step
-        t += op.dt
+        t += dt
 
-    return J_trap * op.dt, nEle
+    return J_trap * dt, nEle
 
 
 def solverThetis(coarseness, op=opt.Options()):
@@ -194,7 +201,7 @@ def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10.):
     Js = []         # Container for objective functional values
     ts = []         # Timing values
     nEls = []       # Container for element counts
-    diff = 1        # Initialise 'difference of differences'
+    diff = 1e20     # Initialise 'difference of differences'
     slowdown = 0
     reason = 'maximum number of iterations being reached.'
     for i in range(maxIter):
@@ -221,7 +228,7 @@ def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10.):
             toPrint = 'coarseness = %2d, ' % (5-i)
         else:
             toPrint = 'n = %3d, ' % n
-        toPrint += "nEle = %6d, J = %6.4f, run time : %5.3f, " % (nEle, Js[-1], t)
+        toPrint += "nEle = %6d, J = %6.4e, run time : %5.3f, " % (nEle, Js[-1], t)
         if i > 0:
             slowdown = ts[-1] / ts[-2]
             toPrint += "slowdown : %5.3f, " % slowdown
@@ -243,5 +250,5 @@ def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10.):
             reason = 'maximum mesh resolution reached.'
             break
 
-    print("Converged to J = %.4f in %d iterations, due to %s" % (Js[-1], iOpt, reason))
+    print("Converged to J = %6.4e in %d iterations, due to %s" % (Js[-1], iOpt, reason))
     return pow(2, iOpt), Js, nEls
