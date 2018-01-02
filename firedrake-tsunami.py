@@ -17,6 +17,7 @@ import utils.timeseries as tim
 print('*********************** TOHOKU TSUNAMI SIMULATION *********************\n')
 approach, getData, getError = msc.cheatCodes(input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': "))
 useAdjoint = approach == 'goalBased'
+tAdapt = True
 
 # Define initial mesh and mesh statistics placeholders
 op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
@@ -53,7 +54,8 @@ if useAdjoint:
     V_N = VectorFunctionSpace(mesh_N, op.space1, op.degree1) * FunctionSpace(mesh_N, op.space2, op.degree2)
 
 # Specify physical and solver parameters
-dt = op.dt
+h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
+dt = 0.9 * min(h.dat.data) / np.sqrt(op.g * max(b.dat.data))
 Dt = Constant(dt)
 T = op.Tend
 Ts = op.Tstart
@@ -259,12 +261,16 @@ if getError:
 
 if approach in ('simpleAdapt', 'goalBased'):
     if useAdjoint & op.gradate:
-        h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
+        h0 = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
     print('\nStarting adaptive mesh primal run (forwards in time)')
     adaptTimer = clock()
     while t <= T:
         if (cnt % rm == 0) & (np.abs(t-T) > 0.5 * dt):
             stepTimer = clock()
+
+            if tAdapt:
+                h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
+                dt = 0.9 * min(h.dat.data) / np.sqrt(op.g * max(b.dat.data))
 
             # Construct metric
             W = TensorFunctionSpace(mesh, "CG", 1)
@@ -279,7 +285,7 @@ if approach in ('simpleAdapt', 'goalBased'):
                 H = adap.constructHessian(mesh, W, eta, op=op)
                 M = adap.computeSteadyMetric(mesh, W, H, eta, nVerT=nVerT, op=op)
             if op.gradate:
-                M_ = adap.isotropicMetric(W, inte.interp(mesh, h)[0], bdy=True, op=op)  # Initial boundary metric
+                M_ = adap.isotropicMetric(W, inte.interp(mesh, h0)[0], bdy=True, op=op) # Initial boundary metric
                 M = adap.metricIntersection(mesh, W, M, M_, bdy=True)
                 adap.metricGradation(mesh, M)
                 # TODO: always gradate to coast

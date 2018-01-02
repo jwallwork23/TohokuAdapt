@@ -19,6 +19,7 @@ print('Mesh adaptive solver initially defined on a rectangular mesh')
 approach, getData, getError = msc.cheatCodes(input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': "))
 useAdjoint = approach == 'goalBased'
 diffusion = True
+tAdapt = True
 
 # Establish filenames
 dirName = "plots/testSuite/"
@@ -35,6 +36,12 @@ n = boot.bootstrap(True, tol=0.05)[0]
 bootTimer = clock() - bootTimer
 print('Bootstrapping run time: %.3fs' % bootTimer)
 
+# Define initial Meshes
+N = 2 * n
+mesh_n = RectangleMesh(4 * n, n, 4, 1)  # Computational mesh
+mesh_N = RectangleMesh(4 * N, N, 4, 1)  # Finer mesh (N > n) upon which to approximate error
+x, y = SpatialCoordinate(mesh_n)
+
 # Specify physical and solver parameters
 op = opt.Options(dt=0.04,
                  Tend=2.4,
@@ -45,16 +52,13 @@ op = opt.Options(dt=0.04,
                  advect=False,
                  window=True,
                  vscale=0.4 if useAdjoint else 0.85)
-dt = op.dt
+h = Function(FunctionSpace(mesh_n, "CG", 1)).interpolate(CellSize(mesh_n))
+dt = 0.9 * min(h.dat.data)
 Dt = Constant(dt)
 T = op.Tend
 nu = 1e-3 if diffusion else 0.
 
-# Define initial Meshes and FunctionSpaces
-N = 2 * n
-mesh_n = RectangleMesh(4 * n, n, 4, 1)  # Computational mesh
-mesh_N = RectangleMesh(4 * N, N, 4, 1)  # Finer mesh (N > n) upon which to approximate error
-x, y = SpatialCoordinate(mesh_n)
+# Define FunctionSpaces
 V_n = FunctionSpace(mesh_n, "CG", 2)
 V_N = FunctionSpace(mesh_N, "CG", 2)
 w = Function(VectorFunctionSpace(mesh_n, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
@@ -220,6 +224,10 @@ if approach in ('simpleAdapt', 'goalBased'):
     while t <= T:
         if (cnt % rm == 0) & (np.abs(t-T) > 0.5 * dt):
             stepTimer = clock()
+
+            if tAdapt:
+                h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
+                dt = 0.9 * min(h.dat.data)
 
             # Construct metric
             W = TensorFunctionSpace(mesh_n, "CG", 1)

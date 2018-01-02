@@ -9,7 +9,7 @@ import utils.mesh as msh
 import utils.options as opt
 
 
-def solverAD(n, op = opt.Options(Tend=2.4)):
+def solverAD(n, op=opt.Options(Tend=2.4)):
 
     # Define Mesh and FunctionSpace
     mesh = RectangleMesh(4 * n, n, 4, 1)  # Computational mesh
@@ -20,8 +20,8 @@ def solverAD(n, op = opt.Options(Tend=2.4)):
     # Specify physical and solver parameters
     w = Function(VectorFunctionSpace(mesh, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
     h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
-    dt = min(0.8 * min(h.dat.data), op.Tend / 2)
-    Dt = Constant(op.dt)
+    dt = min(0.9 * min(h.dat.data), op.Tend / 2)
+    Dt = Constant(dt)
 
     # Apply initial condition and define Functions
     ic = project(exp(- (pow(x - 0.5, 2) + pow(y - 0.5, 2)) / 0.04), V)
@@ -48,9 +48,9 @@ def solverAD(n, op = opt.Options(Tend=2.4)):
             J_trap += step
         else:
             J_trap += 2 * step
-        t += op.dt
+        t += dt
 
-    return J_trap * op.dt, nEle
+    return J_trap * dt, nEle
 
 
 def solverSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg',)):
@@ -65,7 +65,7 @@ def solverSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg',)):
     # Specify solver parameters
     b = Constant(0.1)
     h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
-    dt = min(0.8 * min(h.dat.data) / np.sqrt(op.g * 0.1), op.Tend/2)
+    dt = min(0.9 * min(h.dat.data) / np.sqrt(op.g * 0.1), op.Tend/2)
     Dt = Constant(dt)
 
     # Apply initial condition and define Functions
@@ -118,7 +118,7 @@ def solverFiredrake(coarseness, op=opt.Options()):
 
     # Specify solver parameters
     h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
-    dt = min(0.8 * min(h.dat.data) / np.sqrt(op.g * max(b.dat.data)), op.Tend / 2)
+    dt = min(0.9 * min(h.dat.data) / np.sqrt(op.g * max(b.dat.data)), op.Tend / 2)
     Dt = Constant(dt)
     print("     Using dt = ", dt)
 
@@ -232,9 +232,8 @@ def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10.):
         if i > 0:
             slowdown = ts[-1] / ts[-2]
             toPrint += "slowdown : %5.3f, " % slowdown
-        if i > 1:
-            diff = np.abs(np.abs(Js[-2] - Js[-3]) - np.abs(Js[-1] - Js[-2]))
-            toPrint += "diff : %6.4f" % diff
+            diff = np.abs(Js[-1] - Js[-2])
+            toPrint += "diff : %6.4e" % diff
         print(toPrint)
         iOpt = i+1  # Get current iteration number
 
@@ -243,7 +242,7 @@ def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10.):
             break
 
         if slowdown > slowTol:
-            reason = 'run time decreasing too much.'
+            reason = 'run time becoming too high.'
             break
 
         if (problem in ('firedrake-tsunami', 'thetis-tsunami')) & (i == 4):

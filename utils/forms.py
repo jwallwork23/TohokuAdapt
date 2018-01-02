@@ -171,6 +171,8 @@ def localProblemSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=F
     :return: residual of local problem.
     """
     V = q.function_space()
+    u, eta = q.split()
+    ut, et = qt.split()
 
     # Establish variational form for residual equation
     B_, L = formsSW(q, q_, qt, b, Dt, nu=nu, g=g, f0=f0, beta=beta, rotational=rotational, nonlinear=nonlinear,
@@ -179,14 +181,9 @@ def localProblemSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=F
     B = formsSW(phi, q_, qt, b, Dt, nu=nu, g=g, f0=f0, beta=beta, rotational=rotational, nonlinear=nonlinear,
                    allowNormalFlow=allowNormalFlow, timestepper=timestepper)[0]
     F = B + B_ - L
-
-    # Establish inter-element flux term
-    (u, eta) = (as_vector((q[0], q[1])), q[2])
-    gradu = grad(u)
-    grade = grad(eta)
     n = FacetNormal(V.mesh())
+    F += (inner(grad(u), n) * et) * dS   # Inter-element flux term
 
-    # TODO: subtract flow over boundary term
     # TODO: how to solve problem in a local sense?
 
     return F

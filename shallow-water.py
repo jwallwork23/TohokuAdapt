@@ -18,6 +18,7 @@ print('\n*********************** SHALLOW WATER TEST PROBLEM ********************
 print('Mesh adaptive solver initially defined on a square mesh')
 approach, getData, getError = msc.cheatCodes(input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': "))
 useAdjoint = approach == 'goalBased'
+tAdapt = True
 
 # Establish filenames
 dirName = "plots/testSuite/"
@@ -34,6 +35,14 @@ n = boot.bootstrap(False, tol=0.05)[0]
 bootTimer = clock() - bootTimer
 print('Bootstrapping run time: %.3fs' % bootTimer)
 
+# Define initial Meshes
+N = 2 * n
+lx = 2 * np.pi
+mesh = SquareMesh(n, n, lx, lx)     # Computational mesh
+x, y = SpatialCoordinate(mesh)
+mesh_N = SquareMesh(N, N, lx, lx)   # Finer mesh (N > n) upon which to approximate error
+x, y = SpatialCoordinate(mesh)
+
 # Specify physical and solver parameters
 op = opt.Options(dt=0.05,
                  Tstart=0.5,
@@ -46,20 +55,14 @@ op = opt.Options(dt=0.05,
                  advect=False,
                  window=True,
                  vscale=0.4 if useAdjoint else 0.85)
-dt = op.dt
+b = Constant(0.1)
+h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
+dt = 0.9 * min(h.dat.data) / np.sqrt(op.g * max(b.dat.data))
 Dt = Constant(dt)
 T = op.Tend
 Ts = op.Tstart
-b = Constant(0.1)
-op.checkCFL(b)
 
-# Define initial Meshes and FunctionSpaces
-N = 2 * n
-lx = 2 * np.pi
-mesh = SquareMesh(n, n, lx, lx)     # Computational mesh
-x, y = SpatialCoordinate(mesh)
-mesh_N = SquareMesh(N, N, lx, lx)   # Finer mesh (N > n) upon which to approximate error
-x, y = SpatialCoordinate(mesh)
+# Define FunctionSpaces
 V_n = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
 V_N = VectorFunctionSpace(mesh_N, op.space1, op.degree1) * FunctionSpace(mesh_N, op.space2, op.degree2)
 
@@ -247,6 +250,10 @@ if approach in ('simpleAdapt', 'goalBased'):
     while t <= T:
         if (cnt % rm == 0) & (np.abs(t-T) > 0.5 * dt):
             stepTimer = clock()
+
+            if tAdapt:
+                h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
+                dt = 0.9 * min(h.dat.data) / np.sqrt(op.g * max(b.dat.data))
 
             # Construct metric
             W = TensorFunctionSpace(mesh, "CG", 1)

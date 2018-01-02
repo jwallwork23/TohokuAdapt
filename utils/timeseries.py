@@ -71,7 +71,6 @@ def extractTimeseries(gauges, eta, current, v0, op=opt.Options()):
     :param op: Options object holding parameter values.
     :return: dictionary containing all timeseries data so far.
     """
-
     for gauge in gauges:
         if gauge not in current.keys():
             current[gauge] = []
