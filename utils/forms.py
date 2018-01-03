@@ -160,9 +160,9 @@ def interelementTerm(v, n=None):
         n = FacetNormal(v.function_space().mesh())
     v = as_ufl(v)
     if len(v.ufl_shape) == 0:
-        return 0.5 * (v('+') + v('-')) * n('+')
+        return 0.5 * (v('+') * n('+') - v('-') * n('-'))
     else:
-        return 0.5 * dot(v('+') + v('-'), n('+'))
+        return 0.5 * (dot(v('+'), n('+')) - dot(v('-'), n('-')))
 
 
 def localProblemSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, nonlinear=False,
