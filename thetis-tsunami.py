@@ -15,28 +15,21 @@ import utils.timeseries as tim
 
 
 print('*********************** TOHOKU TSUNAMI SIMULATION *********************\n')
-approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'goalBased'
-
-# Cheat code to resume from saved data in goalBased case
-if approach == 'saved':
-    approach = 'goalBased'
-    getData = False
-elif approach == 'simpleAdapt':
-    getData = False
-else:
-    getData = True
+approach, getData, getError = msc.cheatCodes(input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': "))
 useAdjoint = approach == 'goalBased'
+tAdapt = True
 
 # Define initial mesh and mesh statistics placeholders
 op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
                  rm=60 if useAdjoint else 30,
                  gradate=True if useAdjoint else False,
-                 # gradate=False,
                  advect=False,
                  outputHessian=False,
                  plotpvd=False,
-                 coarseness=4,
+                 coarseness=8,
                  gauges=True)
+nEle = (691750, 450386, 196560, 33784, 20724, 14228, 11020, 8782, 6176)[op.coarseness]
+# TODO: bootstrap to establish initial mesh resolution
 
 # Establish filenames
 dirName = 'plots/thetis-tsunami/'
@@ -48,15 +41,18 @@ if op.outputHessian:
     hessianFile = File(dirName + "hessian.pvd")
 
 # Generate mesh(es)
-mesh, eta0, b = msh.TohokuDomain(op.coarseness)
+mesh, eta0, b = msh.TohokuDomain(nEle)
 if useAdjoint:
-    assert op.coarseness != 1
+    try:
+        assert op.coarseness != 1
+    except:
+        raise NotImplementedError("Requested mesh resolution not yet available.")
     mesh_N, b_N = msh.TohokuDomain(op.coarseness-1)[0::2]   # Get finer mesh and associated bathymetry
     V_N = VectorFunctionSpace(mesh_N, op.space1, op.degree1) * FunctionSpace(mesh_N, op.space2, op.degree2)
 
 # Specify physical and solver parameters
-dt = op.dt
-Dt = Constant(dt)
+dt = adap.adaptTimestepSW(mesh, b)
+print('     #### Using initial timestep = %4.3fs\n' % dt)
 T = op.Tend
 Ts = op.Tstart
 ndump = op.ndump
@@ -88,17 +84,20 @@ if useAdjoint:
 hmin = op.hmin
 hmax = op.hmax
 rm = op.rm
+iStart = int(op.Tstart / dt)
+iEnd = int(np.ceil(T / dt))
 nEle, nVer = msh.meshStats(mesh)
 mM = [nEle, nEle]           # Min/max #Elements
 Sn = nEle
 nVerT = nVer * op.vscale    # Target #Vertices
+nVerT0 = nVerT
 
 # Initialise counters
 cnt = 0
 
 if getData:
 
-    # Get solver parameter values and construct solver, with default dg1-dg1 space
+    # Get solver parameter values and construct solver
     tic = clock()
     solver_obj = solver2d.FlowSolver2d(mesh, b)
     options = solver_obj.options
@@ -111,12 +110,12 @@ if getData:
     options.timestep = op.dt
     options.output_directory = dirName
     options.export_diagnostics = True
-    options.fields_to_export_hdf5 = ['elev_2d']
+    options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
 
     # Apply ICs and time integrate
     solver_obj.assign_initial_conditions(elev=eta0)
     solver_obj.iterate()
-    fixedMeshTime = clock() - tic
+    fixedMeshTime = clock()-tic
     print('Time elapsed for fixed mesh solver: %.1fs (%.2fmins)' % (fixedMeshTime, fixedMeshTime / 60))
 
     # TODO: somehow integrate this at EACH TIMESTEP:

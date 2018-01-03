@@ -27,9 +27,8 @@ op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
                  window=False,
                  outputHessian=False,
                  plotpvd=False if approach == 'fixedMesh' else True,
-                 coarseness=5,
+                 coarseness=8,
                  gauges=True)
-
 nEle = (691750, 450386, 196560, 33784, 20724, 14228, 11020, 8782, 6176)[op.coarseness]
 # TODO: bootstrap to establish initial mesh resolution
 
@@ -45,7 +44,7 @@ if op.outputHessian:
     hessianFile = File(dirName + "hessian.pvd")
 
 # Load Meshes
-mesh, eta0, b = msh.TohokuDomain(op.coarseness)
+mesh, eta0, b = msh.TohokuDomain(nEle)
 if useAdjoint:
     try:
         assert op.coarseness != 1

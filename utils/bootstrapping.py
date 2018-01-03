@@ -150,10 +150,10 @@ def solverFiredrake(nEle, op=opt.Options()):
         if (t >= op.Tstart) and not started:
             started = True
             J_trap = step
+        elif t >= op.Tend:
+            J_trap += step
         elif started:
             J_trap += 2 * step
-        if t >= op.Tend:
-            J_trap += step
         t += dt
 
     return J_trap * dt
@@ -227,7 +227,7 @@ def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10.):
         ts.append(t)
         nEls.append(nEle)
         if problem in ('firedrake-tsunami', 'thetis-tsunami'):
-            toPrint = 'coarseness = %2d, ' % (5-i)
+            toPrint = 'i = %d, ' % i
         else:
             toPrint = 'n = %3d, ' % n
         toPrint += "nEle = %6d, J = %6.4e, run time : %6.3f, " % (nEle, Js[-1], t)
@@ -247,7 +247,7 @@ def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10.):
             reason = 'run time becoming too high.'
             break
 
-        if (problem in ('firedrake-tsunami', 'thetis-tsunami')) & (i == 4):
+        if (problem in ('firedrake-tsunami', 'thetis-tsunami')) & (i == 8):
             reason = 'maximum mesh resolution reached.'
             break
 
