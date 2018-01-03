@@ -281,8 +281,9 @@ if approach in ('simpleAdapt', 'goalBased'):
                 H = adap.constructHessian(mesh, W, eta, op=op)
                 M = adap.computeSteadyMetric(mesh, W, H, eta, nVerT=nVerT, op=op)
             if op.gradate:
-                M_ = adap.isotropicMetric(W, inte.interp(mesh, h0)[0], bdy=True, op=op) # Initial boundary metric
-                M = adap.metricIntersection(mesh, W, M, M_, bdy=True)
+                if useAdjoint:
+                    M_ = adap.isotropicMetric(W, inte.interp(mesh, h0)[0], bdy=True, op=op) # Initial boundary metric
+                    M = adap.metricIntersection(mesh, W, M, M_, bdy=True)
                 adap.metricGradation(mesh, M)
                 # TODO: always gradate to coast
             if op.advect:
@@ -329,7 +330,6 @@ if approach in ('simpleAdapt', 'goalBased'):
         cnt += 1
     adaptTimer = clock() - adaptTimer
     print('Adaptive primal run complete. Run time: %.3fs \n' % adaptTimer)
-    cnt -= 1
 
 # Print to screen timing analyses
 if getData and useAdjoint:

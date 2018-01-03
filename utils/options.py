@@ -60,9 +60,9 @@ class Options:
         # Initial mesh parameters
         self.coarseness = coarseness
         try:
-            assert coarseness in (1, 2, 3, 4, 5)
+            assert coarseness in range(1, 9)
         except:
-            raise ValueError('Please choose an integer between 1 and 5.')
+            raise ValueError('Please choose an integer between 1 and 8.')
 
         # Adaptivity parameters
         self.family = family

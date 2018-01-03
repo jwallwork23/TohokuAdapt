@@ -10,6 +10,7 @@ import utils.adaptivity as adap
 import utils.forms as form
 import utils.interpolation as inte
 import utils.mesh as msh
+import utils.misc as msc
 import utils.options as opt
 import utils.timeseries as tim
 
@@ -27,12 +28,15 @@ op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
                  outputHessian=False,
                  plotpvd=False,
                  coarseness=8,
+                 iso=False,
                  gauges=True)
 nEle = (691750, 450386, 196560, 33784, 20724, 14228, 11020, 8782, 6176)[op.coarseness]
 # TODO: bootstrap to establish initial mesh resolution
 
 # Establish filenames
 dirName = 'plots/thetis-tsunami/'
+if approach in ('simpleAdapt', 'goalBased'):
+    dirName += approach + '/'
 if op.plotpvd:
     residualFile = File(dirName + "residual.pvd")
     errorFile = File(dirName + "errorIndicator.pvd")
@@ -40,7 +44,7 @@ if op.plotpvd:
 if op.outputHessian:
     hessianFile = File(dirName + "hessian.pvd")
 
-# Generate mesh(es)
+# Generate Mesh(es)
 mesh, eta0, b = msh.TohokuDomain(nEle)
 if useAdjoint:
     try:
@@ -52,7 +56,7 @@ if useAdjoint:
 
 # Specify physical and solver parameters
 dt = adap.adaptTimestepSW(mesh, b)
-print('     #### Using initial timestep = %4.3fs\n' % dt)
+Dt = Constant(dt)
 T = op.Tend
 Ts = op.Tstart
 ndump = op.ndump
@@ -65,20 +69,22 @@ v0 = {}
 for gauge in gauges:
     v0[gauge] = float(eta0.at(op.gaugeCoord(gauge)))
 
+# Define Functions relating to goalBased approach
 if useAdjoint:
     V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
-
-    # Define Function to hold residual data
     rho = Function(V_N)
     rho_u, rho_e = rho.split()
     rho_u.rename("Velocity residual")
     rho_e.rename("Elevation residual")
     dual = Function(V)
     dual_u, dual_e = dual.split()
-    dual_u.rename("Adjoint velocity")
-    dual_e.rename("Adjoint elevation")
+    dual_N = Function(V_N)
+    dual_N_u, dual_N_e = dual_N.split()
+    dual_N_u.rename("Adjoint velocity")
+    dual_N_e.rename("Adjoint elevation")
     P0_N = FunctionSpace(mesh_N, "DG", 0)
     v = TestFunction(P0_N)
+    epsilon = Function(P0_N, name="Error indicator")
 
 # Get adaptivity parameters
 hmin = op.hmin
@@ -149,47 +155,58 @@ if getData:
 # TODO: load residual data and calculate error estimators. Save these data.
 
 if approach in ('simpleAdapt', 'goalBased'):
+    if useAdjoint & op.gradate:
+        h0 = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
     mn = 0
-    tic1 = clock()
+    adaptTimer = clock()
     while mn < np.ceil(T / (dt * rm)):
-        tic2 = clock()
+        stepTimer = clock()
         index = mn * int(rm / ndump)
-        W = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
-        elev_2d, uv_2d = op.loadFromDisk(W, index, dirName, elev0=eta0)  # Enforce ICs / load variables from disk
+        V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
+        elev_2d, uv_2d = op.loadFromDisk(V, index, dirName, elev0=eta0)  # Enforce ICs / load variables from disk
 
-        # Compute Hessian and metric, adapt mesh and interpolate variables
-        V = TensorFunctionSpace(mesh, 'CG', 1)
-        if op.mtype != 's':
-            if iso:
-                M = adap.isotropicMetric(V, elev_2d, op=op)
-            else:
-                H = adap.constructHessian(mesh, V, elev_2d, op=op)
-                M = adap.computeSteadyMetric(mesh, V, H, elev_2d, nVerT=nVerT, op=op)
-
-        # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
-        if approach == 'goalBased':
-            with DumbCheckpoint(dirName + 'hdf5/error_' + op.indexString(cnt), mode=FILE_READ) as loadError:
-                loadError.load(epsilon)  # P0 field on the initial mesh
+        # Construct metric
+        W = TensorFunctionSpace(mesh, 'CG', 1)
+        if useAdjoint & (cnt != 0):
+            # TODO properly (see above)
+            # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
+            # with DumbCheckpoint(dirName + 'hdf5/error_' + msc.indexString(cnt), mode=FILE_READ) as loadError:
+            with DumbCheckpoint('plots/firedrake-tsunami/hdf5/error_' + msc.indexString(cnt), mode=FILE_READ) as loadError:
+                loadError.load(epsilon)
                 loadError.close()
             errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])
-            for k in range(mesh.topology.num_vertices()):
-                H.dat.data[k] *= errEst.dat.data[k]  # Scale by error estimate
-
-        if op.mtype != 'f':
-            spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
-            if iso:
-                M2 = adap.isotropicMetric(V, spd, op=op)
-            else:
-                H = adap.constructHessian(mesh, V, spd, op=op)
-                M2 = adap.computeSteadyMetric(mesh, V, H, spd, nVerT=nVerT, op=op)
-            M = adap.metricIntersection(mesh, V, M, M2) if op.mtype == 'b' else M2
+            M = adap.isotropicMetric(W, errEst, op=op, invert=False)
+        else:
+            if op.mtype != 's':
+                if op.iso:
+                    M = adap.isotropicMetric(W, elev_2d, op=op)
+                else:
+                    H = adap.constructHessian(mesh, W, elev_2d, op=op)
+                    M = adap.computeSteadyMetric(mesh, W, H, elev_2d, nVerT=nVerT, op=op)
+            if op.mtype != 'f':
+                spd = Function(W.sub(1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
+                if op.iso:
+                    M2 = adap.isotropicMetric(W, spd, op=op)
+                else:
+                    H = adap.constructHessian(mesh, W, spd, op=op)
+                    M2 = adap.computeSteadyMetric(mesh, W, H, spd, nVerT=nVerT, op=op)
+                M = adap.metricIntersection(mesh, W, M, M2) if op.mtype == 'b' else M2
         if op.gradate:
+            if useAdjoint:
+                M_ = adap.isotropicMetric(W, inte.interp(mesh, h0)[0], bdy=True, op=op)  # Initial boundary metric
+                M = adap.metricIntersection(mesh, W, M, M_, bdy=True)
             adap.metricGradation(mesh, M)
-        if op.advect & mn != 0:
-            adap.advectMetric(M, uv_2d, dt, rm)  # Advect metric ahead in direction of velocity
+            # TODO: always gradate to coast
+        if op.advect:
+            M = adap.advectMetric(M, uv_2d, 2 * Dt, n=3 * rm)
+            # TODO: isotropic advection?
+
+        # Adapt mesh and interpolate variables
         mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
+        V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
         elev_2d, uv_2d, b = inte.interp(mesh, elev_2d, uv_2d, b)
-        msh.saveMesh(mesh, dirName + 'hdf5/mesh_' + op.indexString(index))  # Save mesh to disk
+        uv_2d.rename('uv_2d')
+        elev_2d.rename('elev_2d')
 
         # Establish Thetis flow solver object
         solver_obj = solver2d.FlowSolver2d(mesh, b)
@@ -205,7 +222,10 @@ if approach in ('simpleAdapt', 'goalBased'):
         options.export_diagnostics = True
         options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
         field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
-        e = exporter.ExportManager(dirName + 'hdf5', ['elev_2d', 'uv_2d'], field_dict, field_metadata,
+        e = exporter.ExportManager(dirName + 'hdf5',
+                                   ['elev_2d', 'uv_2d'],
+                                   field_dict,
+                                   field_metadata,
                                    export_type='hdf5')
         solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
 
@@ -221,18 +241,23 @@ if approach in ('simpleAdapt', 'goalBased'):
         # Time integrate and print
         solver_obj.iterate()
         nEle = msh.meshStats(mesh)[0]
-        N = [min(nEle, N[0]), max(nEle, N[1])]
+        mM = [min(nEle, mM[0]), max(nEle, mM[1])]
         Sn += nEle
         mn += 1
-        op.printToScreen(mn, clock() - tic1, clock() - tic2, nEle, Sn, N)
-    toc1 = clock()
-    print('Elapsed time for adaptive solver: %1.1fs (%1.2f mins)' % (toc1 - tic1, (toc1 - tic1) / 60))
+        op.printToScreen(mn, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, mM, solver_obj.simulation_time)
 
-# TODO: test ``simpleAdapt`` script
+    # Extract gauge timeseries data
+    if op.gauges:
+            gaugeData = tim.extractTimeseries(gauges, elev_2d, gaugeData, v0, op=op)
+    adaptTimer = clock() - adaptTimer
+    print('Elapsed time for adaptive solver: %1.1fs (%1.2f mins)' % (adaptTimer, adaptTimer / 60))
 
+# Print to screen timing analyses
+if getData and useAdjoint:
+    msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer)
 
-# # Save and plot timeseries
-# name = input("Enter a name for these time series (e.g. 'goalBased8-12-17'): ") or 'test'
-# for gauge in gauges:
-#     tim.saveTimeseries(gauge, gaugeData[gauge], name=name)
-#     tim.plotGauges(gauge, int(T), op=op)
+# Save and plot timeseries
+name = input("Enter a name for these time series (e.g. 'goalBased8-12-17'): ") or 'test'
+for gauge in gauges:
+    tim.saveTimeseries(gauge, gaugeData[gauge], name=name)
+    tim.plotGauges(gauge, int(T), op=op)
