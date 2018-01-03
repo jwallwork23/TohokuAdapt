@@ -100,20 +100,20 @@ nVerT0 = nVerT
 
 # Initialise counters
 cnt = 0
+endT = 0.
 
 if getData:
-
     # Get solver parameter values and construct solver
-    tic = clock()
+    primalTimer = clock()
     solver_obj = solver2d.FlowSolver2d(mesh, b)
     options = solver_obj.options
     options.element_family = op.family
     options.use_nonlinear_equations = False
     options.use_grad_depth_viscosity_term = False
-    options.simulation_export_time = op.dt * op.ndump
+    options.simulation_export_time = dt * ndump
     options.simulation_end_time = T
     options.timestepper_type = op.timestepper
-    options.timestep = op.dt
+    options.timestep = dt
     options.output_directory = dirName
     options.export_diagnostics = True
     options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
@@ -121,8 +121,8 @@ if getData:
     # Apply ICs and time integrate
     solver_obj.assign_initial_conditions(elev=eta0)
     solver_obj.iterate()
-    fixedMeshTime = clock()-tic
-    print('Time elapsed for fixed mesh solver: %.1fs (%.2fmins)' % (fixedMeshTime, fixedMeshTime / 60))
+    primalTimer = clock()-primalTimer
+    print('Time elapsed for fixed mesh solver: %.1fs (%.2fmins)' % (primalTimer, primalTimer / 60))
 
     # TODO: somehow integrate this at EACH TIMESTEP:
 
@@ -168,7 +168,7 @@ if approach in ('simpleAdapt', 'goalBased'):
         # Construct metric
         W = TensorFunctionSpace(mesh, 'CG', 1)
         if useAdjoint & (cnt != 0):
-            # TODO properly (see above)
+            # TODO properly (see above). Test in this form
             # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
             # with DumbCheckpoint(dirName + 'hdf5/error_' + msc.indexString(cnt), mode=FILE_READ) as loadError:
             with DumbCheckpoint('plots/firedrake-tsunami/hdf5/error_' + msc.indexString(cnt), mode=FILE_READ) as loadError:
@@ -208,6 +208,11 @@ if approach in ('simpleAdapt', 'goalBased'):
         uv_2d.rename('uv_2d')
         elev_2d.rename('elev_2d')
 
+        # Adapt timestep
+        if tAdapt:
+            dt = adap.adaptTimestepSW(mesh, b)
+            Dt.assign(dt)
+
         # Establish Thetis flow solver object
         solver_obj = solver2d.FlowSolver2d(mesh, b)
         options = solver_obj.options
@@ -215,7 +220,9 @@ if approach in ('simpleAdapt', 'goalBased'):
         options.use_nonlinear_equations = False
         options.use_grad_depth_viscosity_term = False
         options.simulation_export_time = dt * ndump
-        options.simulation_end_time = (mn + 1) * dt * rm
+        startT = endT
+        endT += dt * rm
+        options.simulation_end_time = endT
         options.timestepper_type = op.timestepper
         options.timestep = dt
         options.output_directory = dirName
@@ -231,10 +238,9 @@ if approach in ('simpleAdapt', 'goalBased'):
 
         # Timestepper bookkeeping for export time step and next export
         solver_obj.i_export = index
-        solver_obj.next_export_t = solver_obj.i_export * options.simulation_export_time
-        solver_obj.iteration = int(np.ceil(solver_obj.next_export_t / dt))
-        solver_obj.simulation_time = solver_obj.iteration * dt
-        solver_obj.next_export_t += options.simulation_export_time  # For next export
+        solver_obj.iteration = mn * rm
+        solver_obj.simulation_time = startT
+        solver_obj.next_export_t = startT + options.simulation_export_time  # For next export
         for e in solver_obj.exporters.values():
             e.set_next_export_ix(solver_obj.i_export)
 
@@ -244,7 +250,7 @@ if approach in ('simpleAdapt', 'goalBased'):
         mM = [min(nEle, mM[0]), max(nEle, mM[1])]
         Sn += nEle
         mn += 1
-        op.printToScreen(mn, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, mM, solver_obj.simulation_time)
+        op.printToScreen(mn, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, mM, endT)
 
     # Extract gauge timeseries data
     if op.gauges:

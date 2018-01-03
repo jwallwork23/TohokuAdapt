@@ -103,7 +103,7 @@ def plotGauges(gauge, iEnd, op=opt.Options()):
 
     # Get solver parameters
     T = op.Tend
-    dt = op.dt
+    dt = op.dt                      # TODO: allow for adaptive timestepping
     ndump = op.ndump
     numStrips = int(T / (ndump * dt))
     numVals = numStrips + 1
