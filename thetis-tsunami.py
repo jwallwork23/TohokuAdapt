@@ -163,15 +163,29 @@ if approach in ('simpleAdapt', 'goalBased'):
         stepTimer = clock()
         index = mn * int(rm / ndump)
         V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
-        elev_2d, uv_2d = op.loadFromDisk(V, index, dirName, elev0=eta0)  # Enforce ICs / load variables from disk
+
+        # Enforce ICs / load variables from disk
+        uv_2d = Function(V.sub(0))
+        elev_2d = Function(V.sub(1))
+        if index == 0:
+            elev_2d.interpolate(eta0)
+            uv_2d.interpolate(Expression((0, 0)))
+        else:
+            indexStr = msc.indexString(index)
+            with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as loadElev:
+                loadElev.load(elev_2d, name='elev_2d')
+                loadElev.close()
+            with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as loadVel:
+                loadVel.load(uv_2d, name='uv_2d')
+                loadVel.close()
 
         # Construct metric
         W = TensorFunctionSpace(mesh, 'CG', 1)
-        if useAdjoint & (cnt != 0):
+        if useAdjoint & (mn != 0):
             # TODO properly (see above). Test in this form
             # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
             # with DumbCheckpoint(dirName + 'hdf5/error_' + msc.indexString(cnt), mode=FILE_READ) as loadError:
-            with DumbCheckpoint('plots/firedrake-tsunami/hdf5/error_' + msc.indexString(cnt), mode=FILE_READ) as loadError:
+            with DumbCheckpoint('plots/firedrake-tsunami/hdf5/error_' + msc.indexString(mn), mode=FILE_READ) as loadError:
                 loadError.load(epsilon)
                 loadError.close()
             errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])
@@ -198,7 +212,7 @@ if approach in ('simpleAdapt', 'goalBased'):
             adap.metricGradation(mesh, M)
             # TODO: always gradate to coast
         if op.advect:
-            M = adap.advectMetric(M, uv_2d, 2 * Dt, n=3 * rm)
+            M = adap.advectMetric(M, uv_2d, 2*Dt, n=3*rm)
             # TODO: isotropic advection?
 
         # Adapt mesh and interpolate variables

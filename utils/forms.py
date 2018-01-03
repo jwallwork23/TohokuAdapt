@@ -150,6 +150,21 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=F
     return B - L
 
 
+def interelementTerm(v, n=None):
+    """
+    :param v: Function to be averaged over element boundaries.
+    :param n: FacetNormal
+    :return: averaged jump discontinuity over element boundary.
+    """
+    if n == None:
+        n = FacetNormal(v.function_space().mesh())
+    v = as_ufl(v)
+    if len(v.ufl_shape) == 0:
+        return 0.5 * (v('+') + v('-')) * n('+')
+    else:
+        return 0.5 * dot(v('+') + v('-'), n('+'))
+
+
 def localProblemSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, nonlinear=False,
                    allowNormalFlow=True, timestepper='CrankNicolson'):
     """
@@ -171,6 +186,7 @@ def localProblemSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=F
     :return: residual of local problem.
     """
     V = q.function_space()
+    n = FacetNormal(V.mesh())
     u, eta = q.split()
     ut, et = qt.split()
 
@@ -180,11 +196,9 @@ def localProblemSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=F
     phi = Function(V, name='Local solution')
     B = formsSW(phi, q_, qt, b, Dt, nu=nu, g=g, f0=f0, beta=beta, rotational=rotational, nonlinear=nonlinear,
                    allowNormalFlow=allowNormalFlow, timestepper=timestepper)[0]
-    F = B + B_ - L
-    n = FacetNormal(V.mesh())
-    F += (inner(grad(u), n) * et) * dS   # Inter-element flux term
+    F = B + B_ - L + interelementTerm(grad(u) * et, n=n) * dS
 
-    # TODO: how to solve problem in a local sense?
+    # TODO: test this
 
     return F
 
