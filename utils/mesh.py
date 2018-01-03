@@ -5,20 +5,26 @@ class MeshSetup:
         self.res = res
         self.dirName = 'resources/meshes/'
         try:
-            self.meshName = {1: 'TohokuXFine', 2: 'TohokuFine', 3: 'TohokuMedium', 4: 'TohokuCoarse',
-                             5: 'TohokuXCoarse'}[res]
+            self.meshName = {691750: 'Tohoku691750', 450386: 'Tohoku450386', 196560: 'Tohoku196560',
+                             33784: 'Tohoku33784', 20724: 'Tohoku20724', 14228: 'Tohoku14228', 11020: 'Tohoku11020',
+                             8782: 'Tohoku8782', 6176: 'Tohoku6176'}[res]
         except:
-            raise ValueError('Resolution value not recognised. Choose an integer in the range 1-5.')
+            raise ValueError('Resolution value not recognised.')
 
         # Define gradations (in metres)
-        self.innerGradation1 = {1: 1000., 2: 1000., 3: 3000., 4: 5000., 5: 7500.}[res]
-        self.outerGradation1 = {1: 2500., 2: 4000., 3: 10000., 4: 15000., 5: 25000.}[res]
-        self.innerGradation2 = {1: 2500., 2: 3000., 3: 6000., 4: 10000., 5: 10000.}[res]
-        self.outerGradation2 = {1: 5000., 2: 8000., 3: 10000., 4: 15000., 5: 25000.}[res]
+        self.innerGradation1 = {691750: 900., 450386: 1000., 196560: 1000., 33784: 3000., 20724: 4000.,
+                                14228: 5000., 11020: 5500., 8782: 6000., 6176: 7500., }[res]
+        self.outerGradation1 = {691750: 2000., 450386: 2500., 196560: 4000., 33784: 10000., 20724: 12500.,
+                                14228: 15000., 11020: 17500., 8782: 20000., 6176: 25000.,}[res]
+        self.innerGradation2 = {691750: 2000., 450386: 2500., 196560: 3000., 33784: 6000., 20724: 8000.,
+                                14228: 10000., 11020: 10000., 8782: 10000., 6176: 10000.,}[res]
+        self.outerGradation2 = {691750: 4000., 450386: 5000., 196560: 8000., 33784: 10000., 20724: 12500.,
+                                14228: 15000., 11020: 17500., 8782: 20000., 6176: 25000.,}[res]
 
         # Define gradation distances (in degrees)
         self.gradationDistance1 = 1.
-        self.gradationDistance2 = {1: 1., 2: 1., 3: 1., 4: 0.5, 5: 0.5}[res]
+        self.gradationDistance2 = {691750: 1., 450386: 1., 196560: 1., 33784: 1., 20724: 0.75,
+                                   14228: 0.5, 11020: 0.5, 8782: 0.5, 6176: 0.5,}[res]
 
     def generateMesh(self):
         """
@@ -87,7 +93,8 @@ class MeshSetup:
 if __name__ == '__main__':
     import qmesh
 
-    ms = MeshSetup(input('Specify mesh coarseness (1 = x-fine, 5 = x-coarse): ') or 3)
+    ms = MeshSetup(input('Choose #Elements from: {6176, 8782, 11020, 14228, 20724, 33784, 196560, 450386, 691750}:\n')
+                   or 6176)
     qmesh.setLogOutputFile(ms.dirName + 'generateMesh.log')     # Store QMESH log for later reference
     qmesh.initialise()                                          # Initialise QGIS API
     ms.generateMesh()                                           # Generate the mesh
