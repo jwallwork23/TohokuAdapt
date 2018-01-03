@@ -30,6 +30,7 @@ op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
                  coarseness=5,
                  gauges=True)
 
+nEle = (691750, 450386, 196560, 33784, 20724, 14228, 11020, 8782, 6176)[op.coarseness]
 # TODO: bootstrap to establish initial mesh resolution
 
 # Establish filenames

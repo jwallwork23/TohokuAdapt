@@ -1,30 +1,30 @@
 class MeshSetup:
-    def __init__(self, res=3):
+    def __init__(self, nEle=6176):
 
         # Get mesh descriptions
-        self.res = res
+        self.nEle = nEle
         self.dirName = 'resources/meshes/'
         try:
             self.meshName = {691750: 'Tohoku691750', 450386: 'Tohoku450386', 196560: 'Tohoku196560',
                              33784: 'Tohoku33784', 20724: 'Tohoku20724', 14228: 'Tohoku14228', 11020: 'Tohoku11020',
-                             8782: 'Tohoku8782', 6176: 'Tohoku6176'}[res]
+                             8782: 'Tohoku8782', 6176: 'Tohoku6176'}[nEle]
         except:
             raise ValueError('Resolution value not recognised.')
 
         # Define gradations (in metres)
         self.innerGradation1 = {691750: 900., 450386: 1000., 196560: 1000., 33784: 3000., 20724: 4000.,
-                                14228: 5000., 11020: 5500., 8782: 6000., 6176: 7500., }[res]
+                                14228: 5000., 11020: 5500., 8782: 6000., 6176: 7500., }[nEle]
         self.outerGradation1 = {691750: 2000., 450386: 2500., 196560: 4000., 33784: 10000., 20724: 12500.,
-                                14228: 15000., 11020: 17500., 8782: 20000., 6176: 25000.,}[res]
+                                14228: 15000., 11020: 17500., 8782: 20000., 6176: 25000.,}[nEle]
         self.innerGradation2 = {691750: 2000., 450386: 2500., 196560: 3000., 33784: 6000., 20724: 8000.,
-                                14228: 10000., 11020: 10000., 8782: 10000., 6176: 10000.,}[res]
+                                14228: 10000., 11020: 10000., 8782: 10000., 6176: 10000.,}[nEle]
         self.outerGradation2 = {691750: 4000., 450386: 5000., 196560: 8000., 33784: 10000., 20724: 12500.,
-                                14228: 15000., 11020: 17500., 8782: 20000., 6176: 25000.,}[res]
+                                14228: 15000., 11020: 17500., 8782: 20000., 6176: 25000.,}[nEle]
 
         # Define gradation distances (in degrees)
         self.gradationDistance1 = 1.
         self.gradationDistance2 = {691750: 1., 450386: 1., 196560: 1., 33784: 1., 20724: 0.75,
-                                   14228: 0.5, 11020: 0.5, 8782: 0.5, 6176: 0.5,}[res]
+                                   14228: 0.5, 11020: 0.5, 8782: 0.5, 6176: 0.5,}[nEle]
 
     def generateMesh(self):
         """
@@ -108,7 +108,7 @@ else:
     from . import conversion
 
 
-def TohokuDomain(res=3, output=False):
+def TohokuDomain(nEle=6176, output=False):
     """
     Load the mesh, initial condition and bathymetry profile for the 2D ocean domain of the Tohoku tsunami problem.
     
@@ -118,7 +118,7 @@ def TohokuDomain(res=3, output=False):
     """
 
     # Define mesh and an associated elevation function space and establish initial condition and bathymetry functions
-    ms = MeshSetup(res)
+    ms = MeshSetup(nEle)
     mesh = Mesh(ms.dirName + ms.meshName + '.msh')
     meshCoords = mesh.coordinates.dat.data
     P1 = FunctionSpace(mesh, 'CG', 1)

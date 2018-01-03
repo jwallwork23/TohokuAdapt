@@ -109,10 +109,10 @@ def solverSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg',)):
 # TODO: Rossby Wave test problem
 
 
-def solverFiredrake(coarseness, op=opt.Options()):
+def solverFiredrake(nEle, op=opt.Options()):
 
     # Define Mesh and FunctionSpace
-    mesh, eta0, b = msh.TohokuDomain(coarseness)
+    mesh, eta0, b = msh.TohokuDomain(nEle)
     nEle = msh.meshStats(mesh)[0]
     V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
 
@@ -156,13 +156,13 @@ def solverFiredrake(coarseness, op=opt.Options()):
             J_trap += step
         t += dt
 
-    return J_trap * dt, nEle
+    return J_trap * dt
 
 
-def solverThetis(coarseness, op=opt.Options()):
+def solverThetis(nEle, op=opt.Options()):
 
     # Get Mesh and initial condition and bathymetry defined thereupon
-    mesh, eta0, b = msh.TohokuDomain(op.coarseness)
+    mesh, eta0, b = msh.TohokuDomain(nEle)
     nEle = msh.meshStats(mesh)[0]
     V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
 
@@ -194,7 +194,7 @@ def solverThetis(coarseness, op=opt.Options()):
     solver_obj.assign_initial_conditions(elev=eta0)
     solver_obj.iterate(export_func=getJ(elev_2d, t, J_trap))
 
-    return J_trap * op.dt, nEle
+    return J_trap * op.dt
 
 
 def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10.):
@@ -215,9 +215,11 @@ def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10.):
         elif problem == 'rossby-wave':
             raise NotImplementedError
         elif problem == 'firedrake-tsunami':
-            J, nEle = solverFiredrake(5-i)
+            nEle = (6176, 8782, 11020, 14228, 20724, 33784, 196560, 450386, 691750)[i]
+            J = solverFiredrake(nEle)
         elif problem == 'thetis-tsunami':
-            J, nEle = solverThetis(5-i)
+            nEle = (6176, 8782, 11020, 14228, 20724, 33784, 196560, 450386, 691750)[i]
+            J = solverFiredrake(nEle)
         else:
             raise ValueError("Problem not recognised.")
         t = clock() - tic
