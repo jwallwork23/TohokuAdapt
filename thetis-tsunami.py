@@ -264,7 +264,7 @@ if approach in ('simpleAdapt', 'goalBased'):
         mM = [min(nEle, mM[0]), max(nEle, mM[1])]
         Sn += nEle
         mn += 1
-        op.printToScreen(mn, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, mM, endT)
+        op.printToScreen(mn, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, mM, endT, dt)
 
     # Extract gauge timeseries data
     if op.gauges:

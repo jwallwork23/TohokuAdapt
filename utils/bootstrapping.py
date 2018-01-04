@@ -238,7 +238,7 @@ def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10.):
             diff = np.abs(Js[-1] - Js[-2])
             toPrint += "diff : %6.4e" % diff
         print(toPrint)
-        iOpt = i+1  # Get current iteration number
+        iOpt = i    # Get current iteration number
 
         if diff < tol:
             reason = 'attaining tolerance for convergence.'
@@ -256,4 +256,4 @@ def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10.):
     if problem in ('firedrake-tsunami', 'thetis-tsunami'):
         return nEle, Js, nEls, ts
     else:
-        return n, Js, nEls, ts
+        return pow(2, iOpt), Js, nEls, ts

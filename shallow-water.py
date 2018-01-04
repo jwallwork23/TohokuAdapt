@@ -28,12 +28,13 @@ adjointFile = File(dirName + "adjointSW.pvd")
 errorFile = File(dirName + "errorIndicatorSW.pvd")
 adaptiveFile = File(dirName + "goalBasedSW.pvd") if useAdjoint else File(dirName + "simpleAdaptSW.pvd")
 
-# Establish initial mesh resolution
-bootTimer = clock()
-print('\nBootstrapping to establish optimal mesh resolution')
-n = boot.bootstrap('shallow-water', tol=0.01)[0]
-bootTimer = clock() - bootTimer
-print('Bootstrapping run time: %.3fs' % bootTimer)
+# # Establish initial mesh resolution
+# bootTimer = clock()
+# print('\nBootstrapping to establish optimal mesh resolution')
+# n = boot.bootstrap('shallow-water', tol=0.01)[0]
+# bootTimer = clock() - bootTimer
+# print('Bootstrapping run time: %.3fs\n' % bootTimer)
+n = 64
 
 # Define initial Meshes
 N = 2 * n
@@ -53,13 +54,13 @@ op = opt.Options(Tstart=0.5,
                  advect=False,
                  window=True if useAdjoint else False,
                  vscale=0.4 if useAdjoint else 0.85,
-                 plotpvd=True if getData == False else False)
+                 plotpvd=True)
 V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
 V_N = VectorFunctionSpace(mesh_N, op.space1, op.degree1) * FunctionSpace(mesh_N, op.space2, op.degree2)
 b = Constant(0.1)
 h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
 dt = adap.adaptTimestepSW(mesh, b)
-print('     #### Using initial timestep = %4.3fs\n' % dt)
+print('Using initial timestep = %4.3fs\n' % dt)
 Dt = Constant(dt)
 T = op.Tend
 Ts = op.Tstart
@@ -98,7 +99,7 @@ hmin = op.hmin
 hmax = op.hmax
 rm = op.rm
 iStart = int(op.Tstart / dt)
-iEnd = np.ceil(T / dt)
+iEnd = int(np.ceil(T / dt))
 nEle, nVer = msh.meshStats(mesh)
 mM = [nEle, nEle]           # Min/max #Elements
 Sn = nEle
@@ -126,21 +127,28 @@ if getData:
         # Approximate residual of forward equation and save to HDF5
         if useAdjoint:
             if cnt % rm == 0:
+                tic = clock()
                 qN, q_N = inte.mixedPairInterp(mesh_N, V_N, q, q_)
+                print('#### DEBUG: solution pair %d interpolated. Time: %5.1fs' % (int(rm/(cnt+1)), clock()-tic))
+                tic = clock()
                 Au, Ae = form.strongResidualSW(qN, q_N, b, Dt)
                 rho_u.interpolate(Au)
                 rho_e.interpolate(Ae)
+                print('#### DEBUG: residual %d approximated. Time: %5.1fs' % (int(rm/(cnt+1)), clock()-tic))
+                tic = clock()
                 with DumbCheckpoint(dirName + 'hdf5/residual_SW' + msc.indexString(cnt), mode=FILE_CREATE) as saveRes:
                     saveRes.store(rho_u)
                     saveRes.store(rho_e)
                     saveRes.close()
                 if op.plotpvd:
                     residualFile.write(rho_u, rho_e, time=t)
+                print('#### DEBUG: residual %d stored. Time: %5.1fs' % (int(rm/(cnt+1)), clock()-tic))
 
         # Update solution at previous timestep
         q_.assign(q)
 
         # Mark timesteps to be used in adjoint simulation
+        tic = clock()
         if useAdjoint:
             if t >= T - dt:
                 finished = True
@@ -148,6 +156,7 @@ if getData:
                 adj_start_timestep()
             else:
                 adj_inc_timestep(time=t, finished=finished)
+            print('#### DEBUG: solution data logged for timestep %d. Time: %5.1fs' % (cnt, clock()-tic))
 
         if op.plotpvd & (cnt % ndump == 0):
             forwardFile.write(u, eta, time=t)
@@ -155,6 +164,7 @@ if getData:
         t += dt
         cnt += 1
     cnt -= 1
+    cntT = cnt      # Total number of steps
     primalTimer = clock() - primalTimer
     print('Primal run complete. Run time: %.3fs' % primalTimer)
 
@@ -162,7 +172,6 @@ if getData:
         # Set up adjoint problem
         J = form.objectiveFunctionalSW(q, Tstart=Ts, x1=0., x2=np.pi/2, y1=0.5*np.pi, y2=1.5*np.pi, smooth=False)
         parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
-        t = T
         save = True
 
         # Time integrate (backwards)
@@ -183,20 +192,15 @@ if getData:
                         saveAdj.store(dual_N_u)
                         saveAdj.store(dual_N_e)
                         saveAdj.close()
-
-                if op.plotpvd:
-                    adjointFile.write(dual_u, dual_e, time=t)
-                print('t = %.3fs' % t)
-                t -= dt
+                print('Adjoint simulation %.2f%% complete' % ((cntT-cnt)/cntT))
                 cnt -= 1
                 save = False
             else:
                 save = True
-            if (cnt == -1) | (t < -dt):
+            if cnt == -1:
                 break
         dualTimer = clock() - dualTimer
         print('Adjoint run complete. Run time: %.3fs' % dualTimer)
-        t += dt
         cnt += 1
 
         # Reset initial conditions for primal problem
@@ -249,6 +253,7 @@ if getError:
     print('Errors estimated. Run time: %.3fs' % errorTimer)
 
 if approach in ('simpleAdapt', 'goalBased'):
+    t = 0.
     print('\nStarting adaptive mesh primal run (forwards in time)')
     adaptTimer = clock()
     while t <= T:
@@ -287,16 +292,15 @@ if approach in ('simpleAdapt', 'goalBased'):
             adaptProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
             adaptSolver = NonlinearVariationalSolver(adaptProblem, solver_parameters=op.params)
 
+            if tAdapt:
+                dt = adap.adaptTimestepSW(mesh, b)
+                Dt.assign(dt)
+
             # Get mesh stats
             nEle = msh.meshStats(mesh)[0]
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
-            op.printToScreen(cnt/rm+1, clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, t)
-
-        if tAdapt & (cnt % rm == 1):
-            dt = adap.adaptTimestepSW(mesh, b)
-            Dt.assign(dt)
-            print('     #### New timestep = %4.3fs' % dt)
+            op.printToScreen(cnt/rm+1, clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, t, dt)
 
         # Solve problem at current timestep
         adaptSolver.solve()

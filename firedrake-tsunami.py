@@ -36,7 +36,7 @@ bootTimer = clock()
 print('\nBootstrapping to establish optimal mesh resolution')
 nEle = boot.bootstrap('firedrake-tsunami', tol=2e10)[0]
 bootTimer = clock() - bootTimer
-print('Bootstrapping run time: %.3fs' % bootTimer)
+print('Bootstrapping run time: %.3fs\n' % bootTimer)
 
 # Establish filenames
 dirName = 'plots/firedrake-tsunami/'
@@ -61,7 +61,7 @@ if useAdjoint:
 
 # Specify physical and solver parameters
 dt = adap.adaptTimestepSW(mesh, b)
-print('     #### Using initial timestep = %4.3fs\n' % dt)
+print('Using initial timestep = %4.3fs\n' % dt)
 Dt = Constant(dt)
 T = op.Tend
 Ts = op.Tstart
@@ -160,8 +160,8 @@ if getData:
             else:
                 adj_inc_timestep(time=t, finished=finished)
 
-        if not cnt % ndump:
-            if op.plotpvd:
+        if cnt % ndump == 0:
+            if op.plotpvd & (cnt % ndump == 0):
                 forwardFile.write(u, eta, time=t)
             if op.gauges and not useAdjoint:
                 gaugeData = tim.extractTimeseries(gauges, eta, gaugeData, v0, op=op)
@@ -169,6 +169,7 @@ if getData:
         t += dt
         cnt += 1
     cnt -=1
+    cntT = cnt  # Total number of steps
     primalTimer = clock() - primalTimer
     print('Primal run complete. Run time: %.3fs' % primalTimer)
 
@@ -176,7 +177,6 @@ if getData:
         # Set up adjoint problem
         J = form.objectiveFunctionalSW(q, plot=True)
         parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
-        t = T
         save = True
 
         # Time integrate (backwards)
@@ -197,21 +197,15 @@ if getData:
                         saveAdj.store(dual_N_u)
                         saveAdj.store(dual_N_e)
                         saveAdj.close()
-
-                if not cnt % ndump:
-                    if op.plotpvd:
-                        adjointFile.write(dual_u, dual_e, time=t)
-                    print('t = %.2fs' % t)
-                t -= dt
+                print('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT))
                 cnt -= 1
                 save = False
             else:
                 save = True
-            if (cnt == -1) | (t < -dt):
+            if cnt == -1:
                 break
         dualTimer = clock() - dualTimer
         print('Adjoint run complete. Run time: %.3fs' % dualTimer)
-        t += dt
         cnt += 1
 
         # Reset initial conditions for primal problem and recreate error indicator placeholder
@@ -251,8 +245,6 @@ if getError:
                     epsilon.dat.data[j] = max(epsilon.dat.data[j], epsilon_.dat.data[j])
 
         # Normalise error estimate
-        # if k != 0:
-        #     nVerT = 0.1 * nVerT0
         epsilon.dat.data[:] = np.abs(epsilon.dat.data) * nVerT / (np.abs(assemble(epsilon * dx)) or 1.)
         epsilon.rename("Error indicator")
 
@@ -266,6 +258,7 @@ if getError:
     print('Errors estimated. Run time: %.3fs' % errorTimer)
 
 if approach in ('simpleAdapt', 'goalBased'):
+    t = 0.
     if useAdjoint & op.gradate:
         h0 = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
     print('\nStarting adaptive mesh primal run (forwards in time)')
@@ -311,16 +304,15 @@ if approach in ('simpleAdapt', 'goalBased'):
             adaptProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
             adaptSolver = NonlinearVariationalSolver(adaptProblem, solver_parameters=op.params)
 
+            if tAdapt:
+                dt = adap.adaptTimestepSW(mesh, b)
+                Dt.assign(dt)
+
             # Get mesh stats
             nEle = msh.meshStats(mesh)[0]
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
-            op.printToScreen(cnt/rm+1, clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, t)
-
-        if tAdapt & (cnt % rm == 1):
-            dt = adap.adaptTimestepSW(mesh, b)
-            Dt.assign(dt)
-            print('     #### New timestep = %4.3fs' % dt)
+            op.printToScreen(cnt/rm+1, clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, t, dt)
 
         # Solve problem at current timestep
         adaptSolver.solve()

@@ -34,7 +34,7 @@ bootTimer = clock()
 print('\nBootstrapping to establish optimal mesh resolution')
 n = boot.bootstrap('advection-diffusion', tol=0.01)[0]
 bootTimer = clock() - bootTimer
-print('Bootstrapping run time: %.3fs' % bootTimer)
+print('Bootstrapping run time: %.3fs\n' % bootTimer)
 
 # Define initial Meshes
 N = 2 * n
@@ -57,7 +57,7 @@ V = FunctionSpace(mesh, "CG", 2)
 V_N = FunctionSpace(mesh_N, "CG", 2)
 w = Function(VectorFunctionSpace(mesh, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
 dt = adap.adaptTimestepAD(w)
-print('     #### Using initial timestep = %4.3fs\n' % dt)
+print('Using initial timestep = %4.3fs\n' % dt)
 Dt = Constant(dt)
 T = op.Tend
 ndump = op.ndump
@@ -65,7 +65,7 @@ nu = 1e-3 if diffusion else 0.
 
 # Define Functions relating to goalBased approach
 if useAdjoint:
-    dual_n = Function(V, name='Adjoint')
+    dual = Function(V, name='Adjoint')
     dual_N = Function(V_N, name='Fine mesh adjoint')
     rho = Function(V_N, name='Residual')
     P0_N = FunctionSpace(mesh_N, "DG", 0)
@@ -102,21 +102,21 @@ if getData:
     finished = False
     primalTimer = clock()
     if op.plotpvd:
-        forwardFile.write(u, eta, time=t)
+        forwardFile.write(phi, time=t)
     while t < T:
         # Solve problem at current timestep
         solve(F == 0, phi_next, bc)
 
         # Approximate residual of forward equation and save to HDF5
         if useAdjoint:
-            if not cnt % rm:
+            if cnt % rm == 0:
                 phi_next_N, phi_N, w_N = inte.interp(mesh_N, phi_next, phi, w)
                 rho.interpolate(form.strongResidualAD(phi_next_N, phi_N, w_N, Dt, nu=nu))
                 with DumbCheckpoint(dirName + 'hdf5/residual_AD' + msc.indexString(cnt), mode=FILE_CREATE) as saveRes:
                     saveRes.store(rho)
                     saveRes.close()
                 if op.plotpvd:
-                    residualFile.write(rho_u, rho_e, time=t)
+                    residualFile.write(rho, time=t)
 
         # Update solution at previous timestep
         phi.assign(phi_next)
@@ -131,11 +131,12 @@ if getData:
                 adj_inc_timestep(time=t, finished=finished)
 
         if op.plotpvd & (cnt % ndump == 0):
-            forwardFile.write(u, eta, time=t)
+            forwardFile.write(phi, time=t)
         print('t = %.3fs' % t)
         t += dt
         cnt += 1
     cnt -= 1
+    cntT = cnt  # Total number of steps
     primalTimer = clock() - primalTimer
     print('Primal run complete. Run time: %.3fs' % primalTimer)
 
@@ -143,7 +144,6 @@ if getData:
         # Set up adjoint problem
         J = form.objectiveFunctionalAD(phi)
         parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
-        t = T
         save = True
 
         # Time integrate (backwards)
@@ -152,32 +152,27 @@ if getData:
         for (variable, solution) in compute_adjoint(J):
             if save:
                 # Load adjoint data
-                dual_n.interpolate(variable, annotate=False)
-                dual_N = inte.interp(mesh_N, dual_n)[0]
+                dual.interpolate(variable, annotate=False)
+                dual_N = inte.interp(mesh_N, dual)[0]
                 dual_N.rename('Fine mesh adjoint')
 
                 # Save adjoint data to HDF5
-                if not cnt % rm:
+                if cnt % rm == 0:
                     with DumbCheckpoint(dirName+'hdf5/adjoint_AD'+msc.indexString(cnt), mode=FILE_CREATE) as saveAdj:
                         saveAdj.store(dual_N)
                         saveAdj.close()
-
-                if op.plotpvd:
-                    adjointFile.write(dual_n, time=t)
-                print('t = %.3fs' % t)
-                t -= dt
+                print('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT))
                 cnt -= 1
                 save = False
             else:
                 save = True
-            if (cnt == -1) | (t < -dt):
+            if cnt == -1:
                 break
         dualTimer = clock() - dualTimer
         print('Adjoint run complete. Run time: %.3fs' % dualTimer)
-        t += dt
         cnt += 1
 
-        # Reset initial conditions for primal problem and recreate error indicator placeholder
+        # Reset initial conditions for primal problem
         phi = ic.copy(deepcopy=True)
         phi.rename('Concentration')
 
@@ -224,6 +219,7 @@ if getError:
     print('Errors estimated. Run time: %.3fs' % errorTimer)
 
 if approach in ('simpleAdapt', 'goalBased'):
+    t = 0.
     print('\nStarting adaptive mesh primal run (forwards in time)')
     adaptTimer = clock()
     while t <= T:
@@ -263,16 +259,15 @@ if approach in ('simpleAdapt', 'goalBased'):
             F = form.weakResidualAD(phi_next, phi, psi, w, Dt, nu=nu)
             bc = DirichletBC(V, 0., "on_boundary")
 
+            if tAdapt:
+                dt = adap.adaptTimestepAD(w)
+                Dt.assign(dt)
+
             # Get mesh stats
             nEle = msh.meshStats(mesh)[0]
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
-            op.printToScreen(cnt / rm + 1, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, mM, t)
-
-        if tAdapt:
-            dt = adap.adaptTimestepAD(w)
-            Dt.assign(dt)
-            print('     #### New timestep = %4.3fs' % dt)
+            op.printToScreen(cnt / rm + 1, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, mM, t, dt)
 
         # Solve problem at current timestep
         solve(F == 0, phi_next, bc)
