@@ -30,7 +30,7 @@ primalFile = File('plots/forwardTest.pvd')
 cnt = 0
 primalTimer = clock()
 while t < T:
-    solve(F == 0, c, annotate=False)
+    solve(F == 0, c)
     c_.assign(c)
     if t == 0.:
         adj_start_timestep()
@@ -54,6 +54,9 @@ for (variable, solution) in compute_adjoint(J):
         dual.assign(variable, annotate=False)
         dualFile.write(dual, time=cnt)
         cnt -= 1
+        store = False
+    else:
+        store = True
     if cnt == 0:
         break
 print('Dual run time:   %.3fs' % (clock()-dualTimer))
