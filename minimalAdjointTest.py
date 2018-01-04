@@ -6,6 +6,7 @@ dt_meas = dt        # Time measure
 dt = 0.04           # Time step
 T = 2.4             # End time
 t = 0.
+cnt = 0
 
 # Define Mesh, FunctionSpace and apply IC
 mesh = RectangleMesh(4 * 16, 16, 4, 1)
@@ -15,19 +16,18 @@ c_ = Function(V, name='Prev').interpolate(exp(- (pow(x - 0.5, 2) + pow(y - 0.5, 
 c = Function(V, name='Concentration')
 dual = Function(V, name='Adjoint')
 
-# Define variational problem: advection-diffusion with no normal flow BCs
+# Define variational problem: advection-diffusion with no-normal-flow BCs
 ct = TestFunction(V)
 cm = 0.5 * (c + c_) # Crank-Nicolson timestepping
 w = Function(VectorFunctionSpace(mesh, "CG", 2), name='Wind field').interpolate(Expression([1, 0]), annotate=False)
 F = ((c - c_) * ct / Constant(dt) + inner(grad(cm), w * ct) + Constant(1e-3) * inner(grad(cm), grad(ct))) * dx
 
 # Establish objective functional associated with the space-time integral of concentration in a certain region
-indicator = Function(V).interpolate(Expression('(x[0] > 2.75)&(x[0] < 3.25)&(x[1] > 0.25)&(x[1] < 0.75) ? 1. : 0.'))
+expr = '(x[0] > 2.75) & (x[0] < 3.25) & (x[1] > 0.25) & (x[1] < 0.75) ? 1. : 0.'
+indicator = Function(V).interpolate(Expression(expr), annotate=False)
 J = Functional(c * indicator * dx * dt_meas)
 
 # Solve primal problem
-primalFile = File('plots/forwardTest.pvd')
-cnt = 0
 primalTimer = clock()
 while t < T:
     solve(F == 0, c)
@@ -38,21 +38,18 @@ while t < T:
         adj_inc_timestep(time=t, finished=True)
     else:
         adj_inc_timestep(time=t, finished=False)
-    primalFile.write(c, time=t)
     t += dt
     cnt += 1
 cnt -= 1
 print('Primal run time: %.3fs' % (clock()-primalTimer))
 
 # Solve dual problem
-dualFile = File('plots/adjointTest.pvd')
 store = True
 parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
 dualTimer = clock()
 for (variable, solution) in compute_adjoint(J):
     if store:
         dual.assign(variable, annotate=False)
-        dualFile.write(dual, time=cnt)
         cnt -= 1
         store = False
     else:
@@ -60,3 +57,4 @@ for (variable, solution) in compute_adjoint(J):
     if cnt == 0:
         break
 print('Dual run time:   %.3fs' % (clock()-dualTimer))
+assert(cnt == 0)
