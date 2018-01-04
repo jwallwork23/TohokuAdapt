@@ -5,22 +5,19 @@ import numpy as np
 from time import clock
 
 import utils.adaptivity as adap
+import utils.bootstrapping as boot
+import utils.error as err
 import utils.forms as form
 import utils.interpolation as inte
 import utils.mesh as msh
+import utils.misc as msc
 import utils.options as opt
 
 print('\n***************** EQUATORIAL ROSSBY WAVE TEST PROBLEM *********************\n')
 print('Mesh adaptive solver defined on a rectangular mesh')
-approach = input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': ") or 'fixedMesh'
-
-# Cheat code to resume from saved data in goalBased case
-if approach == 'saved':
-    approach = 'goalBased'
-    getData = False
-else:
-    getData = True
+approach, getData, getError = msc.cheatCodes(input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': "))
 useAdjoint = approach == 'goalBased'
+periodic = True
 
 # Establish filenames
 dirName = "plots/testSuite/"
@@ -30,66 +27,84 @@ adjointFile = File(dirName + "adjointRW.pvd")
 errorFile = File(dirName + "errorIndicatorRW.pvd")
 adaptiveFile = File(dirName + "goalBasedRW.pvd") if useAdjoint else File(dirName + "simpleAdaptRW.pvd")
 
-# Specify physical and solver parameters
-op = opt.Options(dt=0.25,
-                 ndump=4,
+# TODO: bootstrapping
+n = 4
+
+# Define initial mesh and FunctionSpace
+N = 2 * n
+lx = 48
+ly = 24
+if periodic:
+    mesh = PeriodicRectangleMesh(lx * n, ly * n, lx, ly, direction="x")     # Computational mesh
+    mesh_N = PeriodicRectangleMesh(lx * N, ly * N, lx, ly, direction="x")
+else:
+    mesh = RectangleMesh(lx * n, ly * n, lx, ly)    # Computational mesh
+    mesh_N = RectangleMesh(lx * N, ly * N, lx, ly)
+for m in (mesh, mesh_N):
+    xy = Function(m.coordinates)
+    xy.dat.data[:, 0] -= 24.
+    xy.dat.data[:, 1] -= 12.
+    m.coordinates.assign(xy)
+x, y = SpatialCoordinate(mesh)
+
+# Define FunctionSpaces and specify physical and solver parameters
+op = opt.Options(Tstart=0,
                  Tend=120,
                  family='dg-cg',
-                 # Tstart=0.5, hmin=5e-2, hmax=1., rm=5, gradate=False, advect=False,
-                 # vscale=0.4 if useAdjoint else 0.85
-                 )
-dt = op.dt
+                 hmin=0.2,
+                 hmax=4.,
+                 rm=5,
+                 gradate=False,
+                 advect=False,
+                 window=True if useAdjoint else False,
+                 vscale=0.4 if useAdjoint else 0.85,
+                 plotpvd=True if getData == False else False)
+V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
+V_N = VectorFunctionSpace(mesh_N, op.space1, op.degree1) * FunctionSpace(mesh_N, op.space2, op.degree2)
+b = Constant(1.)
+h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
+dt = adap.adaptTimestepSW(mesh, b)
+print('     #### Using initial timestep = %4.3fs\n' % dt)
 Dt = Constant(dt)
 T = op.Tend
 Ts = op.Tstart
 ndump = op.ndump
-b = Constant(1.)
-op.checkCFL(b)
 
-# Define initial mesh and FunctionSpace
-n = 4
-# N = 2 * n
-lx = 48
-ly = 24
-mesh = PeriodicRectangleMesh(lx * n, ly * n, lx, ly, direction="x")   # Computational mesh
-# mesh = RectangleMesh(lx * n, ly * n, lx, ly)   # Computational mesh
-xy = Function(mesh.coordinates)
-xy.dat.data[:, 0] -= 24.
-xy.dat.data[:, 1] -= 12.
-mesh.coordinates.assign(xy)
-
-# mesh_N = SquareMesh(N, N, lx, lx)   # Finer mesh (N > n) upon which to approximate error
-x, y = SpatialCoordinate(mesh)
-V_n = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
-# V_N = VectorFunctionSpace(mesh_N, op.space1, op.degree1) * FunctionSpace(mesh_N, op.space2, op.degree2)
-
+# Define Functions relating to goalBased approach
 if useAdjoint:
     rho = Function(V_N)
     rho_u, rho_e = rho.split()
     rho_u.rename("Velocity residual")
     rho_e.rename("Elevation residual")
-    dual = Function(V_n)
+    dual = Function(V)
     dual_u, dual_e = dual.split()
-    dual_u.rename("Adjoint velocity")
-    dual_e.rename("Adjoint elevation")
+    dual_N = Function(V_N)
+    dual_N_u, dual_N_e = dual_N.split()
+    dual_N_u.rename("Adjoint velocity")
+    dual_N_e.rename("Adjoint elevation")
     P0_N = FunctionSpace(mesh_N, "DG", 0)
     v = TestFunction(P0_N)
+    epsilon = Function(P0_N, name="Error indicator")
 
 # Apply initial and boundary conditions
-q_ = form.analyticHuang(V_n)
+q_ = form.analyticHuang(V)
 u_, eta_ = q_.split()
-q = Function(V_n)
+q = Function(V)
 q.assign(q_)
 u, eta = q.split()
 u.rename("Velocity")
 eta.rename("Elevation")
-bc = DirichletBC(V_n.sub(0), [0, 0], [1, 2])  # No-slip on top and bottom of domain
-# bc = DirichletBC(V_n.sub(0), [0, 0], 'on_boundary')  # No-slip on top and bottom of domain
+if periodic:
+    bc = DirichletBC(V.sub(0), [0, 0], [1, 2])              # No-slip on top and bottom of domain
+else:
+    bc = DirichletBC(V_n.sub(0), [0, 0], 'on_boundary')     # No-slip on entire boundary
 
 # Get adaptivity parameters
 hmin = op.hmin
 hmax = op.hmax
 rm = op.rm
+iStart = int(op.Tstart / dt)
+iEnd = np.ceil(T / dt)
 nEle, nVer = msh.meshStats(mesh)
 mM = [nEle, nEle]           # Min/max #Elements
 Sn = nEle
@@ -99,9 +114,9 @@ nVerT = nVer * op.vscale    # Target #Vertices
 t = 0.
 cnt = 0
 
-if getData or (approach == 'fixedMesh'):
+if getData:
     # Define variational problem
-    qt = TestFunction(V_n)
+    qt = TestFunction(V)
     F = form.weakResidualSW(q, q_, qt, b, Dt, g=1., f0=0., beta=1.,
                             rotational=True, nonlinear=False, allowNormalFlow=True)
     forwardProblem = NonlinearVariationalProblem(F, q, bcs=bc)
@@ -140,7 +155,7 @@ if getData or (approach == 'fixedMesh'):
         #     else:
         #         adj_inc_timestep(time=t, finished=finished)
 
-        if not cnt % ndump:
+        if cnt % ndump == 0:
             forwardFile.write(u, eta, time=t)
             print('t = %.2fs' % t)
         t += dt

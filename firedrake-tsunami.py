@@ -26,7 +26,7 @@ op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
                  advect=False,
                  window=False,
                  outputHessian=False,
-                 plotpvd=False if approach == 'fixedMesh' else True,
+                 plotpvd=True,
                  coarseness=8,
                  gauges=True)
 nEle = (691750, 450386, 196560, 33784, 20724, 14228, 11020, 8782, 6176)[op.coarseness]
@@ -116,7 +116,7 @@ cnt = 0
 if getData:
     # Define variational problem
     qt = TestFunction(V)
-    forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
+    forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
     forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
     print('\nStarting fixed mesh primal run (forwards in time)')
@@ -302,7 +302,7 @@ if approach in ('simpleAdapt', 'goalBased'):
 
             # Re-establish variational form
             qt = TestFunction(V)
-            adaptProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
+            adaptProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
             adaptSolver = NonlinearVariationalSolver(adaptProblem, solver_parameters=op.params)
 
             # Get mesh stats
@@ -335,7 +335,7 @@ if approach in ('simpleAdapt', 'goalBased'):
 if getData and useAdjoint:
     msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer)
 
-# Save and plot timeseries
+# Save and plot timeseries  TODO: output times as well, to account for adaptive timestepping
 name = input("Enter a name for these time series (e.g. 'goalBased8-12-17'): ") or 'test'
 for gauge in gauges:
     tim.saveTimeseries(gauge, gaugeData[gauge], name=name)

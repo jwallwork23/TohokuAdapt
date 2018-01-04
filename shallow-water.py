@@ -15,7 +15,7 @@ import utils.options as opt
 
 
 print('\n*********************** SHALLOW WATER TEST PROBLEM ************************\n')
-print('Mesh adaptive solver initially defined on a square mesh')
+print('Mesh adaptive solver defined on a square mesh')
 approach, getData, getError = msc.cheatCodes(input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': "))
 useAdjoint = approach == 'goalBased'
 tAdapt = True
@@ -39,13 +39,11 @@ print('Bootstrapping run time: %.3fs' % bootTimer)
 N = 2 * n
 lx = 2 * np.pi
 mesh = SquareMesh(n, n, lx, lx)     # Computational mesh
-x, y = SpatialCoordinate(mesh)
 mesh_N = SquareMesh(N, N, lx, lx)   # Finer mesh (N > n) upon which to approximate error
 x, y = SpatialCoordinate(mesh)
 
 # Define FunctionSpaces and specify physical and solver parameters
-op = opt.Options(dt=0.05,
-                 Tstart=0.5,
+op = opt.Options(Tstart=0.5,
                  Tend=2.5,
                  family='dg-cg',
                  hmin=5e-2,
@@ -53,9 +51,10 @@ op = opt.Options(dt=0.05,
                  rm=5,
                  gradate=False,
                  advect=False,
-                 window=True,
-                 vscale=0.4 if useAdjoint else 0.85)
-V_n = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
+                 window=True if useAdjoint else False,
+                 vscale=0.4 if useAdjoint else 0.85,
+                 plotpvd=True if getData == False else False)
+V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
 V_N = VectorFunctionSpace(mesh_N, op.space1, op.degree1) * FunctionSpace(mesh_N, op.space2, op.degree2)
 b = Constant(0.1)
 h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
@@ -64,6 +63,7 @@ print('     #### Using initial timestep = %4.3fs\n' % dt)
 Dt = Constant(dt)
 T = op.Tend
 Ts = op.Tstart
+ndump = op.ndump
 
 # Define Functions relating to goalBased approach
 if useAdjoint:
@@ -71,7 +71,7 @@ if useAdjoint:
     rho_u, rho_e = rho.split()
     rho_u.rename("Velocity residual")
     rho_e.rename("Elevation residual")
-    dual = Function(V_n)
+    dual = Function(V)
     dual_u, dual_e = dual.split()
     dual_N = Function(V_N)
     dual_N_u, dual_N_e = dual_N.split()
@@ -82,12 +82,12 @@ if useAdjoint:
     epsilon = Function(P0_N, name="Error indicator")
 
 # Apply initial condition and define Functions
-ic = project(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))), V_n.sub(1))
-q_ = Function(V_n)
+ic = project(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))), V.sub(1))
+q_ = Function(V)
 u_, eta_ = q_.split()
 u_.interpolate(Expression([0, 0]))
 eta_.assign(ic)
-q = Function(V_n)
+q = Function(V)
 q.assign(q_)
 u, eta = q.split()
 u.rename("Velocity")
@@ -110,21 +110,22 @@ cnt = 0
 
 if getData:
     # Define variational problem
-    qt = TestFunction(V_n)
-    forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
+    qt = TestFunction(V)
+    forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
     forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
     print('\nStarting primal run (forwards in time) on a fixed mesh with %d elements' % nEle)
     finished = False
     primalTimer = clock()
-    # forwardFile.write(u, eta, time=t)
+    if op.plotpvd:
+        forwardFile.write(u, eta, time=t)
     while t < T:
         # Solve problem at current timestep
         forwardSolver.solve()
 
         # Approximate residual of forward equation and save to HDF5
         if useAdjoint:
-            if not cnt % rm:
+            if cnt % rm == 0:
                 qN, q_N = inte.mixedPairInterp(mesh_N, V_N, q, q_)
                 Au, Ae = form.strongResidualSW(qN, q_N, b, Dt)
                 rho_u.interpolate(Au)
@@ -133,7 +134,8 @@ if getData:
                     saveRes.store(rho_u)
                     saveRes.store(rho_e)
                     saveRes.close()
-                # residualFile.write(rho_u, rho_e, time=t)
+                if op.plotpvd:
+                    residualFile.write(rho_u, rho_e, time=t)
 
         # Update solution at previous timestep
         q_.assign(q)
@@ -147,7 +149,8 @@ if getData:
             else:
                 adj_inc_timestep(time=t, finished=finished)
 
-        # forwardFile.write(u, eta, time=t)
+        if op.plotpvd & (cnt % ndump == 0):
+            forwardFile.write(u, eta, time=t)
         print('t = %.3fs' % t)
         t += dt
         cnt += 1
@@ -175,13 +178,14 @@ if getData:
                 dual_N_e.rename('Adjoint elevation')
 
                 # Save adjoint data to HDF5
-                if not cnt % rm:
+                if cnt % rm == 0:
                     with DumbCheckpoint(dirName+'hdf5/adjoint_SW'+msc.indexString(cnt), mode=FILE_CREATE) as saveAdj:
                         saveAdj.store(dual_N_u)
                         saveAdj.store(dual_N_e)
                         saveAdj.close()
 
-                # adjointFile.write(dual_u, dual_e, time=t)
+                if op.plotpvd:
+                    adjointFile.write(dual_u, dual_e, time=t)
                 print('t = %.3fs' % t)
                 t -= dt
                 cnt -= 1
@@ -239,7 +243,8 @@ if getError:
         with DumbCheckpoint(dirName + 'hdf5/error_SW' + indexStr, mode=FILE_CREATE) as saveErr:
             saveErr.store(epsilon)
             saveErr.close()
-        errorFile.write(epsilon, time=t)
+        if op.plotpvd:
+            errorFile.write(epsilon, time=t)
     errorTimer = clock() - errorTimer
     print('Errors estimated. Run time: %.3fs' % errorTimer)
 
@@ -279,7 +284,7 @@ if approach in ('simpleAdapt', 'goalBased'):
 
             # Re-establish variational form
             qt = TestFunction(V)
-            adaptProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
+            adaptProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
             adaptSolver = NonlinearVariationalSolver(adaptProblem, solver_parameters=op.params)
 
             # Get mesh stats
@@ -299,7 +304,8 @@ if approach in ('simpleAdapt', 'goalBased'):
 
         # Print to screen, save data and increment counters
         print('t = %.3fs' % t)
-        adaptiveFile.write(u, eta, time=t)
+        if op.plotpvd & (cnt % ndump == 0):
+            adaptiveFile.write(u, eta, time=t)
         t += dt
         cnt += 1
     adaptTimer = clock() - adaptTimer

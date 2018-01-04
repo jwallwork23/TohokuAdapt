@@ -51,19 +51,21 @@ op = opt.Options(dt=0.04,
                  gradate=False,
                  advect=False,
                  window=True,
-                 vscale=0.4 if useAdjoint else 0.85)
-V_n = FunctionSpace(mesh_n, "CG", 2)
+                 vscale=0.4 if useAdjoint else 0.85,
+                 plotpvd=True if getData == False else False)
+V = FunctionSpace(mesh_n, "CG", 2)
 V_N = FunctionSpace(mesh_N, "CG", 2)
 w = Function(VectorFunctionSpace(mesh_n, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
 dt = adap.adaptTimestepAD(w)
 print('     #### Using initial timestep = %4.3fs\n' % dt)
 Dt = Constant(dt)
 T = op.Tend
+ndump = op.ndump
 nu = 1e-3 if diffusion else 0.
 
 # Define Functions relating to goalBased approach
 if useAdjoint:
-    dual_n = Function(V_n, name='Adjoint')
+    dual_n = Function(V, name='Adjoint')
     dual_N = Function(V_N, name='Fine mesh adjoint')
     rho = Function(V_N, name='Residual')
     P0_N = FunctionSpace(mesh_N, "DG", 0)
@@ -71,10 +73,10 @@ if useAdjoint:
     epsilon = Function(P0_N, name="Error indicator")
 
 # Apply initial condition and define Functions
-ic = project(exp(- (pow(x - 0.5, 2) + pow(y - 0.5, 2)) / 0.04), V_n)
+ic = project(exp(- (pow(x - 0.5, 2) + pow(y - 0.5, 2)) / 0.04), V)
 phi = ic.copy(deepcopy=True)
 phi.rename('Concentration')
-phi_next = Function(V_n, name='Concentration next')
+phi_next = Function(V, name='Concentration next')
 
 # Get adaptivity parameters
 hmin = op.hmin
@@ -92,13 +94,15 @@ cnt = 0
 
 if getData:
     # Define variational problem
-    psi = TestFunction(V_n)
+    psi = TestFunction(V)
     F = form.weakResidualAD(phi_next, phi, psi, w, Dt, nu=nu)
-    bc = DirichletBC(V_n, 0., "on_boundary")
+    bc = DirichletBC(V, 0., "on_boundary")
 
     print('\nStarting primal run (forwards in time) on a fixed mesh with %d elements' % nEle)
     finished = False
     primalTimer = clock()
+    if op.plotpvd:
+        forwardFile.write(u, eta, time=t)
     while t < T:
         # Solve problem at current timestep
         solve(F == 0, phi_next, bc)
@@ -111,7 +115,8 @@ if getData:
                 with DumbCheckpoint(dirName + 'hdf5/residual_AD' + msc.indexString(cnt), mode=FILE_CREATE) as saveRes:
                     saveRes.store(rho)
                     saveRes.close()
-                # residualFile.write(rho, time=t)
+                if op.plotpvd:
+                    residualFile.write(rho_u, rho_e, time=t)
 
         # Update solution at previous timestep
         phi.assign(phi_next)
@@ -125,7 +130,8 @@ if getData:
             else:
                 adj_inc_timestep(time=t, finished=finished)
 
-        # forwardFile.write(phi, time=t)
+        if op.plotpvd & (cnt % ndump == 0):
+            forwardFile.write(u, eta, time=t)
         print('t = %.3fs' % t)
         t += dt
         cnt += 1
@@ -156,8 +162,8 @@ if getData:
                         saveAdj.store(dual_N)
                         saveAdj.close()
 
-                # Print to screen, save data and increment counters
-                # adjointFile.write(dual_n, time=t)
+                if op.plotpvd:
+                    adjointFile.write(dual_n, time=t)
                 print('t = %.3fs' % t)
                 t -= dt
                 cnt -= 1
@@ -212,7 +218,8 @@ if getError:
         with DumbCheckpoint(dirName + 'hdf5/error_AD' + indexStr, mode=FILE_CREATE) as saveErr:
             saveErr.store(epsilon)
             saveErr.close()
-        errorFile.write(epsilon, time=t)
+        if op.plotpvd:
+            errorFile.write(epsilon, time=t)
     errorTimer = clock() - errorTimer
     print('Errors estimated. Run time: %.3fs' % errorTimer)
 
@@ -247,14 +254,14 @@ if approach in ('simpleAdapt', 'goalBased'):
             mesh_n = AnisotropicAdaptation(mesh_n, M).adapted_mesh
             phi = inte.interp(mesh_n, phi)[0]
             phi.rename("Concentration")
-            V_n = FunctionSpace(mesh_n, "CG", 2)
-            phi_next = Function(V_n)
+            V = FunctionSpace(mesh_n, "CG", 2)
+            phi_next = Function(V)
 
             # Re-establish bilinear form and set boundary conditions
-            psi = TestFunction(V_n)
+            psi = TestFunction(V)
             w = Function(VectorFunctionSpace(mesh_n, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
             F = form.weakResidualAD(phi_next, phi, psi, w, Dt, nu=nu)
-            bc = DirichletBC(V_n, 0., "on_boundary")
+            bc = DirichletBC(V, 0., "on_boundary")
 
             # Get mesh stats
             nEle = msh.meshStats(mesh_n)[0]
@@ -273,7 +280,8 @@ if approach in ('simpleAdapt', 'goalBased'):
 
         # Print to screen, save data and increment counters
         print('t = %.3fs' % t)
-        adaptiveFile.write(phi, time=t)
+        if op.plotpvd & (cnt % ndump == 0):
+            adaptiveFile.write(phi, time=t)
         t += dt
         cnt += 1
     adaptTimer = clock() - adaptTimer

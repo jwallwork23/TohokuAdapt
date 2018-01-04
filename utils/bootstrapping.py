@@ -80,7 +80,7 @@ def solverSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg',)):
 
     # Define variational problem and OF
     qt = TestFunction(V)
-    forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
+    forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
     forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
     iA = form.indicator(V.sub(1), x1=0., x2=0.5*np.pi, y1=0.5*np.pi, y2=1.5*np.pi, smooth=False)
 
@@ -133,7 +133,7 @@ def solverFiredrake(nEle, op=opt.Options()):
 
     # Define variational problem and OF
     qt = TestFunction(V)
-    forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt), q)
+    forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
     forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
     iA = form.indicator(V.sub(1), x1=490e3, x2=640e3, y1=4160e3, y2=4360e3, smooth=True)
 

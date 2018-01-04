@@ -98,19 +98,15 @@ def formsSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, n
     (w, xi) = (as_vector((qt[0], qt[1])), qt[2])
     a1, a2 = timestepCoeffs(timestepper)
 
-    # LHS bilinear form
-    B = (inner(u, w) + inner(eta, xi)) / Dt * dx                            # Time derivative component
-    B += a1 * (g * inner(grad(eta), w) - inner(b * u, grad(xi))) * dx       # Linear spatial derivative components
-
-    # RHS linear functional
-    L = (inner(u_, w) + inner(eta_, xi)) / Dt * dx                          # Time derivative component
-    L -= a2 * (g * inner(grad(eta_), w) - inner(b * u_, grad(xi))) * dx     # Linear spatial derivative components
-    # TODO: try NOT applying Neumann condition ^^^ in RHS functional
+    B = (inner(u, w) + eta * xi) / Dt * dx + a1 * g * inner(grad(eta), w) * dx      # LHS bilinear form
+    L = (inner(u_, w) + eta_ * xi) / Dt * dx - a2 * g * inner(grad(eta_), w) * dx   # RHS linear functional
 
     if allowNormalFlow:
-        n = FacetNormal(mesh)
-        B += a1 * b * xi * dot(u, n) * ds
-        L -= a2 * b * xi * dot(u_, n) * ds
+        B += a1 * div(b * u) * xi * dx
+        L -= a2 * div(b * u_) * xi * dx
+    else:
+        B -= a1 * inner(b * u, grad(xi)) * dx
+        L += a2 * inner(b * u_, grad(xi)) * dx
     if nu != 0.:
         B -= a1 * nu * inner(grad(u) + transpose(grad(u)), grad(w)) * dx
         L += a2 * nu * inner(grad(u_) + transpose(grad(u_)), grad(w)) * dx
