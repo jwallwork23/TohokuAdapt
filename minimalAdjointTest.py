@@ -26,29 +26,34 @@ indicator = Function(V).interpolate(Expression('(x[0] > 2.75)&(x[0] < 3.25)&(x[1
 J = Functional(c * indicator * dx * dt_meas)
 
 # Solve primal problem
+primalFile = File('plots/forwardTest.pvd')
 cnt = 0
 primalTimer = clock()
 while t < T:
-    solve(F == 0, c)
-    c_.assign(c, annotate=False)
+    solve(F == 0, c, annotate=False)
+    c_.assign(c)
     if t == 0.:
         adj_start_timestep()
     elif t >= T:
         adj_inc_timestep(time=t, finished=True)
     else:
         adj_inc_timestep(time=t, finished=False)
+    primalFile.write(c, time=t)
     t += dt
     cnt += 1
 cnt -= 1
 print('Primal run time: %.3fs' % (clock()-primalTimer))
 
 # Solve dual problem
+dualFile = File('plots/adjointTest.pvd')
+store = True
 parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
 dualTimer = clock()
 for (variable, solution) in compute_adjoint(J):
-    # print(solution)
-    dual.assign(variable, annotate=False)
-    cnt -= 1
+    if store:
+        dual.assign(variable, annotate=False)
+        dualFile.write(dual, time=cnt)
+        cnt -= 1
     if cnt == 0:
         break
 print('Dual run time:   %.3fs' % (clock()-dualTimer))
