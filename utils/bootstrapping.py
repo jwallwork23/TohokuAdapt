@@ -215,7 +215,8 @@ def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10.):
         elif problem == 'rossby-wave':
             raise NotImplementedError
         elif problem == 'firedrake-tsunami':
-            nEle = (6176, 8782, 11020, 14228, 20724, 33784, 196560, 450386, 691750)[i]
+            # nEle = (6176, 8782, 11020, 14228, 20724, 33784, 196560, 450386, 691750)[i]
+            nEle = (6176, 8782, 11020, 20724, 33784, 196560, 450386, 691750)[i]
             J = solverFiredrake(nEle)
         elif problem == 'thetis-tsunami':
             nEle = (6176, 8782, 11020, 14228, 20724, 33784, 196560, 450386, 691750)[i]
@@ -252,4 +253,4 @@ def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10.):
             break
 
     print("Converged to J = %6.4e in %d iterations, due to %s" % (Js[-1], iOpt, reason))
-    return pow(2, iOpt), Js, nEls, ts
+    return nEle, Js, nEls, ts

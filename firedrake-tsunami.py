@@ -5,6 +5,7 @@ import numpy as np
 from time import clock
 
 import utils.adaptivity as adap
+import utils.bootstrapping as boot
 import utils.error as err
 import utils.forms as form
 import utils.interpolation as inte
@@ -27,10 +28,15 @@ op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
                  window=False,
                  outputHessian=False,
                  plotpvd=True,
-                 coarseness=8,
+                 coarseness=3,
                  gauges=True)
-nEle = (691750, 450386, 196560, 33784, 20724, 14228, 11020, 8782, 6176)[op.coarseness]
-# TODO: bootstrap to establish initial mesh resolution
+
+# Establish initial mesh resolution
+bootTimer = clock()
+print('\nBootstrapping to establish optimal mesh resolution')
+nEle = boot.bootstrap('firedrake-tsunami', tol=2e10)[0]
+bootTimer = clock() - bootTimer
+print('Bootstrapping run time: %.3fs' % bootTimer)
 
 # Establish filenames
 dirName = 'plots/firedrake-tsunami/'
