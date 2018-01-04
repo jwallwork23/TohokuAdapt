@@ -253,4 +253,7 @@ def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10.):
             break
 
     print("Converged to J = %6.4e in %d iterations, due to %s" % (Js[-1], iOpt, reason))
-    return nEle, Js, nEls, ts
+    if problem in ('firedrake-tsunami', 'thetis-tsunami'):
+        return nEle, Js, nEls, ts
+    else:
+        return n, Js, nEls, ts

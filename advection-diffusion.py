@@ -38,9 +38,9 @@ print('Bootstrapping run time: %.3fs' % bootTimer)
 
 # Define initial Meshes
 N = 2 * n
-mesh_n = RectangleMesh(4 * n, n, 4, 1)  # Computational mesh
+mesh = RectangleMesh(4 * n, n, 4, 1)  # Computational mesh
 mesh_N = RectangleMesh(4 * N, N, 4, 1)  # Finer mesh (N > n) upon which to approximate error
-x, y = SpatialCoordinate(mesh_n)
+x, y = SpatialCoordinate(mesh)
 
 # Define FunctionSpaces and specify physical and solver parameters
 op = opt.Options(dt=0.04,
@@ -53,9 +53,9 @@ op = opt.Options(dt=0.04,
                  window=True,
                  vscale=0.4 if useAdjoint else 0.85,
                  plotpvd=True if getData == False else False)
-V = FunctionSpace(mesh_n, "CG", 2)
+V = FunctionSpace(mesh, "CG", 2)
 V_N = FunctionSpace(mesh_N, "CG", 2)
-w = Function(VectorFunctionSpace(mesh_n, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
+w = Function(VectorFunctionSpace(mesh, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
 dt = adap.adaptTimestepAD(w)
 print('     #### Using initial timestep = %4.3fs\n' % dt)
 Dt = Constant(dt)
@@ -83,7 +83,7 @@ hmin = op.hmin
 hmax = op.hmax
 rm = op.rm
 iEnd = np.ceil(T / dt)
-nEle, nVer = msh.meshStats(mesh_n)
+nEle, nVer = msh.meshStats(mesh)
 mM = [nEle, nEle]           # Min/max #Elements
 Sn = nEle
 nVerT = nVer * op.vscale    # Target #Vertices
@@ -231,19 +231,19 @@ if approach in ('simpleAdapt', 'goalBased'):
             stepTimer = clock()
 
             # Construct metric
-            W = TensorFunctionSpace(mesh_n, "CG", 1)
+            W = TensorFunctionSpace(mesh, "CG", 1)
             if useAdjoint:
                 # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
                 with DumbCheckpoint(dirName + 'hdf5/error_AD' + msc.indexString(cnt), mode=FILE_READ) as loadError:
                     loadError.load(epsilon)
                     loadError.close()
-                errEst = Function(FunctionSpace(mesh_n, "CG", 1)).interpolate(inte.interp(mesh_n, epsilon)[0])
+                errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])
                 M = adap.isotropicMetric(W, errEst, op=op, invert=False)
             else:
-                H = adap.constructHessian(mesh_n, W, phi, op=op)
-                M = adap.computeSteadyMetric(mesh_n, W, H, phi, nVerT=nVerT, op=op)
+                H = adap.constructHessian(mesh, W, phi, op=op)
+                M = adap.computeSteadyMetric(mesh, W, H, phi, nVerT=nVerT, op=op)
             if op.gradate:
-                adap.metricGradation(mesh_n, M)
+                adap.metricGradation(mesh, M)
             if op.advect:
                 if useAdjoint:
                     M = adap.isotropicAdvection(M, errEst, w, 2*Dt, n=3*rm)
@@ -251,20 +251,20 @@ if approach in ('simpleAdapt', 'goalBased'):
                     M = adap.advectMetric(M, w, 2*Dt, n=3*rm)
 
             # Adapt mesh and interpolate variables
-            mesh_n = AnisotropicAdaptation(mesh_n, M).adapted_mesh
-            phi = inte.interp(mesh_n, phi)[0]
+            mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
+            phi = inte.interp(mesh, phi)[0]
             phi.rename("Concentration")
-            V = FunctionSpace(mesh_n, "CG", 2)
+            V = FunctionSpace(mesh, "CG", 2)
             phi_next = Function(V)
 
             # Re-establish bilinear form and set boundary conditions
             psi = TestFunction(V)
-            w = Function(VectorFunctionSpace(mesh_n, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
+            w = Function(VectorFunctionSpace(mesh, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
             F = form.weakResidualAD(phi_next, phi, psi, w, Dt, nu=nu)
             bc = DirichletBC(V, 0., "on_boundary")
 
             # Get mesh stats
-            nEle = msh.meshStats(mesh_n)[0]
+            nEle = msh.meshStats(mesh)[0]
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
             op.printToScreen(cnt / rm + 1, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, mM, t)

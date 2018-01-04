@@ -475,7 +475,7 @@ def adaptTimestepAD(w, sigma=0.9):
     """
     mesh = w.function_space().mesh()
     h = Function(FunctionSpace(mesh, 'DG', 0)).interpolate(CellSize(mesh))
-    return sigma * min(h.dat.data) / max(w.dat.data)
+    return sigma * min(h.dat.data) / max(np.sqrt(pow(w.dat.data[:, 0], 2) + pow(w.dat.data[:, 1], 2)))
 
 
 if __name__ == '__main__':
