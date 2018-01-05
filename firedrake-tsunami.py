@@ -34,7 +34,8 @@ op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
 # Establish initial mesh resolution
 bootTimer = clock()
 print('\nBootstrapping to establish optimal mesh resolution')
-nEle = boot.bootstrap('firedrake-tsunami', tol=2e10)[0]
+i = boot.bootstrap('firedrake-tsunami', tol=2e10)[0]
+nEle = op.meshes[i]
 bootTimer = clock() - bootTimer
 print('Bootstrapping run time: %.3fs\n' % bootTimer)
 
@@ -56,7 +57,8 @@ if useAdjoint:
         assert op.coarseness != 1
     except:
         raise NotImplementedError("Requested mesh resolution not yet available.")
-    mesh_N, b_N = msh.TohokuDomain(op.coarseness-1)[0::2]   # Get finer mesh and associated bathymetry
+    # Get finer mesh and associated bathymetry
+    mesh_N, b_N = msh.TohokuDomain(op.meshes[i+1])[0::2]
     V_N = VectorFunctionSpace(mesh_N, op.space1, op.degree1) * FunctionSpace(mesh_N, op.space2, op.degree2)
 
 # Specify physical and solver parameters
@@ -72,8 +74,8 @@ op.checkCFL(b)
 V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
 q_ = Function(V)
 u_, eta_ = q_.split()
-u_.interpolate(Expression([0, 0]))
-eta_.interpolate(eta0)
+u_.interpolate(Expression([0, 0]), annotate=False)
+eta_.interpolate(eta0, annotate=False)
 q = Function(V)
 q.assign(q_)
 u, eta = q.split()
@@ -102,6 +104,7 @@ if useAdjoint:
     P0_N = FunctionSpace(mesh_N, "DG", 0)
     v = TestFunction(P0_N)
     epsilon = Function(P0_N, name="Error indicator")
+    J = form.objectiveFunctionalSW(q, plot=True)
 
 # Get adaptivity parameters
 hmin = op.hmin
@@ -109,7 +112,6 @@ hmax = op.hmax
 rm = op.rm
 iStart = int(op.Tstart / dt)
 iEnd = int(np.ceil(T / dt))
-nEle, nVer = msh.meshStats(mesh)
 mM = [nEle, nEle]           # Min/max #Elements
 Sn = nEle
 nVerT = nVer * op.vscale    # Target #Vertices
@@ -118,6 +120,7 @@ nVerT0 = nVerT
 # Initialise counters
 t = 0.
 cnt = 0
+save = True
 
 if getData:
     # Define variational problem
@@ -125,7 +128,7 @@ if getData:
     forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
     forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
-    print('\nStarting fixed mesh primal run (forwards in time)')
+    print('Starting fixed mesh primal run (forwards in time)')
     finished = False
     primalTimer = clock()
     if op.plotpvd:
@@ -174,12 +177,7 @@ if getData:
     print('Primal run complete. Run time: %.3fs' % primalTimer)
 
     if useAdjoint:
-        # Set up adjoint problem
-        J = form.objectiveFunctionalSW(q, plot=True)
         parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
-        save = True
-
-        # Time integrate (backwards)
         print('\nStarting fixed mesh dual run (backwards in time)')
         dualTimer = clock()
         for (variable, solution) in compute_adjoint(J):
@@ -192,12 +190,12 @@ if getData:
                 dual_N_e.rename('Adjoint elevation')
 
                 # Save adjoint data to HDF5
-                if not cnt % rm:
+                if cnt % rm == 0:
                     with DumbCheckpoint(dirName + 'hdf5/adjoint_' + msc.indexString(cnt), mode=FILE_CREATE) as saveAdj:
                         saveAdj.store(dual_N_u)
                         saveAdj.store(dual_N_e)
                         saveAdj.close()
-                print('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT))
+                print('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT) * 100)
                 cnt -= 1
                 save = False
             else:

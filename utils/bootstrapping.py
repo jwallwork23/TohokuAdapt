@@ -113,7 +113,6 @@ def solverFiredrake(nEle, op=opt.Options()):
 
     # Define Mesh and FunctionSpace
     mesh, eta0, b = msh.TohokuDomain(nEle)
-    nEle = msh.meshStats(mesh)[0]
     V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
 
     # Specify solver parameters
@@ -163,7 +162,6 @@ def solverThetis(nEle, op=opt.Options()):
 
     # Get Mesh and initial condition and bathymetry defined thereupon
     mesh, eta0, b = msh.TohokuDomain(nEle)
-    nEle = msh.meshStats(mesh)[0]
     V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
 
     # Set up solver
@@ -197,7 +195,7 @@ def solverThetis(nEle, op=opt.Options()):
     return J_trap * op.dt
 
 
-def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10.):
+def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10., op=opt.Options()):
     Js = []         # Container for objective functional values
     ts = []         # Timing values
     nEls = []       # Container for element counts
@@ -215,11 +213,10 @@ def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10.):
         elif problem == 'rossby-wave':
             raise NotImplementedError
         elif problem == 'firedrake-tsunami':
-            # nEle = (6176, 8782, 11020, 14228, 20724, 33784, 196560, 450386, 691750)[i]
-            nEle = (6176, 8782, 11020, 20724, 33784, 196560, 450386, 691750)[i]
+            nEle = op.meshes[i]
             J = solverFiredrake(nEle)
         elif problem == 'thetis-tsunami':
-            nEle = (6176, 8782, 11020, 14228, 20724, 33784, 196560, 450386, 691750)[i]
+            nEle = op.meshes[i]
             J = solverFiredrake(nEle)
         else:
             raise ValueError("Problem not recognised.")
@@ -254,6 +251,6 @@ def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10.):
 
     print("Converged to J = %6.4e in %d iterations, due to %s" % (Js[-1], iOpt, reason))
     if problem in ('firedrake-tsunami', 'thetis-tsunami'):
-        return nEle, Js, nEls, ts
+        return iOpt, Js, nEls, ts
     else:
         return pow(2, iOpt), Js, nEls, ts
