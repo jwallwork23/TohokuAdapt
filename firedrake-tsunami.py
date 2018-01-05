@@ -22,11 +22,11 @@ tAdapt = False
 bootstrap = False
 
 # Define initial mesh and mesh statistics placeholders
-op = opt.Options(vscale=0.045 if useAdjoint else 0.85,
+op = opt.Options(vscale=0.05 if useAdjoint else 0.85,
                  rm=60 if useAdjoint else 30,
                  gradate=True if useAdjoint else False,
                  advect=False,
-                 window=True,
+                 window=False,
                  outputHessian=False,
                  plotpvd=True,
                  coarseness=3,
@@ -237,7 +237,7 @@ if getError:
 
         # Estimate error using dual weighted residual
         epsilon = err.DWR(rho, dual_N, v)      # Currently a P0 field
-        # TODO: include functionality for other error estimators
+        # TODO: include functionality for other error estimators. e.g. basic error estimator
 
         # Loop over relevant time window
         if op.window:

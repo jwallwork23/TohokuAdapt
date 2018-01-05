@@ -43,25 +43,6 @@ def explicitErrorEstimator(u_, u, eta_, eta, lu, le, b, dt, hk):
     return Function(FunctionSpace(mesh, "CG", 1)).interpolate(rho)
 
 
-def basicErrorEstimator(u, lu, eta, le):
-    """
-    Consider significant regions as those where the 'dot product' between forward and adjoint variables take significant
-    values in modulus, as per Davis & LeVeque 2016.
-    
-    :param u: fluid velocity at current timestep.
-    :param lu: adjoint fluid velocity at current timestep.
-    :param eta: free surface displacement at current timestep.
-    :param le: adjoint free surface displacement at current timestep.
-    :return: field of local error indicators taken as product over fields.
-    """
-    W = FunctionSpace(u.function_space().mesh(), "CG", 1)   # NOTE error estimators should be continuous!
-    rho = Function(W).interpolate(eta * le)
-    rho_u = Function(W).interpolate(u[0] * lu[0] + u[1] * lu[1])
-    rho.assign(rho + rho_u)
-
-    return rho
-
-
 def DWR(residual, adjoint, v):
     """
     :param residual: approximation of residual for primal equations. 
@@ -76,6 +57,22 @@ def DWR(residual, adjoint, v):
         return assemble(v * inner(residual, adjoint) * dx)
     else:
         return assemble(v * sum([inner(residual.split()[k], adjoint.split()[k]) for k in range(n)]) * dx)
+
+
+def basicErrorEstimator(primal, dual, v):
+    """
+    :param primal: approximate solution of primal equations. 
+    :param dual: approximate solution of dual equations.
+    :param v: P0 test function over the same function space.
+    :return: error estimate as in DL16.
+    """
+    m = len(primal.function_space().dof_count)
+    n = len(dual.function_space().dof_count)
+    assert(m == n)
+    if n == 1:
+        return assemble(v * inner(primal, dual) * dx)
+    else:
+        return assemble(v * sum([inner(primal.split()[k], dual.split()[k]) for k in range(n)]) * dx)
 
 
 def totalVariation(data):
