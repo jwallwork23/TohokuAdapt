@@ -195,7 +195,7 @@ if getData:
                         saveAdj.store(dual_N_u)
                         saveAdj.store(dual_N_e)
                         saveAdj.close()
-                print('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT) * 100)
+                    print('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT) * 100)
                 cnt -= 1
                 save = False
             else:
@@ -316,11 +316,11 @@ if approach in ('simpleAdapt', 'goalBased'):
         adaptSolver.solve()
         q_.assign(q)
 
-        if not cnt % ndump:
+        if cnt % ndump == 0:
             if op.plotpvd:
                 adaptiveFile.write(u, eta, time=t)
             if op.gauges:
-                gaugeData = tim.extractTimeseries(gauges, eta, gaugeData, v0, op=op)
+                gaugeData = tim.extractTimeseries(gauges, eta, t, gaugeData, v0, op=op)
             print('t = %.2fs' % t)
         t += dt
         cnt += 1

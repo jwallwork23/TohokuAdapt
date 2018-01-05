@@ -161,7 +161,7 @@ if getData:
                     with DumbCheckpoint(dirName+'hdf5/adjoint_AD'+msc.indexString(cnt), mode=FILE_CREATE) as saveAdj:
                         saveAdj.store(dual_N)
                         saveAdj.close()
-                print('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT))
+                    print('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT) * 100)
                 cnt -= 1
                 save = False
             else:

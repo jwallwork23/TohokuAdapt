@@ -62,51 +62,47 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options(), output=False, name='
     outfile.close()
 
 
-def extractTimeseries(gauges, eta, current, v0, op=opt.Options()):
+def extractTimeseries(gauges, eta, t,  current, v0, op=opt.Options()):
     """
     :param gauges: list of gauge name strings, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
     :param eta: Function to extract timeseries from.
-    :param current: dictionary containing previous timeseries data.
+    :param t: current time.
+    :param current: dictionary containing timeseries data.
     :param v0: dictionary containing initial gauge values.
     :param op: Options object holding parameter values.
     :return: dictionary containing all timeseries data so far.
     """
     for gauge in gauges:
         if gauge not in current.keys():
-            current[gauge] = []
-            current[gauge].append(0.)
+            current[gauge] = {}
+            current[gauge][t] = 0.
         else:
-            current[gauge].append(float(eta.at(op.gaugeCoord(gauge)) - v0[gauge]))
+            current[gauge][t] = float(eta.at(op.gaugeCoord(gauge)) - v0[gauge])
     return current
 
 
 def saveTimeseries(gauge, data, name='test'):
     """
     :param gauge: gauge name string, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
-    :param data: Timeseries data to save.
+    :param data: timeseries data to save.
     :param name: name to give to timeseries.    
     """
     outfile = open('outdata/timeseries/' + gauge + name + '.txt', 'w+')
-    for i in range(len(data)):
-        outfile.write(str(data[i]) + '\n')
+    for t in data[gauge]:
+        outfile.write(str(t) + ' , ' + str(data[gauge][t]) + '\n')
     outfile.close()
 
 
-def plotGauges(gauge, iEnd, op=opt.Options()):
+def plotGauges(gauge, op=opt.Options()):
     """
     Read timeseries data for a particular gauge and calculate (L1, L2, L-infinity and TV) error norms.
 
     :param gauge: gauge name string, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
-    :param iEnd: final index.
     :param op: Options object holding parameter values.
     """
-
-    # Get solver parameters
     T = op.Tend
-    dt = op.dt                      # TODO: allow for adaptive timestepping
-    ndump = op.ndump
-    numStrips = int(T / (ndump * dt))
-    numVals = numStrips + 1
+    filename = 'outdata/timeseries/' + gauge + 'data_' + str(int(T/60)) + 'mins.txt'
+    iEnd = sum(1 for line in open(filename))
 
     # Get plotting parameters
     labels = op.labels
@@ -115,8 +111,8 @@ def plotGauges(gauge, iEnd, op=opt.Options()):
     mM = [0, 0]     # Min/max for y-axis limits
 
     # Import data from the inversion analysis and interpolate
-    measuredfile = open('outdata/timeseries/' + gauge + 'data_' + str(int(T/60)) + 'mins.txt', 'r')
-    p = np.linspace(0, T/60, num=numVals)
+    measuredfile = open(filename, 'r')
+    p = np.linspace(0, T/60, num=T)
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     plt.rc('legend', fontsize='x-large')
@@ -138,9 +134,10 @@ def plotGauges(gauge, iEnd, op=opt.Options()):
     # Plot timeseries data
     print('\nGauge to plot: ' + gauge + '\n')
     for mesh in labels:
-        error = [0, 0, 0, 0]
-        norm = [0, 0, 0, 0]
-        t = np.linspace(0, T / 60, num=iEnd + 1)
+        # error = [0, 0, 0, 0]
+        # norm = [0, 0, 0, 0]
+        TV_e = TV_n = 0
+        ts = []
         print('Timeseries to plot: ', mesh)
         name = stamps[mesh] + input("Version (hit enter to skip): ")
         if name != stamps[mesh]:
@@ -148,45 +145,47 @@ def plotGauges(gauge, iEnd, op=opt.Options()):
             data = []
             i = 0
             for line in infile:
-                val = float(line)
-                mVal = float(m(t[i]))
+                pair = line.split(',')
+                ts.append(float(pair[0])/60)    # Time in minutes
+                val = float(pair[1])
+                mVal = float(m(ts[-1]))
                 if i == 0:
                     v0 = val - mVal
                     sStart = v0
                     mStart = mVal
                 diff = val - v0 - mVal
-                absDiff = np.abs(diff)
+                # absDiff = np.abs(diff)
 
-                # Compute L1, L2, L-infinity errors and norms of gauge data using trapezium rule
-                if i in (0, iEnd):
-                    error[0] += absDiff
-                    error[1] += absDiff ** 2
-                    norm[0] += np.abs(mVal)
-                    norm[1] += mVal ** 2
-                else:
-                    error[0] += 2 * absDiff
-                    error[1] += 2 * absDiff ** 2
-                    norm[0] += 2 * np.abs(mVal)
-                    norm[1] += 2 * mVal ** 2
-                if absDiff > error[2]:
-                    error[2] = absDiff
-                if mVal > norm[2]:
-                    norm[2] = mVal
+                # # Compute L1, L2, L-infinity errors and norms of gauge data using trapezium rule
+                # if i in (0, iEnd):
+                #     error[0] += absDiff
+                #     error[1] += absDiff ** 2
+                #     norm[0] += np.abs(mVal)
+                #     norm[1] += mVal ** 2
+                # else:
+                #     error[0] += 2 * absDiff
+                #     error[1] += 2 * absDiff ** 2
+                #     norm[0] += 2 * np.abs(mVal)
+                #     norm[1] += 2 * mVal ** 2
+                # if absDiff > error[2]:
+                #     error[2] = absDiff
+                # if mVal > norm[2]:
+                #     norm[2] = mVal
 
                 # Compute total variation of error and gauge data
-                if i == ndump:
+                if i == 1:
                     sign = (diff - diff_) / np.abs(diff - diff_)
                     mSign = (mVal - mVal_) / np.abs(mVal - mVal_)
-                elif i > ndump:
+                elif i > 1:
                     sign_ = sign
                     mSign_ = mSign
                     sign = (diff - diff_) / np.abs(diff - diff_)
                     mSign = (mVal - mVal_) / np.abs(mVal - mVal_)
                     if (sign != sign_) | (i == iEnd):
-                        error[3] += np.abs(diff - sStart)
+                        TV_e += np.abs(diff - sStart)
                         sStart = diff
                     if (mSign != mSign_) | (i == iEnd):
-                        norm[3] += np.abs(mVal - mStart)
+                        TV_n += np.abs(mVal - mStart)
                         mStart = mVal
                 diff_ = diff
                 mVal_ = mVal
@@ -195,27 +194,23 @@ def plotGauges(gauge, iEnd, op=opt.Options()):
                 elif val > mM[1]:
                     mM[1] = val
                 data.append(val)
-                # i += ndump
                 i += 1
-            plt.plot(np.linspace(0, T/60, numVals), data,
-                     label=mesh,
-                     marker=styles[mesh],
-                     markevery=10,
-                     linewidth=0.75)
+            plt.plot(ts, data, label=mesh, marker=styles[mesh], markevery=5, linewidth=0.75)
+            print('Absolute total variation : %6.3f Relative total variation : %6.3f' % (TV_e, TV_e / TV_n))
 
-            # Print errors to screen
-            h = 1 / numStrips
-            error[0] *= h / 2
-            norm[0] *= h / 2
-            error[1] = np.sqrt(error[1] * h / 2)
-            norm[1] = np.sqrt(norm[1] * h / 2)
-            print('\n' + gauge + """
-Absolute L1 norm :         %6.3f Relative L1 norm :         %6.3f
-Absolute L2 norm :         %6.3f Relative L2 norm :         %6.3f
-Absolute L-infinity norm : %6.3f Relative L-infinity norm : %6.3f
-Absolute total variation : %6.3f Relative total variation : %6.3f""" %
-                  (error[0], error[0] / norm[0], error[1], error[1] / norm[1],
-                   error[2], error[2] / norm[2], error[3], error[3] / norm[3],))
+#             # Print errors to screen
+#             h = ts[-1] - ts[-2]
+#             error[0] *= h / 2
+#             norm[0] *= h / 2
+#             error[1] = np.sqrt(error[1] * h / 2)
+#             norm[1] = np.sqrt(norm[1] * h / 2)
+#             print('\n' + gauge + """
+# Absolute L1 norm :         %6.3f Relative L1 norm :         %6.3f
+# Absolute L2 norm :         %6.3f Relative L2 norm :         %6.3f
+# Absolute L-infinity norm : %6.3f Relative L-infinity norm : %6.3f
+# Absolute total variation : %6.3f Relative total variation : %6.3f""" %
+#                   (error[0], error[0] / norm[0], error[1], error[1] / norm[1],
+#                    error[2], error[2] / norm[2], error[3], error[3] / norm[3],))
 
     plt.xlim([0, T/60])
     plt.gcf()

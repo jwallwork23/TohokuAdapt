@@ -192,7 +192,7 @@ if getData:
                         saveAdj.store(dual_N_u)
                         saveAdj.store(dual_N_e)
                         saveAdj.close()
-                print('Adjoint simulation %.2f%% complete' % ((cntT-cnt)/cntT))
+                    print('Adjoint simulation %.2f%% complete' % ((cntT-cnt)/cntT) * 100)
                 cnt -= 1
                 save = False
             else:
