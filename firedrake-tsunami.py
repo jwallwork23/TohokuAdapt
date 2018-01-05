@@ -22,15 +22,18 @@ tAdapt = False
 bootstrap = False
 
 # Define initial mesh and mesh statistics placeholders
-op = opt.Options(vscale=0.05 if useAdjoint else 0.85,
+op = opt.Options(vscale=0.045 if useAdjoint else 0.85,
                  rm=60 if useAdjoint else 30,
                  gradate=True if useAdjoint else False,
                  advect=False,
-                 window=False,
+                 window=True,
                  outputHessian=False,
                  plotpvd=True,
                  coarseness=3,
-                 gauges=True)
+                 gauges=True,
+                 ndump=10,
+                 mtype='f',
+                 iso=True if useAdjoint else False)
 
 # Establish initial mesh resolution
 if bootstrap:
@@ -114,8 +117,8 @@ if useAdjoint:
 hmin = op.hmin
 hmax = op.hmax
 rm = op.rm
-iStart = int(op.Tstart / dt)
-iEnd = int(np.ceil(T / dt))
+iStart = int(op.Tstart / dt)    # TODO: alter for t-adapt
+iEnd = int(np.ceil(T / dt))     # TODO: alter for t-adapt
 mM = [nEle, nEle]           # Min/max #Elements
 Sn = nEle
 nVerT = msh.meshStats(mesh)[1] * op.vscale    # Target #Vertices
@@ -171,7 +174,7 @@ if getData:
             if op.plotpvd & (cnt % ndump == 0):
                 forwardFile.write(u, eta, time=t)
             if op.gauges and not useAdjoint:
-                gaugeData = tim.extractTimeseries(gauges, eta, gaugeData, v0, op=op)
+                gaugeData = tim.extractTimeseries(gauges, eta, t, gaugeData, v0, op=op)
             print('t = %.2fs' % t)
         t += dt
         cnt += 1
@@ -217,8 +220,9 @@ if getData:
 # Loop back over times to generate error estimators
 if getError:
     errorTimer = clock()
+    errEstMean = 0
     for k in range(0, iEnd, rm):
-        print('Generating error estimate %d / %d' % (k / rm + 1, iEnd / rm))
+        print('Generating error estimate %d / %d' % (k / rm + 1, iEnd / rm + 1))
         indexStr = msc.indexString(k)
 
         # Load residual and adjoint data from HDF5
@@ -245,9 +249,7 @@ if getError:
                 epsilon_ = err.DWR(rho, dual_N, v)
                 for j in range(len(epsilon.dat.data)):
                     epsilon.dat.data[j] = max(epsilon.dat.data[j], epsilon_.dat.data[j])
-
-        # Normalise error estimate
-        epsilon.dat.data[:] = np.abs(epsilon.dat.data) * nVerT / (np.abs(assemble(epsilon * dx)) or 1.)
+        epsilon.dat.data[:] = np.abs(epsilon.dat.data) * nVerT / (np.abs(assemble(epsilon * dx)) or 1.)  # Normalise
         epsilon.rename("Error indicator")
 
         # Store error estimates
@@ -266,7 +268,7 @@ if approach in ('simpleAdapt', 'goalBased'):
     print('\nStarting adaptive mesh primal run (forwards in time)')
     adaptTimer = clock()
     while t <= T:
-        if (cnt % rm == 0) & (np.abs(t-T) > 0.5 * dt):      # TODO: change the first condition for t-adaptivity
+        if cnt % rm == 0:      # TODO: change this condition for t-adaptivity?
             stepTimer = clock()
 
             # Construct metric
@@ -279,8 +281,20 @@ if approach in ('simpleAdapt', 'goalBased'):
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])
                 M = adap.isotropicMetric(W, errEst, op=op, invert=False)
             else:
-                H = adap.constructHessian(mesh, W, eta, op=op)
-                M = adap.computeSteadyMetric(mesh, W, H, eta, nVerT=nVerT, op=op)
+                if op.mtype != 's':
+                    if op.iso:
+                        M = adap.isotropicMetric(W, eta, op=op)
+                    else:
+                        H = adap.constructHessian(mesh, W, eta, op=op)
+                        M = adap.computeSteadyMetric(mesh, W, H, eta, nVerT=nVerT, op=op)
+                if op.mtype != 'f':
+                    spd = Function(FunctionSpace(mesh, 'DG', 1)).interpolate(sqrt(dot(u, u)))
+                    if op.iso:
+                        M2 = adap.isotropicMetric(W, spd, op=op)
+                    else:
+                        H = adap.constructHessian(mesh, W, spd, op=op)
+                        M2 = adap.computeSteadyMetric(mesh, W, H, spd, nVerT=nVerT, op=op)
+                    M = adap.metricIntersection(mesh, W, M, M2) if op.mtype == 'b' else M2
             if op.gradate:
                 if useAdjoint:
                     M_ = adap.isotropicMetric(W, inte.interp(mesh, h0)[0], bdy=True, op=op) # Initial boundary metric
@@ -335,9 +349,7 @@ if approach in ('simpleAdapt', 'goalBased'):
 if getData and useAdjoint:
     msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer)
 
-print(gaugeData)
 # Save and plot timeseries
 name = input("Enter a name for these time series (e.g. 'goalBased8-12-17'): ") or 'test'
 for gauge in gauges:
     tim.saveTimeseries(gauge, gaugeData, name=name)
-    tim.plotGauges(gauge, op=op)
