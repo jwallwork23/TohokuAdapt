@@ -77,7 +77,7 @@ def extractTimeseries(gauges, eta, t,  current, v0, op=opt.Options()):
             current[gauge] = {}
             current[gauge][t] = 0.
         else:
-            current[gauge][t] = float(eta.at(op.gaugeCoord(gauge)) - v0[gauge])
+            current[gauge][t] = float(eta.at(op.gaugeCoord(gauge))) - float(v0[gauge])
     return current
 
 
@@ -88,7 +88,7 @@ def saveTimeseries(gauge, data, name='test'):
     :param name: name to give to timeseries.    
     """
     outfile = open('outdata/timeseries/' + gauge + name + '.txt', 'w+')
-    for t in data[gauge]:
+    for t in data[gauge].keys():
         outfile.write(str(t) + ' , ' + str(data[gauge][t]) + '\n')
     outfile.close()
 

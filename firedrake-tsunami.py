@@ -18,10 +18,11 @@ import utils.timeseries as tim
 print('*********************** TOHOKU TSUNAMI SIMULATION *********************\n')
 approach, getData, getError = msc.cheatCodes(input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': "))
 useAdjoint = approach == 'goalBased'
-tAdapt = True
+tAdapt = False
+bootstrap = False
 
 # Define initial mesh and mesh statistics placeholders
-op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
+op = opt.Options(vscale=0.05 if useAdjoint else 0.85,
                  rm=60 if useAdjoint else 30,
                  gradate=True if useAdjoint else False,
                  advect=False,
@@ -32,12 +33,15 @@ op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
                  gauges=True)
 
 # Establish initial mesh resolution
-bootTimer = clock()
-print('\nBootstrapping to establish optimal mesh resolution')
-i = boot.bootstrap('firedrake-tsunami', tol=2e10)[0]
+if bootstrap:
+    bootTimer = clock()
+    print('\nBootstrapping to establish optimal mesh resolution')
+    i = boot.bootstrap('firedrake-tsunami', tol=2e10)[0]
+    bootTimer = clock() - bootTimer
+    print('Bootstrapping run time: %.3fs\n' % bootTimer)
+else:
+    i = 1
 nEle = op.meshes[i]
-bootTimer = clock() - bootTimer
-print('Bootstrapping run time: %.3fs\n' % bootTimer)
 
 # Establish filenames
 dirName = 'plots/firedrake-tsunami/'
@@ -114,7 +118,7 @@ iStart = int(op.Tstart / dt)
 iEnd = int(np.ceil(T / dt))
 mM = [nEle, nEle]           # Min/max #Elements
 Sn = nEle
-nVerT = nVer * op.vscale    # Target #Vertices
+nVerT = msh.meshStats(mesh)[1] * op.vscale    # Target #Vertices
 nVerT0 = nVerT
 
 # Initialise counters
@@ -139,7 +143,7 @@ if getData:
 
         # Approximate residual of forward equation and save to HDF5
         if useAdjoint:
-            if not cnt % rm:
+            if cnt % rm == 0:
                 qN, q_N = inte.mixedPairInterp(mesh_N, V_N, q, q_)
                 Au, Ae = form.strongResidualSW(qN, q_N, b_N, Dt)
                 rho_u.interpolate(Au)
@@ -262,12 +266,12 @@ if approach in ('simpleAdapt', 'goalBased'):
     print('\nStarting adaptive mesh primal run (forwards in time)')
     adaptTimer = clock()
     while t <= T:
-        if (cnt % rm == 0) & (np.abs(t-T) > 0.5 * dt):
+        if (cnt % rm == 0) & (np.abs(t-T) > 0.5 * dt):      # TODO: change the first condition for t-adaptivity
             stepTimer = clock()
 
             # Construct metric
             W = TensorFunctionSpace(mesh, "CG", 1)
-            if useAdjoint & (cnt != 0):
+            if useAdjoint:
                 # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
                 with DumbCheckpoint(dirName + 'hdf5/error_' + msc.indexString(cnt), mode=FILE_READ) as loadError:
                     loadError.load(epsilon)
@@ -331,8 +335,9 @@ if approach in ('simpleAdapt', 'goalBased'):
 if getData and useAdjoint:
     msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer)
 
-# Save and plot timeseries  TODO: output times as well, to account for adaptive timestepping
+print(gaugeData)
+# Save and plot timeseries
 name = input("Enter a name for these time series (e.g. 'goalBased8-12-17'): ") or 'test'
 for gauge in gauges:
-    tim.saveTimeseries(gauge, gaugeData[gauge], name=name)
-    tim.plotGauges(gauge, int(T), op=op)
+    tim.saveTimeseries(gauge, gaugeData, name=name)
+    tim.plotGauges(gauge, op=op)
