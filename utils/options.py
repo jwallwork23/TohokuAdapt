@@ -160,8 +160,7 @@ class Options:
         self.stamps = {labels[0]: 'fixedMesh', labels[1]: 'fixedMesh', labels[2]: 'fixedMesh',
                        labels[3]: 'simpleAdapt', labels[4]: 'adjointBased', labels[5]: 'goalBased'}
 
-        # self.meshes = (6176, 8782, 11020, 14228, 20724, 33784, 196560, 450386, 691750)
-        self.meshes = (6176, 8782, 11020, 20724, 33784, 196560, 450386, 691750)
+        self.meshes = (6176, 8782, 11020, 16656, 20724, 33784, 52998, 196560, 450386, 691750)
 
     def gaugeCoord(self, gauge):
         """

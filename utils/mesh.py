@@ -6,25 +6,31 @@ class MeshSetup:
         self.dirName = 'resources/meshes/'
         try:
             self.meshName = {691750: 'Tohoku691750', 450386: 'Tohoku450386', 196560: 'Tohoku196560',
-                             33784: 'Tohoku33784', 20724: 'Tohoku20724', 14228: 'Tohoku14228', 11020: 'Tohoku11020',
-                             8782: 'Tohoku8782', 6176: 'Tohoku6176'}[nEle]
+                             129442: 'Tohoku129442',81902: 'Tohoku81902', 52998: 'Tohoku52998',
+                             33784: 'Tohoku33784', 20724: 'Tohoku20724', 16656: 'Tohoku16656',
+                             11020: 'Tohoku11020', 8782: 'Tohoku8782', 6176: 'Tohoku6176'}[nEle]
         except:
-            raise ValueError('Resolution value not recognised.')
+            raise ValueError('Number of elements not recognised.')
 
         # Define gradations (in metres)
-        self.innerGradation1 = {691750: 900., 450386: 1000., 196560: 1000., 33784: 3000., 20724: 4000.,
-                                14228: 5000., 11020: 5500., 8782: 6000., 6176: 7500., }[nEle]
-        self.outerGradation1 = {691750: 2000., 450386: 2500., 196560: 4000., 33784: 10000., 20724: 12500.,
-                                14228: 15000., 11020: 17500., 8782: 20000., 6176: 25000.,}[nEle]
-        self.innerGradation2 = {691750: 2000., 450386: 2500., 196560: 3000., 33784: 6000., 20724: 8000.,
-                                14228: 10000., 11020: 10000., 8782: 10000., 6176: 10000.,}[nEle]
-        self.outerGradation2 = {691750: 4000., 450386: 5000., 196560: 8000., 33784: 10000., 20724: 12500.,
-                                14228: 15000., 11020: 17500., 8782: 20000., 6176: 25000.,}[nEle]
+        self.innerGradation1 = {691750: 900., 450386: 1000., 196560: 1000., 129442: 1200.,
+                                81902: 1500., 52998: 2000., 33784: 3000., 20724: 4000.,
+                                16656: 4500., 11020: 5500., 8782: 6000., 6176: 7500., }[nEle]
+        self.outerGradation1 = {691750: 2000., 450386: 2500., 196560: 4000., 129442: 5000.,
+                                81902: 6500., 52998: 8000., 33784: 10000., 20724: 12500.,
+                                16656: 14000., 11020: 17500., 8782: 20000., 6176: 25000.,}[nEle]
+        self.innerGradation2 = {691750: 2000., 450386: 2500., 196560: 3000., 129442: 3500.,
+                                81902: 4000., 52998: 5000., 33784: 6000., 20724: 8000.,
+                                16656: 9000., 11020: 10000., 8782: 10000., 6176: 10000.,}[nEle]
+        self.outerGradation2 = {691750: 4000., 450386: 5000., 196560: 8000., 129442: 7500.,
+                                81902: 7000., 52998: 9000., 33784: 10000., 20724: 12500.,
+                                16656: 14000., 11020: 17500., 8782: 20000., 6176: 25000.,}[nEle]
 
         # Define gradation distances (in degrees)
         self.gradationDistance1 = 1.
-        self.gradationDistance2 = {691750: 1., 450386: 1., 196560: 1., 33784: 1., 20724: 0.75,
-                                   14228: 0.5, 11020: 0.5, 8782: 0.5, 6176: 0.5,}[nEle]
+        self.gradationDistance2 = {691750: 1., 450386: 1., 196560: 1., 129442: 1.,
+                                   81902: 1., 52998: 1., 33784: 1., 20724: 0.75,
+                                   16656: 0.65, 11020: 0.5, 8782: 0.5, 6176: 0.5}[nEle]
 
     def generateMesh(self):
         """
@@ -93,7 +99,8 @@ class MeshSetup:
 if __name__ == '__main__':
     import qmesh
 
-    ms = MeshSetup(input('Choose #Elements from: {6176, 8782, 11020, 14228, 20724, 33784, 196560, 450386, 691750}:\n')
+    ms = MeshSetup(input('Choose #Elements from:\n '
+                         '{6176, 8782, 11020, 16656, 20724, 33784, 52998, 81902, 129442, 196560, 450386, 691750}:\n')
                    or 6176)
     qmesh.setLogOutputFile(ms.dirName + 'generateMesh.log')     # Store QMESH log for later reference
     qmesh.initialise()                                          # Initialise QGIS API
