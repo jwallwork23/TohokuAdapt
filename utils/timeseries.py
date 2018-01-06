@@ -217,7 +217,6 @@ Absolute L-infinity norm : %6.3f Relative L-infinity norm : %6.3f
 Absolute total variation : %6.3f Relative total variation : %6.3f""" %
                   (error[0], error[0] / norm[0], error[1], error[1] / norm[1],
                    error[2], error[2] / norm[2], error[3], error[3] / norm[3],))
-            print('#### DEBUG: norms = ', norm)
 
     plt.xlim([0, T/60])
     plt.gcf()

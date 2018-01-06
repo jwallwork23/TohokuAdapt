@@ -22,16 +22,15 @@ tAdapt = False
 bootstrap = False
 
 # Define initial mesh and mesh statistics placeholders
-op = opt.Options(vscale=0.05 if useAdjoint else 0.85,
-                 rm=60 if useAdjoint else 30,
+op = opt.Options(vscale=0.1 if useAdjoint else 0.85,
+                 rm=20 if useAdjoint else 10,
                  gradate=True if useAdjoint else False,
                  advect=False,
-                 window=False,
+                 window=True,
                  outputHessian=False,
-                 plotpvd=True,
-                 coarseness=3,
+                 plotpvd=False,
                  gauges=True,
-                 ndump=10,
+                 ndump=2,
                  mtype='f',
                  iso=True if useAdjoint else False)
 
@@ -43,7 +42,7 @@ if bootstrap:
     bootTimer = clock() - bootTimer
     print('Bootstrapping run time: %.3fs\n' % bootTimer)
 else:
-    i = 8
+    i = 1
 nEle = op.meshes[i]
 
 # Establish filenames
@@ -53,7 +52,7 @@ if op.plotpvd:
     residualFile = File(dirName + "residual.pvd")
     adjointFile = File(dirName + "adjoint.pvd")
     errorFile = File(dirName + "errorIndicator.pvd")
-    adaptiveFile = File(dirName + "goalBased.pvd") if useAdjoint else File(dirName + "simpleAdapt.pvd")
+adaptiveFile = File(dirName + "goalBased.pvd") if useAdjoint else File(dirName + "simpleAdapt.pvd")
 if op.outputHessian:
     hessianFile = File(dirName + "hessian.pvd")
 
@@ -202,7 +201,7 @@ if getData:
                         saveAdj.store(dual_N_u)
                         saveAdj.store(dual_N_e)
                         saveAdj.close()
-                    print('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT) * 100)
+                    print('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT * 100))
                 cnt -= 1
                 save = False
             else:
@@ -335,8 +334,7 @@ if approach in ('simpleAdapt', 'goalBased'):
         q_.assign(q)
 
         if cnt % ndump == 0:
-            if op.plotpvd:
-                adaptiveFile.write(u, eta, time=t)
+            adaptiveFile.write(u, eta, time=t)
             if op.gauges:
                 gaugeData = tim.extractTimeseries(gauges, eta, t, gaugeData, v0, op=op)
             print('t = %.2fs' % t)

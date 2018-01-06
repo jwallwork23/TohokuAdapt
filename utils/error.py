@@ -34,9 +34,8 @@ def explicitErrorEstimator(u_, u, eta_, eta, lu, le, b, dt, hk):
                                      * (eta_ - eta - dt * div(b * 0.5 * (u + u_)))) / CellVolume(mesh) * dx)
 
     # Compute and add boundary residual term
-    # TODO: this only currently integrates over domain the boundary, NOT cell boundaries
-    # TODO: also, need multiply by normed bdy size
-    rho_bdy = assemble(v * dt * b * dot(0.5 * (u + u_), FacetNormal(mesh)) / CellVolume(mesh) * ds)
+    # TODO: Need multiply by normed bdy size
+    rho_bdy = assemble(v * dt * b * dot(0.5 * (u + u_), FacetNormal(mesh)) / CellVolume(mesh) * dS)
     lambdaNorm = assemble(v * sqrt((dot(lu, lu) + le * le)) * dx)
     rho = assemble((sqrt(rho) + sqrt(rho_bdy)) * lambdaNorm)
 
