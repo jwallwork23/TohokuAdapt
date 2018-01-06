@@ -20,6 +20,7 @@ approach, getData, getError = msc.cheatCodes(input("Choose approach: 'fixedMesh'
 useAdjoint = approach == 'goalBased'
 tAdapt = False
 bootstrap = False
+outputOF = True
 
 # Define initial mesh and mesh statistics placeholders
 op = opt.Options(vscale=0.1 if useAdjoint else 0.85,
@@ -262,6 +263,8 @@ if getError:
 
 if approach in ('simpleAdapt', 'goalBased'):
     t = 0.
+    J_trap = 0.
+    started = False
     if useAdjoint & op.gradate:
         h0 = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
     print('\nStarting adaptive mesh primal run (forwards in time)')
@@ -329,9 +332,24 @@ if approach in ('simpleAdapt', 'goalBased'):
             Sn += nEle
             op.printToScreen(cnt/rm+1, clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, t, dt)
 
+            if outputOF:
+                iA = form.indicator(V.sub(1), x1=490e3, x2=640e3, y1=4160e3, y2=4360e3, smooth=True)
+
         # Solve problem at current timestep
         adaptSolver.solve()
         q_.assign(q)
+
+        # Estimate OF using trapezium rule TODO: allow for t-adaptivity
+        if outputOF:
+            step = assemble(eta * iA * dx)
+            if (t >= op.Tstart) and (started == False):
+                started = True
+                J_trap = step
+            elif t >= op.Tend:
+                J_trap += step
+            elif started:
+                J_trap += 2 * step
+            print('J_h = ', J_trap * dt)
 
         if cnt % ndump == 0:
             adaptiveFile.write(u, eta, time=t)
@@ -342,6 +360,7 @@ if approach in ('simpleAdapt', 'goalBased'):
         cnt += 1
     adaptTimer = clock() - adaptTimer
     print('Adaptive primal run complete. Run time: %.3fs \n' % adaptTimer)
+    print('J_h = ', J_trap * dt)
 
 # Print to screen timing analyses
 if getData and useAdjoint:

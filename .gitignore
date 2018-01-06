@@ -18,9 +18,7 @@
 plots/
 resources/meshes/
 utils/.idea/
-outdata/errorPlots/
-outdata/bootstrapping/
-outdata/meshes/
+outdata/
 
 
 ## Files to be ignored:
