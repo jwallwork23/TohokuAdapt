@@ -43,7 +43,7 @@ if bootstrap:
     bootTimer = clock() - bootTimer
     print('Bootstrapping run time: %.3fs\n' % bootTimer)
 else:
-    i = 1
+    i = 8
 nEle = op.meshes[i]
 
 # Establish filenames

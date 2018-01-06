@@ -112,7 +112,7 @@ def plotGauges(gauge, op=opt.Options()):
 
     # Import data from the inversion analysis and interpolate
     measuredfile = open(filename, 'r')
-    p = np.linspace(0, T/60, num=T)
+    p = np.linspace(0, T/60, num=int(T))
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     plt.rc('legend', fontsize='x-large')
@@ -134,59 +134,66 @@ def plotGauges(gauge, op=opt.Options()):
     # Plot timeseries data
     print('\nGauge to plot: ' + gauge + '\n')
     for mesh in labels:
-        # error = [0, 0, 0, 0]
-        # norm = [0, 0, 0, 0]
-        TV_e = TV_n = 0
+        error = [0, 0, 0, 0]
+        norm = [0, 0, 0, 0]
         ts = []
         print('Timeseries to plot: ', mesh)
         name = stamps[mesh] + input("Version (hit enter to skip): ")
         if name != stamps[mesh]:
             infile = open('outdata/timeseries/' + gauge + name + '.txt', 'r')
             data = []
-            i = 0
+            i = 1
             for line in infile:
                 pair = line.split(',')
                 ts.append(float(pair[0])/60)    # Time in minutes
                 val = float(pair[1])
                 mVal = float(m(ts[-1]))
-                if i == 0:
+                if i == 1:
                     v0 = val - mVal
                     sStart = v0
                     mStart = mVal
-                diff = val - v0 - mVal
-                # absDiff = np.abs(diff)
+                diff = val - v0 - mVal          # Approximation error
+                absDiff = np.abs(diff)
 
-                # # Compute L1, L2, L-infinity errors and norms of gauge data using trapezium rule
-                # if i in (0, iEnd):
-                #     error[0] += absDiff
-                #     error[1] += absDiff ** 2
-                #     norm[0] += np.abs(mVal)
-                #     norm[1] += mVal ** 2
-                # else:
-                #     error[0] += 2 * absDiff
-                #     error[1] += 2 * absDiff ** 2
-                #     norm[0] += 2 * np.abs(mVal)
-                #     norm[1] += 2 * mVal ** 2
-                # if absDiff > error[2]:
-                #     error[2] = absDiff
-                # if mVal > norm[2]:
-                #     norm[2] = mVal
+                # Compute L1, L2, L-infinity errors and norms of gauge data using trapezium rule
+                if i in (1, iEnd):
+                    error[0] += absDiff
+                    error[1] += absDiff ** 2
+                    norm[0] += np.abs(mVal)
+                    norm[1] += mVal ** 2
+                else:
+                    error[0] += 2 * absDiff
+                    error[1] += 2 * absDiff ** 2
+                    norm[0] += 2 * np.abs(mVal)
+                    norm[1] += 2 * mVal ** 2
+                if absDiff > error[2]:
+                    error[2] = absDiff
+                if mVal > norm[2]:
+                    norm[2] = mVal
 
                 # Compute total variation of error and gauge data
-                if i == 1:
+                if i == 2:
                     sign = (diff - diff_) / np.abs(diff - diff_)
                     mSign = (mVal - mVal_) / np.abs(mVal - mVal_)
-                elif i > 1:
+                elif i > 2:
                     sign_ = sign
                     mSign_ = mSign
                     sign = (diff - diff_) / np.abs(diff - diff_)
                     mSign = (mVal - mVal_) / np.abs(mVal - mVal_)
-                    if (sign != sign_) | (i == iEnd):
-                        TV_e += np.abs(diff - sStart)
-                        sStart = diff
-                    if (mSign != mSign_) | (i == iEnd):
-                        TV_n += np.abs(mVal - mStart)
-                        mStart = mVal
+                    if sign != sign_:
+                        error[3] += np.abs(diff_ - sStart)
+                        sStart = diff_
+                        if i == iEnd:
+                            error[3] += np.abs(diff - diff_)
+                    elif i == iEnd:
+                        error[3] += np.abs(diff - sStart)
+                    if mSign != mSign_:
+                        norm[3] += np.abs(mVal_ - mStart)
+                        mStart = mVal_
+                        if i == iEnd:
+                            norm[3] += np.abs(mVal - mVal_)
+                    elif i == iEnd:
+                        norm[3] += np.abs(mVal - mStart)
                 diff_ = diff
                 mVal_ = mVal
                 if val < mM[0]:
@@ -196,21 +203,21 @@ def plotGauges(gauge, op=opt.Options()):
                 data.append(val)
                 i += 1
             plt.plot(ts, data, label=mesh, marker=styles[mesh], markevery=5, linewidth=0.75)
-            print('Absolute total variation : %6.3f Relative total variation : %6.3f' % (TV_e, TV_e / TV_n))
 
-#             # Print errors to screen
-#             h = ts[-1] - ts[-2]
-#             error[0] *= h / 2
-#             norm[0] *= h / 2
-#             error[1] = np.sqrt(error[1] * h / 2)
-#             norm[1] = np.sqrt(norm[1] * h / 2)
-#             print('\n' + gauge + """
-# Absolute L1 norm :         %6.3f Relative L1 norm :         %6.3f
-# Absolute L2 norm :         %6.3f Relative L2 norm :         %6.3f
-# Absolute L-infinity norm : %6.3f Relative L-infinity norm : %6.3f
-# Absolute total variation : %6.3f Relative total variation : %6.3f""" %
-#                   (error[0], error[0] / norm[0], error[1], error[1] / norm[1],
-#                    error[2], error[2] / norm[2], error[3], error[3] / norm[3],))
+            # Print errors to screen
+            dt = ts[-1] - ts[-2]     # timestep TODO: needs altering to allow for t-adaptivity
+            error[0] *= dt/2
+            norm[0] *= dt/2
+            error[1] = np.sqrt(error[1] * dt/2)
+            norm[1] = np.sqrt(norm[1] * dt/2)
+            print('\n' + gauge + """
+Absolute L1 norm :         %6.3f Relative L1 norm :         %6.3f
+Absolute L2 norm :         %6.3f Relative L2 norm :         %6.3f
+Absolute L-infinity norm : %6.3f Relative L-infinity norm : %6.3f
+Absolute total variation : %6.3f Relative total variation : %6.3f""" %
+                  (error[0], error[0] / norm[0], error[1], error[1] / norm[1],
+                   error[2], error[2] / norm[2], error[3], error[3] / norm[3],))
+            print('#### DEBUG: norms = ', norm)
 
     plt.xlim([0, T/60])
     plt.gcf()

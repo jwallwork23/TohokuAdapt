@@ -29,11 +29,11 @@ elif problem == 'rossby-wave':
 elif problem == 'firedrake-tsunami':
     title = r'Tohoku tsunami problem solved using Firedrake'
     ylab1 += '$J(u,v,\eta)=\int_{T_{\mathrm{start}}}^{T_{\mathrm{end}}}\int_A\eta\:\mathrm{d}x\mathrm{d}t$'
-    tol = 2.4e10      # Note J ~ 2.4e13
+    tol = 1.5e10      # Note J ~ 2.4e13
 elif problem == 'thetis-tsunami':
     title = r'Tohoku tsunami problem solved using Thetis'
     ylab1 += '$J(u,v,\eta)=\int_{T_{\mathrm{start}}}^{T_{\mathrm{end}}}\int_A\eta\:\mathrm{d}x\mathrm{d}t$'
-    tol = 2.4e10      # Note J ~ 2.4e13
+    tol = 1.5e10      # Note J ~ 2.4e13
 else:
     raise ValueError("Problem not recognised.")
 

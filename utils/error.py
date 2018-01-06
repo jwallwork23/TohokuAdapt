@@ -82,15 +82,19 @@ def totalVariation(data):
     """
     TV = 0
     iStart = 0
-    for i in range(1, len(data)):
+    for i in range(len(data)):
         if i == 1:
-            sign = (data[i] - data[i - 1]) / np.abs(data[i] - data[i - 1])
-        else:
+            sign = (data[i] - data[i-1]) / np.abs(data[i] - data[i-1])
+        elif i > 1:
             sign_ = sign
             sign = (data[i] - data[i - 1]) / np.abs(data[i] - data[i - 1])
-            if (sign != sign_) | (i == len(data) - 1):
+            if sign != sign_:
+                TV += np.abs(data[i-1] - data[iStart])
+                iStart = i-1
+                if i == len(data)-1:
+                    TV += np.abs(data[i] - data[i-1])
+            elif i == len(data)-1:
                 TV += np.abs(data[i] - data[iStart])
-                iStart = i
     return TV
 
 

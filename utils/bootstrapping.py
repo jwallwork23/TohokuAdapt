@@ -195,7 +195,7 @@ def solverThetis(nEle, op=opt.Options()):
     return J_trap * op.dt
 
 
-def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10., op=opt.Options()):
+def bootstrap(problem='advection-diffusion', maxIter=12, tol=1e-3, slowTol=10., op=opt.Options()):
     Js = []         # Container for objective functional values
     ts = []         # Timing values
     nEls = []       # Container for element counts
@@ -245,7 +245,7 @@ def bootstrap(problem='advection-diffusion', maxIter=8, tol=1e-3, slowTol=10., o
             reason = 'run time becoming too high.'
             break
 
-        if (problem in ('firedrake-tsunami', 'thetis-tsunami')) & (i == 8):
+        if (problem in ('firedrake-tsunami', 'thetis-tsunami')) & (i == 11):
             reason = 'maximum mesh resolution reached.'
             break
 
