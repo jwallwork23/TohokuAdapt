@@ -8,6 +8,9 @@ import utils.mesh as msh
 import utils.options as opt
 
 
+# TODO: include other test problems, as well as firedrake-tsunami
+
+
 def continuousAdjointSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg')):
 
     # Define Mesh and FunctionSpace
@@ -66,21 +69,18 @@ def continuousAdjointSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg'))
     slow = slowdown > 1
     if not slow:
         slowdown = 1./slowdown
-    print('Continuous case: Adjoint run %.3fx %s than forward run.' % (slowdown, 'slower' if slow else 'faster'))
+    print('Cts case: Adjoint run %.3fx %s than forward run.' % (slowdown, 'slower' if slow else 'faster'))
 
     # adj_html("outdata/visualisations/forward.html", "forward")
     # adj_html("outdata/visualisations/adjoint.html", "adjoint")
 
     return primalTimer, dualTimer, msh.meshStats(mesh)[0]
 
-n = pow(2, int(input('Power of 2 for mesh resolution: ') or 1.))
-c_t1, c_t2, nEle = continuousAdjointSW(n)
-print('Using a mesh with %d elements' % nEle)
-
 
 from firedrake_adjoint import *
-dt_meas = dt  # Time measure
 
+
+dt_meas = dt  # Time measure
 
 def discreteAdjointSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg')):
 
@@ -128,6 +128,8 @@ def discreteAdjointSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg')):
         cnt += 1
     cnt -= 1
     primalTimer = clock() - primalTimer
+    adj_html("outdata/visualisations/forwardSW.html", "forward")
+    adj_html("outdata/visualisations/adjointSW.html", "adjoint")
     parameters["adjoint"]["stop_annotating"] = True  # Stop registering equations
     store = True
     dualTimer = clock()
@@ -146,20 +148,14 @@ def discreteAdjointSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg')):
     slow = slowdown > 1
     if not slow:
         slowdown = 1./slowdown
-    print('Discrete case: Adjoint run %.3fx %s than forward run.' % (slowdown, 'slower' if slow else 'faster'))
-
-    # adj_html("outdata/visualisations/forward.html", "forward")
-    # adj_html("outdata/visualisations/adjoint.html", "adjoint")
+    print('Dis case: Adjoint run %.3fx %s than forward run.' % (slowdown, 'slower' if slow else 'faster'))
 
     return primalTimer, dualTimer
 
+n = pow(2, int(input('Continuous (cts) versus discrete (dis) adjoint test. Index for mesh resolution: ')))
+c_t1, c_t2, nEle = continuousAdjointSW(n)
 d_t1, d_t2 = discreteAdjointSW(n)
+print('%d elements:' % nEle)
+print('Cts primal: %5.3fs,  Cts dual: %5.3fs,  Cts total: %5.3fs' % (c_t1, c_t2, c_t1+c_t2))
+print('Dis primal: %5.3fs,  Dis dual: %5.3fs,  Dis total: %5.3fs\n' % (d_t1, d_t2, d_t1+d_t2))
 
-
-print("""
-            |  Continuous  |  Discrete
------------------------------------------
-Primal run  |   %5.3fs     |   %5.3fs
-Dual run    |   %5.3fs     |   %5.3fs
------------------------------------------
-Total       |   %5.3fs     |   %5.3fs""" % (c_t1, d_t1, c_t2, d_t2, c_t1+c_t2, d_t1+d_t2))
