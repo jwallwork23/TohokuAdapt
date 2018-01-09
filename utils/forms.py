@@ -128,8 +128,33 @@ def formsSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, n
     return B, L
 
 
+def adjointSW(l, l_, lt, b, Dt, g=9.81, timestepper='CrankNicolson', x1=2.5, x2=3.5, y1=0.1, y2=0.9, smooth=False):
+    """
+    Semi-discrete (time-discretised) weak form adjoint shallow water equations with no normal flow boundary conditions.
+
+    :param l: solution tuple for linear shallow water equations.
+    :param l_: solution tuple for linear shallow water equations at previous timestep.
+    :param lt: test function tuple.
+    :param b: bathymetry profile.
+    :param Dt: timestep expressed as a FiredrakeConstant.
+    :param g: gravitational acceleration.
+    :param timestepper: scheme of choice.
+    :return: weak residual for shallow water equations at current timestep.
+    """
+    (lu, le) = (as_vector((l[0], l[1])), l[2])
+    (lu_, le_) = (as_vector((l_[0], l_[1])), l_[2])
+    (w, xi) = (as_vector((lt[0], lt[1])), lt[2])
+    a1, a2 = timestepCoeffs(timestepper)
+    iA = indicator(l.function_space().sub(1), x1=2.5, x2=3.5, y1=0.1, y2=0.9, smooth=False)
+
+    B = ((inner(lu, w) + le * xi)/Dt + a1 * b * inner(grad(le), w) - a1 * g * inner(lu, grad(xi))) * dx
+    L = ((inner(lu_, w) + le_ * xi)/Dt - a2 * b * inner(grad(le_), w) + a2 * g * inner(lu_, grad(xi)) - iA * xi) * dx
+
+    return B, L
+
+
 def weakResidualSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, nonlinear=False,
-                   allowNormalFlow=True, timestepper='CrankNicolson'):
+                   allowNormalFlow=True, timestepper='CrankNicolson', adjoint=False):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
     
@@ -147,7 +172,11 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=F
     :param timestepper: scheme of choice.
     :return: weak residual for shallow water equations at current timestep.
     """
-    B, L = formsSW(q, q_, qt, b, Dt, nu=nu, g=g, f0=f0, beta=beta, rotational=rotational, nonlinear=nonlinear,
+    if adjoint:
+        B, L = adjointSW(q, q_, qt, b, Dt, g=9.81, timestepper='CrankNicolson', x1=2.5, x2=3.5, y1=0.1, y2=0.9,
+                         smooth=False)
+    else:
+        B, L = formsSW(q, q_, qt, b, Dt, nu=nu, g=g, f0=f0, beta=beta, rotational=rotational, nonlinear=nonlinear,
                    allowNormalFlow=allowNormalFlow, timestepper=timestepper)
 
     return B - L
@@ -242,22 +271,20 @@ def strongResidualAD(c, c_, u, Dt, nu=1e-3, timestepper='CrankNicolson'):
     return (c - c_) / Dt + inner(u, grad(cm)) - Constant(nu) * div(grad(cm))
 
 
-def weakResidualAD(c, c_, ct, u, Dt, nu=1e-3, timestepper='CrankNicolson'):
+def weakResidualAD(c, c_, ct, w, Dt, nu=1e-3, timestepper='CrankNicolson'):
     """
     :param c: concentration solution at current timestep. 
     :param c_: concentration at previous timestep.
     :param ct: test function.
-    :param u: wind field.
+    :param w: wind field.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: diffusivity parameter.
     :param timestepper: time integration scheme used.
     :return: weak residual for advection diffusion equation at current timestep.
     """
     cm = timestepScheme(c, c_, timestepper)
-    return ((c - c_) * ct / Dt - inner(cm * u, grad(ct)) + Constant(nu) * inner(grad(cm), grad(ct))) * dx
+    return ((c - c_) * ct / Dt + inner(grad(cm), w * ct) + Constant(nu) * inner(grad(cm), grad(ct))) * dx
 
-# TODO: appear to be applying too many BCs here. How about just no-normal flow with
-# TODO: F = ((c - c_) * ct / Dt + inner(grad(cm), w * ct) + Constant(nu) * inner(grad(cm), grad(ct))) * dx
 
 def weakMetricAdvection(M, M_, Mt, w, Dt, timestepper='ImplicitEuler'):
     """
