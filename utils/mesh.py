@@ -186,11 +186,11 @@ def saveMesh(mesh, filename):
     viewer(mesh._plex)
 
 
-def loadMesh(filename):
-    """
-    :param filename: mesh filename to load from, including directory location.
-    :return: Mesh, as loaded from HDF5.
-    """
-    plex = PETSc.DMPlex().create()
-    plex.createFromFile(filename + '.h5')
-    return Mesh(plex)
+# def loadMesh(filename):
+#     """
+#     :param filename: mesh filename to load from, including directory location.
+#     :return: Mesh, as loaded from HDF5.
+#     """
+#     plex = PETSc.DMPlex().create()
+#     plex.createFromFile(filename + '.h5')
+#     return Mesh(plex)
