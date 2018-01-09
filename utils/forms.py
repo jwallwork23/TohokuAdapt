@@ -92,15 +92,22 @@ def formsSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, n
     :param timestepper: scheme of choice.
     :return: weak residual for shallow water equations at current timestep.
     """
-    mesh = q.function_space().mesh()
+    V = q.function_space()
+    mesh = V.mesh()
     (u, eta) = (as_vector((q[0], q[1])), q[2])
     (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
     (w, xi) = (as_vector((qt[0], qt[1])), qt[2])
     a1, a2 = timestepCoeffs(timestepper)
 
-    B = (inner(u, w) + eta * xi) / Dt * dx + a1 * g * inner(grad(eta), w) * dx      # LHS bilinear form
-    L = (inner(u_, w) + eta_ * xi) / Dt * dx - a2 * g * inner(grad(eta_), w) * dx   # RHS linear functional
+    B = (inner(u, w) + eta * xi) / Dt * dx      # LHS bilinear form
+    L = (inner(u_, w) + eta_ * xi) / Dt * dx    # RHS linear functional
 
+    if V.sub(1).ufl_element().family() == 'Lagrange':
+        B += a1 * g * inner(grad(eta), w) * dx
+        L -= a2 * g * inner(grad(eta_), w) * dx
+    else:
+        B -= a1 * g * eta * div(w) * dx
+        L += a2 * g * eta_ * div(w) * dx
     if allowNormalFlow:
         B += a1 * div(b * u) * xi * dx
         L -= a2 * div(b * u_) * xi * dx

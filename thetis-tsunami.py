@@ -18,7 +18,7 @@ import utils.timeseries as tim
 print('*********************** TOHOKU TSUNAMI SIMULATION *********************\n')
 approach, getData, getError = msc.cheatCodes(input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': "))
 useAdjoint = approach == 'goalBased'
-tAdapt = True
+tAdapt = False
 
 # Define initial mesh and mesh statistics placeholders
 op = opt.Options(vscale=0.4 if useAdjoint else 0.85,

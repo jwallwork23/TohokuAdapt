@@ -4,12 +4,17 @@ from time import clock
 
 dt_meas = dt        # Time measure
 dt = 0.04           # Time step
+n = 2**8
+lx = 4
+ly = 1
 T = 2.4             # End time
 t = 0.
 cnt = 0
+primalFile = File('plots/minTest/primal.pvd')
+dualFile = File('plots/minTest/dual.pvd')
 
 # Define Mesh, FunctionSpace and apply IC
-mesh = RectangleMesh(4 * 16, 16, 4, 1)
+mesh = RectangleMesh(n * lx, n * ly, 4, 1)
 x, y = SpatialCoordinate(mesh)
 V = FunctionSpace(mesh, "CG", 2)
 c_ = Function(V, name='Prev').interpolate(exp(- (pow(x - 0.5, 2) + pow(y - 0.5, 2)) / 0.04), annotate=False)
@@ -32,6 +37,7 @@ primalTimer = clock()
 while t < T:
     solve(F == 0, c)
     c_.assign(c)
+    primalFile.write(c)
     if t == 0.:
         adj_start_timestep()
     elif t >= T:
@@ -43,13 +49,18 @@ while t < T:
 cnt -= 1
 print('Primal run time: %.3fs' % (clock()-primalTimer))
 
+# Visualise each run
+parameters["adjoint"]["stop_annotating"] = True                 # Stop registering equations
+adj_html("outdata/visualisations/forward.html", "forward")
+adj_html("outdata/visualisations/adjoint.html", "adjoint")
+
 # Solve dual problem
 store = True
-parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
 dualTimer = clock()
 for (variable, solution) in compute_adjoint(J):
     if store:
         dual.assign(variable, annotate=False)
+        dualFile.write(dual)
         cnt -= 1
         store = False
     else:

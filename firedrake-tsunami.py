@@ -23,11 +23,11 @@ bootstrap = False
 outputOF = True
 
 # Define initial mesh and mesh statistics placeholders
-op = opt.Options(vscale=0.1 if useAdjoint else 0.85,
-                 rm=20 if useAdjoint else 10,
+op = opt.Options(vscale=0.05 if useAdjoint else 0.85,
+                 rm=60 if useAdjoint else 30,
                  gradate=True if useAdjoint else False,
                  advect=False,
-                 window=True,
+                 window=False,
                  outputHessian=False,
                  plotpvd=False,
                  gauges=True,
@@ -342,14 +342,13 @@ if approach in ('simpleAdapt', 'goalBased'):
         # Estimate OF using trapezium rule TODO: allow for t-adaptivity
         if outputOF:
             step = assemble(eta * iA * dx)
-            if (t >= op.Tstart) and (started == False):
+            if (t >= op.Tstart) and not started:
                 started = True
                 J_trap = step
             elif t >= op.Tend:
                 J_trap += step
             elif started:
                 J_trap += 2 * step
-            print('J_h = ', J_trap * dt)
 
         if cnt % ndump == 0:
             adaptiveFile.write(u, eta, time=t)

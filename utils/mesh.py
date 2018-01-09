@@ -179,17 +179,18 @@ def meshStats(mesh):
 
 def saveMesh(mesh, filename):
     """
-    :param mesh: Mesh to be saved.
+    :param mesh: Mesh to be saved to HDF5.
     :param filename: filename to be given, including directory location.
     """
     viewer = PETSc.Viewer().createHDF5(filename + '.h5', 'w')
     viewer(mesh._plex)
 
-# def loadMesh(filename):
-#     """
-#     :param filename: mesh filename to load from, including directory location.
-#     :return: Mesh, as loaded from HDF5.
-#     """
-#     plex = PETSc.DMPlex().create()
-#     plex.createFromFile(filename + '.h5')
-#     return Mesh(plex)
+
+def loadMesh(filename):
+    """
+    :param filename: mesh filename to load from, including directory location.
+    :return: Mesh, as loaded from HDF5.
+    """
+    plex = PETSc.DMPlex().create()
+    plex.createFromFile(filename + '.h5')
+    return Mesh(plex)
