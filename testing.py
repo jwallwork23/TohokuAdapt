@@ -24,7 +24,7 @@ else:
     if problem == 'advection-diffusion':
         title = r'Advection-diffusion test case on $[0,4]\times[0,1]$'
         ylab1 += '$J(\phi)=\int_{T_{\mathrm{start}}}^{T_{\mathrm{end}}}\int_A\phi\:\mathrm{d}x\mathrm{d}t$'
-        tol = 1e-2
+        tol = 1e-3
     elif problem == 'shallow-water':
         title = r'Non-rotating shallow water test case on $[0,2]\times[0,2]$'
         ylab1 += '$J(u,v,\eta)=\int_{T_{\mathrm{start}}}^{T_{\mathrm{end}}}\int_A\eta\:\mathrm{d}x\mathrm{d}t$'

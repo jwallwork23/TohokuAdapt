@@ -166,6 +166,10 @@ def TohokuDomain(nEle=6176, output=False):
     return mesh, eta0, b
 
 
+def isoP2(mesh):
+    return MeshHierarchy(mesh, 1).__getitem__(1)
+
+
 def meshStats(mesh):
     """
     :param mesh: current mesh.
