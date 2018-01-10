@@ -58,18 +58,15 @@ if op.outputHessian:
     hessianFile = File(dirName + "hessian.pvd")
 
 # Load Meshes
-mesh, eta0, b = msh.TohokuDomain(nEle)
+mesh_H, eta0, b = msh.TohokuDomain(nEle)        # Computational mesh
 if useAdjoint:
-    try:
-        assert op.coarseness != 1
-    except:
-        raise NotImplementedError("Requested mesh resolution not yet available.")
     # Get finer mesh and associated bathymetry
-    mesh_N, b_N = msh.TohokuDomain(op.meshes[i+1])[0::2]
-    V_N = VectorFunctionSpace(mesh_N, op.space1, op.degree1) * FunctionSpace(mesh_N, op.space2, op.degree2)
+    mesh_h = msh.isoP2(mesh_H)                  # Finer mesh (h < H) upon which to approximate error
+    b_h = msh.TohokuDomain(mesh=mesh_h)[2]
+    V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
 
 # Specify physical and solver parameters
-dt = adap.adaptTimestepSW(mesh, b)
+dt = adap.adaptTimestepSW(mesh_H, b)
 print('Using initial timestep = %4.3fs\n' % dt)
 Dt = Constant(dt)
 T = op.Tend
@@ -78,12 +75,12 @@ ndump = op.ndump
 op.checkCFL(b)
 
 # Define variables of problem and apply initial conditions
-V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
-q_ = Function(V)
+V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
+q_ = Function(V_H)
 u_, eta_ = q_.split()
 u_.interpolate(Expression([0, 0]), annotate=False)
 eta_.interpolate(eta0, annotate=False)
-q = Function(V)
+q = Function(V_H)
 q.assign(q_)
 u, eta = q.split()
 u.rename("uv_2d")
@@ -98,19 +95,19 @@ for gauge in gauges:
 
 # Define Functions relating to goalBased approach
 if useAdjoint:
-    rho = Function(V_N)
+    rho = Function(V_h)
     rho_u, rho_e = rho.split()
     rho_u.rename("Velocity residual")
     rho_e.rename("Elevation residual")
-    dual = Function(V)
+    dual = Function(V_H)
     dual_u, dual_e = dual.split()
-    dual_N = Function(V_N)
-    dual_N_u, dual_N_e = dual_N.split()
-    dual_N_u.rename("Adjoint velocity")
-    dual_N_e.rename("Adjoint elevation")
-    P0_N = FunctionSpace(mesh_N, "DG", 0)
-    v = TestFunction(P0_N)
-    epsilon = Function(P0_N, name="Error indicator")
+    dual_h = Function(V_h)
+    dual_h_u, dual_h_e = dual_h.split()
+    dual_h_u.rename("Adjoint velocity")
+    dual_h_e.rename("Adjoint elevation")
+    P0_h = FunctionSpace(mesh_h, "DG", 0)
+    v = TestFunction(P0_h)
+    epsilon = Function(P0_h, name="Error indicator")
     J = form.objectiveFunctionalSW(q, plot=True)
 
 # Get adaptivity parameters
@@ -121,7 +118,7 @@ iStart = int(op.Tstart / dt)    # TODO: alter for t-adapt
 iEnd = int(np.ceil(T / dt))     # TODO: alter for t-adapt
 mM = [nEle, nEle]           # Min/max #Elements
 Sn = nEle
-nVerT = msh.meshStats(mesh)[1] * op.vscale    # Target #Vertices
+nVerT = msh.meshStats(mesh_H)[1] * op.vscale    # Target #Vertices
 nVerT0 = nVerT
 
 # Initialise counters
@@ -147,8 +144,8 @@ if getData:
         # Approximate residual of forward equation and save to HDF5
         if useAdjoint:
             if cnt % rm == 0:
-                qN, q_N = inte.mixedPairInterp(mesh_N, V_N, q, q_)
-                Au, Ae = form.strongResidualSW(qN, q_N, b_N, Dt)
+                qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
+                Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt)
                 rho_u.interpolate(Au)
                 rho_e.interpolate(Ae)
                 with DumbCheckpoint(dirName + 'hdf5/residual_' + msc.indexString(cnt), mode=FILE_CREATE) as saveRes:
@@ -191,16 +188,16 @@ if getData:
             if save:
                 # Load adjoint data
                 dual.assign(variable, annotate=False)
-                dual_N = inte.mixedPairInterp(mesh_N, V_N, dual)[0]
-                dual_N_u, dual_N_e = dual_N.split()
-                dual_N_u.rename('Adjoint velocity')
-                dual_N_e.rename('Adjoint elevation')
+                dual_h = inte.mixedPairInterp(mesh_h, V_h, dual)[0]
+                dual_h_u, dual_h_e = dual_h.split()
+                dual_h_u.rename('Adjoint velocity')
+                dual_h_e.rename('Adjoint elevation')
 
                 # Save adjoint data to HDF5
                 if cnt % rm == 0:
                     with DumbCheckpoint(dirName + 'hdf5/adjoint_' + msc.indexString(cnt), mode=FILE_CREATE) as saveAdj:
-                        saveAdj.store(dual_N_u)
-                        saveAdj.store(dual_N_e)
+                        saveAdj.store(dual_h_u)
+                        saveAdj.store(dual_h_e)
                         saveAdj.close()
                     print('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT * 100))
                 cnt -= 1
@@ -231,22 +228,22 @@ if getError:
             loadRes.load(rho_e)
             loadRes.close()
         with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_READ) as loadAdj:
-            loadAdj.load(dual_N_u)
-            loadAdj.load(dual_N_e)
+            loadAdj.load(dual_h_u)
+            loadAdj.load(dual_h_e)
             loadAdj.close()
 
         # Estimate error using dual weighted residual
-        epsilon = err.DWR(rho, dual_N, v)      # Currently a P0 field
+        epsilon = err.DWR(rho, dual_h, v)      # Currently a P0 field
         # TODO: include functionality for other error estimators. e.g. basic error estimator
 
         # Loop over relevant time window
         if op.window:
             for i in range(max(iStart, cnt), min(iEnd, cnt), rm):
                 with DumbCheckpoint(dirName + 'hdf5/adjoint_' + msc.indexString(i), mode=FILE_READ) as loadAdj:
-                    loadAdj.load(dual_N_u)
-                    loadAdj.load(dual_N_e)
+                    loadAdj.load(dual_h_u)
+                    loadAdj.load(dual_h_e)
                     loadAdj.close()
-                epsilon_ = err.DWR(rho, dual_N, v)
+                epsilon_ = err.DWR(rho, dual_h, v)
                 for j in range(len(epsilon.dat.data)):
                     epsilon.dat.data[j] = max(epsilon.dat.data[j], epsilon_.dat.data[j])
         epsilon.dat.data[:] = np.abs(epsilon.dat.data) * nVerT / (np.abs(assemble(epsilon * dx)) or 1.)  # Normalise
@@ -266,7 +263,7 @@ if approach in ('simpleAdapt', 'goalBased'):
     J_trap = 0.
     started = False
     if useAdjoint & op.gradate:
-        h0 = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
+        H0 = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(CellSize(mesh_H))
     print('\nStarting adaptive mesh primal run (forwards in time)')
     adaptTimer = clock()
     while t <= T:
@@ -274,66 +271,66 @@ if approach in ('simpleAdapt', 'goalBased'):
             stepTimer = clock()
 
             # Construct metric
-            W = TensorFunctionSpace(mesh, "CG", 1)
+            W = TensorFunctionSpace(mesh_H, "CG", 1)
             if useAdjoint:
                 # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
                 with DumbCheckpoint(dirName + 'hdf5/error_' + msc.indexString(cnt), mode=FILE_READ) as loadError:
                     loadError.load(epsilon)
                     loadError.close()
-                errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(inte.interp(mesh, epsilon)[0])
+                errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon)[0])
                 M = adap.isotropicMetric(W, errEst, op=op, invert=False)
             else:
                 if op.mtype != 's':
                     if op.iso:
                         M = adap.isotropicMetric(W, eta, op=op)
                     else:
-                        H = adap.constructHessian(mesh, W, eta, op=op)
-                        M = adap.computeSteadyMetric(mesh, W, H, eta, nVerT=nVerT, op=op)
+                        H = adap.constructHessian(mesh_H, W, eta, op=op)
+                        M = adap.computeSteadyMetric(mesh_H, W, H, eta, nVerT=nVerT, op=op)
                 if op.mtype != 'f':
-                    spd = Function(FunctionSpace(mesh, 'DG', 1)).interpolate(sqrt(dot(u, u)))
+                    spd = Function(FunctionSpace(mesh_H, 'DG', 1)).interpolate(sqrt(dot(u, u)))
                     if op.iso:
                         M2 = adap.isotropicMetric(W, spd, op=op)
                     else:
-                        H = adap.constructHessian(mesh, W, spd, op=op)
-                        M2 = adap.computeSteadyMetric(mesh, W, H, spd, nVerT=nVerT, op=op)
-                    M = adap.metricIntersection(mesh, W, M, M2) if op.mtype == 'b' else M2
+                        H = adap.constructHessian(mesh_H, W, spd, op=op)
+                        M2 = adap.computeSteadyMetric(mesh_H, W, H, spd, nVerT=nVerT, op=op)
+                    M = adap.metricIntersection(mesh_H, W, M, M2) if op.mtype == 'b' else M2
             if op.gradate:
                 if useAdjoint:
-                    M_ = adap.isotropicMetric(W, inte.interp(mesh, h0)[0], bdy=True, op=op) # Initial boundary metric
-                    M = adap.metricIntersection(mesh, W, M, M_, bdy=True)
-                adap.metricGradation(mesh, M)
+                    M_ = adap.isotropicMetric(W, inte.interp(mesh_H, H0)[0], bdy=True, op=op) # Initial boundary metric
+                    M = adap.metricIntersection(mesh_H, W, M, M_, bdy=True)
+                adap.metricGradation(mesh_H, M)
                 # TODO: always gradate to coast
             if op.advect:
                 M = adap.advectMetric(M, u, 2*Dt, n=3*rm)
                 # TODO: isotropic advection?
 
             # Adapt mesh and interpolate variables
-            mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-            V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
-            q_ = inte.mixedPairInterp(mesh, V, q_)[0]
-            b = inte.interp(mesh, b)[0]     # TODO: Combine this in above interpolation for speed
-            q = Function(V)
+            mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
+            V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
+            q_ = inte.mixedPairInterp(mesh_H, V_H, q_)[0]
+            b = inte.interp(mesh_H, b)[0]     # TODO: Combine this in above interpolation for speed
+            q = Function(V_H)
             u, eta = q.split()
             u.rename("uv_2d")
             eta.rename("elev_2d")
 
             # Re-establish variational form
-            qt = TestFunction(V)
+            qt = TestFunction(V_H)
             adaptProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
             adaptSolver = NonlinearVariationalSolver(adaptProblem, solver_parameters=op.params)
 
             if tAdapt:
-                dt = adap.adaptTimestepSW(mesh, b)
+                dt = adap.adaptTimestepSW(mesh_H, b)
                 Dt.assign(dt)
 
             # Get mesh stats
-            nEle = msh.meshStats(mesh)[0]
+            nEle = msh.meshStats(mesh_H)[0]
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
             op.printToScreen(cnt/rm+1, clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, t, dt)
 
             if outputOF:
-                iA = form.indicator(V.sub(1), x1=490e3, x2=640e3, y1=4160e3, y2=4360e3, smooth=True)
+                iA = form.indicator(V_H.sub(1), x1=490e3, x2=640e3, y1=4160e3, y2=4360e3, smooth=True)
 
         # Solve problem at current timestep
         adaptSolver.solve()

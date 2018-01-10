@@ -115,18 +115,20 @@ else:
     from . import conversion
 
 
-def TohokuDomain(nEle=6176, output=False):
+def TohokuDomain(nEle=6176, mesh=None, output=False):
     """
     Load the mesh, initial condition and bathymetry profile for the 2D ocean domain of the Tohoku tsunami problem.
     
-    :param res: mesh resolution value, ranging from 'extra coarse' (1) to extra fine (5).
-    :param output: toggle plotting of bathymetry and initial surface.
+    :arg res: mesh resolution value, ranging from 'extra coarse' (1) to extra fine (5).
+    :arg mesh: user specified mesh, if already generated.
+    :arg output: toggle plotting of bathymetry and initial surface.
     :return: associated mesh, initial condition and bathymetry field. 
     """
 
     # Define mesh and an associated elevation function space and establish initial condition and bathymetry functions
-    ms = MeshSetup(nEle)
-    mesh = Mesh(ms.dirName + ms.meshName + '.msh')
+    if mesh == None:
+        ms = MeshSetup(nEle)
+        mesh = Mesh(ms.dirName + ms.meshName + '.msh')
     meshCoords = mesh.coordinates.dat.data
     P1 = FunctionSpace(mesh, 'CG', 1)
     eta0 = Function(P1, name='Initial free surface displacement')
@@ -167,12 +169,16 @@ def TohokuDomain(nEle=6176, output=False):
 
 
 def isoP2(mesh):
+    """
+    :arg mesh: mesh to be refined.
+    :return: iso-P2 refined mesh (nodes of a quadratic element on the initial mesh become vertices of the new mesh).
+    """
     return MeshHierarchy(mesh, 1).__getitem__(1)
 
 
 def meshStats(mesh):
     """
-    :param mesh: current mesh.
+    :arg mesh: current mesh.
     :return: number of cells and vertices on the mesh.
     """
     plex = mesh._plex
@@ -183,8 +189,8 @@ def meshStats(mesh):
 
 def saveMesh(mesh, filename):
     """
-    :param mesh: Mesh to be saved to HDF5.
-    :param filename: filename to be given, including directory location.
+    :arg mesh: Mesh to be saved to HDF5.
+    :arg filename: filename to be given, including directory location.
     """
     viewer = PETSc.Viewer().createHDF5(filename + '.h5', 'w')
     viewer(mesh._plex)
@@ -192,7 +198,7 @@ def saveMesh(mesh, filename):
 
 # def loadMesh(filename):
 #     """
-#     :param filename: mesh filename to load from, including directory location.
+#     :arg filename: mesh filename to load from, including directory location.
 #     :return: Mesh, as loaded from HDF5.
 #     """
 #     plex = PETSc.DMPlex().create()
