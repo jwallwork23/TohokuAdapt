@@ -82,7 +82,7 @@ phi_next = Function(V_H, name='Concentration next')
 hmin = op.hmin
 hmax = op.hmax
 rm = op.rm
-iEnd = np.ceil(T / dt)
+iEnd = int(np.ceil(T / dt))
 nEle, nVer = msh.meshStats(mesh_H)
 mM = [nEle, nEle]           # Min/max #Elements
 Sn = nEle
@@ -160,7 +160,7 @@ if getData:
                     with DumbCheckpoint(dirName+'hdf5/adjoint_AD'+msc.indexString(cnt), mode=FILE_CREATE) as saveAdj:
                         saveAdj.store(dual_h)
                         saveAdj.close()
-                    print('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT) * 100)
+                    print('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT * 100))
                 cnt -= 1
                 save = False
             else:

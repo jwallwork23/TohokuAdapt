@@ -82,7 +82,7 @@ if useAdjoint:
     epsilon = Function(P0_h, name="Error indicator")
 
 # Apply initial condition and define Functions
-ic = project(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))), V.sub(1))
+ic = project(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))), V_H.sub(1))
 q_ = Function(V_H)
 u_, eta_ = q_.split()
 u_.interpolate(Expression([0, 0]))
@@ -128,12 +128,10 @@ if getData:
             if cnt % rm == 0:
                 tic = clock()
                 qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
-                print('#### DEBUG: solution pair %d interpolated. Time: %5.1fs' % (int(rm/(cnt+1)), clock()-tic))
                 tic = clock()
                 Au, Ae = form.strongResidualSW(qh, q_h, b, Dt)
                 rho_u.interpolate(Au)
                 rho_e.interpolate(Ae)
-                print('#### DEBUG: residual %d approximated. Time: %5.1fs' % (int(rm/(cnt+1)), clock()-tic))
                 tic = clock()
                 with DumbCheckpoint(dirName + 'hdf5/residual_SW' + msc.indexString(cnt), mode=FILE_CREATE) as saveRes:
                     saveRes.store(rho_u)
@@ -141,7 +139,6 @@ if getData:
                     saveRes.close()
                 if op.plotpvd:
                     residualFile.write(rho_u, rho_e, time=t)
-                print('#### DEBUG: residual %d stored. Time: %5.1fs' % (int(rm/(cnt+1)), clock()-tic))
 
         # Update solution at previous timestep
         q_.assign(q)
@@ -155,8 +152,6 @@ if getData:
                 adj_start_timestep()
             else:
                 adj_inc_timestep(time=t, finished=finished)
-            print('#### DEBUG: solution data logged for timestep %d. Time: %5.1fs' % (cnt, clock()-tic))
-
         if op.plotpvd & (cnt % ndump == 0):
             forwardFile.write(u, eta, time=t)
         print('t = %.3fs' % t)
@@ -191,7 +186,7 @@ if getData:
                         saveAdj.store(dual_h_u)
                         saveAdj.store(dual_h_e)
                         saveAdj.close()
-                    print('Adjoint simulation %.2f%% complete' % ((cntT-cnt)/cntT) * 100)
+                    print('Adjoint simulation %.2f%% complete' % ((cntT-cnt)/cntT * 100))
                 cnt -= 1
                 save = False
             else:
@@ -287,7 +282,7 @@ if approach in ('simpleAdapt', 'goalBased'):
             eta.rename("Elevation")
 
             # Re-establish variational form
-            qt = TestFunction(V)
+            qt = TestFunction(V_H)
             adaptProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
             adaptSolver = NonlinearVariationalSolver(adaptProblem, solver_parameters=op.params)
 
