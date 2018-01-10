@@ -18,32 +18,30 @@ def solverAD(n, op=opt.Options(Tend=2.4)):
     V = FunctionSpace(mesh, "CG", 2)
 
     # Specify physical and solver parameters
-    w = Function(VectorFunctionSpace(mesh, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
+    w = Function(VectorFunctionSpace(mesh, "CG", 2)).interpolate(Expression([1, 0]))
     h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
     dt = min(0.9 * min(h.dat.data), op.Tend / 2)
     Dt = Constant(dt)
 
     # Apply initial condition and define Functions
     ic = project(exp(- (pow(x - 0.5, 2) + pow(y - 0.5, 2)) / 0.04), V)
-    phi = ic.copy(deepcopy=True)
-    phi.rename('Concentration')
-    phi_next = Function(V, name='Concentration next')
+    c_ = ic.copy(deepcopy=True)
+    c = Function(V)
 
     # Define variational problem and OF
-    psi = TestFunction(V)
-    F = form.weakResidualAD(phi_next, phi, psi, w, Dt, nu=1e-3)
-    bc = DirichletBC(V, 0., "on_boundary")
+    ct = TestFunction(V)
+    F = form.weakResidualAD(c, c_, ct, w, Dt, nu=1e-3)
     iA = form.indicator(V)
 
-    J_trap = assemble(phi * iA * dx)
+    J_trap = assemble(c_ * iA * dx)
     t = 0.
     while t < op.Tend:
         # Solve problem at current timestep and update variables
-        solve(F == 0, phi_next, bc)
-        phi.assign(phi_next)
+        solve(F == 0, c)
+        c_.assign(c)
 
         # Estimate OF using trapezium rule
-        step = assemble(phi * iA * dx)
+        step = assemble(c_ * iA * dx)
         if t >= op.Tend:
             J_trap += step
         else:
@@ -289,8 +287,9 @@ def continuousAdjointSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg'))
     forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
     # Define adjoint problem
+    switch = Constant(1.)
     adjointProblem = NonlinearVariationalProblem(form.weakResidualSW(l, l_, qt, b, Dt, allowNormalFlow=False,
-                                                                     adjoint=True), l)
+                                                                     adjoint=True, switch=switch), l)
     adjointSolver = NonlinearVariationalSolver(adjointProblem, solver_parameters=op.params)
 
     t = 0.
@@ -303,11 +302,13 @@ def continuousAdjointSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg'))
         cnt += 1
     primalTimer = clock() - primalTimer
     dualTimer = clock()
-    while t > 0.9*dt:
+    while t > 0.1*dt:
         adjointSolver.solve()
         l_.assign(l)
         t -= dt
         cnt -= 1
+        if t < op.Tstart:
+            switch.assign(0.)
     dualTimer = clock() - dualTimer
     assert (cnt == 0)
     slowdown = dualTimer/primalTimer
@@ -318,6 +319,57 @@ def continuousAdjointSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg'))
 
     # adj_html("outdata/visualisations/forward.html", "forward")
     # adj_html("outdata/visualisations/adjoint.html", "adjoint")
+
+    return primalTimer, dualTimer, msh.meshStats(mesh)[0]
+
+
+def continuousAdjointAD(n, op=opt.Options(Tend=2.4)):
+
+    # Define Mesh and FunctionSpace
+    mesh = RectangleMesh(4 * n, n, 4, 1)  # Computational mesh
+    x, y = SpatialCoordinate(mesh)
+    V = FunctionSpace(mesh, "CG", 2)
+
+    # Specify physical and solver parameters
+    w = Function(VectorFunctionSpace(mesh, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
+    h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
+    dt = min(0.9 * min(h.dat.data), op.Tend / 2)
+    Dt = Constant(dt)
+
+    # Apply initial condition and define Functions
+    ic = project(exp(- (pow(x - 0.5, 2) + pow(y - 0.5, 2)) / 0.04), V)
+    c_ = ic.copy(deepcopy=True)
+    c = Function(V)
+    l_ = Function(V).interpolate(Expression(0))
+    l = Function(V)
+
+    # Define forward and adjoint problems
+    ct = TestFunction(V)
+    F = form.weakResidualAD(c, c_, ct, w, Dt, nu=1e-3)
+    A = form.adjointAD(l, l_, ct, w, Dt)
+
+    t = 0.
+    cnt = 0
+    primalTimer = clock()
+    while t < op.Tend - 0.5*dt:
+        solve(F == 0, c)
+        c_.assign(c)
+        t += dt
+        cnt += 1
+    primalTimer = clock() - primalTimer
+    dualTimer = clock()
+    while t > 0.5*dt:
+        solve(A == 0, l)
+        l_.assign(l)
+        t -= dt
+        cnt -= 1
+    dualTimer = clock() - dualTimer
+    assert (cnt == 0)
+    slowdown = dualTimer / primalTimer
+    slow = slowdown > 1
+    if not slow:
+        slowdown = 1. / slowdown
+    print('Cts case: Adjoint run %.3fx %s than forward run.' % (slowdown, 'slower' if slow else 'faster'))
 
     return primalTimer, dualTimer, msh.meshStats(mesh)[0]
 
@@ -373,8 +425,8 @@ def discreteAdjointSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg')):
         cnt += 1
     cnt -= 1
     primalTimer = clock() - primalTimer
-    adj_html("outdata/visualisations/forwardSW.html", "forward")
-    adj_html("outdata/visualisations/adjointSW.html", "adjoint")
+    # adj_html("outdata/visualisations/forwardSW.html", "forward")
+    # adj_html("outdata/visualisations/adjointSW.html", "adjoint")
     parameters["adjoint"]["stop_annotating"] = True  # Stop registering equations
     store = True
     dualTimer = clock()
@@ -398,11 +450,82 @@ def discreteAdjointSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg')):
     return primalTimer, dualTimer
 
 
-def ctsVsDis(i):
+def discreteAdjointAD(n, op=opt.Options(Tend=2.4)):
+
+    # Define Mesh and FunctionSpace
+    mesh = RectangleMesh(4 * n, n, 4, 1)  # Computational mesh
+    x, y = SpatialCoordinate(mesh)
+    V = FunctionSpace(mesh, "CG", 2)
+
+    # Specify physical and solver parameters
+    w = Function(VectorFunctionSpace(mesh, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
+    h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
+    dt = min(0.9 * min(h.dat.data), op.Tend / 2)
+    Dt = Constant(dt)
+
+    # Apply initial condition and define Functions
+    ic = project(exp(- (pow(x - 0.5, 2) + pow(y - 0.5, 2)) / 0.04), V)
+    c_ = ic.copy(deepcopy=True)
+    c_.rename('Concentration')
+    c = Function(V, name='Concentration next')
+    dual = Function(V)
+
+    # Define variational problem and OF
+    ct = TestFunction(V)
+    F = form.weakResidualAD(c, c_, ct, w, Dt)
+    J = form.objectiveFunctionalAD(c)
+
+    t = 0.
+    cnt = 0
+    primalTimer = clock()
+    while t < op.Tend:
+        # Solve problem at current timestep and update variables
+        solve(F == 0, c)
+        c_.assign(c)
+        if t == 0.:
+            adj_start_timestep()
+        elif t >= op.Tend:
+            adj_inc_timestep(time=t, finished=True)
+        else:
+            adj_inc_timestep(time=t, finished=False)
+        t += dt
+        cnt += 1
+    cnt -= 1
+    primalTimer = clock() - primalTimer
+    parameters["adjoint"]["stop_annotating"] = True  # Stop registering equations
+    store = True
+    dualTimer = clock()
+    for (variable, solution) in compute_adjoint(J):
+        if store:
+            dual.assign(variable, annotate=False)
+            cnt -= 1
+            store = False
+        else:
+            store = True
+        if cnt == 0:
+            break
+    dualTimer = clock() - dualTimer
+    assert (cnt == 0)
+    slowdown = dualTimer / primalTimer
+    slow = slowdown > 1
+    if not slow:
+        slowdown = 1. / slowdown
+    print('Dis case: Adjoint run %.3fx %s than forward run.' % (slowdown, 'slower' if slow else 'faster'))
+
+    return primalTimer, dualTimer
+
+
+def ctsVsDis(i, problem='advection-diffusion'):
     n = pow(2, i)
-    c_t1, c_t2, nEle = continuousAdjointSW(n)
-    d_t1, d_t2 = discreteAdjointSW(n)
-    print('%d elements:' % nEle)
+    if problem == 'advection-diffusion':
+        c_t1, c_t2, nEle = continuousAdjointAD(n)
+        d_t1, d_t2 = discreteAdjointAD(n)
+    elif problem == 'shallow-water':
+        c_t1, c_t2, nEle = continuousAdjointAD(n)
+        d_t1, d_t2 = discreteAdjointSW(n)
+    else:
+        raise NotImplementedError
+    print('Considering %s problem on a mesh with %d elements:' % (problem, nEle))
     print('Cts primal: %5.3fs,  Cts dual: %5.3fs,  Cts total: %5.3fs' % (c_t1, c_t2, c_t1+c_t2))
     print('Dis primal: %5.3fs,  Dis dual: %5.3fs,  Dis total: %5.3fs\n' % (d_t1, d_t2, d_t1+d_t2))
 
