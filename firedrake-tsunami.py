@@ -16,8 +16,8 @@ import utils.timeseries as tim
 
 
 print('*********************** TOHOKU TSUNAMI SIMULATION *********************\n')
-approach, getData, getError = msc.cheatCodes(input("Choose approach: 'fixedMesh', 'simpleAdapt' or 'goalBased': "))
-useAdjoint = approach == 'goalBased'
+approach, getData, getError, useAdjoint = msc.cheatCodes(input(
+    "Choose error estimator: 'hessianBased', 'explicit', 'adjointBased' or 'goalBased': "))
 tAdapt = False
 bootstrap = False
 outputOF = True
@@ -53,7 +53,7 @@ if op.plotpvd:
     residualFile = File(dirName + "residual.pvd")
     adjointFile = File(dirName + "adjoint.pvd")
     errorFile = File(dirName + "errorIndicator.pvd")
-adaptiveFile = File(dirName + "goalBased.pvd") if useAdjoint else File(dirName + "simpleAdapt.pvd")
+adaptiveFile = File(dirName + approach + ".pvd")
 if op.outputHessian:
     hessianFile = File(dirName + "hessian.pvd")
 
@@ -258,7 +258,7 @@ if getError:
     errorTimer = clock() - errorTimer
     print('Errors estimated. Run time: %.3fs' % errorTimer)
 
-if approach in ('simpleAdapt', 'goalBased'):
+if approach in ('hessianBased', 'explicit', 'adjointBased', 'goalBased'):
     t = 0.
     J_trap = 0.
     started = False

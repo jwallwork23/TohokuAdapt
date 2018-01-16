@@ -17,22 +17,36 @@ def cheatCodes(approach, default='goalBased'):
     if approach == 'goalBased':
         getData = True
         getError = True
+        useAdjoint = True
     elif approach == 'saved':
         approach = 'goalBased'
         getData = False
         getError = False
+        useAdjoint = True
     elif approach == 'regen':
         approach = 'goalBased'
         getData = False
         getError = True
+        useAdjoint = True
     elif approach == 'simpleAdapt':
         getData = False
         getError = False
+        useAdjoint = False
+    elif approach == 'explicit':
+        getData = True
+        getError = True
+        useAdjoint = False
+    elif approach == 'adjointBased':
+        getData = True
+        getError = True
+        useAdjoint = True
     else:
+        approach = 'fixedMesh'
         getData = True
         getError = False
+        useAdjoint = False
 
-    return approach, getData, getError
+    return approach, getData, getError, useAdjoint
 
 
 def printTimings(primalTimer, dualTimer, errorTimer, adaptTimer, bootTimer=False):
