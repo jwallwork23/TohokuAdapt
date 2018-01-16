@@ -94,21 +94,24 @@ for gauge in gauges:
     v0[gauge] = float(eta.at(op.gaugeCoord(gauge)))
 
 # Define Functions relating to goalBased approach
-if useAdjoint:
+if approach in ('explicit', 'goalBased'):
     rho = Function(V_h)
     rho_u, rho_e = rho.split()
     rho_u.rename("Velocity residual")
     rho_e.rename("Elevation residual")
+    if useAdjoint:
+        dual_h = Function(V_h)
+        dual_h_u, dual_h_e = dual_h.split()
+        dual_h_u.rename("Adjoint velocity")
+        dual_h_e.rename("Adjoint elevation")
+if useAdjoint:
     dual = Function(V_H)
     dual_u, dual_e = dual.split()
-    dual_h = Function(V_h)
-    dual_h_u, dual_h_e = dual_h.split()
-    dual_h_u.rename("Adjoint velocity")
-    dual_h_e.rename("Adjoint elevation")
-    P0_h = FunctionSpace(mesh_h, "DG", 0)
-    v = TestFunction(P0_h)
-    epsilon = Function(P0_h, name="Error indicator")
     J = form.objectiveFunctionalSW(q, plot=True)
+if approach in ('explicit', 'adjointBased', 'goalBased'):
+    P0 = FunctionSpace(mesh_H, "DG", 0) if approach == 'adjointBased' else FunctionSpace(mesh_h, "DG", 0)
+    v = TestFunction(P0)
+    epsilon = Function(P0, name="Error indicator")
 
 # Get adaptivity parameters
 hmin = op.hmin
@@ -142,7 +145,7 @@ if getData:
         forwardSolver.solve()
 
         # Approximate residual of forward equation and save to HDF5
-        if useAdjoint:
+        if approach in ('explicit', 'goalBased'):
             if cnt % rm == 0:
                 qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
                 Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt)
@@ -154,6 +157,12 @@ if getData:
                     saveRes.close()
                 if op.plotpvd:
                     residualFile.write(rho_u, rho_e, time=t)
+
+        if approach == 'adjointBased':
+            with DumbCheckpoint(dirName + 'hdf5/forward_' + msc.indexString(cnt), mode=FILE_CREATE) as saveFor:
+                saveFor.store(u)
+                saveFor.store(eta)
+                saveFor.close()
 
         # Update solution at previous timestep
         q_.assign(q)
@@ -188,17 +197,24 @@ if getData:
             if save:
                 # Load adjoint data
                 dual.assign(variable, annotate=False)
-                dual_h = inte.mixedPairInterp(mesh_h, V_h, dual)[0]
-                dual_h_u, dual_h_e = dual_h.split()
-                dual_h_u.rename('Adjoint velocity')
-                dual_h_e.rename('Adjoint elevation')
 
                 # Save adjoint data to HDF5
                 if cnt % rm == 0:
-                    with DumbCheckpoint(dirName + 'hdf5/adjoint_' + msc.indexString(cnt), mode=FILE_CREATE) as saveAdj:
-                        saveAdj.store(dual_h_u)
-                        saveAdj.store(dual_h_e)
-                        saveAdj.close()
+                    if approach == 'goalBased':
+                        dual_h = inte.mixedPairInterp(mesh_h, V_h, dual)[0]
+                        dual_h_u, dual_h_e = dual_h.split()
+                        dual_h_u.rename('Adjoint velocity')
+                        dual_h_e.rename('Adjoint elevation')
+                        with DumbCheckpoint(dirName + 'hdf5/adjoint_' + msc.indexString(cnt), mode=FILE_CREATE) as saveAdj:
+                            saveAdj.store(dual_h_u)
+                            saveAdj.store(dual_h_e)
+                            saveAdj.close()
+                    else:
+                        dual_u, dual_e = dual.split()
+                        with DumbCheckpoint(dirName + 'hdf5/adjoint_H_' + msc.indexString(cnt), mode=FILE_CREATE) as saveAdj:
+                            saveAdj.store(dual_u)
+                            saveAdj.store(dual_e)
+                            saveAdj.close()
                     print('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT * 100))
                 cnt -= 1
                 save = False
@@ -223,18 +239,29 @@ if getError:
         indexStr = msc.indexString(k)
 
         # Load residual and adjoint data from HDF5
-        with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_READ) as loadRes:
-            loadRes.load(rho_u)
-            loadRes.load(rho_e)
-            loadRes.close()
-        with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_READ) as loadAdj:
-            loadAdj.load(dual_h_u)
-            loadAdj.load(dual_h_e)
-            loadAdj.close()
+        if approach in ('explicit', 'goalBased'):
+            with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_READ) as loadRes:
+                loadRes.load(rho_u)
+                loadRes.load(rho_e)
+                loadRes.close()
+        if approach == 'goalBased':
+            with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_READ) as loadAdj:
+                loadAdj.load(dual_h_u)
+                loadAdj.load(dual_h_e)
+                loadAdj.close()
+        if approach == 'adjointBased':
+            with DumbCheckpoint(dirName + 'hdf5/adjoint_H' + indexStr, mode=FILE_READ) as loadAdj:
+                loadAdj.load(dual_u)
+                loadAdj.load(dual_e)
+                loadAdj.close()
+            with DumbCheckpoint(dirName + 'hdf5/forward_' + indexStr, mode=FILE_READ) as loadAdj:
+                loadAdj.load(u)
+                loadAdj.load(eta)
+                loadAdj.close()
 
         # Estimate error using dual weighted residual
         epsilon = err.DWR(rho, dual_h, v)      # Currently a P0 field
-        # TODO: include functionality for other error estimators. e.g. basic error estimator
+        # TODO: include functionality for the other error estimators.
 
         # Loop over relevant time window
         if op.window:
@@ -243,7 +270,10 @@ if getError:
                     loadAdj.load(dual_h_u)
                     loadAdj.load(dual_h_e)
                     loadAdj.close()
-                epsilon_ = err.DWR(rho, dual_h, v)
+                if approach == 'goalBased':
+                    epsilon_ = err.DWR(rho, dual_h, v)
+                else:
+                    epsilon_ = err.basicErrorEstimator(q, dual, v_H)
                 for j in range(len(epsilon.dat.data)):
                     epsilon.dat.data[j] = max(epsilon.dat.data[j], epsilon_.dat.data[j])
         epsilon.dat.data[:] = np.abs(epsilon.dat.data) * nVerT / (np.abs(assemble(epsilon * dx)) or 1.)  # Normalise
