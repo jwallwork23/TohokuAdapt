@@ -147,7 +147,7 @@ if getData:
         # Approximate residual of forward equation and save to HDF5
         if cnt % rm == 0:
             if approach in ('explicit', 'goalBased'):
-                qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
+                qh, q_h = inte.generalisedInterp(mesh_h, V_h, q, q_)
                 Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt)
                 rho_u.interpolate(Au)
                 rho_e.interpolate(Ae)
@@ -201,7 +201,7 @@ if getData:
                 # Save adjoint data to HDF5
                 if cnt % rm == 0:
                     if approach == 'goalBased':
-                        dual_h = inte.mixedPairInterp(mesh_h, V_h, dual)[0]
+                        dual_h = inte.generalisedInterp(mesh_h, V_h, dual)[0]
                         dual_h_u, dual_h_e = dual_h.split()
                         dual_h_u.rename('Adjoint velocity')
                         dual_h_e.rename('Adjoint elevation')
@@ -342,8 +342,7 @@ if approach in ('hessianBased', 'explicit', 'adjointBased', 'goalBased'):
             # Adapt mesh and interpolate variables
             mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
             V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
-            q_ = inte.mixedPairInterp(mesh_H, V_H, q_)[0]
-            b = inte.interp(mesh_H, b)[0]     # TODO: Combine this in above interpolation for speed
+            q_, b = inte.generalisedInterp(mesh_H, V_H, q_, b)
             q = Function(V_H)
             u, eta = q.split()
             u.rename("uv_2d")

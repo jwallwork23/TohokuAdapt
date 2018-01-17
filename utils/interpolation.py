@@ -23,13 +23,13 @@ def interp(mesh, *fields):
         f_new = Function(V_new)
         notInDomain = []
         if f.ufl_element().family() == 'Lagrange' and f.ufl_element().degree() == 1:
-            coords = mesh.coordinates.dat.data                                      # Vertex/node coords
+            coords = mesh.coordinates.dat.data      # Vertex/node coords
         elif f.ufl_element().family() == 'Lagrange':
             degree = f.ufl_element().degree()
             C = VectorFunctionSpace(mesh, 'CG', degree)
             interp_coordinates = Function(C)
             interp_coordinates.interpolate(mesh.coordinates)
-            coords = interp_coordinates.dat.data                                    # Node coords (NOT just vertices)
+            coords = interp_coordinates.dat.data    # Node coords (NOT just vertices)
         elif f.ufl_element().family() == 'Discontinuous Lagrange':
             degree = f.ufl_element().degree()
             C = VectorFunctionSpace(mesh, 'DG', degree)
@@ -67,7 +67,10 @@ def interp(mesh, *fields):
     return fields_new
 
 
-def mixedPairInterp(mesh, V, *fields):
+# TODO: somehow take note of problematic elements/vertices
+
+
+def generalisedInterp(mesh, V, *fields):
     """
     Interpolate mixed function space pairs onto a new mesh.
     
@@ -78,10 +81,13 @@ def mixedPairInterp(mesh, V, *fields):
     """
     fields_new = ()
     for q in fields:
-        p = Function(V)
-        p0, p1 = p.split()
-        q0, q1 = q.split()
-        q0, q1 = interp(mesh, q0, q1)
-        p0.assign(q0), p1.assign(q1)
+        if len(q.ufl_shape) == 1:
+            p = Function(V)
+            p0, p1 = p.split()
+            q0, q1 = q.split()
+            q0, q1 = interp(mesh, q0, q1)
+            p0.assign(q0), p1.assign(q1)
+        else:
+            p = interp(mesh, q)
         fields_new += (p,)
     return fields_new

@@ -127,7 +127,7 @@ if getData:
         if useAdjoint:
             if cnt % rm == 0:
                 tic = clock()
-                qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
+                qh, q_h = inte.generalisedInterp(mesh_h, V_h, q, q_)
                 tic = clock()
                 Au, Ae = form.strongResidualSW(qh, q_h, b, Dt)
                 rho_u.interpolate(Au)
@@ -175,7 +175,7 @@ if getData:
             if save:
                 # Load adjoint data
                 dual.assign(variable, annotate=False)
-                dual_h = inte.mixedPairInterp(mesh_h, V_h, dual)[0]
+                dual_h = inte.generalisedInterp(mesh_h, V_h, dual)[0]
                 dual_h_u, dual_h_e = dual_h.split()
                 dual_h_u.rename('Adjoint velocity')
                 dual_h_e.rename('Adjoint elevation')
@@ -275,7 +275,7 @@ if approach in ('simpleAdapt', 'goalBased'):
             # Adapt mesh and interpolate variables
             mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
             V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
-            q_ = inte.mixedPairInterp(mesh_H, V_H, q_)[0]
+            q_ = inte.generalisedInterp(mesh_H, V_H, q_)[0]
             q = Function(V_H)
             u, eta = q.split()
             u.rename("Velocity")
