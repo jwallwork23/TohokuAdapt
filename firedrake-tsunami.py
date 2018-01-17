@@ -23,13 +23,13 @@ bootstrap = False
 outputOF = True
 
 # Define initial mesh and mesh statistics placeholders
-op = opt.Options(vscale=0.05 if useAdjoint else 0.85,
-                 rm=60 if useAdjoint else 30,
+op = opt.Options(vscale=0.3 if useAdjoint else 0.85,
+                 rm=30 if useAdjoint else 30,
                  gradate=True if useAdjoint else False,
                  advect=False,
                  window=False,
                  outputHessian=False,
-                 plotpvd=False,
+                 plotpvd=True,
                  gauges=True,
                  ndump=2,
                  mtype='f',
@@ -51,7 +51,6 @@ dirName = 'plots/firedrake-tsunami/'
 if op.plotpvd:
     forwardFile = File(dirName + "forward.pvd")
     residualFile = File(dirName + "residual.pvd")
-    adjointFile = File(dirName + "adjoint.pvd")
     errorFile = File(dirName + "errorIndicator.pvd")
 adaptiveFile = File(dirName + approach + ".pvd")
 if op.outputHessian:
@@ -131,7 +130,7 @@ save = True
 
 if getData:
     # Define variational problem
-    qt = TestFunction(V)
+    qt = TestFunction(V_H)
     forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
     forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
@@ -177,7 +176,7 @@ if getData:
                 adj_inc_timestep(time=t, finished=finished)
 
         if cnt % ndump == 0:
-            if op.plotpvd & (cnt % ndump == 0):
+            if op.plotpvd:
                 forwardFile.write(u, eta, time=t)
             if op.gauges and not useAdjoint:
                 gaugeData = tim.extractTimeseries(gauges, eta, t, gaugeData, v0, op=op)
@@ -232,6 +231,7 @@ if getData:
 
 # Loop back over times to generate error estimators
 if getError:
+    print('\nStarting error estimate generation')
     errorTimer = clock()
     errEstMean = 0
     for k in range(0, iEnd, rm):
@@ -250,7 +250,7 @@ if getError:
                     loadAdj.load(dual_h_e)
                     loadAdj.close()
         elif approach == 'adjointBased':
-            with DumbCheckpoint(dirName + 'hdf5/adjoint_H' + indexStr, mode=FILE_READ) as loadAdj:
+            with DumbCheckpoint(dirName + 'hdf5/adjoint_H_' + indexStr, mode=FILE_READ) as loadAdj:
                 loadAdj.load(dual_u)
                 loadAdj.load(dual_e)
                 loadAdj.close()
@@ -260,7 +260,7 @@ if getError:
                 loadAdj.close()
 
         # Estimate error using dual weighted residual
-        epsilon_ = err.DWR(rho, dual_h, v) if approach == 'goalBased' else err.basicErrorEstimator(q, dual, v)
+        epsilon = err.DWR(rho, dual_h, v) if approach == 'goalBased' else err.basicErrorEstimator(q, dual, v)
         # TODO: include functionality for the explicit error estimator.
 
         # Loop over relevant time window

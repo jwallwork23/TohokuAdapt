@@ -18,16 +18,6 @@ def cheatCodes(approach, default='goalBased'):
         getData = True
         getError = True
         useAdjoint = True
-    elif approach == 'saved':
-        approach = 'goalBased'
-        getData = False
-        getError = False
-        useAdjoint = True
-    elif approach == 'regen':
-        approach = 'goalBased'
-        getData = False
-        getError = True
-        useAdjoint = True
     elif approach == 'simpleAdapt':
         getData = False
         getError = False
@@ -38,6 +28,16 @@ def cheatCodes(approach, default='goalBased'):
         useAdjoint = False
     elif approach == 'adjointBased':
         getData = True
+        getError = True
+        useAdjoint = True
+    elif approach == 'saved':
+        approach = input("Choose error estimator: 'explicit', 'adjointBased' or 'goalBased': ") or 'goalBased'
+        getData = False
+        getError = False
+        useAdjoint = True
+    elif approach == 'regen':
+        approach = input("Choose error estimator: 'explicit', 'adjointBased' or 'goalBased': ") or 'goalBased'
+        getData = False
         getError = True
         useAdjoint = True
     else:
@@ -63,8 +63,12 @@ def printTimings(primalTimer, dualTimer, errorTimer, adaptTimer, bootTimer=False
     if bool(bootTimer):
         print("""
         Bootstrap run %5.3fs""" % (bootTimer))
+    else:
+        bootTimer = 0
     print("""
         Forward run   %5.3fs,
         Adjoint run   %5.3fs, 
         Error run     %5.3fs,
-        Adaptive run   %5.3fs\n""" % (primalTimer, dualTimer, errorTimer, adaptTimer))
+        Adaptive run  %5.3fs
+        Total         %5.3fs\n""" % (primalTimer, dualTimer, errorTimer, adaptTimer,
+                                     primalTimer + dualTimer + errorTimer + adaptTimer + bootTimer))

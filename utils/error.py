@@ -7,7 +7,7 @@ from . import interpolation
 from . import options
 
 
-def explicitErrorEstimator(u_, u, eta_, eta, lu, le, b, dt, hk):
+def explicitErrorEstimator(u_, u, eta_, eta, lu, le, b, Dt):
     """
     Estimate error locally using an a posteriori error indicator.
     
@@ -18,24 +18,23 @@ def explicitErrorEstimator(u_, u, eta_, eta, lu, le, b, dt, hk):
     :param lu: adjoint velocity at current timestep.
     :param le: adjoint free surface at current timestep.
     :param b: bathymetry field.
-    :param dt: timestep used stepping from u_ to u (and eta_ to eta).
-    :param hk: cell size of current mesh.
+    :param Dt: timestep used as a FiredrakeConstant.
     :return: field of local error indicators.
     """
 
     # Get useful objects related to mesh
     mesh = u.function_space().mesh()
+    h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
     v = TestFunction(FunctionSpace(mesh, "DG", 0))      # DG test functions to get cell-wise norms
 
     # Compute element residual
-    rho = assemble(v * pow(hk, 2) * (dot(u_ - u - dt * 9.81 * grad(0.5 * (eta + eta_)),
-                                         u_ - u - dt * 9.81 * grad(0.5 * (eta + eta_)))
-                                     + (eta_ - eta - dt * div(b * 0.5 * (u + u_)))
-                                     * (eta_ - eta - dt * div(b * 0.5 * (u + u_)))) / CellVolume(mesh) * dx)
+    rho = assemble(v * h * h * (dot(u_ - u - Dt * 9.81 * grad(0.5 * (eta + eta_)),
+                                    u_ - u - Dt * 9.81 * grad(0.5 * (eta + eta_)))
+                                + (eta_ - eta - Dt * div(b * 0.5 * (u + u_)))
+                                * (eta_ - eta - Dt * div(b * 0.5 * (u + u_)))) / CellVolume(mesh) * dx)
 
     # Compute and add boundary residual term
-    # TODO: Need multiply by normed bdy size
-    rho_bdy = assemble(v * dt * b * dot(0.5 * (u + u_), FacetNormal(mesh)) / CellVolume(mesh) * dS)
+    rho_bdy = assemble(v * h * Dt * b * dot(0.5 * (u + u_), FacetNormal(mesh)) / CellVolume(mesh) * dS)
     lambdaNorm = assemble(v * sqrt((dot(lu, lu) + le * le)) * dx)
     rho = assemble((sqrt(rho) + sqrt(rho_bdy)) * lambdaNorm)
 
