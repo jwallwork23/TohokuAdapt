@@ -244,12 +244,12 @@ if getError:
                 loadRes.load(rho_u)
                 loadRes.load(rho_e)
                 loadRes.close()
-        if approach == 'goalBased':
-            with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_READ) as loadAdj:
-                loadAdj.load(dual_h_u)
-                loadAdj.load(dual_h_e)
-                loadAdj.close()
-        if approach == 'adjointBased':
+            if useAdjoint:
+                with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_READ) as loadAdj:
+                    loadAdj.load(dual_h_u)
+                    loadAdj.load(dual_h_e)
+                    loadAdj.close()
+        elif approach == 'adjointBased':
             with DumbCheckpoint(dirName + 'hdf5/adjoint_H' + indexStr, mode=FILE_READ) as loadAdj:
                 loadAdj.load(dual_u)
                 loadAdj.load(dual_e)
@@ -265,7 +265,7 @@ if getError:
 
         # Loop over relevant time window
         if op.window:
-            for i in range(max(iStart, cnt), min(iEnd, cnt), rm):
+            for i in range(cnt, min(cnt+iEnd-iStart, iEnd), rm):
                 with DumbCheckpoint(dirName + 'hdf5/adjoint_' + msc.indexString(i), mode=FILE_READ) as loadAdj:
                     loadAdj.load(dual_h_u)
                     loadAdj.load(dual_h_e)
