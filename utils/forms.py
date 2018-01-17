@@ -94,8 +94,8 @@ def formsSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, n
     """
     V = q.function_space()
     mesh = V.mesh()
-    (u, eta) = (as_vector((q[0], q[1])), q[2])
-    (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
+    u, eta = q.split()
+    u_, eta_ = q_.split()
     (w, xi) = (as_vector((qt[0], qt[1])), qt[2])
     a1, a2 = timestepCoeffs(timestepper)
 

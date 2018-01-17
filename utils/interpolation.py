@@ -82,11 +82,14 @@ def generalisedInterp(mesh, V, *fields):
     fields_new = ()
     for q in fields:
         if len(q.ufl_shape) == 1:
-            p = Function(V)
-            p0, p1 = p.split()
-            q0, q1 = q.split()
-            q0, q1 = interp(mesh, q0, q1)
-            p0.assign(q0), p1.assign(q1)
+            if len(q.dat.data) == 2:
+                p = Function(V)
+                p0, p1 = p.split()
+                q0, q1 = q.split()
+                q0, q1 = interp(mesh, q0, q1)
+                p0.assign(q0), p1.assign(q1)
+            else:
+                raise NotImplementedError
         else:
             p = interp(mesh, q)
         fields_new += (p,)

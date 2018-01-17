@@ -23,7 +23,7 @@ bootstrap = False
 outputOF = True
 
 # Define initial mesh and mesh statistics placeholders
-op = opt.Options(vscale=0.2 if useAdjoint else 0.85,
+op = opt.Options(vscale=0.5 if useAdjoint else 0.85,
                  rm=60 if useAdjoint else 30,
                  # rm=60,
                  gradate=True if useAdjoint else False,
@@ -342,7 +342,8 @@ if approach in ('hessianBased', 'explicit', 'adjointBased', 'goalBased'):
             # Adapt mesh and interpolate variables
             mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
             V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
-            q_, b = inte.generalisedInterp(mesh_H, V_H, q_, b)
+            q_ = inte.generalisedInterp(mesh_H, V_H, q_)[0]
+            b = inte.interp(mesh_H, b)
             q = Function(V_H)
             u, eta = q.split()
             u.rename("uv_2d")
