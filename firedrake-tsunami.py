@@ -23,15 +23,15 @@ bootstrap = False
 outputOF = True
 
 # Define initial mesh and mesh statistics placeholders
-op = opt.Options(vscale=0.3 if useAdjoint else 0.85,
-                 rm=30 if useAdjoint else 30,
+op = opt.Options(vscale=0.2 if useAdjoint else 0.85,
+                 rm=60 if useAdjoint else 30,
                  gradate=True if useAdjoint else False,
                  advect=False,
-                 window=False,
+                 window=True if approach == 'adjointBased' else False,
                  outputHessian=False,
                  plotpvd=True,
                  gauges=True,
-                 ndump=2,
+                 ndump=10,
                  mtype='f',
                  iso=True if useAdjoint else False)
 
@@ -249,6 +249,9 @@ if getError:
                     loadAdj.load(dual_h_u)
                     loadAdj.load(dual_h_e)
                     loadAdj.close()
+                epsilon = err.DWR(rho, dual_h, v)
+            else:
+                epsilon = err.explicitErrorEstimator(q, q_, b, v, Dt)
         elif approach == 'adjointBased':
             with DumbCheckpoint(dirName + 'hdf5/adjoint_H_' + indexStr, mode=FILE_READ) as loadAdj:
                 loadAdj.load(dual_u)
@@ -258,19 +261,23 @@ if getError:
                 loadAdj.load(u)
                 loadAdj.load(eta)
                 loadAdj.close()
-
-        # Estimate error using dual weighted residual
-        epsilon = err.DWR(rho, dual_h, v) if approach == 'goalBased' else err.basicErrorEstimator(q, dual, v)
-        # TODO: include functionality for the explicit error estimator.
+            epsilon = err.basicErrorEstimator(q, dual, v)
 
         # Loop over relevant time window
         if op.window:
             for i in range(cnt, min(cnt+iEnd-iStart, iEnd), rm):
-                with DumbCheckpoint(dirName + 'hdf5/adjoint_' + msc.indexString(i), mode=FILE_READ) as loadAdj:
-                    loadAdj.load(dual_h_u)
-                    loadAdj.load(dual_h_e)
-                    loadAdj.close()
-                epsilon_ = err.DWR(rho, dual_h, v) if approach == 'goalBased' else err.basicErrorEstimator(q, dual, v)
+                if approach == 'goalBased':
+                    with DumbCheckpoint(dirName + 'hdf5/adjoint_' + msc.indexString(i), mode=FILE_READ) as loadAdj:
+                        loadAdj.load(dual_h_u)
+                        loadAdj.load(dual_h_e)
+                        loadAdj.close()
+                    epsilon_ = err.DWR(rho, dual_h, v)
+                elif approach == 'adjointBased':
+                    with DumbCheckpoint(dirName + 'hdf5/adjoint_H_' + msc.indexString(i), mode=FILE_READ) as loadAdj:
+                        loadAdj.load(dual_u)
+                        loadAdj.load(dual_e)
+                        loadAdj.close()
+                    epsilon_ = err.basicErrorEstimator(q, dual, v)
                 for j in range(len(epsilon.dat.data)):
                     epsilon.dat.data[j] = max(epsilon.dat.data[j], epsilon_.dat.data[j])
         epsilon.dat.data[:] = np.abs(epsilon.dat.data) * nVerT / (np.abs(assemble(epsilon * dx)) or 1.)  # Normalise

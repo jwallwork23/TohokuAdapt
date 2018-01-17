@@ -119,9 +119,9 @@ def TohokuDomain(nEle=6176, mesh=None, output=False):
     """
     Load the mesh, initial condition and bathymetry profile for the 2D ocean domain of the Tohoku tsunami problem.
     
-    :arg res: mesh resolution value, ranging from 'extra coarse' (1) to extra fine (5).
-    :arg mesh: user specified mesh, if already generated.
-    :arg output: toggle plotting of bathymetry and initial surface.
+    :arg nEle: number of elements considered.
+    :param mesh: user specified mesh, if already generated.
+    :param output: toggle plotting of bathymetry and initial surface.
     :return: associated mesh, initial condition and bathymetry field. 
     """
 

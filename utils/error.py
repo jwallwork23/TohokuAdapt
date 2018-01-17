@@ -3,49 +3,49 @@ from firedrake import *
 import numpy as np
 import cmath
 
+from . import forms
 from . import interpolation
 from . import options
 
 
-def explicitErrorEstimator(u_, u, eta_, eta, lu, le, b, Dt):
+def explicitErrorEstimator(q, q_, b, v, Dt, g=9.81, timestepper='CrankNicolson'):
     """
     Estimate error locally using an a posteriori error indicator.
     
-    :param u_: fluid velocity at previous timestep.
-    :param u: fluid velocity at current timestep.
-    :param eta_: free surface displacement at previous timestep.
-    :param eta: free surface displacement at current timestep.
-    :param lu: adjoint velocity at current timestep.
-    :param le: adjoint free surface at current timestep.
-    :param b: bathymetry field.
+    :arg q: approximation at current timestep.
+    :arg q_: approximation at previous timestep.
+    :arg b: bathymetry field.
+    :arg v: P0 test function over the same function space.
     :param Dt: timestep used as a FiredrakeConstant.
+    :param g: gravitational acceleration.
+    :param timestepper: scheme of choice.
     :return: field of local error indicators.
     """
+    u, eta = q.split()
+    u_, eta_ = q_.split()
 
     # Get useful objects related to mesh
     mesh = u.function_space().mesh()
     h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
-    v = TestFunction(FunctionSpace(mesh, "DG", 0))      # DG test functions to get cell-wise norms
 
     # Compute element residual
-    rho = assemble(v * h * h * (dot(u_ - u - Dt * 9.81 * grad(0.5 * (eta + eta_)),
-                                    u_ - u - Dt * 9.81 * grad(0.5 * (eta + eta_)))
-                                + (eta_ - eta - Dt * div(b * 0.5 * (u + u_)))
-                                * (eta_ - eta - Dt * div(b * 0.5 * (u + u_)))) / CellVolume(mesh) * dx)
+    a1, a2 = forms.timestepCoeffs(timestepper)
+    resTerm = assemble(v * h * h * (dot((u_ - u) / Dt + g * grad(a1 * eta + a2 * eta_),
+                                        (u_ - u) / Dt + g * grad(a1 * eta + a2 * eta_))
+                                    + ((eta_ - eta) / Dt + div(b * (a1 * u + a2 * u_)))
+                                    * ((eta_ - eta) / Dt + div(b * (a1 * u + a2 * u_)))) / CellVolume(mesh) * dx)
 
     # Compute and add boundary residual term
-    rho_bdy = assemble(v * h * Dt * b * dot(0.5 * (u + u_), FacetNormal(mesh)) / CellVolume(mesh) * dS)
-    lambdaNorm = assemble(v * sqrt((dot(lu, lu) + le * le)) * dx)
-    rho = assemble((sqrt(rho) + sqrt(rho_bdy)) * lambdaNorm)
+    jumpTerm = assemble(jump(v * h * dot(u, FacetNormal(mesh)) / CellVolume(mesh) * dS))
 
-    return Function(FunctionSpace(mesh, "CG", 1)).interpolate(rho)
+    return assemble(sqrt(resTerm + jumpTerm))
 
 
 def DWR(residual, adjoint, v):
     """
-    :param residual: approximation of residual for primal equations. 
-    :param adjoint: approximate solution of adjoint equations.
-    :param v: P0 test function over the same function space.
+    :arg residual: approximation of residual for primal equations. 
+    :arg adjoint: approximate solution of adjoint equations.
+    :arg v: P0 test function over the same function space.
     :return: dual weighted residual.
     """
     m = len(residual.function_space().dof_count)
@@ -59,9 +59,9 @@ def DWR(residual, adjoint, v):
 
 def basicErrorEstimator(primal, dual, v):
     """
-    :param primal: approximate solution of primal equations. 
-    :param dual: approximate solution of dual equations.
-    :param v: P0 test function over the same function space.
+    :arg primal: approximate solution of primal equations. 
+    :arg dual: approximate solution of dual equations.
+    :arg v: P0 test function over the same function space.
     :return: error estimate as in DL16.
     """
     m = len(primal.function_space().dof_count)
@@ -75,7 +75,7 @@ def basicErrorEstimator(primal, dual, v):
 
 def totalVariation(data):
     """
-    :param data: (one-dimensional) timeseries record.
+    :arg data: (one-dimensional) timeseries record.
     :return: total variation thereof.
     """
     TV = 0
@@ -98,9 +98,9 @@ def totalVariation(data):
 
 def FourierSeriesSW(eta0, t, b, trunc=10):
     """
-    :param eta0: initial free surface displacement field.
-    :param t: current time.
-    :param b: (flat) bathymetry.
+    :arg eta0: initial free surface displacement field.
+    :arg t: current time.
+    :arg b: (flat) bathymetry.
     :param trunc: term at which to truncate Fourier expansion.
     :return: Fourier series solution for free surface displacement in the shallow water equations.
     """

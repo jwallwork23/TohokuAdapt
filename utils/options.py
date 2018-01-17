@@ -182,9 +182,9 @@ class Options:
 
     def loadFromDisk(self, W, index, dirName, elev0=None, adjoint=False):
         """
-        :param mesh: FunctionSpace on which data is stored.
-        :param index: index of data stored.
-        :param dirName: name of directory for storage.
+        :arg W: FunctionSpace on which data is stored.
+        :arg index: index of data stored.
+        :arg dirName: name of directory for storage.
         :param elev0: initial free surface.
         :param adjoint: toggle use of adjoint or forward equations.
         :return: saved free surface elevation and fluid velocity, along with mesh index.
@@ -218,14 +218,14 @@ class Options:
 
     def printToScreen(self, mn, outerTime, innerTime, nEle, Sn, N, t, dt):
         """
-        :param mn: mesh number.
-        :param outerTime: time taken so far.
-        :param innerTime: time taken for this step.
-        :param nEle: current number of elements.
-        :param Sn: sum over #Elements.
-        :param N: tuple of min and max #Elements.
-        :param t: current simuation time.
-        :param dt: current timestep.
+        :arg mn: mesh number.
+        :arg outerTime: time taken so far.
+        :arg innerTime: time taken for this step.
+        :arg nEle: current number of elements.
+        :arg Sn: sum over #Elements.
+        :arg N: tuple of min and max #Elements.
+        :arg t: current simuation time.
+        :arg dt: current timestep.
         """
         print("""\n************************** Adaption step %d ****************************
 Percent complete  : %4.1f%%    Elapsed time : %4.2fs (This step : %4.2fs)     

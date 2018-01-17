@@ -14,9 +14,9 @@ def constructHessian(mesh, V, sol, op=None):
     by parts reconstruction approach is based on the Monge-Amp\`ere tutorial provided in the Firedrake website 
     documentation.
 
-    :param mesh: current mesh on which variables are defined.
-    :param V: TensorFunctionSpace defined on ``mesh``.
-    :param sol: P1 solution field defined on ``mesh``.
+    :arg mesh: current mesh on which variables are defined.
+    :arg V: TensorFunctionSpace defined on ``mesh``.
+    :arg sol: P1 solution field defined on ``mesh``.
     :param op: Options class object providing min/max cell size values.
     :return: reconstructed Hessian associated with ``sol``.
     """
@@ -57,10 +57,10 @@ def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=None):
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``computeSteadyMetric``, from 
     ``adapt.py``, 2016.
 
-    :param mesh: current mesh on which variables are defined.
-    :param V: TensorFunctionSpace defined on ``mesh``.
-    :param H: reconstructed Hessian, usually chosen to be associated with ``sol``.
-    :param sol: P1 solution field defined on ``mesh``.
+    :arg mesh: current mesh on which variables are defined.
+    :arg V: TensorFunctionSpace defined on ``mesh``.
+    :arg H: reconstructed Hessian, usually chosen to be associated with ``sol``.
+    :arg sol: P1 solution field defined on ``mesh``.
     :param nVerT: target number of vertices, in the case of Lp normalisation.
     :param iError: inverse of the target error, in the case of manual normalisation.
     :param op: Options class object providing min/max cell size values.
@@ -146,8 +146,8 @@ def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=None):
 
 def isotropicMetric(V, f, bdy=False, op=None, invert=True):
     """
-    :param V: tensor function space on which metric will be defined.
-    :param f: (scalar) function to adapt to.
+    :arg V: tensor function space on which metric will be defined.
+    :arg f: (scalar) function to adapt to.
     :param bdy: toggle boundary metric.
     :param op: Options class object providing min/max cell size values.
     :param invert: toggle cell size vs error.
@@ -186,8 +186,8 @@ def metricGradation(mesh, M, beta=1.4, iso=False):
     Perform anisotropic metric gradation in the method described in Alauzet 2010, using linear interpolation. Python
     code based on Nicolas Barral's function ``DMPlexMetricGradation2d_Internal`` in ``plex-metGradation.c``, 2017.
 
-    :param mesh: current mesh on which variables are defined.
-    :param metric: metric to be gradated.
+    :arg mesh: current mesh on which variables are defined.
+    :arg metric: metric to be gradated.
     :param beta: scale factor used.
     :param iso: specify whether isotropic or anisotropic mesh adaptivity is being used.
     :return: gradated ``metric``.
@@ -270,8 +270,8 @@ def localMetricIntersection(M1, M2):
     """
     Intersect two metrics (i.e. two 2x2 matrices).
 
-    :param M1: first metric to be intersected.
-    :param M2: second metric to be intersected.
+    :arg M1: first metric to be intersected.
+    :arg M2: second metric to be intersected.
     :return: intersection of metrics M1 and M2.
     """
     # print('#### localMetricIntersection DEBUG: attempting to compute sqrtm of matrix with determinant ', la.det(M1))
@@ -283,10 +283,10 @@ def localMetricIntersection(M1, M2):
 
 def metricIntersection(mesh, V, M1, M2, bdy=False):
     """
-    :param mesh: current mesh on which variables are defined.
-    :param V: TensorFunctionSpace defined on current mesh.
-    :param M1: first metric to be intersected.
-    :param M2: second metric to be intersected.
+    :arg mesh: current mesh on which variables are defined.
+    :arg V: TensorFunctionSpace defined on current mesh.
+    :arg M1: first metric to be intersected.
+    :arg M2: second metric to be intersected.
     :param bdy: when True, intersection with M2 only contributes on the domain boundary.
     :return: intersection of metrics M1 and M2.
     """
@@ -298,8 +298,8 @@ def metricIntersection(mesh, V, M1, M2, bdy=False):
 
 def symmetricProduct(A, b):
     """
-    :param A: symmetric, 2x2 matrix / metric field.
-    :param b: 2-vector / vector field.
+    :arg A: symmetric, 2x2 matrix / metric field.
+    :arg b: 2-vector / vector field.
     :return: product b^T * A * b.
     """
     # assert(isinstance(A, numpy.ndarray) | isinstance(A, Function))
@@ -322,8 +322,8 @@ def symmetricProduct(A, b):
 
 def pointwiseMax(f, g):
     """
-    :param f: first field to be considered.
-    :param g: second field to be considered.
+    :arg f: first field to be considered.
+    :arg g: second field to be considered.
     :return: field taking pointwise maximal values in modulus.
     """
     fdat = f.dat.data
@@ -344,9 +344,9 @@ def isotropicAdvection(M_, h_, w, Dt, n=1, timestepper='ImplicitEuler'):
     """
     'Advect' an isotropic metric with finest resolution in direction of fluid velocity/wind field.
 
-    :param M_: metric field defined on current mesh, at current timestep.
-    :param h_: scalar field determining metric.
-    :param w: (vector) velocity field on current mesh. Can be Function, list or ndarray.
+    :arg M_: metric field defined on current mesh, at current timestep.
+    :arg h_: scalar field determining metric.
+    :arg w: (vector) velocity field on current mesh. Can be Function, list or ndarray.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param n: number of timesteps to advect over.
     :param timestepper: time integration scheme used.
@@ -375,9 +375,9 @@ def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEul
     """
     'Advect' metric with finest resolution in direction of fluid velocity/wind field.
     
-    :param M_: metric field defined on current mesh, at current timestep.
-    :param w: (vector) velocity field on current mesh. Can be Function, list or ndarray.
-    :param Dt: timestep expressed as a FiredrakeConstant.
+    :arg M_: metric field defined on current mesh, at current timestep.
+    :arg w: (vector) velocity field on current mesh. Can be Function, list or ndarray.
+    :arg Dt: timestep expressed as a FiredrakeConstant.
     :param n: number of timesteps to advect over.
     :param outfile: toggle metric output and location.
     :param bc: boundary condition on Tensor advection PDE problem.
@@ -454,8 +454,8 @@ def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEul
 
 def adaptTimestepSW(mesh, b, sigma=0.9, g=9.81):
     """
-    :param mesh: Current (recently adapted) mesh.
-    :param b: bathymetry profile.
+    :arg mesh: Current (recently adapted) mesh.
+    :arg b: bathymetry profile.
     :param sigma: scaling parameter in range (0,1).
     :param g: gravitational acceleration.
     :return: near-optimal numerically stable timestep.
@@ -469,7 +469,7 @@ def adaptTimestepSW(mesh, b, sigma=0.9, g=9.81):
 
 def adaptTimestepAD(w, sigma=0.9):
     """
-    :param w: wind-field used in advection-diffusion eqn.
+    :arg w: wind-field used in advection-diffusion eqn.
     :param sigma: scaling parameter in range (0,1).
     :return: near-optimal numerically stable timestep.
     """

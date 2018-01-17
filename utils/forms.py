@@ -3,7 +3,7 @@ from firedrake import *
 
 def timestepCoeffs(timestepper):
     """
-    :param timestepper: scheme of choice.
+    :arg timestepper: scheme of choice.
     :return: coefficients for use in scheme.
     """
     if timestepper == 'ExplicitEuler':
@@ -23,9 +23,9 @@ def timestepCoeffs(timestepper):
 
 def timestepScheme(u, u_, timestepper):
     """
-    :param u: prognostic variable at current timestep. 
-    :param u_: prognostic variable at previous timestep. 
-    :param timestepper: scheme of choice.
+    :arg u: prognostic variable at current timestep. 
+    :arg u_: prognostic variable at previous timestep. 
+    :arg timestepper: scheme of choice.
     :return: expression for prognostic variable to be used in scheme.
     """
     a1, a2 = timestepCoeffs(timestepper)
@@ -38,9 +38,9 @@ def strongResidualSW(q, q_, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=Fal
     """
     Construct the strong residual for the semi-discrete linear shallow water equations at the current timestep.
     
-    :param q: solution tuple for linear shallow water equations.
-    :param q_: solution tuple for linear shallow water equations at previous timestep.
-    :param b: bathymetry profile.
+    :arg q: solution tuple for linear shallow water equations.
+    :arg q_: solution tuple for linear shallow water equations at previous timestep.
+    :arg b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: coefficient for stress term.
     :param g: gravitational acceleration.
@@ -78,10 +78,10 @@ def formsSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, n
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
 
-    :param q: solution tuple for linear shallow water equations.
-    :param q_: solution tuple for linear shallow water equations at previous timestep.
-    :param qt: test function tuple.
-    :param b: bathymetry profile.
+    :arg q: solution tuple for linear shallow water equations.
+    :arg q_: solution tuple for linear shallow water equations at previous timestep.
+    :arg qt: test function tuple.
+    :arg b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: coefficient for stress term.
     :param g: gravitational acceleration.
@@ -133,10 +133,10 @@ def adjointSW(l, l_, lt, b, Dt, g=9.81, timestepper='CrankNicolson', x1=2.5, x2=
     """
     Semi-discrete (time-discretised) weak form adjoint shallow water equations with no normal flow boundary conditions.
 
-    :param l: solution tuple for adjoint linear shallow water equations.
-    :param l_: solution tuple for adjoint linear shallow water equations at previous timestep.
-    :param lt: test function tuple.
-    :param b: bathymetry profile.
+    :arg l: solution tuple for adjoint linear shallow water equations.
+    :arg l_: solution tuple for adjoint linear shallow water equations at previous timestep.
+    :arg lt: test function tuple.
+    :arg b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param g: gravitational acceleration.
     :param timestepper: scheme of choice.
@@ -160,10 +160,10 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=F
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
     
-    :param q: solution tuple for linear shallow water equations.
-    :param q_: solution tuple for linear shallow water equations at previous timestep.
-    :param qt: test function tuple.
-    :param b: bathymetry profile.
+    :arg q: solution tuple for linear shallow water equations.
+    :arg q_: solution tuple for linear shallow water equations at previous timestep.
+    :arg qt: test function tuple.
+    :arg b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: coefficient for stress term.
     :param g: gravitational acceleration.
@@ -186,7 +186,7 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=F
 
 def interelementTerm(v, n=None):
     """
-    :param v: Function to be averaged over element boundaries.
+    :arg v: Function to be averaged over element boundaries.
     :param n: FacetNormal
     :return: averaged jump discontinuity over element boundary.
     """
@@ -205,10 +205,10 @@ def localProblemSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=F
     Semi-discrete (time-discretised) local variational problem for the shallow water equations with no normal flow 
     boundary conditions, under the element residual method.
 
-    :param q: solution tuple for linear shallow water equations.
-    :param q_: solution tuple for linear shallow water equations at previous timestep.
-    :param qt: test function tuple.
-    :param b: bathymetry profile.
+    :arg q: solution tuple for linear shallow water equations.
+    :arg q_: solution tuple for linear shallow water equations at previous timestep.
+    :arg qt: test function tuple.
+    :arg b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: coefficient for stress term.
     :param g: gravitational acceleration.
@@ -237,11 +237,11 @@ def localProblemSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=F
     return F
 
 
-def analyticHuang(V, B=0.395, t=0.):
+def analyticHuang(V, t=0., B=0.395):
     """
-    :param V: Mixed function space upon which to define solutions.
+    :arg V: Mixed function space upon which to define solutions.
+    :arg t: current time.
     :param B: Parameter controlling amplitude of soliton.
-    :param t: current time.
     :return: Initial condition for test problem of Huang.
     """
 
@@ -259,26 +259,26 @@ def analyticHuang(V, B=0.395, t=0.):
     return q
 
 
-def strongResidualAD(c, c_, u, Dt, nu=1e-3, timestepper='CrankNicolson'):
+def strongResidualAD(c, c_, w, Dt, nu=1e-3, timestepper='CrankNicolson'):
     """
-    :param c: concentration solution at current timestep. 
-    :param c_: concentration at previous timestep.
-    :param u: wind field.
+    :arg c: concentration solution at current timestep. 
+    :arg c_: concentration at previous timestep.
+    :arg w: wind field.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: diffusivity parameter.
     :param timestepper: time integration scheme used.
     :return: weak residual for advection diffusion equation at current timestep.
     """
     cm = timestepScheme(c, c_, timestepper)
-    return (c - c_) / Dt + inner(u, grad(cm)) - Constant(nu) * div(grad(cm))
+    return (c - c_) / Dt + inner(w, grad(cm)) - Constant(nu) * div(grad(cm))
 
 
 def weakResidualAD(c, c_, ct, w, Dt, nu=1e-3, timestepper='CrankNicolson'):
     """
-    :param c: concentration solution at current timestep. 
-    :param c_: concentration at previous timestep.
-    :param ct: test function.
-    :param w: wind field.
+    :arg c: concentration solution at current timestep. 
+    :arg c_: concentration at previous timestep.
+    :arg ct: test function.
+    :arg w: wind field.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: diffusivity parameter.
     :param timestepper: time integration scheme used.
@@ -290,10 +290,10 @@ def weakResidualAD(c, c_, ct, w, Dt, nu=1e-3, timestepper='CrankNicolson'):
 
 def adjointAD(l, l_, lt, w, Dt, nu=1e-3, timestepper='CrankNicolson', x1=2.75, x2=3.25, y1=0.25, y2=0.75):
     """
-    :param l: adjoint concentration solution at current timestep. 
-    :param l_: adjoint concentration at previous timestep.
-    :param lt: test function.
-    :param w: wind field.
+    :arg l: adjoint concentration solution at current timestep. 
+    :arg l_: adjoint concentration at previous timestep.
+    :arg lt: test function.
+    :arg w: wind field.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: diffusivity parameter.
     :param timestepper: time integration scheme used.
@@ -310,10 +310,10 @@ def weakMetricAdvection(M, M_, Mt, w, Dt, timestepper='ImplicitEuler'):
     """
     Advect a metric. Also works for vector fields.
     
-    :param M: metric at current timestep.
-    :param M_: metric at previous timestep.
-    :param Mt: test function.
-    :param w: wind vector.
+    :arg M: metric at current timestep.
+    :arg M_: metric at previous timestep.
+    :arg Mt: test function.
+    :arg w: wind vector.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param timestepper: time integration scheme used.
     :return: weak residual for metric advection.
@@ -325,7 +325,7 @@ def weakMetricAdvection(M, M_, Mt, w, Dt, timestepper='ImplicitEuler'):
 
 def indicator(V, x1=2.5, x2=3.5, y1=0.1, y2=0.9, smooth=False):
     """
-    :param V: Function space to use.
+    :arg V: Function space to use.
     :param x1: West-most coordinate for region A (m).
     :param x2: East-most coordinate for region A (m).
     :param y1: South-most coordinate for region A (m).
@@ -350,7 +350,7 @@ from firedrake_adjoint import dt, Functional
 
 def objectiveFunctionalAD(c, x1=2.5, x2=3.5, y1=0.1, y2=0.9):
     """
-    :param c: concentration.
+    :arg c: concentration.
     :param x1: West-most coordinate for region A (m).
     :param x2: East-most coordinate for region A (m).
     :param y1: South-most coordinate for region A (m).
@@ -363,7 +363,7 @@ def objectiveFunctionalAD(c, x1=2.5, x2=3.5, y1=0.1, y2=0.9):
 def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=4160e3, y2=4360e3,
                           plot=False, smooth=True):
     """
-    :param q: forward solution tuple.
+    :arg q: forward solution tuple.
     :param Tstart: first time considered as relevant (s).
     :param Tend: last time considered as relevant (s).
     :param x1: West-most coordinate for region A (m).

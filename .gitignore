@@ -26,9 +26,6 @@ outdata/
 
 .README.md.swp
 
-# Attempt at a priori goal based adaptivity
-explicitErrorEstimate.py
-
 # Old fixed mesh tsunami script
 fixedMesh.py
 

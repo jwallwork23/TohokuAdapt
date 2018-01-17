@@ -1,6 +1,6 @@
 def indexString(index):
     """
-    :param index: integer form of index.
+    :arg index: integer form of index.
     :return: five-digit string form of index.
     """
     return (5 - len(str(index))) * '0' + str(index)
@@ -10,7 +10,7 @@ def cheatCodes(approach, default='goalBased'):
     """
     Enable skipping of sections of code using 'saved' and 'regen'.
     
-    :param approach: user specified input.
+    :arg approach: user specified input.
     :return: approach to use and keys to skip sections.
     """
     approach = approach or default
@@ -53,10 +53,11 @@ def printTimings(primalTimer, dualTimer, errorTimer, adaptTimer, bootTimer=False
     """
     Print timings for the various sections of code.
     
-    :param primalTimer: primal solver.
-    :param dualTimer: dual solver.
-    :param errorTimer: error estimation phase.
-    :param adaptTimer: adaptive primal solver.
+    :arg primalTimer: primal solver.
+    :arg dualTimer: dual solver.
+    :arg errorTimer: error estimation phase.
+    :arg adaptTimer: adaptive primal solver.
+    :arg bootTimer: bootstrapping routine.
     :return: 
     """
     print("TIMINGS:")

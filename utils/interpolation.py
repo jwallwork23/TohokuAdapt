@@ -8,8 +8,8 @@ def interp(mesh, *fields):
     Transfer solution fields from the old mesh to the new mesh. Based around the function ``transfer_solution`` by
     Nicolas Barral, 2017.
     
-    :param mesh: new mesh onto which fields are to be interpolated.
-    :param fields: tuple of functions defined on the old mesh that one wants to transfer
+    :arg mesh: new mesh onto which fields are to be interpolated.
+    :arg fields: tuple of functions defined on the old mesh that one wants to transfer
     :return: interpolated fields.
     """
     dim = mesh._topological_dimension
@@ -71,9 +71,9 @@ def mixedPairInterp(mesh, V, *fields):
     """
     Interpolate mixed function space pairs onto a new mesh.
     
-    :param mesh: new mesh to be interpolated onto.
-    :param V: mixed function space defined on new mesh, with same type as that on which fields are defined.
-    :param fields: fields to be interpolated.
+    :arg mesh: new mesh to be interpolated onto.
+    :arg V: mixed function space defined on new mesh, with same type as that on which fields are defined.
+    :arg fields: fields to be interpolated.
     :return: interpolated function pairs.
     """
     fields_new = ()

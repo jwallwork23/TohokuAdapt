@@ -11,7 +11,7 @@ from . import options as opt
 
 def loadMesh(filename):
     """
-    :param filename: mesh filename to load from, including directory location.
+    :arg filename: mesh filename to load from, including directory location.
     :return: Mesh, as loaded from HDF5.
     """
     filename += '.h5'
@@ -25,9 +25,9 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options(), output=False, name='
     """
     Extract timeseries data from HDF5 for a particular gauge.
     
-    :param gauge: gauge name string, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
-    :param dirName: name of directory for locating HDF5 files, from the set {'fixedMesh', 'simpleAdapt', 'adjointBased'}
-    :param iEnd: final index.
+    :arg gauge: gauge name string, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
+    :arg dirName: name of directory for locating HDF5 files, from the set {'fixedMesh', 'simpleAdapt', 'adjointBased'}
+    :arg iEnd: final index.
     :param op: Options object holding parameter values.
     :param output: toggle printing timeseries values to screen.
     :param name: name to give to timeseries.
@@ -62,13 +62,13 @@ def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options(), output=False, name='
     outfile.close()
 
 
-def extractTimeseries(gauges, eta, t,  current, v0, op=opt.Options()):
+def extractTimeseries(gauges, eta, t, current, v0, op=opt.Options()):
     """
-    :param gauges: list of gauge name strings, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
-    :param eta: Function to extract timeseries from.
-    :param t: current time.
-    :param current: dictionary containing timeseries data.
-    :param v0: dictionary containing initial gauge values.
+    :arg gauges: list of gauge name strings, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
+    :arg eta: Function to extract timeseries from.
+    :arg t: current time.
+    :arg current: dictionary containing timeseries data.
+    :arg v0: dictionary containing initial gauge values.
     :param op: Options object holding parameter values.
     :return: dictionary containing all timeseries data so far.
     """
@@ -83,8 +83,8 @@ def extractTimeseries(gauges, eta, t,  current, v0, op=opt.Options()):
 
 def saveTimeseries(gauge, data, name='test'):
     """
-    :param gauge: gauge name string, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
-    :param data: timeseries data to save.
+    :arg gauge: gauge name string, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
+    :arg data: timeseries data to save.
     :param name: name to give to timeseries.    
     """
     outfile = open('outdata/timeseries/' + gauge + name + '.txt', 'w+')
@@ -97,7 +97,7 @@ def plotGauges(gauge, op=opt.Options()):
     """
     Read timeseries data for a particular gauge and calculate (L1, L2, L-infinity and TV) error norms.
 
-    :param gauge: gauge name string, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
+    :arg gauge: gauge name string, from the set {'P02', 'P06', '801', '802', '803', '804', '806'}.
     :param op: Options object holding parameter values.
     """
     T = op.Tend

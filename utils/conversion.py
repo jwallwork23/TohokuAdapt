@@ -41,9 +41,9 @@ def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None):
     """
     Convert UTM coordinates to latitude-longitude, courtesy of Tobias Bieniek, 2012 (with some minor edits).
     
-    :param easting: eastward-measured Cartesian geographic distance.
-    :param northing: northward-measured Cartesian geographic distance.
-    :param zone_number: UTM zone number (increasing eastward).
+    :arg easting: eastward-measured Cartesian geographic distance.
+    :arg northing: northward-measured Cartesian geographic distance.
+    :arg zone_number: UTM zone number (increasing eastward).
     :param zone_letter: UTM zone letter (increasing alphabetically northward).
     :param northern: specify northern or southern hemisphere.
     :return: latitude-longitude coordinate pair.
@@ -118,9 +118,9 @@ def get_latitude(easting, northing, zone_number, zone_letter=None, northern=None
     """
     Convert UTM coordinates to latitude alone.
 
-    :param easting: eastward-measured Cartesian geographic distance.
-    :param northing: northward-measured Cartesian geographic distance.
-    :param zone_number: UTM zone number (increasing eastward).
+    :arg easting: eastward-measured Cartesian geographic distance.
+    :arg northing: northward-measured Cartesian geographic distance.
+    :arg zone_number: UTM zone number (increasing eastward).
     :param zone_letter: UTM zone letter (increasing alphabetically northward).
     :param northern: specify northern or southern hemisphere.
     :return: latitude coordinate.
@@ -133,8 +133,8 @@ def from_latlon(latitude, longitude, force_zone_number=None):
     """
     Convert latitude-longitude coordinates to UTM, courtesy of Tobias Bieniek, 2012.
     
-    :param latitude: northward anglular position, origin at the Equator.
-    :param longitude: eastward angular position, with origin at the Greenwich Meridian.
+    :arg latitude: northward anglular position, origin at the Equator.
+    :arg longitude: eastward angular position, with origin at the Greenwich Meridian.
     :param force_zone_number: force coordinates to fall within a particular UTM zone.
     :return: UTM coordinate 4-tuple.
     """
@@ -190,7 +190,7 @@ def latitude_to_zone_letter(latitude):
     """
     Convert latitude UTM letter, courtesy of Tobias Bieniek, 2012.
     
-    :param latitude: northward anglular position, origin at the Equator.
+    :arg latitude: northward anglular position, origin at the Equator.
     :return: UTM zone letter (increasing alphabetically northward).
     """
     if -80 <= latitude <= 84:
@@ -203,8 +203,8 @@ def latlon_to_zone_number(latitude, longitude):
     """
     Convert a latitude-longitude coordinate pair to UTM zone, courtesy of Tobias Bieniek, 2012.
     
-    :param latitude: northward anglular position, origin at the Equator.
-    :param longitude: eastward angular position, with origin at the Grenwich Meridian.
+    :arg latitude: northward anglular position, origin at the Equator.
+    :arg longitude: eastward angular position, with origin at the Grenwich Meridian.
     :return: UTM zone number (increasing eastward).
     """
     if 56 <= latitude < 64 and 3 <= longitude < 12:
@@ -227,7 +227,7 @@ def zone_number_to_central_longitude(zone_number):
     """
     Convert a UTM zone number to the corresponding central longitude, courtesy of Tobias Bieniek, 2012.
     
-    :param zone_number: UTM zone number (increasing eastward).
+    :arg zone_number: UTM zone number (increasing eastward).
     :return: central eastward angular position of the UTM zone, with origin at the Grenwich Meridian.
     """
     return (zone_number - 1) * 6 - 180 + 3
@@ -237,8 +237,8 @@ def vectorlonlat2utm(latitude, longitude, force_zone_number):
     """
     Convert a vector of longitude-latitude coordinate pairs to UTM coordinates.
     
-    :param latitude: northward anglular position, origin at the Equator.
-    :param longitude: eastward angular position, with origin at the Grenwich Meridian.
+    :arg latitude: northward anglular position, origin at the Equator.
+    :arg longitude: eastward angular position, with origin at the Grenwich Meridian.
     :param force_zone_number: 
     :return: force coordinates to fall within a particular UTM zone.
     """
@@ -253,7 +253,7 @@ def vectorlonlat2utm(latitude, longitude, force_zone_number):
 
 def earth_radius(latitude):
     """
-    :param latitude: latitudinal coordinate.
+    :arg latitude: latitudinal coordinate.
     :return: radius of the Earth at this latitude.
     """
     k = 1. / 298.257  # Earth flatness constant
@@ -265,8 +265,8 @@ def lonlat2tangentxy(latitude, longitude, latitude0, longitude0):
     """
     Project latitude-longitude coordinates onto a tangent plane at (lon0, lat0), in metric Cartesian coordinates (x,y).
 
-    :param latitude: latitudinal coordinate for projection.
-    :param longitude: longitudinal coordinate for projection.
+    :arg latitude: latitudinal coordinate for projection.
+    :arg longitude: longitudinal coordinate for projection.
     :param latitude0: latitudinal tangent coordinate. 
     :param longitude0: longitudinal tangent coordinate.
     :return: Cartesian coordinates on tangent plane.
@@ -284,8 +284,8 @@ def lonlat2tangent_pair(latitude, longitude, latitude0, longitude0):
     Project latitude-longitude coordinates onto a tangent plane at (lon0, lat0), in metric Cartesian coordinates (x,y),
     with output given as a pair.
 
-    :param latitude: latitudinal coordinate for projection.
-    :param longitude: longitudinal coordinate for projection.
+    :arg latitude: latitudinal coordinate for projection.
+    :arg longitude: longitudinal coordinate for projection.
     :param latitude0: latitudinal tangent coordinate. 
     :param longitude0: longitudinal tangent coordinate.
     :return: Cartesian coordinates on tangent plane.
@@ -299,8 +299,8 @@ def vectorlonlat2tangentxy(latitude, longitude, latitude0, longitude0):
     Project a vector of latitude-longitude coordinates onto a tangent plane at (lon0, lat0), in metric Cartesian 
     coordinates (x,y).
 
-    :param latitude: latitudinal coordinate for projection.
-    :param longitude: longitudinal coordinate for projection.
+    :arg latitude: latitudinal coordinate for projection.
+    :arg longitude: longitudinal coordinate for projection.
     :param latitude0: latitudinal tangent coordinate. 
     :param longitude0: longitudinal tangent coordinate.
     :return: vector of Cartesian coordinates on tangent plane.
@@ -318,7 +318,7 @@ def mesh_converter(meshfile, latitude0, longitude0):
     Project a mesh file from latitude-longitude coordinates onto a tangent plane at (lon0, lat0), in metric Cartesian 
     coordinates (x,y).
 
-    :param meshfile: .msh file to be converted.
+    :arg meshfile: .msh file to be converted.
     :param latitude0: latitudinal tangent coordinate. 
     :param longitude0: longitudinal tangent coordinate.
     :return: corresponding mesh file in Cartesian coordinates on tangent plane.
@@ -357,8 +357,8 @@ def xy2barycentric(crdM, crdTri, i):
     Compute the barycentric coordinate of M in triangle Tri = P0, P1, P2 with respect to the ith vertex 
     crd = det(MPj, MPk) / det(PiPj, PiPk). Courtesy of Nicolas Barral, 2016.
     
-    :param crdM: coordinate for conversion.
-    :param crdTri: vertices of the triangle.
+    :arg crdM: coordinate for conversion.
+    :arg crdTri: vertices of the triangle.
     :param i: vertex index.
     :return: 
     """
@@ -377,7 +377,7 @@ def xy2barycentric(crdM, crdTri, i):
 
 def rescaleMesh(mesh):
     """
-    :param mesh: mesh to be converted.
+    :arg mesh: mesh to be converted.
     :return: mesh rescaled to [-1, 1] x [-1, 1]. 
     """
     xy = Function(mesh.coordinates)
