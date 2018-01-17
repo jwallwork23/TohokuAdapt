@@ -25,6 +25,7 @@ outputOF = True
 # Define initial mesh and mesh statistics placeholders
 op = opt.Options(vscale=0.2 if useAdjoint else 0.85,
                  rm=60 if useAdjoint else 30,
+                 # rm=60,
                  gradate=True if useAdjoint else False,
                  advect=False,
                  window=True if approach == 'adjointBased' else False,
@@ -118,7 +119,7 @@ hmax = op.hmax
 rm = op.rm
 iStart = int(op.Tstart / dt)    # TODO: alter for t-adapt
 iEnd = int(np.ceil(T / dt))     # TODO: alter for t-adapt
-mM = [nEle, nEle]           # Min/max #Elements
+mM = [nEle, nEle]               # Min/max #Elements
 Sn = nEle
 nVerT = msh.meshStats(mesh_H)[1] * op.vscale    # Target #Vertices
 nVerT0 = nVerT
@@ -144,8 +145,8 @@ if getData:
         forwardSolver.solve()
 
         # Approximate residual of forward equation and save to HDF5
-        if approach in ('explicit', 'goalBased'):
-            if cnt % rm == 0:
+        if cnt % rm == 0:
+            if approach in ('explicit', 'goalBased'):
                 qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
                 Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt)
                 rho_u.interpolate(Au)
@@ -157,11 +158,11 @@ if getData:
                 if op.plotpvd:
                     residualFile.write(rho_u, rho_e, time=t)
 
-        if approach == 'adjointBased':
-            with DumbCheckpoint(dirName + 'hdf5/forward_' + msc.indexString(cnt), mode=FILE_CREATE) as saveFor:
-                saveFor.store(u)
-                saveFor.store(eta)
-                saveFor.close()
+            if approach == 'adjointBased':
+                with DumbCheckpoint(dirName + 'hdf5/forward_' + msc.indexString(cnt), mode=FILE_CREATE) as saveFor:
+                    saveFor.store(u)
+                    saveFor.store(eta)
+                    saveFor.close()
 
         # Update solution at previous timestep
         q_.assign(q)
