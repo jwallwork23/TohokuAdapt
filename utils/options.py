@@ -154,12 +154,14 @@ class Options:
                         "802": (39.3, 142.1), "803": (38.9, 141.8), "804": (39.7, 142.2), "806": (37.0, 141.2)}
 
         # Plotting dictionaries
-        labels = ('Coarse mesh', 'Medium mesh', 'Fine mesh', 'Simple adaptive', 'Adjoint based', 'Goal based')
+        labels = ('Coarse mesh', 'Medium mesh', 'Fine mesh', 'Hessian based', 'Explicit', 'Adjoint based', 'Goal based')
         self.labels = labels
-        self.styles = {labels[0]: 's', labels[1]: '^', labels[2]: 'x', labels[3]: 'o', labels[4]: 'h', labels[5]: '*'}
-        self.stamps = {labels[0]: 'fixedMesh', labels[1]: 'fixedMesh', labels[2]: 'fixedMesh',
-                       labels[3]: 'simpleAdapt', labels[4]: 'adjointBased', labels[5]: 'goalBased'}
+        self.styles = {labels[0]: 's', labels[1]: '^', labels[2]: 'x', labels[3]: 'o', labels[4]: 'h', labels[5]: '*',
+                       labels[6]: '+'}
+        self.stamps = {labels[0]: 'fixedMesh', labels[1]: 'fixedMesh', labels[2]: 'fixedMesh', labels[3]: 'hessianBased',
+                       labels[4]: 'explicit', labels[5]: 'adjointBased', labels[6]: 'goalBased'}
 
+        # Mesh element counts currently generated in QMESH
         self.meshes = (6176, 8782, 11020, 16656, 20724, 33784, 52998, 81902, 129442, 196560, 450386, 691750)
 
     def gaugeCoord(self, gauge):
@@ -179,42 +181,6 @@ class Options:
             print('WARNING: chosen timestep dt = %.4fs exceeds recommended value of %.4fs' % (self.dt, cdt))
             if input('Hit enter if happy to proceed.'):
                 exit(23)
-
-    def loadFromDisk(self, W, index, dirName, elev0=None, adjoint=False):
-        """
-        :arg W: FunctionSpace on which data is stored.
-        :arg index: index of data stored.
-        :arg dirName: name of directory for storage.
-        :param elev0: initial free surface.
-        :param adjoint: toggle use of adjoint or forward equations.
-        :return: saved free surface elevation and fluid velocity, along with mesh index.
-        """
-        # Enforce initial conditions on discontinuous space / load variables from disk
-        indexStr = misc.indexString(index)
-        if adjoint:
-            with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_READ) as chk:
-                lu = Function(W.sub(0), name='Adjoint velocity')
-                le = Function(W.sub(1), name='Adjoint free surface')
-                chk.load(lu)
-                chk.load(le)
-                chk.close()
-            return le, lu
-        else:
-            uv_2d = Function(W.sub(0))
-            elev_2d = Function(W.sub(1))
-            if index == 0:
-                elev_2d.interpolate(elev0)
-                uv_2d.interpolate(Expression((0, 0)))
-            else:
-                with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as el:
-                    el.load(elev_2d, name='elev_2d')
-                    el.close()
-                with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as ve:
-                    ve.load(uv_2d, name='uv_2d')
-                    ve.close()
-            return elev_2d, uv_2d
-
-        # TODO: make more general
 
     def printToScreen(self, mn, outerTime, innerTime, nEle, Sn, N, t, dt):
         """

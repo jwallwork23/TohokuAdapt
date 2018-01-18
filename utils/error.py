@@ -7,11 +7,11 @@ from . import interpolation
 from . import options
 
 
-def explicitErrorEstimator(u, residual, v):
+def explicitErrorEstimator(q, residual, v):
     """
     Estimate error locally using an a posteriori error indicator.
     
-    :arg u: fluid velocity approximation at current timestep.
+    :arg q: primal approximation at current timestep.
     :arg residual: approximation of residual for primal equations.
     :arg v: P0 test function over the same function space.
     :return: field of local error indicators.
@@ -20,6 +20,7 @@ def explicitErrorEstimator(u, residual, v):
     m = len(V.dof_count)
     mesh = V.mesh()
     h = CellSize(mesh)
+    n = FacetNormal(mesh)
 
     # Compute element residual term
     if m == 1:
@@ -27,12 +28,15 @@ def explicitErrorEstimator(u, residual, v):
     else:
         resTerm = assemble(v * h * h * sum([inner(residual.split()[k], residual.split()[k]) for k in range(m)]) * dx)
 
-    # TODO: u needs to come from the fine space
-    # # Compute and add boundary residual term
-    # uJump = jump(grad(u), n=FacetNormal(mesh))
-    # jumpTerm = assemble(v * dot(uJump, uJump) * dS) # * h
+    # Compute and add boundary residual term
+    # qh = interpolation.mixedPairInterp(mesh, V, q)[0]
+    # uh, etah = qh.split()
+    # j0 = jump(grad(uh), n=n)
+    # j1 = jump(grad(etah), n=n)
+    # jumpTerm = assemble(v * h * (inner(j0, j0) + j1 * j1) * dS)
+    jumpTerm = Constant(0)
 
-    return assemble(sqrt(resTerm)) # + jumpTerm))
+    return assemble(sqrt(resTerm + jumpTerm))
 
 
 def DWR(residual, adjoint, v):

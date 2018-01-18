@@ -26,7 +26,7 @@ outputOF = True
 op = opt.Options(vscale=0.1 if useAdjoint else 0.85,
                  # rm=60 if useAdjoint else 30,
                  rm=60,
-                 gradate=True if useAdjoint else False,
+                 gradate=True if (useAdjoint or approach == 'explicit') else False,
                  advect=False,
                  window=True if approach == 'adjointBased' else False,
                  outputHessian=False,
@@ -57,10 +57,9 @@ adaptiveFile = File(dirName + approach + ".pvd")
 if op.outputHessian:
     hessianFile = File(dirName + "hessian.pvd")
 
-# Load Meshes
+# Load Mesh(es)
 mesh_H, eta0, b = msh.TohokuDomain(nEle)        # Computational mesh
 if approach in ('explicit', 'goalBased'):
-    # Get finer mesh and associated bathymetry
     mesh_h = msh.isoP2(mesh_H)                  # Finer mesh (h < H) upon which to approximate error
     b_h = msh.TohokuDomain(mesh=mesh_h)[2]
     V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
@@ -104,6 +103,11 @@ if approach in ('explicit', 'goalBased'):
         dual_h_u, dual_h_e = dual_h.split()
         dual_h_u.rename("Adjoint velocity")
         dual_h_e.rename("Adjoint elevation")
+    else:
+        qh = Function(V_h)
+        uh, eh = qh.split()
+        uh.rename("Fine velocity")
+        eh.rename("Fine elevation")
 if useAdjoint:
     dual = Function(V_H)
     dual_u, dual_e = dual.split()
@@ -154,11 +158,14 @@ if getData:
                 with DumbCheckpoint(dirName + 'hdf5/residual_' + msc.indexString(cnt), mode=FILE_CREATE) as saveRes:
                     saveRes.store(rho_u)
                     saveRes.store(rho_e)
+                    if approach == 'explicit':
+                        uh, eh = qh.split()
+                        saveRes.store(uh)
+                        saveRes.store(eh)
                     saveRes.close()
                 if op.plotpvd:
                     residualFile.write(rho_u, rho_e, time=t)
-
-            if approach == 'adjointBased':
+            if approach in ('explicit', 'adjointBased'):
                 with DumbCheckpoint(dirName + 'hdf5/forward_' + msc.indexString(cnt), mode=FILE_CREATE) as saveFor:
                     saveFor.store(u)
                     saveFor.store(eta)
@@ -195,25 +202,24 @@ if getData:
         dualTimer = clock()
         for (variable, solution) in compute_adjoint(J):
             if save:
-                # Load adjoint data
-                dual.assign(variable, annotate=False)
-
-                # Save adjoint data to HDF5
+                # Load adjoint data and save to HDF5
                 if cnt % rm == 0:
-                    if approach == 'goalBased':
+                    indexStr = msc.indexString(cnt)
+                    dual.assign(variable, annotate=False)
+                    if approach == 'adjointBased':
+                        dual_u, dual_e = dual.split()
+                        dual_u.rename('Adjoint velocity')
+                        dual_e.rename('Adjoint elevation')
+                        with DumbCheckpoint(dirName + 'hdf5/adjoint_H_' + indexStr, mode=FILE_CREATE) as saveAdjH:
+                            saveAdjH.store(dual_u)
+                            saveAdjH.store(dual_e)
+                            saveAdjH.close()
+                    else:
                         dual_h = inte.mixedPairInterp(mesh_h, V_h, dual)[0]
                         dual_h_u, dual_h_e = dual_h.split()
-                        dual_h_u.rename('Adjoint velocity')
-                        dual_h_e.rename('Adjoint elevation')
-                        with DumbCheckpoint(dirName + 'hdf5/adjoint_' + msc.indexString(cnt), mode=FILE_CREATE) as saveAdj:
+                        with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_CREATE) as saveAdj:
                             saveAdj.store(dual_h_u)
                             saveAdj.store(dual_h_e)
-                            saveAdj.close()
-                    else:
-                        dual_u, dual_e = dual.split()
-                        with DumbCheckpoint(dirName + 'hdf5/adjoint_H_' + msc.indexString(cnt), mode=FILE_CREATE) as saveAdj:
-                            saveAdj.store(dual_u)
-                            saveAdj.store(dual_e)
                             saveAdj.close()
                     print('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT * 100))
                 cnt -= 1
@@ -239,29 +245,33 @@ if getError:
         indexStr = msc.indexString(k)
 
         # Load residual and adjoint data from HDF5
+        if useAdjoint:
+            if approach == 'goalBased':
+                with DumbCheckpoint(dirName + 'hdf5/adjoint_' + msc.indexString(i), mode=FILE_READ) as loadAdj:
+                    loadAdj.load(dual_h_u)
+                    loadAdj.load(dual_h_e)
+                    loadAdj.close()
+            else:
+                with DumbCheckpoint(dirName + 'hdf5/adjoint_H_' + indexStr, mode=FILE_READ) as loadAdjH:
+                    loadAdjH.load(dual_u)
+                    loadAdjH.load(dual_e)
+                    loadAdjH.close()
         if approach in ('explicit', 'goalBased'):
             with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_READ) as loadRes:
                 loadRes.load(rho_u)
                 loadRes.load(rho_e)
                 loadRes.close()
-            if useAdjoint:
-                with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_READ) as loadAdj:
-                    loadAdj.load(dual_h_u)
-                    loadAdj.load(dual_h_e)
-                    loadAdj.close()
-                epsilon = err.DWR(rho, dual_h, v)
-            else:
-                epsilon = err.explicitErrorEstimator(u, rho, v)
-        elif approach == 'adjointBased':
-            with DumbCheckpoint(dirName + 'hdf5/adjoint_H_' + indexStr, mode=FILE_READ) as loadAdj:
-                loadAdj.load(dual_u)
-                loadAdj.load(dual_e)
-                loadAdj.close()
-            with DumbCheckpoint(dirName + 'hdf5/forward_' + indexStr, mode=FILE_READ) as loadAdj:
-                loadAdj.load(u)
-                loadAdj.load(eta)
-                loadAdj.close()
+        if approach in ('explicit', 'adjointBased'):
+            with DumbCheckpoint(dirName + 'hdf5/forward_' + indexStr, mode=FILE_READ) as loadFor:
+                loadFor.load(u)
+                loadFor.load(eta)
+                loadFor.close()
+        if approach == 'adjointBased':
             epsilon = err.basicErrorEstimator(q, dual, v)
+        elif approach == 'goalBased':
+            epsilon = err.DWR(rho, dual_h, v)
+        elif approach == 'explicit':
+            epsilon = err.explicitErrorEstimator(q, rho, v)
 
         # Loop over relevant time window
         if op.window:
@@ -296,7 +306,7 @@ if approach in ('hessianBased', 'explicit', 'adjointBased', 'goalBased'):
     t = 0.
     J_trap = 0.
     started = False
-    if useAdjoint & op.gradate:
+    if op.gradate:
         H0 = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(CellSize(mesh_H))
     print('\nStarting adaptive mesh primal run (forwards in time)')
     adaptTimer = clock()
@@ -329,9 +339,8 @@ if approach in ('hessianBased', 'explicit', 'adjointBased', 'goalBased'):
                         M2 = adap.computeSteadyMetric(mesh_H, W, H, spd, nVerT=nVerT, op=op)
                     M = adap.metricIntersection(mesh_H, W, M, M2) if op.mtype == 'b' else M2
             if op.gradate:
-                if useAdjoint:
-                    M_ = adap.isotropicMetric(W, inte.interp(mesh_H, H0)[0], bdy=True, op=op) # Initial boundary metric
-                    M = adap.metricIntersection(mesh_H, W, M, M_, bdy=True)
+                M_ = adap.isotropicMetric(W, inte.interp(mesh_H, H0)[0], bdy=True, op=op) # Initial boundary metric
+                M = adap.metricIntersection(mesh_H, W, M, M_, bdy=True)
                 adap.metricGradation(mesh_H, M)
                 # TODO: always gradate to coast
             if op.advect:
@@ -342,7 +351,7 @@ if approach in ('hessianBased', 'explicit', 'adjointBased', 'goalBased'):
             mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
             V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
             q_ = inte.mixedPairInterp(mesh_H, V_H, q_)[0]
-            b = inte.interp(mesh_H, b)[0]     # TODO: Combine this in above interpolation for speed
+            b = inte.interp(mesh_H, b)[0]
             q = Function(V_H)
             u, eta = q.split()
             u.rename("uv_2d")
@@ -390,7 +399,10 @@ if approach in ('hessianBased', 'explicit', 'adjointBased', 'goalBased'):
         cnt += 1
     adaptTimer = clock() - adaptTimer
     print('Adaptive primal run complete. Run time: %.3fs \n' % adaptTimer)
-    print('J_h = ', J_trap * dt)
+    J_h = J_trap * dt
+    J = 2.4391e+13      # Objective functional value converged to 3s.f.
+    print('J_h = %5.4E' % J_h)
+    print('Relative error = %5.4E' % (np.abs(J - J_h) / J))
 
 # Print to screen timing analyses
 if getData and useAdjoint:
