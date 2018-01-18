@@ -3,42 +3,35 @@ from firedrake import *
 import numpy as np
 import cmath
 
-from . import forms
 from . import interpolation
 from . import options
 
 
-def explicitErrorEstimator(q, q_, b, v, Dt, g=9.81, timestepper='CrankNicolson'):
+def explicitErrorEstimator(u, residual, v):
     """
     Estimate error locally using an a posteriori error indicator.
     
-    :arg q: approximation at current timestep.
-    :arg q_: approximation at previous timestep.
-    :arg b: bathymetry field.
+    :arg u: fluid velocity approximation at current timestep.
+    :arg residual: approximation of residual for primal equations.
     :arg v: P0 test function over the same function space.
-    :param Dt: timestep used as a FiredrakeConstant.
-    :param g: gravitational acceleration.
-    :param timestepper: scheme of choice.
     :return: field of local error indicators.
     """
-    u, eta = q.split()
-    u_, eta_ = q_.split()
-
-    # Get useful objects related to mesh
+    m = len(residual.function_space().dof_count)
     mesh = u.function_space().mesh()
-    h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
+    h = Function(FunctionSpace(mesh, "DG", 0)).interpolate(CellSize(mesh))
+    # h = CellSize(mesh)
+    n = FacetNormal(mesh)
 
-    # Compute element residual
-    a1, a2 = forms.timestepCoeffs(timestepper)
-    resTerm = assemble(v * h * h * (dot((u_ - u) / Dt + g * grad(a1 * eta + a2 * eta_),
-                                        (u_ - u) / Dt + g * grad(a1 * eta + a2 * eta_))
-                                    + ((eta_ - eta) / Dt + div(b * (a1 * u + a2 * u_)))
-                                    * ((eta_ - eta) / Dt + div(b * (a1 * u + a2 * u_)))) / CellVolume(mesh) * dx)
+    # Compute element residual term
+    if m == 1:
+        resTerm = assemble(v * h * h * inner(residual, residual) * dx)
+    else:
+        resTerm = assemble(v * h * h * sum([inner(residual.split()[k], residual.split()[k]) for k in range(m)]) * dx)
 
-    # Compute and add boundary residual term
-    jumpTerm = assemble(jump(v * h * dot(u, FacetNormal(mesh)) / CellVolume(mesh) * dS))
+    # # Compute and add boundary residual term
+    # jumpTerm = assemble(jump(v * dot(u, n)) * dS) # * h
 
-    return assemble(sqrt(resTerm + jumpTerm))
+    return assemble(sqrt(resTerm)) # + jumpTerm))
 
 
 def DWR(residual, adjoint, v):

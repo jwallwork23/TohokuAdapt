@@ -23,9 +23,9 @@ bootstrap = False
 outputOF = True
 
 # Define initial mesh and mesh statistics placeholders
-op = opt.Options(vscale=0.2 if useAdjoint else 0.85,
-                 rm=60 if useAdjoint else 30,
-                 # rm=60,
+op = opt.Options(vscale=0.1 if useAdjoint else 0.85,
+                 # rm=60 if useAdjoint else 30,
+                 rm=60,
                  gradate=True if useAdjoint else False,
                  advect=False,
                  window=True if approach == 'adjointBased' else False,
@@ -59,7 +59,7 @@ if op.outputHessian:
 
 # Load Meshes
 mesh_H, eta0, b = msh.TohokuDomain(nEle)        # Computational mesh
-if useAdjoint:
+if approach in ('explicit', 'goalBased'):
     # Get finer mesh and associated bathymetry
     mesh_h = msh.isoP2(mesh_H)                  # Finer mesh (h < H) upon which to approximate error
     b_h = msh.TohokuDomain(mesh=mesh_h)[2]
@@ -234,7 +234,6 @@ if getData:
 if getError:
     print('\nStarting error estimate generation')
     errorTimer = clock()
-    errEstMean = 0
     for k in range(0, iEnd, rm):
         print('Generating error estimate %d / %d' % (k / rm + 1, iEnd / rm + 1))
         indexStr = msc.indexString(k)
@@ -252,7 +251,7 @@ if getError:
                     loadAdj.close()
                 epsilon = err.DWR(rho, dual_h, v)
             else:
-                epsilon = err.explicitErrorEstimator(q, q_, b, v, Dt)
+                epsilon = err.explicitErrorEstimator(u, rho, v)
         elif approach == 'adjointBased':
             with DumbCheckpoint(dirName + 'hdf5/adjoint_H_' + indexStr, mode=FILE_READ) as loadAdj:
                 loadAdj.load(dual_u)
