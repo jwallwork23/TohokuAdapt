@@ -16,11 +16,10 @@ def explicitErrorEstimator(u, residual, v):
     :arg v: P0 test function over the same function space.
     :return: field of local error indicators.
     """
-    m = len(residual.function_space().dof_count)
-    mesh = u.function_space().mesh()
-    h = Function(FunctionSpace(mesh, "DG", 0)).interpolate(CellSize(mesh))
-    # h = CellSize(mesh)
-    n = FacetNormal(mesh)
+    V = residual.function_space()
+    m = len(V.dof_count)
+    mesh = V.mesh()
+    h = CellSize(mesh)
 
     # Compute element residual term
     if m == 1:
@@ -28,8 +27,10 @@ def explicitErrorEstimator(u, residual, v):
     else:
         resTerm = assemble(v * h * h * sum([inner(residual.split()[k], residual.split()[k]) for k in range(m)]) * dx)
 
+    # TODO: u needs to come from the fine space
     # # Compute and add boundary residual term
-    # jumpTerm = assemble(jump(v * dot(u, n)) * dS) # * h
+    # uJump = jump(grad(u), n=FacetNormal(mesh))
+    # jumpTerm = assemble(v * dot(uJump, uJump) * dS) # * h
 
     return assemble(sqrt(resTerm)) # + jumpTerm))
 
