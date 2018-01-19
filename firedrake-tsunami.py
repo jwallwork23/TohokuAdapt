@@ -34,7 +34,7 @@ op = opt.Options(vscale=0.1 if useAdjoint else 0.85,
                  gauges=True,
                  ndump=10,
                  mtype='f',
-                 iso=True if useAdjoint else False)
+                 iso=True if (useAdjoint or approach == 'explicit') else False)
 
 # Establish initial mesh resolution
 if bootstrap:
@@ -44,7 +44,7 @@ if bootstrap:
     bootTimer = clock() - bootTimer
     print('Bootstrapping run time: %.3fs\n' % bootTimer)
 else:
-    i = 1
+    i = 2
 nEle = op.meshes[i]
 
 # Establish filenames
@@ -101,8 +101,8 @@ if approach in ('explicit', 'goalBased'):
     if useAdjoint:
         dual_h = Function(V_h)
         dual_h_u, dual_h_e = dual_h.split()
-        dual_h_u.rename("Adjoint velocity")
-        dual_h_e.rename("Adjoint elevation")
+        dual_h_u.rename('Fine adjoint velocity')
+        dual_h_e.rename('Fine adjoint elevation')
     else:
         qh = Function(V_h)
         uh, eh = qh.split()
@@ -111,6 +111,8 @@ if approach in ('explicit', 'goalBased'):
 if useAdjoint:
     dual = Function(V_H)
     dual_u, dual_e = dual.split()
+    dual_u.rename("Adjoint velocity")
+    dual_e.rename("Adjoint elevation")
     J = form.objectiveFunctionalSW(q, plot=True)
 if approach in ('explicit', 'adjointBased', 'goalBased'):
     P0 = FunctionSpace(mesh_H, "DG", 0) if approach == 'adjointBased' else FunctionSpace(mesh_h, "DG", 0)
@@ -217,6 +219,8 @@ if getData:
                     else:
                         dual_h = inte.mixedPairInterp(mesh_h, V_h, dual)[0]
                         dual_h_u, dual_h_e = dual_h.split()
+                        dual_h_u.rename('Fine adjoint velocity')
+                        dual_h_e.rename('Fine adjoint elevation')
                         with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_CREATE) as saveAdj:
                             saveAdj.store(dual_h_u)
                             saveAdj.store(dual_h_e)
@@ -247,7 +251,7 @@ if getError:
         # Load residual and adjoint data from HDF5
         if useAdjoint:
             if approach == 'goalBased':
-                with DumbCheckpoint(dirName + 'hdf5/adjoint_' + msc.indexString(i), mode=FILE_READ) as loadAdj:
+                with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_READ) as loadAdj:
                     loadAdj.load(dual_h_u)
                     loadAdj.load(dual_h_e)
                     loadAdj.close()

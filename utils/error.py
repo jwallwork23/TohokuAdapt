@@ -28,7 +28,7 @@ def explicitErrorEstimator(q, residual, v):
     else:
         resTerm = assemble(v * h * h * sum([inner(residual.split()[k], residual.split()[k]) for k in range(m)]) * dx)
 
-    # Compute and add boundary residual term
+    # Compute boundary residual term on fine mesh
     # qh = interpolation.mixedPairInterp(mesh, V, q)[0]
     # uh, etah = qh.split()
     # j0 = jump(grad(uh), n=n)
