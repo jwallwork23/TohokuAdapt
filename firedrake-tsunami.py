@@ -23,15 +23,16 @@ bootstrap = False
 outputOF = True
 
 # Define initial mesh and mesh statistics placeholders
-op = opt.Options(vscale=0.1 if useAdjoint else 0.85,
+op = opt.Options(vscale=0.8 if useAdjoint else 0.85,
                  # rm=60 if useAdjoint else 30,
                  rm=60,
                  gradate=True if (useAdjoint or approach == 'explicit') else False,
                  advect=False,
-                 window=True if approach == 'adjointBased' else False,
+                 # window=True if approach == 'adjointBased' else False,
+                 window=True,
                  outputHessian=False,
                  plotpvd=True,
-                 gauges=True,
+                 gauges=False,
                  ndump=10,
                  mtype='f',
                  iso=True if (useAdjoint or approach == 'explicit') else False)
@@ -44,7 +45,7 @@ if bootstrap:
     bootTimer = clock() - bootTimer
     print('Bootstrapping run time: %.3fs\n' % bootTimer)
 else:
-    i = 2
+    i = 0
 nEle = op.meshes[i]
 
 # Establish filenames
@@ -60,7 +61,7 @@ if op.outputHessian:
 # Load Mesh(es)
 mesh_H, eta0, b = msh.TohokuDomain(nEle)        # Computational mesh
 if approach in ('explicit', 'goalBased'):
-    mesh_h = msh.isoP2(mesh_H)                  # Finer mesh (h < H) upon which to approximate error
+    mesh_h = adap.isoP2(mesh_H)                  # Finer mesh (h < H) upon which to approximate error
     b_h = msh.TohokuDomain(mesh=mesh_h)[2]
     V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
 
@@ -123,12 +124,14 @@ if approach in ('explicit', 'adjointBased', 'goalBased'):
 hmin = op.hmin
 hmax = op.hmax
 rm = op.rm
-iStart = int(op.Tstart / dt)    # TODO: alter for t-adapt
-iEnd = int(np.ceil(T / dt))     # TODO: alter for t-adapt
+if tAdapt:
+    raise NotImplementedError("Mesh adaptive routines not quite calibrated for t-adaptivity")
+else:
+    iStart = int(op.Tstart / dt)
+    iEnd = int(np.ceil(T / dt))
 mM = [nEle, nEle]               # Min/max #Elements
 Sn = nEle
 nVerT = msh.meshStats(mesh_H)[1] * op.vscale    # Target #Vertices
-nVerT0 = nVerT
 
 # Initialise counters
 t = 0.
@@ -405,8 +408,8 @@ if approach in ('hessianBased', 'explicit', 'adjointBased', 'goalBased'):
     print('Adaptive primal run complete. Run time: %.3fs \n' % adaptTimer)
     J_h = J_trap * dt
     J = 2.4391e+13      # Objective functional value converged to 3s.f.
-    print('J_h = %5.4E' % J_h)
-    print('Relative error = %5.4E' % (np.abs(J - J_h) / J))
+    print('J_h = %5.4e' % J_h)
+    print('Relative error = %5.4e' % (np.abs(J - J_h) / J))
 
 # Print to screen timing analyses
 if getData and useAdjoint:

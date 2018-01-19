@@ -4,6 +4,7 @@ from thetis import *
 import numpy as np
 from time import clock
 
+import utils.adaptivity as adap
 import utils.forms as form
 import utils.mesh as msh
 import utils.options as opt
@@ -107,10 +108,14 @@ def solverSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg',)):
 # TODO: Rossby Wave test problem
 
 
-def solverFiredrake(nEle, op=opt.Options()):
+def solverFiredrake(nEle, isoP2=0, op=opt.Options()):
 
     # Define Mesh and FunctionSpace
     mesh, eta0, b = msh.TohokuDomain(nEle)
+    # TODO: finish this isoP2 version of bootstrapping - more rigorous mode of refinement
+    if bool(isoP2):
+        for i in range(int(isoP2)):
+            mesh = adap.isoP2(mesh)
     V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
 
     # Specify solver parameters

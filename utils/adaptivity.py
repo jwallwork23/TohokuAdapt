@@ -181,6 +181,14 @@ get a degree 1 Lagrange metric.""" % (deg, family))
     return M
 
 
+def isoP2(mesh):
+    """
+    :arg mesh: mesh to be refined.
+    :return: iso-P2 refined mesh (nodes of a quadratic element on the initial mesh become vertices of the new mesh).
+    """
+    return MeshHierarchy(mesh, 1).__getitem__(1)
+
+
 def metricGradation(mesh, M, beta=1.4, iso=False):
     """
     Perform anisotropic metric gradation in the method described in Alauzet 2010, using linear interpolation. Python
