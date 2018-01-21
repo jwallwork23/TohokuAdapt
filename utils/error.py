@@ -29,12 +29,12 @@ def explicitErrorEstimator(q, residual, v):
         resTerm = assemble(v * h * h * sum([inner(residual.split()[k], residual.split()[k]) for k in range(m)]) * dx)
 
     # Compute boundary residual term on fine mesh
-    # qh = interpolation.mixedPairInterp(mesh, V, q)[0]
-    # uh, etah = qh.split()
-    # j0 = jump(grad(uh), n=n)
-    # j1 = jump(grad(etah), n=n)
-    # jumpTerm = assemble(v * h * (inner(j0, j0) + j1 * j1) * dS)
-    jumpTerm = Constant(0)
+    qh = interpolation.mixedPairInterp(mesh, V, q)[0]
+    uh, etah = qh.split()
+    j0 = assemble(jump(v * grad(uh[0]), n=n) * dS)
+    j1 = assemble(jump(v * grad(uh[1]), n=n) * dS)
+    j2 = assemble(jump(v * grad(etah), n=n) * dS)
+    jumpTerm = assemble(v * h * (j0 * j0 + j1 * j1 + j2 * j2) * dx)
 
     return assemble(sqrt(resTerm + jumpTerm))
 

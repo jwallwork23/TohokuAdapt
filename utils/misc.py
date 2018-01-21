@@ -18,7 +18,7 @@ def cheatCodes(approach, default='goalBased'):
         getData = True
         getError = True
         useAdjoint = True
-    elif approach == 'simpleAdapt':
+    elif approach == 'hessianBased':
         getData = False
         getError = False
         useAdjoint = False
