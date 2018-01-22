@@ -23,7 +23,7 @@ bootstrap = False
 outputOF = True
 
 # Define initial mesh and mesh statistics placeholders
-op = opt.Options(vscale=0.1 if useAdjoint else 0.85,
+op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
                  rm=60 if useAdjoint else 30,
                  # rm=60,
                  gradate=True if (useAdjoint or approach == 'explicit') else False,
