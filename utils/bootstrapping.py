@@ -112,7 +112,6 @@ def solverFiredrake(nEle, isoP2=0, op=opt.Options()):
 
     # Define Mesh and FunctionSpace
     mesh, eta0, b = msh.TohokuDomain(nEle)
-    # TODO: finish this isoP2 version of bootstrapping - more rigorous mode of refinement
     if bool(isoP2):
         for i in range(int(isoP2)):
             mesh = adap.isoP2(mesh)
@@ -218,6 +217,8 @@ def bootstrap(problem='advection-diffusion', maxIter=12, tol=1e-3, slowTol=10., 
         elif problem == 'firedrake-tsunami':
             nEle = op.meshes[i]
             J = solverFiredrake(nEle)
+        elif problem == 'isoP2-firedrake-tsunami':
+            J = solverFiredrake(op.meshes[0], isoP2=i)
         elif problem == 'thetis-tsunami':
             nEle = op.meshes[i]
             J = solverFiredrake(nEle)
