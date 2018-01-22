@@ -43,7 +43,7 @@ if bootstrap:
     bootTimer = clock() - bootTimer
     print('Bootstrapping run time: %.3fs\n' % bootTimer)
 else:
-    i = 5
+    i = 0
 nEle = op.meshes[i]
 
 # Establish filenames
@@ -198,6 +198,11 @@ if getData:
     cntT = cnt  # Total number of steps
     primalTimer = clock() - primalTimer
     print('Primal run complete. Run time: %.3fs' % primalTimer)
+
+    # Reset counters in explicit case
+    if approach == 'explicit':
+        t = 0.
+        cnt = 0
 
     if useAdjoint:
         parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
