@@ -168,14 +168,6 @@ def TohokuDomain(nEle=6176, mesh=None, output=False):
     return mesh, eta0, b
 
 
-def isoP2(mesh):
-    """
-    :arg mesh: mesh to be refined.
-    :return: iso-P2 refined mesh (nodes of a quadratic element on the initial mesh become vertices of the new mesh).
-    """
-    return MeshHierarchy(mesh, 1).__getitem__(1)
-
-
 def meshStats(mesh):
     """
     :arg mesh: current mesh.

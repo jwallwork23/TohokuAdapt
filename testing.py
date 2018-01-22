@@ -8,6 +8,7 @@ problem = input("""Select from the following
       'shallow-water'
       'rossby-wave'
       'firedrake-tsunami'
+      'isoP2-firedrake-tsunami'
       'thetis-tsunami'\n""") or 'advection-diffusion'
 
 print('Default mode is to run a mesh bootstrapping routine to establish a near-optimal initial mesh.')
@@ -32,7 +33,7 @@ else:
     elif problem == 'rossby-wave':
         title = r'Equatorial Rossby wave test case on $[-24,24]\times[-12,12]$'
         raise NotImplementedError
-    elif problem == 'firedrake-tsunami':
+    elif problem in ('firedrake-tsunami', 'isoP2-firedrake-tsunami'):
         title = r'Tohoku tsunami problem solved using Firedrake'
         ylab1 += '$J(u,v,\eta)=\int_{T_{\mathrm{start}}}^{T_{\mathrm{end}}}\int_A\eta\:\mathrm{d}x\mathrm{d}t$'
         tol = 1e10      # Note J ~ 2.4e13

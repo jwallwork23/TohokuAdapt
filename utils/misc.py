@@ -18,7 +18,7 @@ def cheatCodes(approach, default='goalBased'):
         getData = True
         getError = True
         useAdjoint = True
-    elif approach == 'simpleAdapt':
+    elif approach == 'hessianBased':
         getData = False
         getError = False
         useAdjoint = False
@@ -39,7 +39,7 @@ def cheatCodes(approach, default='goalBased'):
         approach = input("Choose error estimator: 'explicit', 'adjointBased' or 'goalBased': ") or 'goalBased'
         getData = False
         getError = True
-        useAdjoint = True
+        useAdjoint = approach in ('adjointBased', 'goalBased')
     else:
         approach = 'fixedMesh'
         getData = True
