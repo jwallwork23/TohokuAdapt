@@ -7,7 +7,7 @@ def interp(mesh, *fields):
     """
     Transfer solution fields from the old mesh to the new mesh. Based around the function ``transfer_solution`` by
     Nicolas Barral, 2017.
-    
+
     :arg mesh: new mesh onto which fields are to be interpolated.
     :arg fields: tuple of functions defined on the old mesh that one wants to transfer
     :return: interpolated fields.
@@ -23,13 +23,13 @@ def interp(mesh, *fields):
         f_new = Function(V_new)
         notInDomain = []
         if f.ufl_element().family() == 'Lagrange' and f.ufl_element().degree() == 1:
-            coords = mesh.coordinates.dat.data      # Vertex/node coords
+            coords = mesh.coordinates.dat.data  # Vertex/node coords
         elif f.ufl_element().family() == 'Lagrange':
             degree = f.ufl_element().degree()
             C = VectorFunctionSpace(mesh, 'CG', degree)
             interp_coordinates = Function(C)
             interp_coordinates.interpolate(mesh.coordinates)
-            coords = interp_coordinates.dat.data    # Node coords (NOT just vertices)
+            coords = interp_coordinates.dat.data  # Node coords (NOT just vertices)
         elif f.ufl_element().family() == 'Discontinuous Lagrange':
             degree = f.ufl_element().degree()
             C = VectorFunctionSpace(mesh, 'DG', degree)
@@ -50,7 +50,7 @@ def interp(mesh, *fields):
                     notInDomain.append(x)
                 finally:
                     f_new.dat.data[x] = val
-        eps = 1e-6                              # Tolerance to be increased
+        eps = 1e-6  # Tolerance to be increased
         while len(notInDomain) > 0:
             eps *= 10
             for x in notInDomain:
@@ -67,13 +67,10 @@ def interp(mesh, *fields):
     return fields_new
 
 
-# TODO: somehow take note of problematic elements/vertices
-
-
-def generalisedInterp(mesh, V, *fields):
+def mixedPairInterp(mesh, V, *fields):
     """
     Interpolate mixed function space pairs onto a new mesh.
-    
+
     :arg mesh: new mesh to be interpolated onto.
     :arg V: mixed function space defined on new mesh, with same type as that on which fields are defined.
     :arg fields: fields to be interpolated.
@@ -81,16 +78,10 @@ def generalisedInterp(mesh, V, *fields):
     """
     fields_new = ()
     for q in fields:
-        if len(q.ufl_shape) == 1:
-            if len(q.dat.data) == 2:
-                p = Function(V)
-                p0, p1 = p.split()
-                q0, q1 = q.split()
-                q0, q1 = interp(mesh, q0, q1)
-                p0.assign(q0), p1.assign(q1)
-            else:
-                raise NotImplementedError
-        else:
-            p = interp(mesh, q)
+        p = Function(V)
+        p0, p1 = p.split()
+        q0, q1 = q.split()
+        q0, q1 = interp(mesh, q0, q1)
+        p0.assign(q0), p1.assign(q1)
         fields_new += (p,)
     return fields_new

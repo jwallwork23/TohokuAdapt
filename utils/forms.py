@@ -20,6 +20,8 @@ def timestepCoeffs(timestepper):
 
     return a1, a2
 
+# TODO: consider RK4 timestepping
+
 
 def timestepScheme(u, u_, timestepper):
     """
@@ -34,10 +36,10 @@ def timestepScheme(u, u_, timestepper):
 
 
 def strongResidualSW(q, q_, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, nonlinear=False,
-                   timestepper='CrankNicolson'):
+                     timestepper='CrankNicolson'):
     """
     Construct the strong residual for the semi-discrete linear shallow water equations at the current timestep.
-    
+
     :arg q: solution tuple for linear shallow water equations.
     :arg q_: solution tuple for linear shallow water equations at previous timestep.
     :arg b: bathymetry profile.
@@ -94,13 +96,13 @@ def formsSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, n
     """
     V = q.function_space()
     mesh = V.mesh()
-    u, eta = q.split()
-    u_, eta_ = q_.split()
+    (u, eta) = (as_vector((q[0], q[1])), q[2])
+    (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
     (w, xi) = (as_vector((qt[0], qt[1])), qt[2])
     a1, a2 = timestepCoeffs(timestepper)
 
-    B = (inner(u, w) + eta * xi) / Dt * dx      # LHS bilinear form
-    L = (inner(u_, w) + eta_ * xi) / Dt * dx    # RHS linear functional
+    B = (inner(u, w) + eta * xi) / Dt * dx  # LHS bilinear form
+    L = (inner(u_, w) + eta_ * xi) / Dt * dx  # RHS linear functional
 
     if V.sub(1).ufl_element().family() == 'Lagrange':
         B += a1 * g * inner(grad(eta), w) * dx
@@ -148,8 +150,8 @@ def adjointSW(l, l_, lt, b, Dt, g=9.81, timestepper='CrankNicolson', x1=2.5, x2=
     a1, a2 = timestepCoeffs(timestepper)
     iA = indicator(l.function_space().sub(1), x1=x1, x2=x2, y1=y1, y2=y2, smooth=smooth)
 
-    B = ((inner(lu, w) + le * xi)/Dt + a1 * b * inner(grad(le), w) - a1 * g * inner(lu, grad(xi))) * dx
-    L = ((inner(lu_, w) + le_ * xi)/Dt - a2 * b * inner(grad(le_), w) + a2 * g * inner(lu_, grad(xi))) * dx
+    B = ((inner(lu, w) + le * xi) / Dt + a1 * b * inner(grad(le), w) - a1 * g * inner(lu, grad(xi))) * dx
+    L = ((inner(lu_, w) + le_ * xi) / Dt - a2 * b * inner(grad(le_), w) + a2 * g * inner(lu_, grad(xi))) * dx
     L -= switch * iA * xi * dx
 
     return B, L
@@ -159,7 +161,7 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=F
                    allowNormalFlow=True, timestepper='CrankNicolson', adjoint=False, switch=Constant(0.)):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
-    
+
     :arg q: solution tuple for linear shallow water equations.
     :arg q_: solution tuple for linear shallow water equations at previous timestep.
     :arg qt: test function tuple.
@@ -179,7 +181,7 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=F
                          smooth=False, switch=switch)
     else:
         B, L = formsSW(q, q_, qt, b, Dt, nu=nu, g=g, f0=f0, beta=beta, rotational=rotational, nonlinear=nonlinear,
-                   allowNormalFlow=allowNormalFlow, timestepper=timestepper)
+                       allowNormalFlow=allowNormalFlow, timestepper=timestepper)
 
     return B - L
 
@@ -226,10 +228,10 @@ def localProblemSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=F
 
     # Establish variational form for residual equation
     B_, L = formsSW(q, q_, qt, b, Dt, nu=nu, g=g, f0=f0, beta=beta, rotational=rotational, nonlinear=nonlinear,
-                   allowNormalFlow=allowNormalFlow, timestepper=timestepper)
+                    allowNormalFlow=allowNormalFlow, timestepper=timestepper)
     phi = Function(V, name='Local solution')
     B = formsSW(phi, q_, qt, b, Dt, nu=nu, g=g, f0=f0, beta=beta, rotational=rotational, nonlinear=nonlinear,
-                   allowNormalFlow=allowNormalFlow, timestepper=timestepper)[0]
+                allowNormalFlow=allowNormalFlow, timestepper=timestepper)[0]
     F = B + B_ - L + interelementTerm(grad(u) * et, n=n) * dS
 
     # TODO: test this
@@ -303,13 +305,14 @@ def adjointAD(l, l_, lt, w, Dt, nu=1e-3, timestepper='CrankNicolson', x1=2.75, x
     iA = indicator(l.function_space(), x1=x1, x2=x2, y1=y1, y2=y2, smooth=False)
     return ((l - l_) * lt / Dt + inner(grad(lm), w * lt) + iA * lt) * dx
 
+
 # TODO: not sure this is properly linearised
 
 
 def weakMetricAdvection(M, M_, Mt, w, Dt, timestepper='ImplicitEuler'):
     """
     Advect a metric. Also works for vector fields.
-    
+
     :arg M: metric at current timestep.
     :arg M_: metric at previous timestep.
     :arg Mt: test function.
@@ -337,7 +340,7 @@ def indicator(V, x1=2.5, x2=3.5, y1=0.1, y2=0.9, smooth=False):
         xd = (x2 - x1) / 2
         yd = (y2 - y1) / 2
         ind = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? ' \
-              'exp(1. / (pow(x[0] - %f, 2) - pow(%f, 2))) * exp(1. / (pow(x[1] - %f, 2) - pow(%f, 2))) : 0.'\
+              'exp(1. / (pow(x[0] - %f, 2) - pow(%f, 2))) * exp(1. / (pow(x[1] - %f, 2) - pow(%f, 2))) : 0.' \
               % (x1, x2, y1, y2, x1 + xd, xd, y1 + yd, yd)
     else:
         ind = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' % (x1, x2, y1, y2)
@@ -357,7 +360,7 @@ def objectiveFunctionalAD(c, x1=2.5, x2=3.5, y1=0.1, y2=0.9):
     :param y2: North-most coordinate for region A (m).
     :return: objective functional for advection diffusion problem. 
     """
-    return  Functional(c * indicator(c.function_space(), x1, x2, y1, y2) * dx * dt)
+    return Functional(c * indicator(c.function_space(), x1, x2, y1, y2) * dx * dt)
 
 
 def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=4160e3, y2=4360e3,
