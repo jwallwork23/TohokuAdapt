@@ -8,6 +8,7 @@ problem = input("""Select from the following
       'shallow-water'
       'rossby-wave'
       'firedrake-tsunami'
+      'isoP2-firedrake-tsunami'
       'thetis-tsunami'\n""") or 'advection-diffusion'
 
 print('Default mode is to run a mesh bootstrapping routine to establish a near-optimal initial mesh.')

@@ -111,10 +111,11 @@ def solverSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg',)):
 def solverFiredrake(nEle, isoP2=0, op=opt.Options()):
 
     # Define Mesh and FunctionSpace
-    mesh, eta0, b = msh.TohokuDomain(nEle)
+    mesh = msh.TohokuDomain(nEle)[0]
     if bool(isoP2):
         for i in range(int(isoP2)):
             mesh = adap.isoP2(mesh)
+    eta0, b = msh.TohokuDomain(mesh=mesh)[1:]
     V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
 
     # Specify solver parameters
@@ -218,6 +219,7 @@ def bootstrap(problem='advection-diffusion', maxIter=12, tol=1e-3, slowTol=10., 
             nEle = op.meshes[i]
             J = solverFiredrake(nEle)
         elif problem == 'isoP2-firedrake-tsunami':
+            nEle = op.meshes[0] * pow(4, i)
             J = solverFiredrake(op.meshes[0], isoP2=i)
         elif problem == 'thetis-tsunami':
             nEle = op.meshes[i]
@@ -228,7 +230,7 @@ def bootstrap(problem='advection-diffusion', maxIter=12, tol=1e-3, slowTol=10., 
         Js.append(J)
         ts.append(t)
         nEls.append(nEle)
-        if problem in ('firedrake-tsunami', 'thetis-tsunami'):
+        if problem in ('firedrake-tsunami', 'thetis-tsunami', 'isoP2-firedrake-tsunami'):
             toPrint = 'i = %d, ' % i
         else:
             toPrint = 'n = %3d, ' % n
