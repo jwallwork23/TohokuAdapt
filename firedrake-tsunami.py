@@ -43,7 +43,7 @@ if bootstrap:
     bootTimer = clock() - bootTimer
     print('Bootstrapping run time: %.3fs\n' % bootTimer)
 else:
-    i = 0
+    i = 1
 nEle = op.meshes[i]
 
 # Establish filenames
@@ -199,9 +199,8 @@ if getData:
     primalTimer = clock() - primalTimer
     print('Primal run complete. Run time: %.3fs' % primalTimer)
 
-    # Reset counters in explicit case
+    # Reset counter in explicit case
     if approach == 'explicit':
-        t = 0.
         cnt = 0
 
     if useAdjoint:
@@ -285,7 +284,7 @@ if getError:
 
         # Loop over relevant time window
         if op.window:
-            for i in range(cnt, min(cnt+iEnd-iStart, iEnd), rm):
+            for i in range(k, min(k+iEnd-iStart, iEnd), rm):
                 if approach == 'goalBased':
                     with DumbCheckpoint(dirName + 'hdf5/adjoint_' + msc.indexString(i), mode=FILE_READ) as loadAdj:
                         loadAdj.load(dual_h_u)
