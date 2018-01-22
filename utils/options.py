@@ -15,7 +15,7 @@ class Options:
                  a=100,
                  ntype='lp',
                  p=2,
-                 mtype='f',
+                 mtype='s',
                  iso=False,
                  advect=False,
                  gradate=False,

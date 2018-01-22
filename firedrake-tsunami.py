@@ -23,9 +23,8 @@ bootstrap = False
 outputOF = True
 
 # Define initial mesh and mesh statistics placeholders
-op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
+op = opt.Options(vscale=0.1 if useAdjoint else 0.85,
                  rm=60 if useAdjoint else 30,
-                 # rm=60,
                  gradate=True if (useAdjoint or approach == 'explicit') else False,
                  advect=False,
                  window=True if approach == 'adjointBased' else False,
@@ -33,7 +32,7 @@ op = opt.Options(vscale=0.4 if useAdjoint else 0.85,
                  plotpvd=True,
                  gauges=False,
                  ndump=10,
-                 mtype='s',
+                 mtype='s',     # Best approach for SW modelling
                  iso=False)
 
 # Establish initial mesh resolution
@@ -44,7 +43,7 @@ if bootstrap:
     bootTimer = clock() - bootTimer
     print('Bootstrapping run time: %.3fs\n' % bootTimer)
 else:
-    i = 2
+    i = 4
 nEle = op.meshes[i]
 
 # Establish filenames
@@ -408,7 +407,7 @@ if approach in ('hessianBased', 'explicit', 'adjointBased', 'goalBased'):
     J_h = J_trap * dt
     J = 2.4391e+13      # Objective functional value converged to 3s.f.
     print('J_h = %5.4e' % J_h)
-    print('Relative error = %5.4e' % (np.abs(J - J_h) / J))
+    print('Relative error = %5.4f' % (np.abs(J - J_h) / J))
 
 # Print to screen timing analyses
 if getData and useAdjoint:

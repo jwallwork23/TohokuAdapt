@@ -228,32 +228,32 @@ Absolute total variation : %6.3f Relative total variation : %6.3f""" %
     plt.show()
 
 
-def errorVsTime(op=opt.Options()):
-    """
-    :param op: Options object holding parameter values. 
-    :return: plot of relative total variation versus simulation run time.
-    """
-
-    # Get plotting parameters
-    # labels = op.labels
-    labels = ("Coarse mesh", "Simple adaptive", "Goal based")
-    styles = op.styles
-    t = []
-    e = []
-
+def errorVsElements():
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='serif')
+    plt.rc('legend', fontsize='x-large')
+    labels = ("Fixed mesh", "Hessian based", "Explicit estimator", "Adjoint based", "Goal based")
+    styles = {labels[0]: 's', labels[1]: '^', labels[2]: 'x', labels[3]: 'o', labels[4]: '*'}
+    err = {}
+    nEls = {}
+    err[labels[0]] = [0.0046, 0.0067, 0.0022, 0.0083, 0.0034, 0.0026, 0.0005]
+    nEls[labels[0]] = [6176, 8782, 11020, 16656, 20724, 33784, 52998]
+    err[labels[1]] = [0.0046, 0.0064, 0.0014]
+    nEls[labels[1]] = [7036, 12540, 18638]
+    err[labels[2]] = []
+    nEls[labels[2]] = []
+    err[labels[3]] = [0.0237, 0.0056, 0.0149]
+    nEls[labels[3]] = [5848, 10752, 17389]
+    err[labels[4]] = [0.0209, 0.0027, 0.0020, 0.0010]
+    nEls[labels[4]] = [3633, 12840, 27718, 43961]
     for mesh in labels:
-        for gauge in ("P02", "P06"):
-            print('Datum to plot: ', mesh, gauge)
-            t.append(input("Run time to solution: "))
-            e.append(input("Corresponding error: "))
-            plt.plot(t, e, label=mesh, marker=styles[mesh], linewidth=0.)
-
+        plt.semilogy(nEls[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
     plt.gcf()
-    plt.legend(bbox_to_anchor=(1.01, 1.), loc=2)
-    plt.xlabel(r'Time elapsed (s)')
-    plt.ylabel(r'Relative total variation')
-    plt.xlim([0, 50000])
-    plt.ylim([0, 1])
-    plt.savefig('outdata/errorPlots/errorVsTime.pdf', bbox_inches='tight')
+    plt.legend(bbox_to_anchor=(0.6, 1.), loc=2)
+    plt.xlabel(r'Mean element count')
+    plt.ylabel(r'Relative error $\frac{|J(\textbf{q})-J(\textbf{q}_h)|}{|J(\textbf{q})|}$')
+    plt.xlim([0, 55000])
+    plt.ylim([0, 0.05])
+    plt.savefig('outdata/errorPlots/errorVsElements.pdf', bbox_inches='tight')
     plt.show()
 
