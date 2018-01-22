@@ -11,7 +11,7 @@ class Options:
                  family='dg-cg',
                  vscale=0.85,
                  hmin=500.,
-                 hmax=1e7,
+                 hmax=1e6,
                  a=100,
                  ntype='lp',
                  p=2,
@@ -62,7 +62,7 @@ class Options:
         try:
             assert coarseness in range(1, 9)
         except:
-            raise ValueError('Please choose an integer between 1 and 8.')
+            raise ValueError('Please choose an integer between 0 and 8.')
 
         # Adaptivity parameters
         self.family = family
