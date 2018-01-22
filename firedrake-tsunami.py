@@ -32,7 +32,7 @@ op = opt.Options(vscale=0.1 if useAdjoint else 0.85,
                  plotpvd=True,
                  gauges=False,
                  ndump=10,
-                 mtype='s',     # Best approach for SW modelling
+                 mtype='s',     # Best approach for tsunami modelling
                  iso=False)
 
 # Establish initial mesh resolution
@@ -43,7 +43,7 @@ if bootstrap:
     bootTimer = clock() - bootTimer
     print('Bootstrapping run time: %.3fs\n' % bootTimer)
 else:
-    i = 4
+    i = 5
 nEle = op.meshes[i]
 
 # Establish filenames

@@ -236,20 +236,28 @@ def errorVsElements():
     styles = {labels[0]: 's', labels[1]: '^', labels[2]: 'x', labels[3]: 'o', labels[4]: '*'}
     err = {}
     nEls = {}
+    tim = {}
     err[labels[0]] = [0.0046, 0.0067, 0.0022, 0.0083, 0.0034, 0.0026, 0.0005]
     nEls[labels[0]] = [6176, 8782, 11020, 16656, 20724, 33784, 52998]
-    err[labels[1]] = [0.0046, 0.0064, 0.0014]
-    nEls[labels[1]] = [7036, 12540, 18638]
+    tim[labels[0]] = [11.7, 14.5, 16.8, 12.4, 17.8, 38.1, 98.5]
+    err[labels[1]] = [0.0046, 0.0064, 0.0014, 0.0069]
+    nEls[labels[1]] = [7036, 12540, 18638, 23699]
+    tim[labels[1]] = [202.7, 420.8, 359.9, 619.6]
     err[labels[2]] = []
     nEls[labels[2]] = []
+    tim[labels[2]] = []
     err[labels[3]] = [0.0237, 0.0056, 0.0149]
     nEls[labels[3]] = [5848, 10752, 17389]
+    tim[labels[3]] = [276.7, 566.5, 682.0]
     err[labels[4]] = [0.0209, 0.0027, 0.0020, 0.0010]
     nEls[labels[4]] = [3633, 12840, 27718, 43961]
+    tim[labels[4]] = [895.2, 1873.9, 2655.5, 3198.2]
+
+    # Plot errors
     for mesh in labels:
         plt.semilogy(nEls[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
     plt.gcf()
-    plt.legend(bbox_to_anchor=(0.6, 1.), loc=2)
+    plt.legend(bbox_to_anchor=(0.8, 1.), loc=2)
     plt.xlabel(r'Mean element count')
     plt.ylabel(r'Relative error $\frac{|J(\textbf{q})-J(\textbf{q}_h)|}{|J(\textbf{q})|}$')
     plt.xlim([0, 55000])
@@ -257,3 +265,14 @@ def errorVsElements():
     plt.savefig('outdata/errorPlots/errorVsElements.pdf', bbox_inches='tight')
     plt.show()
 
+    # Plot timings
+    for mesh in labels:
+        plt.loglog(nEls[mesh], tim[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
+    plt.gcf()
+    plt.legend(bbox_to_anchor=(0.8, 1.), loc=2)
+    plt.xlabel(r'Mean element count')
+    plt.ylabel(r'CPU time (s)')
+    plt.xlim([0, 55000])
+    plt.ylim([0, 4000])
+    plt.savefig('outdata/errorPlots/timeVsElements.pdf', bbox_inches='tight')
+    plt.show()
