@@ -243,12 +243,12 @@ def errorVsElements():
     err[labels[1]] = [0.0046, 0.0064, 0.0014, 0.0069, 0.0059]
     nEls[labels[1]] = [7036, 12540, 18638, 23699, 38610]
     tim[labels[1]] = [202.7, 420.8, 359.9, 619.6, 1295.0]
-    err[labels[2]] = [0.0069]
-    nEls[labels[2]] = [7963]
-    tim[labels[2]] = [1459.3]
-    err[labels[3]] = [0.0237, 0.0056, 0.0149]
-    nEls[labels[3]] = [5848, 10752, 17389]
-    tim[labels[3]] = [276.7, 566.5, 682.0]
+    err[labels[2]] = [0.0069, 0.0004]
+    nEls[labels[2]] = [7963, 11051]
+    tim[labels[2]] = [1459.3, 2245.1]
+    err[labels[3]] = [0.0845, 0.0157, 0.0236, 0.0156]
+    nEls[labels[3]] = [3410, 10088, 16610, 18277]
+    tim[labels[3]] = [345.6, 562.4, 591.6, 1276.5]
     err[labels[4]] = [0.0209, 0.0027, 0.0020, 0.0010]
     nEls[labels[4]] = [3633, 12840, 27718, 43961]
     tim[labels[4]] = [895.2, 1873.9, 2655.5, 3198.2]
@@ -261,7 +261,7 @@ def errorVsElements():
     plt.xlabel(r'Mean element count')
     plt.ylabel(r'Relative error $\frac{|J(\textbf{q})-J(\textbf{q}_h)|}{|J(\textbf{q})|}$')
     plt.xlim([0, 55000])
-    plt.ylim([0, 0.05])
+    plt.ylim([0, 0.1])
     plt.savefig('outdata/errorPlots/errorVsElements.pdf', bbox_inches='tight')
     plt.show()
 
