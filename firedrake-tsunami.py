@@ -21,7 +21,7 @@ approach, getData, getError, useAdjoint = msc.cheatCodes(input(
 tAdapt = False
 bootstrap = False
 outputOF = True
-orderIncrease = False   # For residual estimation
+orderIncrease = True   # For residual estimation
 
 # Define initial mesh and mesh statistics placeholders
 op = opt.Options(vscale=0.1 if approach == 'goalBased' else 0.85,
@@ -44,7 +44,7 @@ if bootstrap:
     bootTimer = clock() - bootTimer
     print('Bootstrapping run time: %.3fs\n' % bootTimer)
 else:
-    i = 2
+    i = 1
 nEle = op.meshes[i]
 
 # Establish filenames
@@ -106,7 +106,7 @@ if orderIncrease:
 
 # Define Functions relating to goalBased approach
 if approach in ('explicit', 'goalBased'):
-    rho = Function(V_oi) if orderIncrease else Function(V_h)
+    rho = Function(V_oi if orderIncrease else V_h)
     rho_u, rho_e = rho.split()
     rho_u.rename("Velocity residual")
     rho_e.rename("Elevation residual")
@@ -127,7 +127,10 @@ if useAdjoint:
     dual_e.rename("Adjoint elevation")
     J = form.objectiveFunctionalSW(q, plot=True)
 if approach in ('explicit', 'adjointBased', 'goalBased'):
-    P0 = FunctionSpace(mesh_H, "DG", 0) if approach == 'adjointBased' else FunctionSpace(mesh_h, "DG", 0)
+    if approach == 'adjointBased' or orderIncrease:
+        P0 = FunctionSpace(mesh_H, "DG", 0)
+    else:
+        P0 = FunctionSpace(mesh_h, "DG", 0)
     v = TestFunction(P0)
     epsilon = Function(P0, name="Error indicator")
 
@@ -176,7 +179,7 @@ if getData:
                 else:
                     qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
                     Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt)
-                rho_u.interpolate(Au)
+                rho_u.interpolate(Au)   # TODO: could this just be an 'assign'?
                 rho_e.interpolate(Ae)
                 with DumbCheckpoint(dirName + 'hdf5/residual_' + msc.indexString(cnt), mode=FILE_CREATE) as saveRes:
                     saveRes.store(rho_u)
@@ -343,11 +346,7 @@ if approach in ('hessianBased', 'explicit', 'adjointBased', 'goalBased'):
                 with DumbCheckpoint(dirName + 'hdf5/error_' + msc.indexString(cnt), mode=FILE_READ) as loadError:
                     loadError.load(epsilon)
                     loadError.close()
-                errEst = Function(FunctionSpace(mesh_H, "CG", 1))   # Estimate need be CG1 to feed into metric
-                if orderIncrease:
-                    errEst.interpolate(epsilon)
-                else:
-                    errEst.interpolate(inte.interp(mesh_H, epsilon)[0])
+                errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon)[0])
                 M = adap.isotropicMetric(W, errEst, op=op, invert=False)
             else:
                 if op.mtype != 's':
