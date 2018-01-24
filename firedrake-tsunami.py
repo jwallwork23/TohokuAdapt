@@ -44,7 +44,7 @@ if bootstrap:
     bootTimer = clock() - bootTimer
     print('Bootstrapping run time: %.3fs\n' % bootTimer)
 else:
-    i = 1
+    i = 0
 nEle = op.meshes[i]
 
 # Establish filenames
@@ -93,13 +93,12 @@ for gauge in gauges:
     v0[gauge] = float(eta.at(op.gaugeCoord(gauge)))
 
 if orderIncrease:
-    V_oi = VectorFunctionSpace(mesh_H, op.space1, op.degree1 + 1) * FunctionSpace(mesh_H, op.space2, op.degree2 + 1)
+    V_oi = VectorFunctionSpace(mesh_H, op.space1, op.degree1+1) * FunctionSpace(mesh_H, op.space2, op.degree2+1)
     q_oi = Function(V_oi)
     u_oi, eta_oi = q_oi.split()
     q__oi = Function(V_oi)
-    u__oi, eta__oi = q_oi.split()
-    b_oi = Function(V_oi).sub(1)
-    b_oi.interpolate(b)
+    u__oi, eta__oi = q__oi.split()
+    b_oi = Function(V_oi.sub(1)).interpolate(b)
     if useAdjoint:
         dual_oi = Function(V_oi)
         dual_oi_u, dual_oi_e = dual_oi.split()
