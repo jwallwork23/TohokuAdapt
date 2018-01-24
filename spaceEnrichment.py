@@ -26,9 +26,9 @@ u_H = Function(CG3, name='Approximation').interpolate(u_H_CG2)
 File("plots/approxHighOrder.pvd").write(u_H)
 f_H = Function(CG3).interpolate((1+8*pi*pi)*cos(x*pi*2)*cos(y*pi*2))
 v_H = TestFunction(FunctionSpace(mesh, "DG", 0))
-R_H = assemble(v_H * (- div(grad(u_H)) + u_H - f_H) * dx)
-R_H.rename("Residual by order increase")
-File("plots/residualOI.pvd").write(R_H)
+R = assemble(v_H * (- div(grad(u_H)) + u_H - f_H) * dx)
+R.rename("Residual by order increase")
+File("plots/residualOI.pvd").write(R)
 pTimer = clock() - pTimer
 
 # Interpolate solution into iso-P2 refined space
@@ -40,8 +40,9 @@ CG2_h = FunctionSpace(mesh_h, "CG", 2)
 f_h = Function(CG2_h).interpolate((1+8*pi*pi)*cos(x*pi*2)*cos(y*pi*2))
 v_h = TestFunction(FunctionSpace(mesh_h, "DG", 0))
 R_h = assemble(v_h * (- div(grad(u_h)) + u_h - f_h) * dx)
-R_h.rename("Residual by refinement")
-File("plots/residualRef.pvd").write(R_h)
+R_H = inte.interp(mesh_h, R_h)[0]
+R_H.rename("Residual by refinement")
+File("plots/residualRef.pvd").write(R_H)
 hTimer = clock() - hTimer
 
 print("""

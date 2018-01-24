@@ -228,7 +228,7 @@ Absolute total variation : %6.3f Relative total variation : %6.3f""" %
     plt.show()
 
 
-def errorVsElements(i=5):
+def errorVsElements():
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     plt.rc('legend', fontsize='x-large')
@@ -253,34 +253,33 @@ def errorVsElements(i=5):
     nEls[labels[4]] = [7963, 11051, 12841]
     tim[labels[4]] = [1459.3, 2245.1, 3306.4]
 
-    # Plot errors
-    cnt = 0
-    for mesh in labels:
-        plt.semilogy(nEls[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
-        cnt += 1
-        if cnt == i:
-            break
-    plt.gcf()
-    plt.legend(bbox_to_anchor=(0.6, 1.), loc=2)
-    plt.xlabel(r'Mean element count')
-    plt.ylabel(r'Relative error $\frac{|J(\textbf{q})-J(\textbf{q}_h)|}{|J(\textbf{q})|}$')
-    plt.xlim([0, 55000])
-    plt.ylim([0, 0.1])
-    plt.savefig('outdata/errorPlots/errorVsElements' + str(i) + '.pdf', bbox_inches='tight')
-    plt.show()
+    for i in range(1, 6):
+        # Plot errors
+        cnt = 0
+        for mesh in labels:
+            plt.semilogy(nEls[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
+            cnt += 1
+            if cnt == i:
+                break
+        plt.gcf()
+        plt.legend(bbox_to_anchor=(0.6, 1.), loc=2)
+        plt.xlabel(r'Mean element count')
+        plt.ylabel(r'Relative error $\frac{|J(\textbf{q})-J(\textbf{q}_h)|}{|J(\textbf{q})|}$')
+        plt.xlim([0, 55000])
+        plt.ylim([0, 0.1])
+        plt.savefig('outdata/errorPlots/errorVsElements' + str(i) + '.pdf', bbox_inches='tight')
 
-    # Plot timings
-    cnt = 0
-    for mesh in labels:
-        plt.loglog(nEls[mesh], tim[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
-        cnt += 1
-        if cnt == i:
-            break
-    plt.gcf()
-    # plt.legend(bbox_to_anchor=(0.2, -0.1), loc=4)
-    plt.xlabel(r'Mean element count')
-    plt.ylabel(r'CPU time (s)')
-    plt.xlim([0, 55000])
-    plt.ylim([0, 4000])
-    plt.savefig('outdata/errorPlots/timeVsElements' + str(i) + '.pdf', bbox_inches='tight')
-    plt.show()
+        # Plot timings
+        cnt = 0
+        for mesh in labels:
+            plt.loglog(nEls[mesh], tim[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
+            cnt += 1
+            if cnt == i:
+                break
+        plt.gcf()
+        # plt.legend(bbox_to_anchor=(0.2, -0.1), loc=4)
+        plt.xlabel(r'Mean element count')
+        plt.ylabel(r'CPU time (s)')
+        plt.xlim([0, 55000])
+        plt.ylim([0, 4000])
+        plt.savefig('outdata/errorPlots/timeVsElements' + str(i) + '.pdf', bbox_inches='tight')
