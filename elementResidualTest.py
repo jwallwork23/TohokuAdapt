@@ -41,7 +41,8 @@ v = TestFunction(DG2)
 B = (inner(grad(e_h), grad(v)) + e_h*v)*dx                          # LHS bilinear form on prognostic variable
 B_ = (inner(grad(u_h), grad(v)) + u_h*v)*dx                         # LHS form on data
 L = f*v*dx                                                          # RHS linear form
-I = interelementTerm(grad(u_h)*v, n=FacetNormal(mesh))*dS           # Interelement flux term
+# I = interelementTerm(grad(u_h)*v, n=FacetNormal(mesh))*dS           # Interelement flux term
+I = jump(grad(u_h)*v , n=FacetNormal(mesh))*dS
 F = B - L + B_ - I
 solve(F == 0, e_h)
 e_h.dat.data[:] = np.abs(e_h.dat.data)
