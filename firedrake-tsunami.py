@@ -21,6 +21,7 @@ approach, getData, getError, useAdjoint = msc.cheatCodes(input(
 tAdapt = False
 bootstrap = False
 outputOF = True
+orderIncrease = False   # For residual estimation
 
 # Define initial mesh and mesh statistics placeholders
 op = opt.Options(vscale=0.1 if approach == 'goalBased' else 0.85,
@@ -91,9 +92,21 @@ v0 = {}
 for gauge in gauges:
     v0[gauge] = float(eta.at(op.gaugeCoord(gauge)))
 
+if orderIncrease:
+    V_oi = VectorFunctionSpace(mesh_H, op.space1, op.degree1 + 1) * FunctionSpace(mesh_H, op.space2, op.degree2 + 1)
+    q_oi = Function(V_oi)
+    u_oi, eta_oi = q_oi.split()
+    q__oi = Function(V_oi)
+    u__oi, eta__oi = q_oi.split()
+    b_oi = Function(V_oi).sub(1)
+    b_oi.interpolate(b)
+    if useAdjoint:
+        dual_oi = Function(V_oi)
+        dual_oi_u, dual_oi_e = dual_oi.split()
+
 # Define Functions relating to goalBased approach
 if approach in ('explicit', 'goalBased'):
-    rho = Function(V_h)
+    rho = Function(V_oi) if orderIncrease else Function(V_h)
     rho_u, rho_e = rho.split()
     rho_u.rename("Velocity residual")
     rho_e.rename("Elevation residual")
@@ -153,22 +166,25 @@ if getData:
 
         # Approximate residual of forward equation and save to HDF5
         if cnt % rm == 0:
-            if approach in ('explicit', 'goalBased'):
-                qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
-                Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt)
+            if (approach in ('explicit', 'goalBased')):
+                if orderIncrease:
+                    u_oi.interpolate(u)
+                    eta_oi.interpolate(eta)
+                    u__oi.interpolate(u_)
+                    eta__oi.interpolate(eta_)
+                    Au, Ae = form.strongResidualSW(q_oi, q__oi, b_oi, Dt)
+                else:
+                    qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
+                    Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt)
                 rho_u.interpolate(Au)
                 rho_e.interpolate(Ae)
                 with DumbCheckpoint(dirName + 'hdf5/residual_' + msc.indexString(cnt), mode=FILE_CREATE) as saveRes:
                     saveRes.store(rho_u)
                     saveRes.store(rho_e)
-                    if approach == 'explicit':
-                        uh, eh = qh.split()
-                        saveRes.store(uh)
-                        saveRes.store(eh)
                     saveRes.close()
                 if op.plotpvd:
                     residualFile.write(rho_u, rho_e, time=t)
-            if approach in ('explicit', 'adjointBased'):
+            if (approach in ('explicit', 'adjointBased')):
                 with DumbCheckpoint(dirName + 'hdf5/forward_' + msc.indexString(cnt), mode=FILE_CREATE) as saveFor:
                     saveFor.store(u)
                     saveFor.store(eta)
@@ -213,7 +229,7 @@ if getData:
                 if cnt % rm == 0:
                     indexStr = msc.indexString(cnt)
                     dual.assign(variable, annotate=False)
-                    if approach == 'adjointBased':
+                    if (approach == 'adjointBased') or (orderIncrease and approach == 'goalBased'):
                         dual_u, dual_e = dual.split()
                         dual_u.rename('Adjoint velocity')
                         dual_e.rename('Adjoint elevation')
@@ -253,9 +269,9 @@ if getError:
         print('Generating error estimate %d / %d' % (k / rm + 1, iEnd / rm + 1))
         indexStr = msc.indexString(k)
 
-        # Load residual and adjoint data from HDF5
+        # Load forward / adjoint / residual data from HDF5
         if useAdjoint:
-            if approach == 'goalBased':
+            if (approach == 'goalBased') and not orderIncrease:
                 with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_READ) as loadAdj:
                     loadAdj.load(dual_h_u)
                     loadAdj.load(dual_h_e)
@@ -265,40 +281,37 @@ if getError:
                     loadAdjH.load(dual_u)
                     loadAdjH.load(dual_e)
                     loadAdjH.close()
-        if approach in ('explicit', 'goalBased'):
-            with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_READ) as loadRes:
-                loadRes.load(rho_u)
-                loadRes.load(rho_e)
-                loadRes.close()
-        if approach in ('explicit', 'adjointBased'):
+                if orderIncrease:
+                    dual_oi_u.interpolate(dual_u)
+                    dual_oi_e.interpolate(dual_e)
+        if (approach in ('explicit', 'adjointBased')):
             with DumbCheckpoint(dirName + 'hdf5/forward_' + indexStr, mode=FILE_READ) as loadFor:
                 loadFor.load(u)
                 loadFor.load(eta)
                 loadFor.close()
+        if (approach in ('explicit', 'goalBased')):
+            with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_READ) as loadRes:
+                    loadRes.load(rho_u)
+                    loadRes.load(rho_e)
+                    loadRes.close()
+
         if approach == 'adjointBased':
             epsilon = err.basicErrorEstimator(q, dual, v)
         elif approach == 'goalBased':
-            epsilon = err.DWR(rho, dual_h, v)
+            epsilon = err.DWR(rho, dual_oi if orderIncrease else dual_h, v)
         elif approach == 'explicit':
             epsilon = err.explicitErrorEstimator(q, rho, v)
 
         # Loop over relevant time window
-        if op.window:
+        if op.window and approach == 'adjointBased':
             for i in range(k, min(k+iEnd-iStart, iEnd), rm):
-                if approach == 'goalBased':
-                    with DumbCheckpoint(dirName + 'hdf5/adjoint_' + msc.indexString(i), mode=FILE_READ) as loadAdj:
-                        loadAdj.load(dual_h_u)
-                        loadAdj.load(dual_h_e)
-                        loadAdj.close()
-                    epsilon_ = err.DWR(rho, dual_h, v)
-                elif approach == 'adjointBased':
-                    with DumbCheckpoint(dirName + 'hdf5/adjoint_H_' + msc.indexString(i), mode=FILE_READ) as loadAdj:
-                        loadAdj.load(dual_u)
-                        loadAdj.load(dual_e)
-                        loadAdj.close()
-                    epsilon_ = err.basicErrorEstimator(q, dual, v)
-                for j in range(len(epsilon.dat.data)):
-                    epsilon.dat.data[j] = max(epsilon.dat.data[j], epsilon_.dat.data[j])
+                with DumbCheckpoint(dirName + 'hdf5/adjoint_H_' + msc.indexString(i), mode=FILE_READ) as loadAdj:
+                    loadAdj.load(dual_u)
+                    loadAdj.load(dual_e)
+                    loadAdj.close()
+                epsilon_ = err.basicErrorEstimator(q, dual, v)
+            for j in range(len(epsilon.dat.data)):
+                epsilon.dat.data[j] = max(epsilon.dat.data[j], epsilon_.dat.data[j])
         epsilon.dat.data[:] = np.abs(epsilon.dat.data) * nVerT / (np.abs(assemble(epsilon * dx)) or 1.)  # Normalise
         epsilon.rename("Error indicator")
 
@@ -330,7 +343,11 @@ if approach in ('hessianBased', 'explicit', 'adjointBased', 'goalBased'):
                 with DumbCheckpoint(dirName + 'hdf5/error_' + msc.indexString(cnt), mode=FILE_READ) as loadError:
                     loadError.load(epsilon)
                     loadError.close()
-                errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon)[0])
+                errEst = Function(FunctionSpace(mesh_H, "CG", 1))   # Estimate need be CG1 to feed into metric
+                if orderIncrease:
+                    errEst.interpolate(epsilon)
+                else:
+                    errEst.interpolate(inte.interp(mesh_H, epsilon)[0])
                 M = adap.isotropicMetric(W, errEst, op=op, invert=False)
             else:
                 if op.mtype != 's':

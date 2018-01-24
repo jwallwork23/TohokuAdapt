@@ -268,6 +268,7 @@ def errorVsElements():
         plt.xlim([0, 55000])
         plt.ylim([0, 0.1])
         plt.savefig('outdata/errorPlots/errorVsElements' + str(i) + '.pdf', bbox_inches='tight')
+        plt.clf()
 
         # Plot timings
         cnt = 0
@@ -283,3 +284,4 @@ def errorVsElements():
         plt.xlim([0, 55000])
         plt.ylim([0, 4000])
         plt.savefig('outdata/errorPlots/timeVsElements' + str(i) + '.pdf', bbox_inches='tight')
+        plt.clf()
