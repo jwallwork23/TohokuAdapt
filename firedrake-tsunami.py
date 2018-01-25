@@ -24,7 +24,7 @@ outputOF = True
 orderIncrease = False   # For residual estimation
 
 # Define initial mesh and mesh statistics placeholders
-op = opt.Options(vscale=0.05 if approach == 'goalBased' else 0.85,
+op = opt.Options(vscale=0.1 if approach == 'goalBased' else 0.85,
                  rm=60 if useAdjoint else 30,
                  gradate=True if (useAdjoint or approach == 'explicit') else False,
                  advect=False,
@@ -44,7 +44,7 @@ if bootstrap:
     bootTimer = clock() - bootTimer
     print('Bootstrapping run time: %.3fs\n' % bootTimer)
 else:
-    i = 3
+    i = 0
 nEle = op.meshes[i]
 
 # Establish filenames
@@ -186,11 +186,11 @@ if getData:
                     saveRes.close()
                 if op.plotpvd:
                     residualFile.write(rho_u, rho_e, time=t)
-            if (approach in ('explicit', 'adjointBased')):
-                with DumbCheckpoint(dirName + 'hdf5/forward_' + msc.indexString(cnt), mode=FILE_CREATE) as saveFor:
-                    saveFor.store(u)
-                    saveFor.store(eta)
-                    saveFor.close()
+        if (approach == 'adjointBased') or ((approach == 'explicit') and (cnt % rm == 0)):
+            with DumbCheckpoint(dirName + 'hdf5/forward_' + msc.indexString(cnt), mode=FILE_CREATE) as saveFor:
+                saveFor.store(u)
+                saveFor.store(eta)
+                saveFor.close()
 
         # Update solution at previous timestep
         q_.assign(q)
@@ -304,8 +304,8 @@ if getError:
             epsilon = err.explicitErrorEstimator(q_oi if orderIncrease else q, rho, v)
 
         # Loop over relevant time window
-        if op.window and approach == 'adjointBased':
-            for i in range(k, min(k+iEnd-iStart, iEnd), rm):
+        if op.window:
+            for i in range(k, min(k+iEnd-iStart, iEnd)):
                 with DumbCheckpoint(dirName + 'hdf5/adjoint_H_' + msc.indexString(i), mode=FILE_READ) as loadAdj:
                     loadAdj.load(dual_u)
                     loadAdj.load(dual_e)

@@ -232,8 +232,8 @@ def errorVsElements():
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     plt.rc('legend', fontsize='x-large')
-    labels = ("Fixed mesh", "Hessian based", "Adjoint based", "Goal based", "Explicit estimator")
-    styles = {labels[0]: 's', labels[1]: '^', labels[2]: 'x', labels[3]: 'o', labels[4]: '*'}
+    labels = ("Fixed mesh", "Hessian based", "Explicit estimator", "Adjoint based", "Goal based", "Goal based (h.o.)")
+    styles = {labels[0]: 's', labels[1]: '^', labels[2]: 'x', labels[3]: 'o', labels[4]: '*', labels[5]: 'h'}
     err = {}
     nEls = {}
     tim = {}
@@ -243,17 +243,20 @@ def errorVsElements():
     err[labels[1]] = [0.0046, 0.0064, 0.0014, 0.0069, 0.0059]
     nEls[labels[1]] = [7036, 12540, 18638, 23699, 38610]
     tim[labels[1]] = [202.7, 420.8, 359.9, 619.6, 1295.0]
-    err[labels[2]] = [0.0845, 0.0157, 0.0236, 0.0156]
-    nEls[labels[2]] = [3410, 10088, 16610, 18277]
-    tim[labels[2]] = [345.6, 562.4, 591.6, 1276.5]
-    err[labels[3]] = [0.0209, 0.0027, 0.0020, 0.0010]
-    nEls[labels[3]] = [3633, 12840, 27718, 43961]
-    tim[labels[3]] = [895.2, 1873.9, 2655.5, 3198.2]
-    err[labels[4]] = [0.0069, 0.0004, 0.0119]
-    nEls[labels[4]] = [7963, 11051, 12841]
-    tim[labels[4]] = [1459.3, 2245.1, 3306.4]
+    err[labels[2]] = [0.0069, 0.0119]
+    nEls[labels[2]] = [7963, 12841]
+    tim[labels[2]] = [1459.3, 3306.4]
+    err[labels[3]] = [0.0845, 0.0157, 0.0236, 0.0156]
+    nEls[labels[3]] = [3410, 10088, 16610, 18277]
+    tim[labels[3]] = [345.6, 562.4, 591.6, 1276.5]
+    err[labels[4]] = [0.0209, 0.0027, 0.0020, 0.0010]
+    nEls[labels[4]] = [3633, 12840, 27718, 43961]
+    tim[labels[4]] = [895.2, 1873.9, 2655.5, 3198.2]
+    err[labels[5]] = [0.0163, 0.0056, 0.0026]
+    nEls[labels[5]] = [8146, 11291, 41811]
+    tim[labels[5]] = [295.8, 548.9, 1445.5]
 
-    for i in range(1, 6):
+    for i in range(1, 7):
         # Plot errors
         cnt = 0
         for mesh in labels:
