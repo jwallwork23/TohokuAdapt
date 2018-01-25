@@ -24,7 +24,7 @@ outputOF = True
 orderIncrease = True   # For residual estimation
 
 # Define initial mesh and mesh statistics placeholders
-op = opt.Options(vscale=0.1 if approach == 'goalBased' else 0.85,
+op = opt.Options(vscale=0.05 if approach == 'goalBased' else 0.85,
                  rm=60 if useAdjoint else 30,
                  gradate=True if (useAdjoint or approach == 'explicit') else False,
                  advect=False,
@@ -44,7 +44,7 @@ if bootstrap:
     bootTimer = clock() - bootTimer
     print('Bootstrapping run time: %.3fs\n' % bootTimer)
 else:
-    i = 0
+    i = 2
 nEle = op.meshes[i]
 
 # Establish filenames
@@ -178,7 +178,7 @@ if getData:
                 else:
                     qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
                     Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt)
-                rho_u.interpolate(Au)   # TODO: could this just be an 'assign'?
+                rho_u.interpolate(Au)
                 rho_e.interpolate(Ae)
                 with DumbCheckpoint(dirName + 'hdf5/residual_' + msc.indexString(cnt), mode=FILE_CREATE) as saveRes:
                     saveRes.store(rho_u)
@@ -259,10 +259,6 @@ if getData:
         print('Adjoint run complete. Run time: %.3fs' % dualTimer)
         cnt += 1
 
-        # Reset initial conditions for primal problem and recreate error indicator placeholder
-        u_.interpolate(Expression([0, 0]))
-        eta_.interpolate(eta0)
-
 # Loop back over times to generate error estimators
 if getError:
     print('\nStarting error estimate generation')
@@ -291,18 +287,21 @@ if getError:
                 loadFor.load(u)
                 loadFor.load(eta)
                 loadFor.close()
+            if orderIncrease:
+                u_oi.interpolate(u)
+                eta_oi.interpolate(eta)
         if (approach in ('explicit', 'goalBased')):
             with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_READ) as loadRes:
-                    loadRes.load(rho_u)
-                    loadRes.load(rho_e)
-                    loadRes.close()
+                loadRes.load(rho_u)
+                loadRes.load(rho_e)
+                loadRes.close()
 
         if approach == 'adjointBased':
             epsilon = err.basicErrorEstimator(q, dual, v)
         elif approach == 'goalBased':
             epsilon = err.DWR(rho, dual_oi if orderIncrease else dual_h, v)
         elif approach == 'explicit':
-            epsilon = err.explicitErrorEstimator(q, rho, v)
+            epsilon = err.explicitErrorEstimator(q_oi if orderIncrease else q, rho, v)
 
         # Loop over relevant time window
         if op.window and approach == 'adjointBased':
@@ -327,7 +326,13 @@ if getError:
     print('Errors estimated. Run time: %.3fs' % errorTimer)
 
 if approach in ('hessianBased', 'explicit', 'adjointBased', 'goalBased'):
-    t = 0.
+
+    # Reset initial conditions
+    if approach != 'hessianBased':
+        t = 0.
+        u_.interpolate(Expression([0, 0]))
+        eta_.interpolate(eta0)
+        
     J_trap = 0.
     started = False
     if op.gradate:
