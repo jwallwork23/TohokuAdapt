@@ -21,7 +21,7 @@ approach, getData, getError, useAdjoint = msc.cheatCodes(input(
 tAdapt = False
 bootstrap = False
 outputOF = True
-orderIncrease = True   # For residual estimation
+orderIncrease = False   # For residual estimation
 
 # Define initial mesh and mesh statistics placeholders
 op = opt.Options(vscale=0.05 if approach == 'goalBased' else 0.85,
@@ -44,7 +44,7 @@ if bootstrap:
     bootTimer = clock() - bootTimer
     print('Bootstrapping run time: %.3fs\n' % bootTimer)
 else:
-    i = 2
+    i = 3
 nEle = op.meshes[i]
 
 # Establish filenames
@@ -332,7 +332,7 @@ if approach in ('hessianBased', 'explicit', 'adjointBased', 'goalBased'):
         t = 0.
         u_.interpolate(Expression([0, 0]))
         eta_.interpolate(eta0)
-        
+
     J_trap = 0.
     started = False
     if op.gradate:

@@ -49,27 +49,25 @@ def cheatCodes(approach, default='goalBased'):
     return approach, getData, getError, useAdjoint
 
 
-def printTimings(primalTimer, dualTimer, errorTimer, adaptTimer, bootTimer=False):
+def printTimings(primal, dual=False, error=False, adapt=False, boot=False):
     """
     Print timings for the various sections of code.
     
-    :arg primalTimer: primal solver.
-    :arg dualTimer: dual solver.
-    :arg errorTimer: error estimation phase.
-    :arg adaptTimer: adaptive primal solver.
-    :arg bootTimer: bootstrapping routine.
+    :arg primal: primal solver.
+    :arg dual: dual solver.
+    :arg error: error estimation phase.
+    :arg adapt: adaptive primal solver.
+    :arg boot: bootstrapping routine.
     :return: 
     """
     print("TIMINGS:")
-    if bool(bootTimer):
-        print("""
-        Bootstrap run %5.3fs""" % (bootTimer))
-    else:
-        bootTimer = 0
-    print("""
-        Forward run   %5.3fs,
-        Adjoint run   %5.3fs, 
-        Error run     %5.3fs,
-        Adaptive run  %5.3fs
-        Total         %5.3fs\n""" % (primalTimer, dualTimer, errorTimer, adaptTimer,
-                                     primalTimer + dualTimer + errorTimer + adaptTimer + bootTimer))
+    if bool(boot):
+        print("Bootstrap run %5.3fs" % boot)
+    print("Forward run   %5.3fs" % primal)
+    if bool(dual):
+        print("Adjoint run   %5.3fs" % dual)
+    if bool(error):
+        print("Error run     %5.3fs" % error)
+    if bool(adapt):
+        print("Adaptive run  %5.3fs" % adapt)
+    print("Total         %5.3fs\n" % (primal + float(dual) + float(error) + float(adapt) + float(boot)))    ,
