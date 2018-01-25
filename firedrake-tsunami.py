@@ -186,11 +186,11 @@ if getData:
                     saveRes.close()
                 if op.plotpvd:
                     residualFile.write(rho_u, rho_e, time=t)
-        if (approach == 'adjointBased') or ((approach == 'explicit') and (cnt % rm == 0)):
-            with DumbCheckpoint(dirName + 'hdf5/forward_' + msc.indexString(cnt), mode=FILE_CREATE) as saveFor:
-                saveFor.store(u)
-                saveFor.store(eta)
-                saveFor.close()
+            if approach in ('adjointBased', 'explicit'):
+                with DumbCheckpoint(dirName + 'hdf5/forward_' + msc.indexString(cnt), mode=FILE_CREATE) as saveFor:
+                    saveFor.store(u)
+                    saveFor.store(eta)
+                    saveFor.close()
 
         # Update solution at previous timestep
         q_.assign(q)
@@ -228,26 +228,26 @@ if getData:
         for (variable, solution) in compute_adjoint(J):
             if save:
                 # Load adjoint data and save to HDF5
-                if cnt % rm == 0:
-                    indexStr = msc.indexString(cnt)
-                    dual.assign(variable, annotate=False)
-                    if (approach == 'adjointBased') or (orderIncrease and approach == 'goalBased'):
-                        dual_u, dual_e = dual.split()
-                        dual_u.rename('Adjoint velocity')
-                        dual_e.rename('Adjoint elevation')
-                        with DumbCheckpoint(dirName + 'hdf5/adjoint_H_' + indexStr, mode=FILE_CREATE) as saveAdjH:
-                            saveAdjH.store(dual_u)
-                            saveAdjH.store(dual_e)
-                            saveAdjH.close()
-                    else:
-                        dual_h = inte.mixedPairInterp(mesh_h, V_h, dual)[0]
-                        dual_h_u, dual_h_e = dual_h.split()
-                        dual_h_u.rename('Fine adjoint velocity')
-                        dual_h_e.rename('Fine adjoint elevation')
-                        with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_CREATE) as saveAdj:
-                            saveAdj.store(dual_h_u)
-                            saveAdj.store(dual_h_e)
-                            saveAdj.close()
+                indexStr = msc.indexString(cnt)
+
+                dual.assign(variable, annotate=False)
+                if op.window or ((orderIncrease or approach == 'adjointBased') and cnt % rm == 0):
+                    dual_u, dual_e = dual.split()
+                    dual_u.rename('Adjoint velocity')
+                    dual_e.rename('Adjoint elevation')
+                    with DumbCheckpoint(dirName + 'hdf5/adjoint_H_' + indexStr, mode=FILE_CREATE) as saveAdjH:
+                        saveAdjH.store(dual_u)
+                        saveAdjH.store(dual_e)
+                        saveAdjH.close()
+                elif (approach == 'goalBased') and cnt % rm == 0:
+                    dual_h = inte.mixedPairInterp(mesh_h, V_h, dual)[0]
+                    dual_h_u, dual_h_e = dual_h.split()
+                    dual_h_u.rename('Fine adjoint velocity')
+                    dual_h_e.rename('Fine adjoint elevation')
+                    with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_CREATE) as saveAdj:
+                        saveAdj.store(dual_h_u)
+                        saveAdj.store(dual_h_e)
+                        saveAdj.close()
                     print('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT * 100))
                 cnt -= 1
                 save = False
