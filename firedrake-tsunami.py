@@ -22,6 +22,7 @@ tAdapt = False
 bootstrap = False
 outputOF = True
 orderIncrease = False   # For residual estimation
+bootTimer = primalTimer = dualTimer = errorTimer = adaptTimer = False
 
 # Define initial mesh and mesh statistics placeholders
 op = opt.Options(vscale=0.1 if approach == 'goalBased' else 0.85,
@@ -29,7 +30,7 @@ op = opt.Options(vscale=0.1 if approach == 'goalBased' else 0.85,
                  gradate=True if (useAdjoint or approach == 'explicit') else False,
                  advect=False,
                  window=True if approach == 'adjointBased' else False,
-                 outputHessian=False,
+                 outputMetric=False,
                  plotpvd=True,
                  gauges=False,
                  ndump=10,
@@ -54,8 +55,8 @@ if op.plotpvd:
     residualFile = File(dirName + "residual.pvd")
     errorFile = File(dirName + "errorIndicator.pvd")
 adaptiveFile = File(dirName + approach + ".pvd")
-if op.outputHessian:
-    hessianFile = File(dirName + "hessian.pvd")
+if op.outputMetric:
+    metricFile = File(dirName + "metric.pvd")
 
 # Load Mesh(es)
 mesh_H, eta0, b = msh.TohokuDomain(nEle)        # Computational mesh
@@ -375,6 +376,9 @@ if approach in ('hessianBased', 'explicit', 'adjointBased', 'goalBased'):
             if op.advect:
                 M = adap.advectMetric(M, u, 2*Dt, n=3*rm)
                 # TODO: isotropic advection?
+            if op.outputMetric:
+                M.rename("Metric")
+                metricFile.write(M, time=t)
 
             # Adapt mesh and interpolate variables
             mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
@@ -433,11 +437,9 @@ if approach in ('hessianBased', 'explicit', 'adjointBased', 'goalBased'):
     print('J_h = %5.4e' % J_h)
     print('Relative error = %5.4f' % (np.abs(J - J_h) / J))
 
-# Print to screen timing analyses
-if getData and useAdjoint:
-    msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer)
-
-# Save and plot timeseries
-name = input("Enter a name for these time series (e.g. 'goalBased8-12-17'): ") or 'test'
-for gauge in gauges:
-    tim.saveTimeseries(gauge, gaugeData, name=name)
+# Print to screen timing analyses and plot timeseries
+msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer, bootTimer)
+if op.gauges:
+    name = input("Enter a name for these time series (e.g. 'goalBased8-12-17'): ") or 'test'
+    for gauge in gauges:
+        tim.saveTimeseries(gauge, gaugeData, name=name)

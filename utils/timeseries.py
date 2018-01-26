@@ -243,9 +243,9 @@ def errorVsElements():
     err[labels[1]] = [0.0046, 0.0064, 0.0014, 0.0069, 0.0059]
     nEls[labels[1]] = [7036, 12540, 18638, 23699, 38610]
     tim[labels[1]] = [202.7, 420.8, 359.9, 619.6, 1295.0]
-    err[labels[2]] = [0.0069, 0.0119]
-    nEls[labels[2]] = [7963, 12841]
-    tim[labels[2]] = [1459.3, 3306.4]
+    err[labels[2]] = [0.0069, 0.0119, 0.0081]
+    nEls[labels[2]] = [7963, 12841, 30855]
+    tim[labels[2]] = [1459.3, 3306.4, 4662.5]
     err[labels[3]] = [0.0845, 0.0157, 0.0236, 0.0156]
     nEls[labels[3]] = [3410, 10088, 16610, 18277]
     tim[labels[3]] = [345.6, 562.4, 591.6, 1276.5]
@@ -260,12 +260,12 @@ def errorVsElements():
         # Plot errors
         cnt = 0
         for mesh in labels:
-            plt.semilogy(nEls[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
+            plt.loglog(nEls[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
             cnt += 1
             if cnt == i:
                 break
         plt.gcf()
-        plt.legend(bbox_to_anchor=(0.6, 1.), loc=2)
+        plt.legend(bbox_to_anchor=(0.6, 1.1), loc=2)
         plt.xlabel(r'Mean element count')
         plt.ylabel(r'Relative error $\frac{|J(\textbf{q})-J(\textbf{q}_h)|}{|J(\textbf{q})|}$')
         plt.xlim([0, 55000])
@@ -285,6 +285,6 @@ def errorVsElements():
         plt.xlabel(r'Mean element count')
         plt.ylabel(r'CPU time (s)')
         plt.xlim([0, 55000])
-        plt.ylim([0, 4000])
+        plt.ylim([0, 5000])
         plt.savefig('outdata/errorPlots/timeVsElements' + str(i) + '.pdf', bbox_inches='tight')
         plt.clf()

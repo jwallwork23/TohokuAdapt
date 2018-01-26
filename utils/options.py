@@ -23,7 +23,7 @@ class Options:
                  hessMeth='dL2',
                  beta=1.4,
                  gamma=1.,
-                 outputHessian=False,
+                 outputMetric=False,
                  plotpvd=True,
                  gauges=False,
                  Tstart=300.,
@@ -48,7 +48,7 @@ class Options:
         :param hessMeth: Method of Hessian reconstruction: 'dL2' or 'parts'.
         :param beta: metric gradation scaling parameter.
         :param gamma: metric rescaling parameter.
-        :param outputHessian: toggle saving Hessian to PVD.
+        :param outputMetric: toggle saving metric to PVD.
         :param plotpvd: toggle saving solution fields to PVD.
         :param gauges: toggle saving of elevation to HDF5 for timeseries analysis. 
         :param Tstart: Lower time range limit (s), before which we can assume the wave won't reach the shore.
@@ -117,7 +117,7 @@ class Options:
             assert (beta > 1) & (gamma > 0)
         except:
             raise ValueError('Invalid value for scaling parameter.')
-        self.outputHessian = outputHessian
+        self.outputMetric = outputMetric
         self.plotpvd=plotpvd
         self.gauges = gauges
 
