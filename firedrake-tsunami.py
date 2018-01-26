@@ -35,7 +35,7 @@ op = opt.Options(vscale=0.1 if approach == 'goalBased' else 0.85,
                  gauges=False,
                  ndump=10,
                  mtype='s',     # Best approach for tsunami modelling
-                 iso=False)
+                 iso=False if approach == 'hessianBased' else True)
 
 # Establish initial mesh resolution
 if bootstrap:
@@ -371,7 +371,7 @@ if approach in ('hessianBased', 'explicit', 'adjointBased', 'goalBased'):
             if op.gradate:
                 M_ = adap.isotropicMetric(W, inte.interp(mesh_H, H0)[0], bdy=True, op=op) # Initial boundary metric
                 M = adap.metricIntersection(mesh_H, W, M, M_, bdy=True)
-                adap.metricGradation(mesh_H, M)
+                adap.metricGradation(mesh_H, M, iso=op.iso)
                 # TODO: always gradate to coast
             if op.advect:
                 M = adap.advectMetric(M, u, 2*Dt, n=3*rm)
