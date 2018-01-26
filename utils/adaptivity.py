@@ -260,7 +260,7 @@ def metricGradation(mesh, M, beta=1.4, iso=False):
             if iso:
                 eta2_12 = 1. / pow(1 + (v12[0] * v12[0] + v12[1] * v12[1]) * ln_beta / met1[0, 0], 2)
                 eta2_21 = 1. / pow(1 + (v21[0] * v21[0] + v21[1] * v21[1]) * ln_beta / met2[0, 0], 2)
-                redMet1 = eta2_12 * met2
+                redMet1 = eta2_12 * met2                        # TODO: should this ^^^ be a multiplication?
                 redMet2 = eta2_21 * met1
             else:
                 # Intersect metric with a scaled 'grown' metric to get reduced metric

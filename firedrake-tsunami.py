@@ -35,7 +35,8 @@ op = opt.Options(vscale=0.1 if approach == 'goalBased' else 0.85,
                  gauges=False,
                  ndump=10,
                  mtype='s',     # Best approach for tsunami modelling
-                 iso=False if approach == 'hessianBased' else True)
+                 # iso=False if approach == 'hessianBased' else True,       # TODO: fix isotropic gradation
+                 iso=False)
 
 # Establish initial mesh resolution
 if bootstrap:
