@@ -481,6 +481,14 @@ def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEul
     return M_
 
 
+def metricComplexity(M):
+    """
+    :param M: metric field.
+    :return: Complexity thereof. This provides a continuous analogue for the number of mesh vertices.
+    """
+    return assemble(sqrt(det(M)) * dx)
+
+
 def adaptTimestepSW(mesh, b, sigma=0.9, g=9.81):
     """
     :arg mesh: Current (recently adapted) mesh.
