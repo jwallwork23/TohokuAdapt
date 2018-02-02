@@ -95,7 +95,8 @@ for gauge in gauges:
     v0[gauge] = float(eta.at(op.gaugeCoord(gauge)))
 
 if orderChange:
-    V_oi = VectorFunctionSpace(mesh_H, op.space1, op.degree1+1) * FunctionSpace(mesh_H, op.space2, op.degree2+1)
+    V_oi = VectorFunctionSpace(mesh_H, op.space1, op.degree1+tAdapt) \
+           * FunctionSpace(mesh_H, op.space2, op.degree2+tAdapt)
     q_oi = Function(V_oi)
     u_oi, eta_oi = q_oi.split()
     q__oi = Function(V_oi)
@@ -140,6 +141,7 @@ hmin = op.hmin
 hmax = op.hmax
 rm = op.rm
 if tAdapt:
+    # TODO: t-adaptive goal-based needs to acknowledge timestep change in initial run
     raise NotImplementedError("Mesh adaptive routines not quite calibrated for t-adaptivity")
 else:
     iStart = int(op.Tstart / dt)
