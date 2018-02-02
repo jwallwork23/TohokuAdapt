@@ -186,6 +186,9 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=F
     return B - L
 
 
+# TODO: Conisder 2D linear dispersive SWEs as in Saito '10a
+
+
 def interelementTerm(v, n=None):
     """
     :arg v: Function to be averaged over element boundaries.

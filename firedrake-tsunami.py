@@ -21,7 +21,7 @@ approach, getData, getError, useAdjoint = msc.cheatCodes(input(
 tAdapt = False
 bootstrap = False
 outputOF = True
-orderIncrease = False   # For residual estimation
+orderChange = -1   # +1 corresponds to increasing order in residual approxn, -1 corresponds to reducting
 bootTimer = primalTimer = dualTimer = errorTimer = adaptTimer = False
 
 # Define initial mesh and mesh statistics placeholders
@@ -94,7 +94,7 @@ v0 = {}
 for gauge in gauges:
     v0[gauge] = float(eta.at(op.gaugeCoord(gauge)))
 
-if orderIncrease:
+if orderChange:
     V_oi = VectorFunctionSpace(mesh_H, op.space1, op.degree1+1) * FunctionSpace(mesh_H, op.space2, op.degree2+1)
     q_oi = Function(V_oi)
     u_oi, eta_oi = q_oi.split()
@@ -107,7 +107,7 @@ if orderIncrease:
 
 # Define Functions relating to goalBased approach
 if approach in ('explicit', 'goalBased'):
-    rho = Function(V_oi if orderIncrease else V_h)
+    rho = Function(V_oi if orderChange else V_h)
     rho_u, rho_e = rho.split()
     rho_u.rename("Velocity residual")
     rho_e.rename("Elevation residual")
@@ -128,7 +128,7 @@ if useAdjoint:
     dual_e.rename("Adjoint elevation")
     J = form.objectiveFunctionalSW(q, plot=True)
 if approach in ('explicit', 'adjointBased', 'goalBased'):
-    if approach == 'adjointBased' or orderIncrease:
+    if approach == 'adjointBased' or orderChange:
         P0 = FunctionSpace(mesh_H, "DG", 0)
     else:
         P0 = FunctionSpace(mesh_h, "DG", 0)
@@ -171,7 +171,7 @@ if getData:
         # Approximate residual of forward equation and save to HDF5
         if cnt % rm == 0:
             if (approach in ('explicit', 'goalBased')):
-                if orderIncrease:
+                if orderChange:
                     u_oi.interpolate(u)
                     eta_oi.interpolate(eta)
                     u__oi.interpolate(u_)
@@ -233,7 +233,7 @@ if getData:
                 indexStr = msc.indexString(cnt)
 
                 dual.assign(variable, annotate=False)
-                if op.window or ((orderIncrease or approach == 'adjointBased') and cnt % rm == 0):
+                if op.window or ((orderChange or approach == 'adjointBased') and cnt % rm == 0):
                     dual_u, dual_e = dual.split()
                     dual_u.rename('Adjoint velocity')
                     dual_e.rename('Adjoint elevation')
@@ -271,7 +271,7 @@ if getError:
 
         # Load forward / adjoint / residual data from HDF5
         if useAdjoint:
-            if (approach == 'goalBased') and not orderIncrease:
+            if (approach == 'goalBased') and not orderChange:
                 with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_READ) as loadAdj:
                     loadAdj.load(dual_h_u)
                     loadAdj.load(dual_h_e)
@@ -281,7 +281,7 @@ if getError:
                     loadAdjH.load(dual_u)
                     loadAdjH.load(dual_e)
                     loadAdjH.close()
-                if orderIncrease:
+                if orderChange:
                     dual_oi_u.interpolate(dual_u)
                     dual_oi_e.interpolate(dual_e)
         if (approach in ('explicit', 'adjointBased')):
@@ -289,7 +289,7 @@ if getError:
                 loadFor.load(u)
                 loadFor.load(eta)
                 loadFor.close()
-            if orderIncrease:
+            if orderChange:
                 u_oi.interpolate(u)
                 eta_oi.interpolate(eta)
         if (approach in ('explicit', 'goalBased')):
@@ -301,9 +301,9 @@ if getError:
         if approach == 'adjointBased':
             epsilon = err.basicErrorEstimator(q, dual, v)
         elif approach == 'goalBased':
-            epsilon = err.DWR(rho, dual_oi if orderIncrease else dual_h, v)
+            epsilon = err.DWR(rho, dual_oi if orderChange else dual_h, v)
         elif approach == 'explicit':
-            epsilon = err.explicitErrorEstimator(q_oi if orderIncrease else q, rho, v)
+            epsilon = err.explicitErrorEstimator(q_oi if orderChange else q, rho, v)
 
         # Loop over relevant time window
         if op.window:
