@@ -477,4 +477,7 @@ if __name__ == '__main__':
                      iso=False)
 
     # Run simulation(s)
-    av, rel = firedrakeTsunami(1, approach, getData, getError, useAdjoint, op=op)
+    maxRes = 3
+    for i in range(maxRes):
+        av, rel = firedrakeTsunami(i, approach, getData, getError, useAdjoint, op=op)
+        print('Run %d:  Mean element count %d       Relative error %.4f' % (i, av, rel))
