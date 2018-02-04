@@ -171,13 +171,22 @@ def isotropicMetric(V, f, bdy=False, op=None, invert=True):
 get a degree 1 Lagrange metric.""" % (deg, family))
         g.interpolate(f)
     for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(len(g.dat.data)):
-        if invert:
-            alpha = 1. / max(hmin2, min(pow(g.dat.data[i], 2), hmax2))
-        else:
-            alpha = max(1. / hmax2, min(g.dat.data[i], 1. / hmin2))
-            # alpha = 1. / max(hmin2, min(pow(1. / g.dat.data[i], 2), hmax2))
+        shape = len(f.ufl_element().value_shape())
+        if shape == 0:
+            if invert:
+                alpha = 1. / max(hmin2, min(pow(g.dat.data[i], 2), hmax2))
+            else:
+                alpha = max(1. / hmax2, min(g.dat.data[i], 1. / hmin2))
+            beta = alpha
+        elif shape == 2:
+            if invert:
+                alpha = 1. / max(hmin2, min(pow(g.dat.data[0, i], 2), hmax2))
+                beta = 1. / max(hmin2, min(pow(g.dat.data[1, i], 2), hmax2))
+            else:
+                alpha = max(1. / hmax2, min(g.dat.data[0, i], 1. / hmin2))
+                beta = max(1. / hmax2, min(g.dat.data[1, i], 1. / hmin2))
         M.dat.data[i][0, 0] = alpha
-        M.dat.data[i][1, 1] = alpha
+        M.dat.data[i][1, 1] = beta
     return M
 
 

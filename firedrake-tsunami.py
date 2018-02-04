@@ -21,7 +21,6 @@ date = str(now.day)+'-'+str(now.month)+'-'+str(now.year%2000)
 
 # TODO: Create a reader / plotter.
 
-# TODO: (Static) mesh adaption to gradated bathymetry (or gradients thereof).
 # TODO: Homotopy method to consider a convex combination of error estimators?
 
 def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint=True, op=opt.Options()):
@@ -63,6 +62,12 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
 
     # Load Mesh(es)
     mesh_H, eta0, b = msh.TohokuDomain(nEle)    # Computational mesh
+    if op.bAdapt:                                   # TODO: adapt to gradients in bathymetry?
+        W = TensorFunctionSpace(mesh_H, "CG", 1)
+        H = adap.constructHessian(mesh_H, W, b, op=op)
+        M = adap.computeSteadyMetric(mesh_H, W, H, b, op=op)
+        adap.metricGradation(mesh_H, M)
+        mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
     if approach in ('explicit', 'goalBased'):
         mesh_h = adap.isoP2(mesh_H)             # Finer mesh (h < H) upon which to approximate error
         b_h = msh.TohokuDomain(mesh=mesh_h)[2]

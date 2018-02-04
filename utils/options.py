@@ -21,6 +21,7 @@ class Options:
                  gradate=False,
                  window=False,
                  tAdapt=False,
+                 bAdapt=False,
                  bootstrap=False,
                  outputOF=True,
                  printStats=True,
@@ -50,6 +51,7 @@ class Options:
         :param advect: Toggle metric advection.
         :param gradate: Toggle metric gradation.
         :param window: generate error estimators over a time window of relevance.
+        :param bAdapt: adapt initial mesh to bathymetry profile.
         :param tAdapt: implement adaptive timestepping.
         :param bootstrap: implement mesh bootstrapping to establish initial mesh.
         :param outputOF: print objective functional value to screen.
@@ -116,14 +118,16 @@ class Options:
         self.gradate = gradate
         self.window = window
         self.tAdapt = tAdapt
+        self.bAdapt = bAdapt
         self.bootstrap = bootstrap
         self.outputOF = outputOF
         self.printStats = printStats
         self.outputMetric = outputMetric
         self.plotpvd = plotpvd
         self.gauges = gauges
-        assert(type(advect) == type(gradate) == type(window) == type(iso) == type(tAdapt) == type(bootstrap)
-               == type(outputOF) == type(printStats) == type(outputMetric) == type(plotpvd) == type(gauges) == bool)
+        assert(type(advect) == type(gradate) == type(window) == type(iso) == type(tAdapt) == type(bAdapt)
+               == type(bootstrap) == type(outputOF) == type(printStats) == type(outputMetric) == type(plotpvd)
+               == type(gauges) == bool)
         self.hessMeth = hessMeth
         try:
             assert hessMeth in ('dL2', 'parts')
