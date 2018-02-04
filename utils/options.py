@@ -15,7 +15,7 @@ class Options:
                  a=100,
                  ntype='lp',
                  p=2,
-                 mtype='s',
+                 mtype='s',         # Best approach for tsunami modelling
                  iso=False,
                  advect=False,
                  gradate=False,
@@ -181,6 +181,9 @@ class Options:
 
         # Mesh element counts currently generated in QMESH
         self.meshes = (6176, 8782, 11020, 16656, 20724, 33784, 52998, 81902, 129442, 196560, 450386, 691750)
+
+        # Objective functional value for Tohoku problem converged to 3 s.f. on a mesh with 200k elements
+        self.J = 2.4391e+13
 
     def gaugeCoord(self, gauge):
         """

@@ -17,14 +17,14 @@ import utils.timeseries as tim
 
 # TODO: Automatically write outputs to a text file. Create experiment routines. Also create a reader / plotter.
 
-# TODO: Error estimation based ONLY on flux jumps
 # TODO: (Static) mesh adaption to gradated bathymetry (or gradients thereof).
 # TODO: Homotopy method to consider a convex combination of error estimators?
 
-def firedrakeTsunami(approach, getData=True, getError=True, useAdjoint=True, op=opt.Options()):
+def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint=True, op=opt.Options()):
     """
     Run mesh adaptive simulations for the Tohoku problem.
     
+    :param startRes: Starting resolution, if bootstrapping is not used.
     :param approach: meshing method.
     :param getData: run forward simulation?
     :param getError: generate error estimates?
@@ -41,13 +41,11 @@ def firedrakeTsunami(approach, getData=True, getError=True, useAdjoint=True, op=
         bootTimer = clock()
         if op.printStats:
             print('\nBootstrapping to establish optimal mesh resolution')
-        i = boot.op.bootstrap('firedrake-tsunami', tol=2e10)[0]
+        startRes = boot.op.bootstrap('firedrake-tsunami', tol=2e10)[0]
         bootTimer = clock() - bootTimer
         if op.printStats:
             print('Bootstrapping run time: %.3fs\n' % bootTimer)
-    else:
-        i = 1
-    nEle = op.meshes[i]
+    nEle = op.meshes[startRes]
 
     # Establish filenames
     dirName = 'plots/firedrake-tsunami/'
@@ -133,7 +131,7 @@ def firedrakeTsunami(approach, getData=True, getError=True, useAdjoint=True, op=
         dual_u.rename("Adjoint velocity")
         dual_e.rename("Adjoint elevation")
         J = form.objectiveFunctionalSW(q, plot=True)
-    if approach in ('explicit', 'adjointBased', 'goalBased'):
+    if approach in ('explicit', 'fluxJump', 'adjointBased', 'goalBased'):
         if approach == 'adjointBased' or op.orderChange:
             P0 = FunctionSpace(mesh_H, "DG", 0)
         else:
@@ -185,7 +183,7 @@ def firedrakeTsunami(approach, getData=True, getError=True, useAdjoint=True, op=
                         saveRes.close()
                     if op.plotpvd:
                         residualFile.write(rho_u, rho_e, time=t)
-                if approach in ('adjointBased', 'explicit'):
+                if approach in ('adjointBased', 'explicit', 'fluxJump'):
                     with DumbCheckpoint(dirName + 'hdf5/forward_' + msc.indexString(cnt), mode=FILE_CREATE) as saveFor:
                         saveFor.store(u)
                         saveFor.store(eta)
@@ -287,7 +285,7 @@ def firedrakeTsunami(approach, getData=True, getError=True, useAdjoint=True, op=
                     if op.orderChange:
                         dual_oi_u.interpolate(dual_u)
                         dual_oi_e.interpolate(dual_e)
-            if (approach in ('explicit', 'adjointBased')):
+            if (approach in ('explicit', 'fluxJump', 'adjointBased')):
                 with DumbCheckpoint(dirName + 'hdf5/forward_' + indexStr, mode=FILE_READ) as loadFor:
                     loadFor.load(u)
                     loadFor.load(eta)
@@ -307,6 +305,8 @@ def firedrakeTsunami(approach, getData=True, getError=True, useAdjoint=True, op=
                 epsilon = err.DWR(rho, dual_oi if op.orderChange else dual_h, v)
             elif approach == 'explicit':
                 epsilon = err.explicitErrorEstimator(q_oi if op.orderChange else q, rho, v)
+            elif approach == 'fluxJump':
+                epsilon = err.fluxJumpError(q, v)
 
             # Loop over relevant time window
             if op.window:
@@ -439,8 +439,7 @@ def firedrakeTsunami(approach, getData=True, getError=True, useAdjoint=True, op=
             cnt += 1
         adaptTimer = clock() - adaptTimer
         J_h = J_trap * dt
-        J = 2.4391e+13      # Objective functional value converged to 3s.f.
-        rel = np.abs((J - J_h) / J)
+        rel = np.abs((J - J_h) / op.J)
         if op.printStats:
             print('Adaptive primal run complete. Run time: %.3fs \nRelative error = %5.4f' % (adaptTimer, rel))
 
@@ -457,7 +456,7 @@ if __name__ == '__main__':
 
     # Choose mode and set parameter values
     approach, getData, getError, useAdjoint = msc.cheatCodes(input(
-        "Choose error estimator: 'hessianBased', 'explicit', 'adjointBased' or 'goalBased': "))
+        "Choose error estimator: 'hessianBased', 'explicit', 'fluxJump', 'adjointBased' or 'goalBased': "))
     op = opt.Options(vscale=0.1 if approach == 'goalBased' else 0.85,
                      rm=60 if useAdjoint else 30,
                      gradate=True if (useAdjoint or approach == 'explicit') else False,
@@ -469,11 +468,10 @@ if __name__ == '__main__':
                      tAdapt=False,
                      bootstrap=False,
                      outputOF=True,
-                     orderChange=-1,    # For residual approximation
+                     orderChange=-1,
                      ndump=10,
-                     mtype='s',         # Best approach for tsunami modelling
                      # iso=False if approach == 'hessianBased' else True,       # TODO: fix isotropic gradation
                      iso=False)
 
     # Run simulation(s)
-    firedrakeTsunami(approach, getData, getError, useAdjoint, op=op)
+    av, rel = firedrakeTsunami(1, approach, getData, getError, useAdjoint, op=op)

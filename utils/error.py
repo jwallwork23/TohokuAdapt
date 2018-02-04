@@ -39,6 +39,29 @@ def explicitErrorEstimator(q, residual, v):
     return assemble(sqrt(resTerm + jumpTerm))
 
 
+def fluxJumpError(q, v):
+    """
+    Estimate error locally by flux jump.
+
+    :arg q: primal approximation at current timestep.
+    :arg v: P0 test function over the same function space.
+    :return: field of local error indicators.
+    """
+    V = q.function_space()
+    mesh = V.mesh()
+    h = CellSize(mesh)
+    n = FacetNormal(mesh)
+
+    # Compute boundary residual term on fine mesh
+    qh = interpolation.mixedPairInterp(mesh, V, q)[0]
+    uh, etah = qh.split()
+    j0 = assemble(jump(v * grad(uh[0]), n=n) * dS)
+    j1 = assemble(jump(v * grad(uh[1]), n=n) * dS)
+    j2 = assemble(jump(v * grad(etah), n=n) * dS)
+
+    return np.abs(assemble(v * h * (j0 * j0 + j1 * j1 + j2 * j2) * dx))
+
+
 def DWR(residual, adjoint, v):
     """
     :arg residual: approximation of residual for primal equations. 

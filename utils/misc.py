@@ -22,7 +22,7 @@ def cheatCodes(approach, default='goalBased'):
         getData = False
         getError = False
         useAdjoint = False
-    elif approach == 'explicit':
+    elif approach in ('explicit', 'fluxJump'):
         getData = True
         getError = True
         useAdjoint = False
