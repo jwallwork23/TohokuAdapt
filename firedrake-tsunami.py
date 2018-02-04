@@ -16,7 +16,10 @@ import utils.options as opt
 import utils.timeseries as tim
 
 
-# TODO: Automatically write outputs to a text file. Create experiment routines. Also create a reader / plotter.
+now = datetime.datetime.now()
+date = str(now.day)+'-'+str(now.month)+'-'+str(now.year%2000)
+
+# TODO: Create a reader / plotter.
 
 # TODO: (Static) mesh adaption to gradated bathymetry (or gradients thereof).
 # TODO: Homotopy method to consider a convex combination of error estimators?
@@ -447,8 +450,7 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
     if op.printStats:
         msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer, bootTimer)
     if op.gauges:
-        now = datetime.datetime.now()
-        name = approach+str(now.day)+'-'+str(now.month)+'-'+str(now.year%2000)
+        name = approach+date
         for gauge in gauges:
             tim.saveTimeseries(gauge, gaugeData, name=name)
 
@@ -478,6 +480,8 @@ if __name__ == '__main__':
 
     # Run simulation(s)
     maxRes = 3
+    textfile = open('outdata/outputs/'+approach+date+'.txt')
     for i in range(maxRes):
         av, rel = firedrakeTsunami(i, approach, getData, getError, useAdjoint, op=op)
         print('Run %d:  Mean element count %d       Relative error %.4f' % (i, av, rel))
+        textfile.write(str(av)+' , '+str(rel))
