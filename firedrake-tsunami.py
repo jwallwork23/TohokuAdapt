@@ -3,6 +3,7 @@ from firedrake_adjoint import *
 
 import numpy as np
 from time import clock
+import datetime
 
 import utils.adaptivity as adap
 import utils.op.bootstrapping as boot
@@ -438,19 +439,21 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
             t += dt
             cnt += 1
         adaptTimer = clock() - adaptTimer
-        J_h = J_trap * dt
-        rel = np.abs((J - J_h) / op.J)
+        rel = np.abs((J - J_trap * dt) / op.J)
         if op.printStats:
             print('Adaptive primal run complete. Run time: %.3fs \nRelative error = %5.4f' % (adaptTimer, rel))
 
     # Print to screen timing analyses and plot timeseries
-    msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer, bootTimer)
+    if op.printStats:
+        msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer, bootTimer)
     if op.gauges:
-        name = input("Enter a name for these time series (e.g. 'goalBased8-12-17'): ") or 'test'
+        now = datetime.datetime.now()
+        name = approach+str(now.day)+'-'+str(now.month)+'-'+str(now.year%2000)
         for gauge in gauges:
             tim.saveTimeseries(gauge, gaugeData, name=name)
 
     return av, rel
+
 
 if __name__ == '__main__':
 
