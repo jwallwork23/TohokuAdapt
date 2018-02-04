@@ -20,6 +20,10 @@ class Options:
                  advect=False,
                  gradate=False,
                  window=False,
+                 tAdapt=False,
+                 bootstrap=False,
+                 outputOF=True,
+                 printStats=True,
                  hessMeth='dL2',
                  beta=1.4,
                  gamma=1.,
@@ -30,7 +34,8 @@ class Options:
                  Tend=1500.,
                  dt=1.,
                  ndump=15,
-                 rm=30):
+                 rm=30,
+                 orderChange=0):
         """
         :param coarseness: mesh coarseness to use, where 1 is x-fine and 5 is x-coarse.
         :param family: mixed function space family, from {'dg-dg', 'dg-cg'}.
@@ -45,6 +50,10 @@ class Options:
         :param advect: Toggle metric advection.
         :param gradate: Toggle metric gradation.
         :param window: generate error estimators over a time window of relevance.
+        :param tAdapt: implement adaptive timestepping.
+        :param bootstrap: implement mesh bootstrapping to establish initial mesh.
+        :param outputOF: print objective functional value to screen.
+        :param printStats: print to screen during simulation.
         :param hessMeth: Method of Hessian reconstruction: 'dL2' or 'parts'.
         :param beta: metric gradation scaling parameter.
         :param gamma: metric rescaling parameter.
@@ -56,6 +65,7 @@ class Options:
         :param dt: Timestep (s).
         :param ndump: Timesteps per data dump.
         :param rm: Timesteps per remesh. (Should be an integer multiple of ndump.)
+        :param orderChange: change in polynomial degree for residual approximation.
         """
         # Initial mesh parameters
         self.coarseness = coarseness
@@ -105,7 +115,15 @@ class Options:
         self.advect = advect
         self.gradate = gradate
         self.window = window
-        assert(type(advect) == type(gradate) == type(window) == type(iso) == bool)
+        self.tAdapt = tAdapt
+        self.bootstrap = bootstrap
+        self.outputOF = outputOF
+        self.printStats = printStats
+        self.outputMetric = outputMetric
+        self.plotpvd = plotpvd
+        self.gauges = gauges
+        assert(type(advect) == type(gradate) == type(window) == type(iso) == type(tAdapt) == type(bootstrap)
+               == type(outputOF) == type(printStats) == type(outputMetric) == type(plotpvd) == type(gauges) == bool)
         self.hessMeth = hessMeth
         try:
             assert hessMeth in ('dL2', 'parts')
@@ -117,9 +135,6 @@ class Options:
             assert (beta > 1) & (gamma > 0)
         except:
             raise ValueError('Invalid value for scaling parameter.')
-        self.outputMetric = outputMetric
-        self.plotpvd=plotpvd
-        self.gauges = gauges
 
         # Physical parameters
         self.g = 9.81           # Gravitational acceleration (m s^{-2})
@@ -128,8 +143,11 @@ class Options:
         self.Tstart = Tstart
         self.Tend = Tend
         self.dt = dt
+        assert(type(Tstart) == type(Tend) == type(dt) == float)
         self.ndump = ndump
         self.rm = rm
+        self.orderChange = orderChange
+        assert(type(ndump) == type(rm) == type(orderChange) == int)
         self.timestepper = 'CrankNicolson'
 
         # Solver parameters
@@ -192,9 +210,13 @@ class Options:
         :arg N: tuple of min and max #Elements.
         :arg t: current simuation time.
         :arg dt: current timestep.
+        :returns: mean element count.
         """
-        print("""\n************************** Adaption step %d ****************************
+        av = Sn / (mn+1)
+        if self.printStats:
+            print("""\n************************** Adaption step %d ****************************
 Percent complete  : %4.1f%%    Elapsed time : %4.2fs (This step : %4.2fs)     
 #Elements... Current : %d  Mean : %d  Minimum : %s  Maximum : %s
 Current timestep : %4.3fs\n""" %
-              (mn, 100 * t / self.Tend, outerTime, innerTime, nEle, Sn / (mn+1), N[0], N[1], dt))
+                  (mn, 100 * t / self.Tend, outerTime, innerTime, nEle, av, N[0], N[1], dt))
+        return av
