@@ -34,19 +34,16 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
     :param op: parameter values.
     :return: mean element count and relative error in objective functional value.
     """
-    if op.printStats:
-        print('*********************** TOHOKU TSUNAMI SIMULATION *********************\n')
+    msc.dis('*********************** TOHOKU TSUNAMI SIMULATION *********************\n', op.printStats)
     bootTimer = primalTimer = dualTimer = errorTimer = adaptTimer = False
 
     # Establish initial mesh resolution
     if op.bootstrap:
         bootTimer = clock()
-        if op.printStats:
-            print('\nBootstrapping to establish optimal mesh resolution')
+        msc.dis('\nBootstrapping to establish optimal mesh resolution', op.printStats)
         startRes = boot.op.bootstrap('firedrake-tsunami', tol=2e10)[0]
         bootTimer = clock() - bootTimer
-        if op.printStats:
-            print('Bootstrapping run time: %.3fs\n' % bootTimer)
+        msc.dis('Bootstrapping run time: %.3fs\n' % bootTimer, op.printStats)
     nEle = op.meshes[startRes]
 
     # Establish filenames
@@ -74,8 +71,7 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
 
     # Specify physical and solver parameters
     dt = adap.adaptTimestepSW(mesh_H, b)
-    if op.printStats:
-        print('Using initial timestep = %4.3fs\n' % dt)
+    msc.dis('Using initial timestep = %4.3fs\n' % dt, op.printStats)
     Dt = Constant(dt)
     T = op.Tend
     op.checkCFL(b)
@@ -161,8 +157,7 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
         forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
         forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
-        if op.printStats:
-            print('Starting fixed mesh primal run (forwards in time)')
+        msc.dis('Starting fixed mesh primal run (forwards in time)', op.printStats)
         finished = False
         primalTimer = clock()
         if op.plotpvd:
@@ -214,14 +209,14 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
                     forwardFile.write(u, eta, time=t)
                 if op.gauges and not useAdjoint:
                     gaugeData = tim.extractTimeseries(gauges, eta, t, gaugeData, v0, op=op)
-                print('t = %.2fs' % t)
+                if op.printStats:
+                    print('t = %.2fs' % t)
             t += dt
             cnt += 1
         cnt -=1
         cntT = cnt  # Total number of steps
         primalTimer = clock() - primalTimer
-        if op.printStats:
-            print('Primal run complete. Run time: %.3fs' % primalTimer)
+        msc.dis('Primal run complete. Run time: %.3fs' % primalTimer, op.printStats)
 
         # Reset counter in explicit case
         if approach in ('explicit', 'fluxJump'):
@@ -264,18 +259,15 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
                 if cnt == -1:
                     break
             dualTimer = clock() - dualTimer
-            if op.printStats:
-                print('Adjoint run complete. Run time: %.3fs' % dualTimer)
+            msc.dis('Adjoint run complete. Run time: %.3fs' % dualTimer, op.printStats)
             cnt += 1
 
     # Loop back over times to generate error estimators
     if getError:
-        if op.printStats:
-            print('\nStarting error estimate generation')
+        msc.dis('\nStarting error estimate generation', op.printStats)
         errorTimer = clock()
         for k in range(0, iEnd, op.rm):
-            if op.printStats:
-                print('Generating error estimate %d / %d' % (k / op.rm + 1, iEnd / op.rm + 1))
+            msc.dis('Generating error estimate %d / %d' % (k / op.rm + 1, iEnd / op.rm + 1), op.printStats)
             indexStr = msc.indexString(k)
 
             # Load forward / adjoint / residual data from HDF5
@@ -312,7 +304,7 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
             elif approach == 'goalBased':
                 epsilon = err.DWR(rho, dual_oi if op.orderChange else dual_h, v)
             elif approach == 'explicit':
-                epsilon = err.explicitErrorEstimator(q_oi if op.orderChange else q, rho, b, v)
+                epsilon = err.explicitErrorEstimator(q_oi if op.orderChange else q, rho, b, v, maxBathy=True)
             elif approach == 'fluxJump':
                 epsilon = err.fluxJumpError(q, v)
 
@@ -336,8 +328,7 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
             if op.plotpvd:
                 errorFile.write(epsilon, time=float(k))
         errorTimer = clock() - errorTimer
-        if op.printStats:
-            print('Errors estimated. Run time: %.3fs' % errorTimer)
+        msc.dis('Errors estimated. Run time: %.3fs' % errorTimer, op.printStats)
 
     if approach in ('hessianBased', 'explicit', 'fluxJump', 'adjointBased', 'goalBased'):
 
@@ -351,8 +342,7 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
         started = False
         if op.gradate:
             H0 = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(CellSize(mesh_H))
-        if op.printStats:
-            print('\nStarting adaptive mesh primal run (forwards in time)')
+        msc.dis('\nStarting adaptive mesh primal run (forwards in time)', op.printStats)
         adaptTimer = clock()
         while t <= T:
             if cnt % op.rm == 0:      # TODO: change this condition for t-adaptivity?
@@ -439,14 +429,12 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
                 adaptiveFile.write(u, eta, time=t)
                 if op.gauges:
                     gaugeData = tim.extractTimeseries(gauges, eta, t, gaugeData, v0, op=op)
-                if op.printStats:
-                    print('t = %.2fs' % t)
+                msc.dis('t = %.2fs' % t, op.printStats)
             t += dt
             cnt += 1
         adaptTimer = clock() - adaptTimer
         rel = np.abs((op.J - J_trap * dt) / op.J)
-        if op.printStats:
-            print('Adaptive primal run complete. Run time: %.3fs \nRelative error = %5.4f' % (adaptTimer, rel))
+        msc.dis('Adaptive primal run complete. Run time: %.3fs \nRelative error = %5.4f' % (adaptTimer, rel), op.printStats)
     else:
         av = nEle
 
@@ -478,6 +466,7 @@ if __name__ == '__main__':
                      gauges=False,
                      tAdapt=False,
                      bootstrap=False,
+                     printStats=False,
                      outputOF=True,
                      orderChange=-1,
                      ndump=10,
@@ -485,7 +474,7 @@ if __name__ == '__main__':
                      iso=False)
 
     # Run simulation(s)
-    maxRes = 1
+    maxRes = 3
     textfile = open('outdata/outputs/'+approach+date+'.txt', 'w+')
     for i in range(maxRes):
         av, rel = firedrakeTsunami(i, approach, getData, getError, useAdjoint, op=op)

@@ -70,4 +70,9 @@ def printTimings(primal, dual=False, error=False, adapt=False, boot=False):
         print("Error run     %5.3fs" % error)
     if bool(adapt):
         print("Adaptive run  %5.3fs" % adapt)
-    print("Total         %5.3fs\n" % (primal + float(dual) + float(error) + float(adapt) + float(boot)))    ,
+    print("Total         %5.3fs\n" % (primal + float(dual) + float(error) + float(adapt) + float(boot)))
+
+
+def dis(string, printStats=True):
+    if printStats:
+        print(string)

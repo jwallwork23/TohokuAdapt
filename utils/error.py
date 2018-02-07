@@ -8,7 +8,7 @@ from . import interpolation
 from . import options
 
 
-def explicitErrorEstimator(q, residual, b, v):
+def explicitErrorEstimator(q, residual, b, v, maxBathy=False):
     """
     Estimate error locally using an a posteriori error indicator.
     
@@ -16,6 +16,7 @@ def explicitErrorEstimator(q, residual, b, v):
     :arg residual: approximation of residual for primal equations.
     :arg b: bathymetry profile.
     :arg v: P0 test function over the same function space.
+    :param maxBathy: apply bound on bathymetry.
     :return: field of local error indicators.
     """
     V = residual.function_space()
@@ -23,6 +24,7 @@ def explicitErrorEstimator(q, residual, b, v):
     mesh = V.mesh()
     h = CellSize(mesh)
     n = FacetNormal(mesh)
+    b0 = Constant(max(b.dat.data)) if maxBathy else Function(V.sub(1)).assign(b)
 
     # Compute element residual term
     if m == 1:
@@ -33,12 +35,16 @@ def explicitErrorEstimator(q, residual, b, v):
     # Compute boundary residual term on fine mesh
     qh = interpolation.mixedPairInterp(mesh, V, q)[0]       # TODO: not needed if changing order
     uh, etah = qh.split()
+
+    j0 = assemble(dot(v * grad(uh[0]), n) * ds)
+    j1 = assemble(dot(v * grad(uh[1]), n) * ds)
+    j2 = assemble(jump(v * b0 * uh, n=n) * dS)
+    # jumpTerm = assemble(v * h * j2 * j2 * dx)
+
     # j0 = assemble(jump(v * grad(uh[0]), n=n) * dS)
     # j1 = assemble(jump(v * grad(uh[1]), n=n) * dS)
     # j2 = assemble(jump(v * grad(etah), n=n) * dS)
-    # jumpTerm = assemble(v * h * (j0 * j0 + j1 * j1 + j2 * j2) * dx)
-    j = assemble(jump(v * b * uh, n=n) * dS)
-    jumpTerm = assemble(v * h * j * j * dx)
+    jumpTerm = assemble(v * h * (j0 * j0 + j1 * j1 + j2 * j2) * dx)
 
     return assemble(sqrt(resTerm + jumpTerm))
 
