@@ -20,21 +20,15 @@ adaptivity:
     * Time series data can be stored and plotted using ``timeseries``.
 * A ``resources`` directory, containing bathymetry and coastline data for the ocean domain surrounding Fukushima. Mesh
 files have been removed for copyright reasons, but may be made available upon request.
-* Models on a realistic domain, which build upon the test script codes and apply the methodology to the 2011 Tohoku
-tsunami, which struck the Japanese coast at Fukushima and caused much destruction. These include:
-    * ``firedrake-tsunami``, which solves the shallow water equations using the following meshing strategies:
-        * fixed meshes of various levels of refinement, generated using [QMESH][6];
-        * hessian based error estimate;
-        * explicit a posteriori error estimator based on the shallow water residual;
-        * 'domain of dependence' type estimator as used in Davis and LeVeque 2016;
-        * goal-oriented mesh adaptivity, weighting the residual by adjoint solution data.
-    The latter two approaches encorporate automated differentiation techniques to generate adjoint data in the discrete 
-    sense.
-    * ``thetis-tsunami``, which provides the same functionalities as ``firedrake-tsunami``, but integrated within the
-    coastal and ocean modelling software provided by Thetis.
-* Test problems ``advection-diffusion``, ``shallow-water`` and ``rossby-wave`` for advection diffusion and linearised
- non-rotational and rotational shallow water equations, respectively, defined on quadrilateral model domains. In each 
- case, there is functionality to run fixed mesh or mesh adaptive simulations.
+* Shallow water models ``shallow-water`` for (1) a realistic domain, applied to the 2011 Tohoku tsunami, which struck 
+the Japanese coast at Fukushima and caused much destruction; and (2) test scripts on quadrilateral model domains. The 
+following meshing strategies are implemented:
+    * fixed meshes of various levels of refinement, generated using [QMESH][6];
+    * hessian based error estimate;
+    * explicit a posteriori error estimator based on the shallow water residual;
+    * 'domain of dependence' type estimator as used in Davis and LeVeque 2016;
+    * goal-oriented mesh adaptivity, weighting the residual by adjoint solution data.
+* An ``advection-diffusion`` test problem, on a quadrilateral model domain.
 
 For feedback, comments and questions, please email j.wallwork16@imperial.ac.uk.
 
