@@ -186,8 +186,18 @@ class Options:
         # Mesh element counts currently generated in QMESH
         self.meshes = (6176, 8782, 11020, 16656, 20724, 33784, 52998, 81902, 129442, 196560, 450386, 691750)
 
-        # Objective functional value for Tohoku problem converged to 3 s.f. on a mesh with 200k elements
-        self.J = 2.4391e+13
+
+    def J(self, mode):
+        """
+        :param mode: test problem choice.
+        :return: 'exact' objective functional value, converged to 3 s.f.
+        """
+        dat = {'firedrake-tsunami': 2.4391e+13, 'shallow-water': 0.00224}  # TODO: advection-diffusion and rossby-wave
+        if mode in dat.keys():
+            return dat[mode]
+        else:
+            raise NotImplementedError
+
 
     def gaugeCoord(self, gauge):
         """

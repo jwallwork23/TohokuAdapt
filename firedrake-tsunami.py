@@ -23,7 +23,7 @@ date = str(now.day)+'-'+str(now.month)+'-'+str(now.year%2000)
 # TODO: Homotopy method to consider a convex combination of error estimators?
 # TODO: combine test cases into this script
 
-def runSimulation(startRes, approach, getData=True, getError=True, useAdjoint=True, mode='firedrake-tsunami',
+def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, mode='firedrake-tsunami',
                      op=opt.Options()):
     """
     Run mesh adaptive simulations for the Tohoku problem.
@@ -38,7 +38,10 @@ def runSimulation(startRes, approach, getData=True, getError=True, useAdjoint=Tr
     :return: mean element count and relative error in objective functional value.
     """
     tic = clock()
-    msc.dis('*********************** TOHOKU TSUNAMI SIMULATION *********************\n', op.printStats)
+    if mode == 'firedrake-tsunami':
+        msc.dis('*********************** TOHOKU TSUNAMI SIMULATION *********************\n', op.printStats)
+    elif mode == 'shallow-water':
+        msc.dis('*********************** SHALLOW WATER TEST PROBLEM ********************\n', op.printStats)
     bootTimer = primalTimer = dualTimer = errorTimer = adaptTimer = False
 
     # Establish initial mesh resolution
@@ -69,23 +72,21 @@ def runSimulation(startRes, approach, getData=True, getError=True, useAdjoint=Tr
             M = adap.computeSteadyMetric(mesh_H, W, H, b, op=op)
             adap.metricGradation(mesh_H, M)
             mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
-
-    # Establish finer mesh (h < H) upon which to approximate error
-    if approach in ('explicit', 'goalBased'):
-        mesh_h = adap.isoP2(mesh_H)
-        V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
-        if mode == 'firedrake-tsunami':
-            b_h = msh.TohokuDomain(mesh=mesh_h)[2]
-
-    V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
-    if mode == 'shallow-water':
+    elif mode == 'shallow-water':
         lx = 2 * np.pi
-        mesh_H = SquareMesh(startRes, startRes, lx, lx)  # Computational mesh
+        n = pow(2, startRes)
+        mesh_H = SquareMesh(n, n, lx, lx)  # Computational mesh
+        nEle = msh.meshStats(mesh_H)[0]
         x, y = SpatialCoordinate(mesh_H)
-        eta0 = project(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))), V_H.sub(1))
-        b = Constant(0.1)
     else:
         raise NotImplementedError
+
+    # Define initial FunctionSpace
+    V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
+
+    if mode == 'shallow-water':
+        eta0 = project(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))), V_H.sub(1))
+        b = Constant(0.1)
 
     # Define variables of problem and apply initial conditions
     q_ = Function(V_H)
@@ -98,8 +99,18 @@ def runSimulation(startRes, approach, getData=True, getError=True, useAdjoint=Tr
     u.rename("uv_2d")
     eta.rename("elev_2d")
 
+    # Establish finer mesh (h < H) upon which to approximate error
+    if approach in ('explicit', 'goalBased'):
+        mesh_h = adap.isoP2(mesh_H)
+        V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
+        if mode == 'firedrake-tsunami':
+            b_h = msh.TohokuDomain(mesh=mesh_h)[2]
+
     # Specify physical and solver parameters
-    dt = adap.adaptTimestepSW(mesh_H, b)
+    if mode == 'firedrake-tsunami':
+        dt = adap.adaptTimestepSW(mesh_H, b)
+    else:
+        dt = 0.1        # TODO: change this
     msc.dis('Using initial timestep = %4.3fs\n' % dt, op.printStats)
     Dt = Constant(dt)
     T = op.Tend
@@ -167,6 +178,10 @@ def runSimulation(startRes, approach, getData=True, getError=True, useAdjoint=Tr
         v = TestFunction(P0)
         epsilon = Function(P0, name="Error indicator")
 
+    if op.outputOF:
+        J_trap = 0.
+        started = False
+
     # Initialise adaptivity placeholders and counters
     mM = [nEle, nEle]                               # Min/max #Elements
     Sn = nEle
@@ -180,6 +195,12 @@ def runSimulation(startRes, approach, getData=True, getError=True, useAdjoint=Tr
         qt = TestFunction(V_H)
         forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
         forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
+
+        if op.outputOF:
+            if mode == 'firedrake-tsunami':
+                iA = form.indicator(V_H.sub(1), x1=490e3, x2=640e3, y1=4160e3, y2=4360e3, smooth=True)
+            elif mode == 'shallow-water':
+                iA = form.indicator(V_H.sub(1), x1=0., x2=0.5 * np.pi, y1=0.5 * np.pi, y2=1.5 * np.pi, smooth=False)
 
         msc.dis('Starting fixed mesh primal run (forwards in time)', op.printStats)
         finished = False
@@ -234,10 +255,21 @@ def runSimulation(startRes, approach, getData=True, getError=True, useAdjoint=Tr
                 else:
                     adj_inc_timestep(time=t, finished=finished)
 
+            # Estimate OF using trapezium rule TODO: allow for t-adaptivity
+            if op.outputOF and approach == 'fixedMesh':
+                step = assemble(eta * iA * dx)
+                if (t >= op.Tstart) and not started:
+                    started = True
+                    J_trap = step
+                elif t >= op.Tend:
+                    J_trap += step
+                elif started:
+                    J_trap += 2 * step
+
             if cnt % op.ndump == 0:
                 if op.plotpvd:
                     forwardFile.write(u, eta, time=t)
-                if op.gauges and not useAdjoint:
+                if op.gauges and approach == 'fixedMesh':
                     gaugeData = tim.extractTimeseries(gauges, eta, t, gaugeData, v0, op=op)
                 if op.printStats:
                     print('t = %.2fs' % t)
@@ -246,6 +278,9 @@ def runSimulation(startRes, approach, getData=True, getError=True, useAdjoint=Tr
         cnt -=1
         cntT = cnt  # Total number of steps
         primalTimer = clock() - primalTimer
+        if op.outputOF:
+            rel = np.abs((op.J(mode) - J_trap * dt) / op.J(mode))
+            # print('#### DEBUG: J_h = ', J_trap * dt)
         msc.dis('Primal run complete. Run time: %.3fs' % primalTimer, op.printStats)
 
         # Reset counter in explicit case
@@ -368,9 +403,6 @@ def runSimulation(startRes, approach, getData=True, getError=True, useAdjoint=Tr
             t = 0.
             u_.interpolate(Expression([0, 0]))
             eta_.interpolate(eta0)
-
-        J_trap = 0.
-        started = False
         if op.gradate:
             H0 = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(CellSize(mesh_H))
         msc.dis('\nStarting adaptive mesh primal run (forwards in time)', op.printStats)
@@ -440,7 +472,10 @@ def runSimulation(startRes, approach, getData=True, getError=True, useAdjoint=Tr
                 Sn += nEle
                 av = op.printToScreen(cnt/op.rm+1, clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, t, dt)
                 if op.outputOF:
-                    iA = form.indicator(V_H.sub(1), x1=490e3, x2=640e3, y1=4160e3, y2=4360e3, smooth=True)
+                    if mode == 'firedrake-tsunami':
+                        iA = form.indicator(V_H.sub(1), x1=490e3, x2=640e3, y1=4160e3, y2=4360e3, smooth=True)
+                    elif mode == 'shallow-water':
+                        iA = form.indicator(V_H.sub(1), x1=0., x2=0.5*np.pi, y1=0.5*np.pi, y2=1.5*np.pi, smooth=False)
 
             # Solve problem at current timestep
             adaptSolver.solve()
@@ -465,7 +500,8 @@ def runSimulation(startRes, approach, getData=True, getError=True, useAdjoint=Tr
             t += dt
             cnt += 1
         adaptTimer = clock() - adaptTimer
-        rel = np.abs((op.J - J_trap * dt) / op.J)
+        # print('#### DEBUG: J_h = ', J_trap * dt)
+        rel = np.abs((op.J(mode) - J_trap * dt) / op.J(mode))
         msc.dis('Adaptive primal run complete. Run time: %.3fs \nRelative error = %5.4f' % (adaptTimer, rel), op.printStats)
     else:
         av = nEle
@@ -486,7 +522,7 @@ def runSimulation(startRes, approach, getData=True, getError=True, useAdjoint=Tr
 if __name__ == '__main__':
 
     # Choose mode and set parameter values
-    mode = input("Choose problem: 'firedrake-tsunami', 'shallow-water', 'advection-diffusion', 'rossby-wave': ")
+    mode = input("Choose problem: 'firedrake-tsunami', 'shallow-water', 'rossby-wave': ")
     approach, getData, getError, useAdjoint = msc.cheatCodes(input(
         "Choose error estimator: 'hessianBased', 'explicit', 'fluxJump', 'adjointBased' or 'goalBased': "))
     if mode == 'firedrake-tsunami':
@@ -502,7 +538,7 @@ if __name__ == '__main__':
                          bootstrap=False,
                          printStats=False,
                          outputOF=True,
-                         orderChange=-1,
+                         orderChange=0,
                          ndump=10,
                          # iso=False if approach == 'hessianBased' else True,       # TODO: fix isotropic gradation
                          iso=False)
@@ -512,18 +548,23 @@ if __name__ == '__main__':
                          hmin=5e-2,
                          hmax=1.,
                          rm=5,
+                         ndump=1,
                          gradate=False,
+                         bootstrap=False,
+                         printStats=False,
+                         outputOF=True,
                          advect=False,
-                         window=True if useAdjoint else False,
+                         window=True if approach == 'adjointBased' else False,
                          vscale=0.4 if useAdjoint else 0.85,
+                         orderChange=0,
                          plotpvd=True)
     else:
         raise NotImplementedError
 
     # Run simulation(s)
-    maxRes = 3
+    maxRes = 3 if mode == 'firedrake-tsunami' else 8
     textfile = open('outdata/outputs/'+approach+date+'.txt', 'w+')
     for i in range(maxRes):
-        av, rel, timing = runSimulation(i, approach, getData, getError, useAdjoint, mode=mode, op=op)
+        av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, mode=mode, op=op)
         print('Run %d:  Mean element count %6d  Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
         textfile.write('%d , %.4f\n' % (av, rel))
