@@ -34,6 +34,7 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
     :param op: parameter values.
     :return: mean element count and relative error in objective functional value.
     """
+    tic = clock()
     msc.dis('*********************** TOHOKU TSUNAMI SIMULATION *********************\n', op.printStats)
     bootTimer = primalTimer = dualTimer = errorTimer = adaptTimer = False
 
@@ -448,7 +449,7 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
     if not op.outputOF:
         rel = None
 
-    return av, rel
+    return av, rel, clock()-tic
 
 
 if __name__ == '__main__':
@@ -477,6 +478,6 @@ if __name__ == '__main__':
     maxRes = 3
     textfile = open('outdata/outputs/'+approach+date+'.txt', 'w+')
     for i in range(maxRes):
-        av, rel = firedrakeTsunami(i, approach, getData, getError, useAdjoint, op=op)
-        print('Run %d:  Mean element count %d       Relative error %.4f' % (i, av, rel))
+        av, rel, timing = firedrakeTsunami(i, approach, getData, getError, useAdjoint, op=op)
+        print('Run %d:  Mean element count %d       Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
         textfile.write(str(av)+' , '+str(rel))
