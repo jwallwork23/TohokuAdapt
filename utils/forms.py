@@ -204,6 +204,23 @@ def interelementTerm(v, n=None):
         return 0.5 * (dot(v('+'), n('+')) - dot(v('-'), n('-')))
 
 
+def outwardFlux(v, n=None, inward=False):
+    """
+    :arg v: Function to be evaluated over element boundaries.
+    :param n: FacetNormal
+    :param inward: toggle inward flux.
+    :return: averaged jump discontinuity over element boundary.
+    """
+    sign = '-' if inward else '+'
+    if n == None:
+        n = FacetNormal(v.function_space().mesh())
+    v = as_ufl(v)
+    if len(v.ufl_shape) == 0:
+        return (v(sign) * n(sign))
+    else:
+        return (dot(v(sign), n(sign)))
+
+
 def localProblemSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, nonlinear=False,
                    allowNormalFlow=True, timestepper='CrankNicolson'):
     """

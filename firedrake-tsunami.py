@@ -6,7 +6,7 @@ from time import clock
 import datetime
 
 import utils.adaptivity as adap
-import utils.op.bootstrapping as boot
+import utils.bootstrapping as boot
 import utils.error as err
 import utils.forms as form
 import utils.interpolation as inte
@@ -20,7 +20,6 @@ now = datetime.datetime.now()
 date = str(now.day)+'-'+str(now.month)+'-'+str(now.year%2000)
 
 # TODO: Create a reader / plotter.
-
 # TODO: Homotopy method to consider a convex combination of error estimators?
 
 def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint=True, op=opt.Options()):
@@ -225,7 +224,7 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
             print('Primal run complete. Run time: %.3fs' % primalTimer)
 
         # Reset counter in explicit case
-        if approach == 'explicit':
+        if approach in ('explicit', 'fluxJump'):
             cnt = 0
 
         if useAdjoint:
@@ -340,7 +339,7 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
         if op.printStats:
             print('Errors estimated. Run time: %.3fs' % errorTimer)
 
-    if approach in ('hessianBased', 'explicit', 'adjointBased', 'goalBased'):
+    if approach in ('hessianBased', 'explicit', 'fluxJump', 'adjointBased', 'goalBased'):
 
         # Reset initial conditions
         if approach != 'hessianBased':
@@ -361,7 +360,7 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
 
                 # Construct metric
                 W = TensorFunctionSpace(mesh_H, "CG", 1)
-                if approach in ('explicit', 'adjointBased', 'goalBased'):
+                if approach in ('explicit', 'fluxJump', 'adjointBased', 'goalBased'):
                     # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
                     with DumbCheckpoint(dirName + 'hdf5/error_' + msc.indexString(cnt), mode=FILE_READ) as loadError:
                         loadError.load(epsilon)
@@ -409,7 +408,6 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
                 qt = TestFunction(V_H)
                 adaptProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
                 adaptSolver = NonlinearVariationalSolver(adaptProblem, solver_parameters=op.params)
-
                 if op.tAdapt:
                     dt = adap.adaptTimestepSW(mesh_H, b)
                     Dt.assign(dt)
@@ -419,7 +417,6 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
                 mM = [min(nEle, mM[0]), max(nEle, mM[1])]
                 Sn += nEle
                 av = op.printToScreen(cnt/op.rm+1, clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, t, dt)
-
                 if op.outputOF:
                     iA = form.indicator(V_H.sub(1), x1=490e3, x2=640e3, y1=4160e3, y2=4360e3, smooth=True)
 
@@ -450,6 +447,8 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
         rel = np.abs((J - J_trap * dt) / op.J)
         if op.printStats:
             print('Adaptive primal run complete. Run time: %.3fs \nRelative error = %5.4f' % (adaptTimer, rel))
+    else:
+        av = nEle
 
     # Print to screen timing analyses and plot timeseries
     if op.printStats:
@@ -458,6 +457,8 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
         name = approach+date
         for gauge in gauges:
             tim.saveTimeseries(gauge, gaugeData, name=name)
+    if not op.outputOF:
+        rel = None
 
     return av, rel
 
@@ -484,8 +485,8 @@ if __name__ == '__main__':
                      iso=False)
 
     # Run simulation(s)
-    maxRes = 3
-    textfile = open('outdata/outputs/'+approach+date+'.txt')
+    maxRes = 1
+    textfile = open('outdata/outputs/'+approach+date+'.txt', 'w+')
     for i in range(maxRes):
         av, rel = firedrakeTsunami(i, approach, getData, getError, useAdjoint, op=op)
         print('Run %d:  Mean element count %d       Relative error %.4f' % (i, av, rel))

@@ -3,6 +3,7 @@ from firedrake import *
 import numpy as np
 import cmath
 
+from . import forms
 from . import interpolation
 from . import options
 
@@ -29,12 +30,14 @@ def explicitErrorEstimator(q, residual, v):
         resTerm = assemble(v * h * h * sum([inner(residual.split()[k], residual.split()[k]) for k in range(m)]) * dx)
 
     # Compute boundary residual term on fine mesh
-    qh = interpolation.mixedPairInterp(mesh, V, q)[0]
+    qh = interpolation.mixedPairInterp(mesh, V, q)[0]       # TODO: not needed if changing order
     uh, etah = qh.split()
-    j0 = assemble(jump(v * grad(uh[0]), n=n) * dS)
-    j1 = assemble(jump(v * grad(uh[1]), n=n) * dS)
-    j2 = assemble(jump(v * grad(etah), n=n) * dS)
-    jumpTerm = assemble(v * h * (j0 * j0 + j1 * j1 + j2 * j2) * dx)
+    # j0 = assemble(jump(v * grad(uh[0]), n=n) * dS)
+    # j1 = assemble(jump(v * grad(uh[1]), n=n) * dS)
+    # j2 = assemble(jump(v * grad(etah), n=n) * dS)
+    # jumpTerm = assemble(v * h * (j0 * j0 + j1 * j1 + j2 * j2) * dx)
+    j = assemble(jump(v * uh, n=n) * dS)
+    jumpTerm = assemble(v * h * j * j * dx)
 
     return assemble(sqrt(resTerm + jumpTerm))
 
@@ -59,7 +62,7 @@ def fluxJumpError(q, v):
     j1 = assemble(jump(v * grad(uh[1]), n=n) * dS)
     j2 = assemble(jump(v * grad(etah), n=n) * dS)
 
-    return np.abs(assemble(v * h * (j0 * j0 + j1 * j1 + j2 * j2) * dx))
+    return assemble(v * h * (j0 * j0 + j1 * j1 + j2 * j2) * dx)
 
 
 def DWR(residual, adjoint, v):
