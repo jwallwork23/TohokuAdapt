@@ -312,7 +312,7 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
             elif approach == 'goalBased':
                 epsilon = err.DWR(rho, dual_oi if op.orderChange else dual_h, v)
             elif approach == 'explicit':
-                epsilon = err.explicitErrorEstimator(q_oi if op.orderChange else q, rho, v)
+                epsilon = err.explicitErrorEstimator(q_oi if op.orderChange else q, rho, b, v)
             elif approach == 'fluxJump':
                 epsilon = err.fluxJumpError(q, v)
 
@@ -444,7 +444,7 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
             t += dt
             cnt += 1
         adaptTimer = clock() - adaptTimer
-        rel = np.abs((J - J_trap * dt) / op.J)
+        rel = np.abs((op.J - J_trap * dt) / op.J)
         if op.printStats:
             print('Adaptive primal run complete. Run time: %.3fs \nRelative error = %5.4f' % (adaptTimer, rel))
     else:

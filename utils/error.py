@@ -8,12 +8,13 @@ from . import interpolation
 from . import options
 
 
-def explicitErrorEstimator(q, residual, v):
+def explicitErrorEstimator(q, residual, b, v):
     """
     Estimate error locally using an a posteriori error indicator.
     
     :arg q: primal approximation at current timestep.
     :arg residual: approximation of residual for primal equations.
+    :arg b: bathymetry profile.
     :arg v: P0 test function over the same function space.
     :return: field of local error indicators.
     """
@@ -36,7 +37,7 @@ def explicitErrorEstimator(q, residual, v):
     # j1 = assemble(jump(v * grad(uh[1]), n=n) * dS)
     # j2 = assemble(jump(v * grad(etah), n=n) * dS)
     # jumpTerm = assemble(v * h * (j0 * j0 + j1 * j1 + j2 * j2) * dx)
-    j = assemble(jump(v * uh, n=n) * dS)
+    j = assemble(jump(v * b * uh, n=n) * dS)
     jumpTerm = assemble(v * h * j * j * dx)
 
     return assemble(sqrt(resTerm + jumpTerm))
