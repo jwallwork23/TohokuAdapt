@@ -21,8 +21,10 @@ date = str(now.day)+'-'+str(now.month)+'-'+str(now.year%2000)
 
 # TODO: Create a reader / plotter.
 # TODO: Homotopy method to consider a convex combination of error estimators?
+# TODO: combine test cases into this script
 
-def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint=True, op=opt.Options()):
+def runSimulation(startRes, approach, getData=True, getError=True, useAdjoint=True, mode='firedrake-tsunami',
+                     op=opt.Options()):
     """
     Run mesh adaptive simulations for the Tohoku problem.
     
@@ -31,6 +33,7 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
     :param getData: run forward simulation?
     :param getError: generate error estimates?
     :param useAdjoint: run adjoint simulation?
+    :param mode: test case or main script used.
     :param op: parameter values.
     :return: mean element count and relative error in objective functional value.
     """
@@ -42,13 +45,12 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
     if op.bootstrap:
         bootTimer = clock()
         msc.dis('\nBootstrapping to establish optimal mesh resolution', op.printStats)
-        startRes = boot.op.bootstrap('firedrake-tsunami', tol=2e10)[0]
+        startRes = boot.bootstrap(mode, tol=2e10 if mode == 'firedrake-tsunami' else 1e-3)[0]
         bootTimer = clock() - bootTimer
         msc.dis('Bootstrapping run time: %.3fs\n' % bootTimer, op.printStats)
-    nEle = op.meshes[startRes]
 
     # Establish filenames
-    dirName = 'plots/firedrake-tsunami/'
+    dirName = 'plots/' + mode + '/'
     if op.plotpvd:
         forwardFile = File(dirName + "forward.pvd")
         residualFile = File(dirName + "residual.pvd")
@@ -58,33 +60,34 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
         metricFile = File(dirName + "metric.pvd")
 
     # Load Mesh(es)
-    mesh_H, eta0, b = msh.TohokuDomain(nEle)    # Computational mesh
-    if op.bAdapt:                                   # TODO: adapt to gradients in bathymetry?
-        W = TensorFunctionSpace(mesh_H, "CG", 1)
-        H = adap.constructHessian(mesh_H, W, b, op=op)
-        M = adap.computeSteadyMetric(mesh_H, W, H, b, op=op)
-        adap.metricGradation(mesh_H, M)
-        mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
-    if approach in ('explicit', 'goalBased'):
-        mesh_h = adap.isoP2(mesh_H)             # Finer mesh (h < H) upon which to approximate error
-        b_h = msh.TohokuDomain(mesh=mesh_h)[2]
-        V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
+    if mode == 'firedrake-tsunami':
+        nEle = op.meshes[startRes]
+        mesh_H, eta0, b = msh.TohokuDomain(nEle)    # Computational mesh
+        if op.bAdapt:                                   # TODO: adapt to gradients in bathymetry?
+            W = TensorFunctionSpace(mesh_H, "CG", 1)
+            H = adap.constructHessian(mesh_H, W, b, op=op)
+            M = adap.computeSteadyMetric(mesh_H, W, H, b, op=op)
+            adap.metricGradation(mesh_H, M)
+            mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
 
-    # Specify physical and solver parameters
-    dt = adap.adaptTimestepSW(mesh_H, b)
-    msc.dis('Using initial timestep = %4.3fs\n' % dt, op.printStats)
-    Dt = Constant(dt)
-    T = op.Tend
-    op.checkCFL(b)
-    if op.tAdapt:
-        # TODO: t-adaptive goal-based needs to acknowledge timestep change in initial run
-        raise NotImplementedError("Mesh adaptive routines not quite calibrated for t-adaptivity")
+    # Establish finer mesh (h < H) upon which to approximate error
+    if approach in ('explicit', 'goalBased'):
+        mesh_h = adap.isoP2(mesh_H)
+        V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
+        if mode == 'firedrake-tsunami':
+            b_h = msh.TohokuDomain(mesh=mesh_h)[2]
+
+    V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
+    if mode == 'shallow-water':
+        lx = 2 * np.pi
+        mesh_H = SquareMesh(startRes, startRes, lx, lx)  # Computational mesh
+        x, y = SpatialCoordinate(mesh_H)
+        eta0 = project(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))), V_H.sub(1))
+        b = Constant(0.1)
     else:
-        iStart = int(op.Tstart / dt)
-        iEnd = int(np.ceil(T / dt))
+        raise NotImplementedError
 
     # Define variables of problem and apply initial conditions
-    V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
     q_ = Function(V_H)
     u_, eta_ = q_.split()
     u_.interpolate(Expression([0, 0]), annotate=False)
@@ -95,12 +98,25 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
     u.rename("uv_2d")
     eta.rename("elev_2d")
 
+    # Specify physical and solver parameters
+    dt = adap.adaptTimestepSW(mesh_H, b)
+    msc.dis('Using initial timestep = %4.3fs\n' % dt, op.printStats)
+    Dt = Constant(dt)
+    T = op.Tend
+    if op.tAdapt:
+        # TODO: t-adaptive goal-based needs to acknowledge timestep change in initial run
+        raise NotImplementedError("Mesh adaptive routines not quite calibrated for t-adaptivity")
+    else:
+        iStart = int(op.Tstart / dt)
+        iEnd = int(np.ceil(T / dt))
+
     # Get initial gauge values
-    gaugeData = {}
-    gauges = ("P02", "P06")
-    v0 = {}
-    for gauge in gauges:
-        v0[gauge] = float(eta.at(op.gaugeCoord(gauge)))
+    if op.gauges:
+        gaugeData = {}
+        gauges = ("P02", "P06")
+        v0 = {}
+        for gauge in gauges:
+            v0[gauge] = float(eta.at(op.gaugeCoord(gauge)))
 
     if op.orderChange:
         V_oi = VectorFunctionSpace(mesh_H, op.space1, op.degree1+op.tAdapt) \
@@ -109,7 +125,8 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
         u_oi, eta_oi = q_oi.split()
         q__oi = Function(V_oi)
         u__oi, eta__oi = q__oi.split()
-        b_oi = Function(V_oi.sub(1)).interpolate(b)
+        if mode == 'firedrake-tsunami':
+            b_oi = Function(V_oi.sub(1)).interpolate(b)
         if useAdjoint:
             dual_oi = Function(V_oi)
             dual_oi_u, dual_oi_e = dual_oi.split()
@@ -135,7 +152,13 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
         dual_u, dual_e = dual.split()
         dual_u.rename("Adjoint velocity")
         dual_e.rename("Adjoint elevation")
-        J = form.objectiveFunctionalSW(q, plot=True)
+        if mode == 'firedrake-tsunami':
+            J = form.objectiveFunctionalSW(q, plot=True)
+        elif mode == 'shallow-water':
+            J = form.objectiveFunctionalSW(q, Tstart=op.Tstart, x1=0., x2=np.pi / 2, y1=0.5 * np.pi, y2=1.5 * np.pi,
+                                           smooth=False)
+        else:
+            raise NotImplementedError
     if approach in ('explicit', 'fluxJump', 'adjointBased', 'goalBased'):
         if approach == 'adjointBased' or op.orderChange:
             P0 = FunctionSpace(mesh_H, "DG", 0)
@@ -175,10 +198,16 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
                         eta_oi.interpolate(eta)
                         u__oi.interpolate(u_)
                         eta__oi.interpolate(eta_)
-                        Au, Ae = form.strongResidualSW(q_oi, q__oi, b_oi, Dt)
+                        if mode == 'firedrake-tsunami':
+                            Au, Ae = form.strongResidualSW(q_oi, q__oi, b_oi, Dt)
+                        else:
+                            Au, Ae = form.strongResidualSW(q_oi, q__oi, b, Dt)
                     else:
                         qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
-                        Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt)
+                        if mode == 'firedrake-tsunami':
+                            Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt)
+                        else:
+                            Au, Ae = form.strongResidualSW(qh, q_h, b, Dt)
                     rho_u.interpolate(Au)
                     rho_e.interpolate(Ae)
                     with DumbCheckpoint(dirName + 'hdf5/residual_' + msc.indexString(cnt), mode=FILE_CREATE) as saveRes:
@@ -305,7 +334,8 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
             elif approach == 'goalBased':
                 epsilon = err.DWR(rho, dual_oi if op.orderChange else dual_h, v)
             elif approach == 'explicit':
-                epsilon = err.explicitErrorEstimator(q_oi if op.orderChange else q, rho, b, v, maxBathy=True)
+                epsilon = err.explicitErrorEstimator(q_oi if op.orderChange else q, rho, b, v,
+                                                     maxBathy=True if mode == 'firedrake-tsunami' else False)
             elif approach == 'fluxJump':
                 epsilon = err.fluxJumpError(q, v)
 
@@ -389,7 +419,8 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
                 mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
                 V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
                 q_ = inte.mixedPairInterp(mesh_H, V_H, q_)[0]
-                b = inte.interp(mesh_H, b)[0]
+                if mode == 'firedrake-tsunami':
+                    b = inte.interp(mesh_H, b)[0]
                 q = Function(V_H)
                 u, eta = q.split()
                 u.rename("uv_2d")
@@ -455,29 +486,44 @@ def firedrakeTsunami(startRes, approach, getData=True, getError=True, useAdjoint
 if __name__ == '__main__':
 
     # Choose mode and set parameter values
+    mode = input("Choose problem: 'firedrake-tsunami', 'shallow-water', 'advection-diffusion', 'rossby-wave': ")
     approach, getData, getError, useAdjoint = msc.cheatCodes(input(
         "Choose error estimator: 'hessianBased', 'explicit', 'fluxJump', 'adjointBased' or 'goalBased': "))
-    op = opt.Options(vscale=0.1 if approach == 'goalBased' else 0.85,
-                     rm=60 if useAdjoint else 30,
-                     gradate=True if (useAdjoint or approach == 'explicit') else False,
-                     advect=False,
-                     window=True if approach == 'adjointBased' else False,
-                     outputMetric=False,
-                     plotpvd=True,
-                     gauges=False,
-                     tAdapt=False,
-                     bootstrap=False,
-                     printStats=False,
-                     outputOF=True,
-                     orderChange=-1,
-                     ndump=10,
-                     # iso=False if approach == 'hessianBased' else True,       # TODO: fix isotropic gradation
-                     iso=False)
+    if mode == 'firedrake-tsunami':
+        op = opt.Options(vscale=0.1 if approach == 'goalBased' else 0.85,
+                         rm=60 if useAdjoint else 30,
+                         gradate=True if (useAdjoint or approach == 'explicit') else False,
+                         advect=False,
+                         window=True if approach == 'adjointBased' else False,
+                         outputMetric=False,
+                         plotpvd=True,
+                         gauges=False,
+                         tAdapt=False,
+                         bootstrap=False,
+                         printStats=False,
+                         outputOF=True,
+                         orderChange=-1,
+                         ndump=10,
+                         # iso=False if approach == 'hessianBased' else True,       # TODO: fix isotropic gradation
+                         iso=False)
+    elif mode == 'shallow-water':
+        op = opt.Options(Tstart=0.5,
+                         Tend=2.5,
+                         hmin=5e-2,
+                         hmax=1.,
+                         rm=5,
+                         gradate=False,
+                         advect=False,
+                         window=True if useAdjoint else False,
+                         vscale=0.4 if useAdjoint else 0.85,
+                         plotpvd=True)
+    else:
+        raise NotImplementedError
 
     # Run simulation(s)
     maxRes = 3
     textfile = open('outdata/outputs/'+approach+date+'.txt', 'w+')
     for i in range(maxRes):
-        av, rel, timing = firedrakeTsunami(i, approach, getData, getError, useAdjoint, op=op)
-        print('Run %d:  Mean element count %d       Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
-        textfile.write(str(av)+' , '+str(rel))
+        av, rel, timing = runSimulation(i, approach, getData, getError, useAdjoint, mode=mode, op=op)
+        print('Run %d:  Mean element count %6d  Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
+        textfile.write('%d , %.4f\n' % (av, rel))
