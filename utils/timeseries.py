@@ -229,18 +229,22 @@ Absolute total variation : %6.3f Relative total variation : %6.3f""" %
 
 
 def readErrors(date, approach, mode='firedrake-tsunami'):
-    textfile = open('outdata/outputs/'+mode+'/'+approach+date+'.txt', 'w+')
+    """
+    :arg date: date simulation was run.
+    :arg approach: mesh adaptive approach.
+    :arg mode: problem considered.
+    :return: mean element count, relative error and CPU time.
+    """
+    textfile = open('outdata/outputs/'+mode+'/'+approach+date+'.txt', 'r')
     nEls = []
     err = []
     tim = []
     for line in textfile:
         av, rel, timing = line.split(',')
-        av = int(av)
-        rel = float(rel)
-        timing = float(timing)
-        nEls.append(av)
-        err.append(rel)
-        tim.append(timing)
+        nEls.append(int(av))
+        err.append(float(rel))
+        tim.append(float(timing))
+    textfile.close()
     return nEls, err, tim
 
 
@@ -284,7 +288,7 @@ def errorVsElements(mode='firedrake-tsunami'):
     # nEls[labels[5]] = [8146, 11291, 41811]
     # tim[labels[5]] = [295.8, 548.9, 1445.5]
 
-    for i in range(1, 7):
+    for i in range(1, 8):
         # Plot errors
         cnt = 0
         for mesh in labels:
@@ -296,9 +300,10 @@ def errorVsElements(mode='firedrake-tsunami'):
         plt.legend(bbox_to_anchor=(0.6, 1.1), loc=2)
         plt.xlabel(r'Mean element count')
         plt.ylabel(r'Relative error $\frac{|J(\textbf{q})-J(\textbf{q}_h)|}{|J(\textbf{q})|}$')
-        plt.xlim([0, 55000])
-        plt.ylim([0, 0.1])
-        plt.savefig('outdata/errorPlots/errorVsElements' + str(i) + '.pdf', bbox_inches='tight')
+        if mode == 'firedrake-tsunami':
+            plt.xlim([0, 55000])
+            plt.ylim([0, 0.1])
+        plt.savefig('outdata/outputs/'+mode+'/errorVsElements' + str(i) + '.pdf', bbox_inches='tight')
         plt.clf()
 
         # Plot timings
@@ -312,7 +317,8 @@ def errorVsElements(mode='firedrake-tsunami'):
         # plt.legend(bbox_to_anchor=(0.2, -0.1), loc=4)
         plt.xlabel(r'Mean element count')
         plt.ylabel(r'CPU time (s)')
-        plt.xlim([0, 55000])
-        plt.ylim([0, 5000])
-        plt.savefig('outdata/errorPlots/timeVsElements' + str(i) + '.pdf', bbox_inches='tight')
+        if mode == 'firedrake-tsunami':
+            plt.xlim([0, 55000])
+            plt.ylim([0, 5000])
+        plt.savefig('outdata/outputs/'+mode+'/timeVsElements' + str(i) + '.pdf', bbox_inches='tight')
         plt.clf()

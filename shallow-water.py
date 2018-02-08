@@ -594,12 +594,13 @@ if __name__ == '__main__':
         raise NotImplementedError
 
     # Run simulation(s)
-    maxRes = 5 if mode == 'firedrake-tsunami' else 7
+    minRes = 0 if mode == 'firedrake-tsunami' else 1
+    maxRes = 4 if mode == 'firedrake-tsunami' else 6
     textfile = open('outdata/outputs/'+mode+'/'+approach+date+'.txt', 'w+')
-    for i in range(maxRes):
+    for i in range(minRes, maxRes+1):
         av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, mode=mode, op=op)
         print('Run %d:  Mean element count %6d  Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
-        textfile.write('%d , %.4f, %.1f\n' % (av, rel, timing))
+        textfile.write('%d, %.4f, %.1f\n' % (av, rel, timing))
         # try:
         #     av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, mode=mode, op=op)
         #     print('Run %d:  Mean element count %6d  Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
@@ -607,3 +608,5 @@ if __name__ == '__main__':
         # except:
         #     print("#### ERROR: Failed to run simulation %d." % i)
     textfile.close()
+
+    # TODO: loop over all mesh adaptive approaches consistently and then plot
