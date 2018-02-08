@@ -14,7 +14,7 @@ def cheatCodes(approach, default='goalBased'):
     :return: approach to use and keys to skip sections.
     """
     approach = approach or default
-    if approach == 'goalBased':
+    if approach in ('goalBased', 'adjointBased'):
         getData = True
         getError = True
         useAdjoint = True
@@ -22,14 +22,10 @@ def cheatCodes(approach, default='goalBased'):
         getData = False
         getError = False
         useAdjoint = False
-    elif approach in ('explicit', 'fluxJump'):
+    elif approach in ('explicit', 'fluxJump', 'implicit'):
         getData = True
         getError = True
         useAdjoint = False
-    elif approach == 'adjointBased':
-        getData = True
-        getError = True
-        useAdjoint = True
     elif approach == 'saved':
         approach = input("Choose error estimator: 'explicit', 'adjointBased' or 'goalBased': ") or 'goalBased'
         getData = False

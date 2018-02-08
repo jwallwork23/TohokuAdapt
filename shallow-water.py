@@ -23,6 +23,7 @@ date = str(now.day)+'-'+str(now.month)+'-'+str(now.year%2000)
 # TODO: Homotopy method to consider a convex combination of error estimators?
 # TODO: combine other test cases into this script
 
+
 def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, mode='firedrake-tsunami',
                      op=opt.Options()):
     """
@@ -129,9 +130,11 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
         for gauge in gauges:
             v0[gauge] = float(eta.at(op.gaugeCoord(gauge)))
 
-    if op.orderChange:
+    if op.orderChange or approach == 'implicit':
         V_oi = VectorFunctionSpace(mesh_H, op.space1, op.degree1+op.tAdapt) \
                * FunctionSpace(mesh_H, op.space2, op.degree2+op.tAdapt)
+
+    if op.orderChange:
         q_oi = Function(V_oi)
         u_oi, eta_oi = q_oi.split()
         q__oi = Function(V_oi)
@@ -170,6 +173,9 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
                                            smooth=False)
         else:
             raise NotImplementedError
+    if approach == 'implicit':
+        e = Function(V_oi, name="Implicit error estimate")
+        et = TestFunction(V_oi)
     if approach in ('explicit', 'fluxJump', 'adjointBased', 'goalBased'):
         if approach == 'adjointBased' or op.orderChange:
             P0 = FunctionSpace(mesh_H, "DG", 0)
@@ -214,6 +220,10 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
             # Approximate residual of forward equation and save to HDF5
             if cnt % op.rm == 0:
                 if (approach in ('explicit', 'goalBased')):
+
+                    # TODO: implicit estimators
+
+
                     if op.orderChange:
                         u_oi.interpolate(u)
                         eta_oi.interpolate(eta)
@@ -524,7 +534,7 @@ if __name__ == '__main__':
     # Choose mode and set parameter values
     mode = input("Choose problem: 'firedrake-tsunami', 'shallow-water', 'rossby-wave': ")
     approach, getData, getError, useAdjoint = msc.cheatCodes(input(
-        "Choose error estimator: 'hessianBased', 'explicit', 'fluxJump', 'adjointBased' or 'goalBased': "))
+        "Choose error estimator: 'hessianBased', 'explicit', 'fluxJump', 'implicit', 'adjointBased' or 'goalBased': "))
     if mode == 'firedrake-tsunami':
         op = opt.Options(vscale=0.1 if approach == 'goalBased' else 0.85,
                          rm=60 if useAdjoint else 30,
@@ -532,7 +542,7 @@ if __name__ == '__main__':
                          advect=False,
                          window=True if approach == 'adjointBased' else False,
                          outputMetric=False,
-                         plotpvd=True,
+                         plotpvd=False,
                          gauges=False,
                          tAdapt=False,
                          bootstrap=False,
@@ -557,7 +567,7 @@ if __name__ == '__main__':
                          window=True if approach == 'adjointBased' else False,
                          vscale=0.4 if useAdjoint else 0.85,
                          orderChange=0,
-                         plotpvd=True)
+                         plotpvd=False)
     else:
         raise NotImplementedError
 
@@ -568,7 +578,7 @@ if __name__ == '__main__':
         try:
             av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, mode=mode, op=op)
             print('Run %d:  Mean element count %6d  Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
+            textfile.write('%d , %.4f, %.1f\n' % (av, rel, timing))
         except:
             print("#### ERROR: Failed to run simulation %d." % i)
-        textfile.write('%d , %.4f, %.1f\n' % (av, rel, timing))
     textfile.close()
