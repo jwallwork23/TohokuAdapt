@@ -228,33 +228,61 @@ Absolute total variation : %6.3f Relative total variation : %6.3f""" %
     plt.show()
 
 
-def errorVsElements():
+def readErrors(date, approach, mode='firedrake-tsunami'):
+    textfile = open('outdata/outputs/'+mode+'/'+approach+date+'.txt', 'w+')
+    nEls = []
+    err = []
+    tim = []
+    for line in textfile:
+        av, rel, timing = line.split(',')
+        av = int(av)
+        rel = float(rel)
+        timing = float(timing)
+        nEls.append(av)
+        err.append(rel)
+        tim.append(timing)
+    return nEls, err, tim
+
+
+def errorVsElements(mode='firedrake-tsunami'):
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     plt.rc('legend', fontsize='x-large')
-    labels = ("Fixed mesh", "Hessian based", "Explicit estimator", "Adjoint based", "Goal based", "Goal based (h.o.)")
-    styles = {labels[0]: 's', labels[1]: '^', labels[2]: 'x', labels[3]: 'o', labels[4]: '*', labels[5]: 'h'}
+    labels = ("Fixed mesh", "Hessian based", "Explicit estimator", "Flux jump", "Implicit", "Adjoint based",
+              "Goal based", "Goal based (h.o.)")
+    names = ("fixedMesh", "hessianBased", "explicit", "fluxJump", "implicit", "adjointBased", "goalBased")
+    styles = {labels[0]: 's', labels[1]: '^', labels[2]: 'x', labels[3]: 'o', labels[4]: '*', labels[5]: 'h',
+              labels[6]: 't'}
     err = {}
     nEls = {}
     tim = {}
-    err[labels[0]] = [0.0046, 0.0067, 0.0022, 0.0083, 0.0034, 0.0026, 0.0005]
-    nEls[labels[0]] = [6176, 8782, 11020, 16656, 20724, 33784, 52998]
-    tim[labels[0]] = [11.7, 14.5, 16.8, 12.4, 17.8, 38.1, 98.5]
-    err[labels[1]] = [0.0046, 0.0064, 0.0014, 0.0069, 0.0059]
-    nEls[labels[1]] = [7036, 12540, 18638, 23699, 38610]
-    tim[labels[1]] = [202.7, 420.8, 359.9, 619.6, 1295.0]
-    err[labels[2]] = [0.0069, 0.0119, 0.0081]
-    nEls[labels[2]] = [7963, 12841, 30855]
-    tim[labels[2]] = [1459.3, 3306.4, 4662.5]
-    err[labels[3]] = [0.0845, 0.0157, 0.0236, 0.0156]
-    nEls[labels[3]] = [3410, 10088, 16610, 18277]
-    tim[labels[3]] = [345.6, 562.4, 591.6, 1276.5]
-    err[labels[4]] = [0.0209, 0.0027, 0.0020, 0.0010]
-    nEls[labels[4]] = [3633, 12840, 27718, 43961]
-    tim[labels[4]] = [895.2, 1873.9, 2655.5, 3198.2]
-    err[labels[5]] = [0.0163, 0.0056, 0.0026]
-    nEls[labels[5]] = [8146, 11291, 41811]
-    tim[labels[5]] = [295.8, 548.9, 1445.5]
+    for i in range(len(names)):
+        try:
+            av, rel, timing = readErrors(input("Date to use for %s approach: " % labels[i]), names[i], mode)
+            err[labels[i]] = av
+            nEls[labels[i]] = rel
+            tim[labels[i]] = timing
+        except:
+            pass
+
+    # err[labels[0]] = [0.0046, 0.0067, 0.0022, 0.0083, 0.0034, 0.0026, 0.0005]
+    # nEls[labels[0]] = [6176, 8782, 11020, 16656, 20724, 33784, 52998]
+    # tim[labels[0]] = [11.7, 14.5, 16.8, 12.4, 17.8, 38.1, 98.5]
+    # err[labels[1]] = [0.0046, 0.0064, 0.0014, 0.0069, 0.0059]
+    # nEls[labels[1]] = [7036, 12540, 18638, 23699, 38610]
+    # tim[labels[1]] = [202.7, 420.8, 359.9, 619.6, 1295.0]
+    # err[labels[2]] = [0.0069, 0.0119, 0.0081]
+    # nEls[labels[2]] = [7963, 12841, 30855]
+    # tim[labels[2]] = [1459.3, 3306.4, 4662.5]
+    # err[labels[3]] = [0.0845, 0.0157, 0.0236, 0.0156]
+    # nEls[labels[3]] = [3410, 10088, 16610, 18277]
+    # tim[labels[3]] = [345.6, 562.4, 591.6, 1276.5]
+    # err[labels[4]] = [0.0209, 0.0027, 0.0020, 0.0010]
+    # nEls[labels[4]] = [3633, 12840, 27718, 43961]
+    # tim[labels[4]] = [895.2, 1873.9, 2655.5, 3198.2]
+    # err[labels[5]] = [0.0163, 0.0056, 0.0026]
+    # nEls[labels[5]] = [8146, 11291, 41811]
+    # tim[labels[5]] = [295.8, 548.9, 1445.5]
 
     for i in range(1, 7):
         # Plot errors

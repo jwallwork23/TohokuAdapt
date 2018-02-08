@@ -180,8 +180,8 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
         et = TestFunction(V_oi)
         (et0, et1) = (as_vector((et[0], et[1])), et[2])
         normal = FacetNormal(mesh_H)
-    if approach in ('explicit', 'fluxJump', 'adjointBased', 'goalBased'):
-        if approach == 'adjointBased' or op.orderChange:
+    if approach in ('explicit', 'fluxJump', 'implicit', 'adjointBased', 'goalBased'):
+        if approach in ('adjointBased', 'implicit') or op.orderChange:
             P0 = FunctionSpace(mesh_H, "DG", 0)
         else:
             P0 = FunctionSpace(mesh_h, "DG", 0)
@@ -428,7 +428,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
         errorTimer = clock() - errorTimer
         msc.dis('Errors estimated. Run time: %.3fs' % errorTimer, op.printStats)
 
-    if approach in ('hessianBased', 'explicit', 'fluxJump', 'adjointBased', 'goalBased'):
+    if approach in ('hessianBased', 'explicit', 'fluxJump', 'implicit', 'adjointBased', 'goalBased'):
 
         # Reset initial conditions
         if approach != 'hessianBased':
@@ -594,7 +594,7 @@ if __name__ == '__main__':
         raise NotImplementedError
 
     # Run simulation(s)
-    maxRes = 5 if mode == 'firedrake-tsunami' else 8
+    maxRes = 5 if mode == 'firedrake-tsunami' else 7
     textfile = open('outdata/outputs/'+mode+'/'+approach+date+'.txt', 'w+')
     for i in range(maxRes):
         av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, mode=mode, op=op)
