@@ -174,6 +174,10 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
         else:
             raise NotImplementedError
     if approach == 'implicit':
+        e_ = Function(V_oi)
+        e_0, e_1 = e_.split()
+        e_0.interpolate(Expression([0, 0]))
+        e_1.interpolate(Expression(0))
         e = Function(V_oi, name="Implicit error estimate")
         et = TestFunction(V_oi)
     if approach in ('explicit', 'fluxJump', 'adjointBased', 'goalBased'):
@@ -217,13 +221,28 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
             # Solve problem at current timestep
             forwardSolver.solve()
 
+            if approach == 'implicit':
+                u_oi.interpolate(u)
+                eta_oi.interpolate(eta)
+                u__oi.interpolate(u_)
+                eta__oi.interpolate(eta_)
+                B_, L = form.formsSW(q_oi, q__oi, et, b, Dt, allowNormalFlow=False)
+                B = form.formsSW(e, e_, et, b, Dt, allowNormalFlow=False)[0]
+                et1 = et.split()[1]
+                I = form.interelementTerm(et1 * u_oi) * dS
+                F = B - L + B_ - I
+                solve(F == 0, e)
+                e_.assign(e)
+
             # Approximate residual of forward equation and save to HDF5
             if cnt % op.rm == 0:
-                if (approach in ('explicit', 'goalBased')):
-
-                    # TODO: implicit estimators
-
-
+                indexStr = msc.indexString(cnt)
+                if approach == 'implicit':
+                    epsilon = assemble(v * sqrt(inner(e, e)) * dx)
+                    with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_CREATE) as saveErr:
+                        saveErr.store(epsilon)
+                        saveErr.close()
+                elif (approach in ('explicit', 'goalBased')):
                     if op.orderChange:
                         u_oi.interpolate(u)
                         eta_oi.interpolate(eta)
@@ -239,16 +258,17 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
                             Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt)
                         else:
                             Au, Ae = form.strongResidualSW(qh, q_h, b, Dt)
-                    rho_u.interpolate(Au)
-                    rho_e.interpolate(Ae)
-                    with DumbCheckpoint(dirName + 'hdf5/residual_' + msc.indexString(cnt), mode=FILE_CREATE) as saveRes:
-                        saveRes.store(rho_u)
-                        saveRes.store(rho_e)
-                        saveRes.close()
-                    if op.plotpvd:
-                        residualFile.write(rho_u, rho_e, time=t)
+                    if approach in ('explicit', 'goalBased'):
+                        rho_u.interpolate(Au)
+                        rho_e.interpolate(Ae)
+                        with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_CREATE) as saveRes:
+                            saveRes.store(rho_u)
+                            saveRes.store(rho_e)
+                            saveRes.close()
+                        if op.plotpvd:
+                            residualFile.write(rho_u, rho_e, time=t)
                 if approach in ('adjointBased', 'explicit', 'fluxJump'):
-                    with DumbCheckpoint(dirName + 'hdf5/forward_' + msc.indexString(cnt), mode=FILE_CREATE) as saveFor:
+                    with DumbCheckpoint(dirName + 'hdf5/forward_' + indexStr, mode=FILE_CREATE) as saveFor:
                         saveFor.store(u)
                         saveFor.store(eta)
                         saveFor.close()
