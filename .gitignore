@@ -35,8 +35,9 @@ simpleAdapt.py
 # Old adjoint based mesh adaptive tsunami script
 adjoint-based.py
 
-# Old test script
-shallow-water-test.py
+# Old test scripts
+test-shallow-water.py
+test-rossby-wave.py
 
 # Timings and errors for simulations
 outdata/timings.txt

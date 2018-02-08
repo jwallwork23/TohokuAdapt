@@ -21,7 +21,7 @@ date = str(now.day)+'-'+str(now.month)+'-'+str(now.year%2000)
 
 # TODO: Create a reader / plotter.
 # TODO: Homotopy method to consider a convex combination of error estimators?
-# TODO: combine test cases into this script
+# TODO: combine other test cases into this script
 
 def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, mode='firedrake-tsunami',
                      op=opt.Options()):
@@ -562,9 +562,13 @@ if __name__ == '__main__':
         raise NotImplementedError
 
     # Run simulation(s)
-    maxRes = 3 if mode == 'firedrake-tsunami' else 8
-    textfile = open('outdata/outputs/'+approach+date+'.txt', 'w+')
+    maxRes = 5 if mode == 'firedrake-tsunami' else 8
+    textfile = open('outdata/outputs/'+mode+'/'+approach+date+'.txt', 'w+')
     for i in range(maxRes):
-        av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, mode=mode, op=op)
-        print('Run %d:  Mean element count %6d  Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
-        textfile.write('%d , %.4f\n' % (av, rel))
+        try:
+            av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, mode=mode, op=op)
+            print('Run %d:  Mean element count %6d  Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
+        except:
+            print("#### ERROR: Failed to run simulation %d." % i)
+        textfile.write('%d , %.4f, %.1f\n' % (av, rel, timing))
+    textfile.close()
