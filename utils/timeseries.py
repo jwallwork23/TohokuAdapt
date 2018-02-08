@@ -228,7 +228,7 @@ Absolute total variation : %6.3f Relative total variation : %6.3f""" %
     plt.show()
 
 
-def readErrors(date, approach, mode='firedrake-tsunami'):
+def readErrors(date, approach, mode='tohoku'):
     """
     :arg date: date simulation was run.
     :arg approach: mesh adaptive approach.
@@ -248,7 +248,7 @@ def readErrors(date, approach, mode='firedrake-tsunami'):
     return nEls, err, tim
 
 
-def errorVsElements(mode='firedrake-tsunami'):
+def errorVsElements(mode='tohoku'):
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     plt.rc('legend', fontsize='x-large')
@@ -300,7 +300,7 @@ def errorVsElements(mode='firedrake-tsunami'):
         plt.legend(bbox_to_anchor=(0.6, 1.1), loc=2)
         plt.xlabel(r'Mean element count')
         plt.ylabel(r'Relative error $\frac{|J(\textbf{q})-J(\textbf{q}_h)|}{|J(\textbf{q})|}$')
-        if mode == 'firedrake-tsunami':
+        if mode == 'tohoku':
             plt.xlim([0, 55000])
             plt.ylim([0, 0.1])
         plt.savefig('outdata/outputs/'+mode+'/errorVsElements' + str(i) + '.pdf', bbox_inches='tight')
@@ -317,7 +317,7 @@ def errorVsElements(mode='firedrake-tsunami'):
         # plt.legend(bbox_to_anchor=(0.2, -0.1), loc=4)
         plt.xlabel(r'Mean element count')
         plt.ylabel(r'CPU time (s)')
-        if mode == 'firedrake-tsunami':
+        if mode == 'tohoku':
             plt.xlim([0, 55000])
             plt.ylim([0, 5000])
         plt.savefig('outdata/outputs/'+mode+'/timeVsElements' + str(i) + '.pdf', bbox_inches='tight')

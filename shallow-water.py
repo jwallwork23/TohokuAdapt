@@ -24,7 +24,7 @@ date = str(now.day)+'-'+str(now.month)+'-'+str(now.year%2000)
 # TODO: combine other test cases into this script
 
 
-def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, mode='firedrake-tsunami',
+def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, mode='tohoku',
                      op=opt.Options()):
     """
     Run mesh adaptive simulations for the Tohoku problem.
@@ -39,7 +39,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
     :return: mean element count and relative error in objective functional value.
     """
     tic = clock()
-    if mode == 'firedrake-tsunami':
+    if mode == 'tohoku':
         msc.dis('*********************** TOHOKU TSUNAMI SIMULATION *********************\n', op.printStats)
     elif mode == 'shallow-water':
         msc.dis('*********************** SHALLOW WATER TEST PROBLEM ********************\n', op.printStats)
@@ -49,7 +49,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
     if op.bootstrap:
         bootTimer = clock()
         msc.dis('\nBootstrapping to establish optimal mesh resolution', op.printStats)
-        startRes = boot.bootstrap(mode, tol=2e10 if mode == 'firedrake-tsunami' else 1e-3)[0]
+        startRes = boot.bootstrap(mode, tol=2e10 if mode == 'tohoku' else 1e-3)[0]
         bootTimer = clock() - bootTimer
         msc.dis('Bootstrapping run time: %.3fs\n' % bootTimer, op.printStats)
 
@@ -64,7 +64,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
         metricFile = File(dirName + "metric.pvd")
 
     # Load Mesh(es)
-    if mode == 'firedrake-tsunami':
+    if mode == 'tohoku':
         nEle = op.meshes[startRes]
         mesh_H, eta0, b = msh.TohokuDomain(nEle)    # Computational mesh
         if op.bAdapt:                                   # TODO: adapt to gradients in bathymetry?
@@ -104,11 +104,11 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
     if approach in ('explicit', 'goalBased'):
         mesh_h = adap.isoP2(mesh_H)
         V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
-        if mode == 'firedrake-tsunami':
+        if mode == 'tohoku':
             b_h = msh.TohokuDomain(mesh=mesh_h)[2]
 
     # Specify physical and solver parameters
-    if mode == 'firedrake-tsunami':
+    if mode == 'tohoku':
         dt = adap.adaptTimestepSW(mesh_H, b)
     else:
         dt = 0.1        # TODO: change this
@@ -137,7 +137,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
         u_oi, eta_oi = q_oi.split()
         q__oi = Function(V_oi)
         u__oi, eta__oi = q__oi.split()
-        if mode == 'firedrake-tsunami':
+        if mode == 'tohoku':
             b_oi = Function(V_oi.sub(1)).interpolate(b)
         if useAdjoint:
             dual_oi = Function(V_oi)
@@ -164,7 +164,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
         dual_u, dual_e = dual.split()
         dual_u.rename("Adjoint velocity")
         dual_e.rename("Adjoint elevation")
-        if mode == 'firedrake-tsunami':
+        if mode == 'tohoku':
             J = form.objectiveFunctionalSW(q, plot=True)
         elif mode == 'shallow-water':
             J = form.objectiveFunctionalSW(q, Tstart=op.Tstart, x1=0., x2=np.pi / 2, y1=0.5 * np.pi, y2=1.5 * np.pi,
@@ -214,7 +214,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
             errorSolver = NonlinearVariationalSolver(errorProblem, solver_parameters=op.params)
 
         if op.outputOF:
-            if mode == 'firedrake-tsunami':
+            if mode == 'tohoku':
                 iA = form.indicator(V_H.sub(1), x1=490e3, x2=640e3, y1=4160e3, y2=4360e3, smooth=True)
             elif mode == 'shallow-water':
                 iA = form.indicator(V_H.sub(1), x1=0., x2=0.5 * np.pi, y1=0.5 * np.pi, y2=1.5 * np.pi, smooth=False)
@@ -250,13 +250,13 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
                         eta_oi.interpolate(eta)
                         u__oi.interpolate(u_)
                         eta__oi.interpolate(eta_)
-                        if mode == 'firedrake-tsunami':
+                        if mode == 'tohoku':
                             Au, Ae = form.strongResidualSW(q_oi, q__oi, b_oi, Dt)
                         else:
                             Au, Ae = form.strongResidualSW(q_oi, q__oi, b, Dt)
                     else:
                         qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
-                        if mode == 'firedrake-tsunami':
+                        if mode == 'tohoku':
                             Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt)
                         else:
                             Au, Ae = form.strongResidualSW(qh, q_h, b, Dt)
@@ -316,7 +316,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
         msc.dis('Primal run complete. Run time: %.3fs' % primalTimer, op.printStats)
 
         # Reset counter in explicit case
-        if approach in ('explicit', 'fluxJump'):
+        if approach in ('explicit', 'fluxJump', 'implicit'):
             cnt = 0
 
         if useAdjoint:
@@ -402,7 +402,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
                 epsilon = err.DWR(rho, dual_oi if op.orderChange else dual_h, v)
             elif approach == 'explicit':
                 epsilon = err.explicitErrorEstimator(q_oi if op.orderChange else q, rho, b, v,
-                                                     maxBathy=True if mode == 'firedrake-tsunami' else False)
+                                                     maxBathy=True if mode == 'tohoku' else False)
             elif approach == 'fluxJump':
                 epsilon = err.fluxJumpError(q, v)
 
@@ -483,7 +483,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
                 mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
                 V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
                 q_ = inte.mixedPairInterp(mesh_H, V_H, q_)[0]
-                if mode == 'firedrake-tsunami':
+                if mode == 'tohoku':
                     b = inte.interp(mesh_H, b)[0]
                 q = Function(V_H)
                 u, eta = q.split()
@@ -504,7 +504,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
                 Sn += nEle
                 av = op.printToScreen(cnt/op.rm+1, clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, t, dt)
                 if op.outputOF:
-                    if mode == 'firedrake-tsunami':
+                    if mode == 'tohoku':
                         iA = form.indicator(V_H.sub(1), x1=490e3, x2=640e3, y1=4160e3, y2=4360e3, smooth=True)
                     elif mode == 'shallow-water':
                         iA = form.indicator(V_H.sub(1), x1=0., x2=0.5*np.pi, y1=0.5*np.pi, y2=1.5*np.pi, smooth=False)
@@ -554,10 +554,10 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
 if __name__ == '__main__':
 
     # Choose mode and set parameter values
-    mode = input("Choose problem: 'firedrake-tsunami', 'shallow-water', 'rossby-wave': ")
+    mode = input("Choose problem: 'tohoku', 'shallow-water', 'rossby-wave': ")
     approach, getData, getError, useAdjoint = msc.cheatCodes(input(
         "Choose error estimator: 'hessianBased', 'explicit', 'fluxJump', 'implicit', 'adjointBased' or 'goalBased': "))
-    if mode == 'firedrake-tsunami':
+    if mode == 'tohoku':
         op = opt.Options(vscale=0.1 if approach == 'goalBased' else 0.85,
                          rm=60 if useAdjoint else 30,
                          gradate=True if (useAdjoint or approach == 'explicit') else False,
@@ -594,8 +594,8 @@ if __name__ == '__main__':
         raise NotImplementedError
 
     # Run simulation(s)
-    minRes = 0 if mode == 'firedrake-tsunami' else 1
-    maxRes = 4 if mode == 'firedrake-tsunami' else 6
+    minRes = 0 if mode == 'tohoku' else 1
+    maxRes = 4 if mode == 'tohoku' else 6
     textfile = open('outdata/outputs/'+mode+'/'+approach+date+'.txt', 'w+')
     for i in range(minRes, maxRes+1):
         av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, mode=mode, op=op)
