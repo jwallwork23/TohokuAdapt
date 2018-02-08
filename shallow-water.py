@@ -131,10 +131,8 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
             v0[gauge] = float(eta.at(op.gaugeCoord(gauge)))
 
     if op.orderChange or approach == 'implicit':
-        V_oi = VectorFunctionSpace(mesh_H, op.space1, op.degree1+op.tAdapt) \
-               * FunctionSpace(mesh_H, op.space2, op.degree2+op.tAdapt)
-
-    if op.orderChange:
+        V_oi = VectorFunctionSpace(mesh_H, op.space1, op.degree1+op.orderChange) \
+               * FunctionSpace(mesh_H, op.space2, op.degree2+op.orderChange)
         q_oi = Function(V_oi)
         u_oi, eta_oi = q_oi.split()
         q__oi = Function(V_oi)
@@ -180,6 +178,8 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
         e_1.interpolate(Expression(0))
         e = Function(V_oi, name="Implicit error estimate")
         et = TestFunction(V_oi)
+        (et0, et1) = (as_vector((et[0], et[1])), et[2])
+        normal = FacetNormal(mesh_H)
     if approach in ('explicit', 'fluxJump', 'adjointBased', 'goalBased'):
         if approach == 'adjointBased' or op.orderChange:
             P0 = FunctionSpace(mesh_H, "DG", 0)
@@ -206,6 +206,13 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
         forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
         forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
+        if approach == 'implicit':
+            B_, L = form.formsSW(q_oi, q__oi, et, b, Dt, allowNormalFlow=False)
+            B = form.formsSW(e, e_, et, b, Dt, allowNormalFlow=False)[0]
+            I = form.interelementTerm(et1 * u_oi, n=normal) * dS
+            errorProblem = NonlinearVariationalProblem(B - L + B_ - I, e)
+            errorSolver = NonlinearVariationalSolver(errorProblem, solver_parameters=op.params)
+
         if op.outputOF:
             if mode == 'firedrake-tsunami':
                 iA = form.indicator(V_H.sub(1), x1=490e3, x2=640e3, y1=4160e3, y2=4360e3, smooth=True)
@@ -226,12 +233,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
                 eta_oi.interpolate(eta)
                 u__oi.interpolate(u_)
                 eta__oi.interpolate(eta_)
-                B_, L = form.formsSW(q_oi, q__oi, et, b, Dt, allowNormalFlow=False)
-                B = form.formsSW(e, e_, et, b, Dt, allowNormalFlow=False)[0]
-                et1 = et.split()[1]
-                I = form.interelementTerm(et1 * u_oi) * dS
-                F = B - L + B_ - I
-                solve(F == 0, e)
+                errorSolver.solve(annotate=False)
                 e_.assign(e)
 
             # Approximate residual of forward equation and save to HDF5
@@ -595,10 +597,13 @@ if __name__ == '__main__':
     maxRes = 5 if mode == 'firedrake-tsunami' else 8
     textfile = open('outdata/outputs/'+mode+'/'+approach+date+'.txt', 'w+')
     for i in range(maxRes):
-        try:
-            av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, mode=mode, op=op)
-            print('Run %d:  Mean element count %6d  Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
-            textfile.write('%d , %.4f, %.1f\n' % (av, rel, timing))
-        except:
-            print("#### ERROR: Failed to run simulation %d." % i)
+        av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, mode=mode, op=op)
+        print('Run %d:  Mean element count %6d  Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
+        textfile.write('%d , %.4f, %.1f\n' % (av, rel, timing))
+        # try:
+        #     av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, mode=mode, op=op)
+        #     print('Run %d:  Mean element count %6d  Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
+        #     textfile.write('%d , %.4f, %.1f\n' % (av, rel, timing))
+        # except:
+        #     print("#### ERROR: Failed to run simulation %d." % i)
     textfile.close()
