@@ -181,7 +181,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
         (et0, et1) = (as_vector((et[0], et[1])), et[2])
         normal = FacetNormal(mesh_H)
     if approach in ('explicit', 'fluxJump', 'implicit', 'adjointBased', 'goalBased'):
-        if approach in ('adjointBased', 'implicit') or op.orderChange:
+        if approach in ('adjointBased', 'fluxJump', 'implicit') or op.orderChange:
             P0 = FunctionSpace(mesh_H, "DG", 0)
         else:
             P0 = FunctionSpace(mesh_h, "DG", 0)
