@@ -115,13 +115,14 @@ else:
     from . import conversion
 
 
-def TohokuDomain(nEle=6176, mesh=None, output=False):
+def TohokuDomain(nEle=6176, mesh=None, output=False, capBathymetry=True):
     """
     Load the mesh, initial condition and bathymetry profile for the 2D ocean domain of the Tohoku tsunami problem.
     
     :arg nEle: number of elements considered.
     :param mesh: user specified mesh, if already generated.
     :param output: toggle plotting of bathymetry and initial surface.
+    :param capBathymetry: in the case of no wetting-and-drying.
     :return: associated mesh, initial condition and bathymetry field. 
     """
 
@@ -160,7 +161,8 @@ def TohokuDomain(nEle=6176, mesh=None, output=False):
         b_vec[i] = - interpolatorSurf(p[1], p[0]) - interpolatorBath(p[1], p[0])
 
     # Post-process the bathymetry to have a minimum depth of 30m and plot
-    b.assign(conditional(lt(30, b), b, 30))
+    if capBathymetry:
+        b.assign(conditional(lt(30, b), b, 30))
     if output:
         File('plots/initialisation/surf.pvd').write(eta0)
         File('plots/initialisation/bathymetry.pvd').write(b)

@@ -25,6 +25,7 @@ class Options:
                  bootstrap=False,
                  outputOF=True,
                  printStats=True,
+                 capBathymetry=True,        # TODO: change this under W&D
                  hessMeth='dL2',
                  beta=1.4,
                  gamma=1.,
@@ -56,6 +57,7 @@ class Options:
         :param bootstrap: implement mesh bootstrapping to establish initial mesh.
         :param outputOF: print objective functional value to screen.
         :param printStats: print to screen during simulation.
+        :param capBathymetry: under no wetting-and-drying.
         :param hessMeth: Method of Hessian reconstruction: 'dL2' or 'parts'.
         :param beta: metric gradation scaling parameter.
         :param gamma: metric rescaling parameter.
@@ -122,12 +124,13 @@ class Options:
         self.bootstrap = bootstrap
         self.outputOF = outputOF
         self.printStats = printStats
+        self.capBathymetry = capBathymetry
         self.outputMetric = outputMetric
         self.plotpvd = plotpvd
         self.gauges = gauges
         assert(type(advect) == type(gradate) == type(window) == type(iso) == type(tAdapt) == type(bAdapt)
-               == type(bootstrap) == type(outputOF) == type(printStats) == type(outputMetric) == type(plotpvd)
-               == type(gauges) == bool)
+               == type(bootstrap) == type(outputOF) == type(printStats) == type(capBathymetry) == type(outputMetric)
+               == type(plotpvd) == type(gauges) == bool)
         self.hessMeth = hessMeth
         try:
             assert hessMeth in ('dL2', 'parts')
