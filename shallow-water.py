@@ -19,9 +19,9 @@ import utils.timeseries as tim
 now = datetime.datetime.now()
 date = str(now.day)+'-'+str(now.month)+'-'+str(now.year%2000)
 
-# TODO: Create a reader / plotter.
 # TODO: Homotopy method to consider a convex combination of error estimators?
-# TODO: combine other test cases into this script
+# TODO: combine rossby-wave test case into this script
+# TODO: consider dual weighted implicit error, as well as DWR. Perhaps a more generalised setting for error estimates
 
 
 def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, mode='tohoku',
@@ -559,6 +559,7 @@ if __name__ == '__main__':
         "Choose error estimator: 'hessianBased', 'explicit', 'fluxJump', 'implicit', 'adjointBased' or 'goalBased': "))
     if mode == 'tohoku':
         op = opt.Options(vscale=0.1 if approach == 'goalBased' else 0.85,
+                         # family='dg-dg',
                          rm=60 if useAdjoint else 30,
                          gradate=True if (useAdjoint or approach == 'explicit') else False,
                          advect=False,

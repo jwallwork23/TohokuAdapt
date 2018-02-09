@@ -19,6 +19,7 @@ plots/
 resources/meshes/
 utils/.idea/
 outdata/
+outputs/
 
 
 ## Files to be ignored:
@@ -45,3 +46,6 @@ outdata/errors.txt
 
 # Plot timeseries at a later time
 quickPlot.py
+
+# Thetis sanity check
+thetisTest.py
