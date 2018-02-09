@@ -20,9 +20,9 @@ adaptivity:
     * Time series data can be stored and plotted using ``timeseries``.
 * A ``resources`` directory, containing bathymetry and coastline data for the ocean domain surrounding Fukushima. Mesh
 files have been removed for copyright reasons, but may be made available upon request.
-* Shallow water models ``shallow-water`` for (1) a realistic domain, applied to the 2011 Tohoku tsunami, which struck 
-the Japanese coast at Fukushima and caused much destruction; and (2) test scripts on quadrilateral model domains. The 
-following meshing strategies are implemented:
+* Shallow water models ``firedrake-tsunami`` for (1) a realistic domain, applied to the 2011 Tohoku tsunami, which 
+struck the Japanese coast at Fukushima and caused much destruction; and (2) test scripts on quadrilateral model domains. 
+The following meshing strategies are implemented:
     * fixed meshes of various levels of refinement, generated using [QMESH][6];
     * hessian based error estimate;
     * explicit a posteriori error estimator based on the shallow water residual;

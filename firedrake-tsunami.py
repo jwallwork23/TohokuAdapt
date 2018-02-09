@@ -321,8 +321,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
 
         if useAdjoint:
             parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
-            if op.printStats:
-                print('\nStarting fixed mesh dual run (backwards in time)')
+            msc.dis('\nStarting fixed mesh dual run (backwards in time)', op.printStats)
             dualTimer = clock()
             for (variable, solution) in compute_adjoint(J):
                 if save:

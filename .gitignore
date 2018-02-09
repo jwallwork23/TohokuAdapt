@@ -47,5 +47,6 @@ outdata/errors.txt
 # Plot timeseries at a later time
 quickPlot.py
 
-# Thetis sanity check
+# Thetis sanity checks
 thetisTest.py
+wdTest.py
