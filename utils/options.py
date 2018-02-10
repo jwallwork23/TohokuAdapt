@@ -220,14 +220,14 @@ class Options:
             if input('Hit enter if happy to proceed.'):
                 exit(23)
 
-    def printToScreen(self, mn, outerTime, innerTime, nEle, Sn, N, t, dt):
+    def printToScreen(self, mn, outerTime, innerTime, nEle, Sn, mM, t, dt):
         """
         :arg mn: mesh number.
         :arg outerTime: time taken so far.
         :arg innerTime: time taken for this step.
         :arg nEle: current number of elements.
         :arg Sn: sum over #Elements.
-        :arg N: tuple of min and max #Elements.
+        :arg mM: tuple of min and max #Elements.
         :arg t: current simuation time.
         :arg dt: current timestep.
         :returns: mean element count.
@@ -238,5 +238,5 @@ class Options:
 Percent complete  : %4.1f%%    Elapsed time : %4.2fs (This step : %4.2fs)     
 #Elements... Current : %d  Mean : %d  Minimum : %s  Maximum : %s
 Current timestep : %4.3fs\n""" %
-                  (mn, 100 * t / self.Tend, outerTime, innerTime, nEle, av, N[0], N[1], dt))
+                  (mn, 100 * t / self.Tend, outerTime, innerTime, nEle, av, mM[0], mM[1], dt))
         return av

@@ -162,7 +162,6 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
     mM = [nEle, nEle]  # Min/max #Elements
     Sn = nEle
     nVerT = msh.meshStats(mesh_H)[1] * op.vscale  # Target #Vertices
-    t = 0.
     endT = 0.
     cnt = 0
     save = True
@@ -174,22 +173,22 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
         # TODO: use proper Thetis forms to calculate implicit error and residuals
 
         # Get solver parameter values and construct solver
-        solver_obj = solver2d.FlowSolver2d(mesh_H, b)
-        options = solver_obj.options
-        options.element_family = op.family
-        options.use_nonlinear_equations = False
-        options.use_grad_depth_viscosity_term = False
-        options.simulation_export_time = dt * op.ndump      # This might differ across error estimates
-        options.simulation_end_time = T
-        options.timestepper_type = op.timestepper
-        options.timestep = dt
-        options.output_directory = dirName
-        options.export_diagnostics = True
-        options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+        fixedSolver = solver2d.FlowSolver2d(mesh_H, b)
+        fixedOpt = fixedSolver.options
+        fixedOpt.element_family = op.family
+        fixedOpt.use_nonlinear_equations = False
+        fixedOpt.use_grad_depth_viscosity_term = False
+        fixedOpt.simulation_export_time = dt * op.ndump      # This might differ across error estimates
+        fixedOpt.simulation_end_time = T
+        fixedOpt.timestepper_type = op.timestepper
+        fixedOpt.timestep = dt
+        fixedOpt.output_directory = dirName
+        fixedOpt.export_diagnostics = True
+        fixedOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
 
         # Apply ICs and time integrate
-        solver_obj.assign_initial_conditions(elev=eta0)
-        solver_obj.iterate()
+        fixedSolver.assign_initial_conditions(elev=eta0)
+        fixedSolver.iterate()
         primalTimer = clock() - primalTimer
         print('Time elapsed for fixed mesh solver: %.1fs (%.2fmins)' % (primalTimer, primalTimer / 60))
 
@@ -270,6 +269,16 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
         while cnt < np.ceil(T / dt):
             stepTimer = clock()
 
+            # Load variables from disk
+            if cnt != 0:
+                indexStr = msc.indexString(int(cnt / op.ndump))
+                with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as loadElev:
+                    loadElev.load(elev_2d, name='elev_2d')
+                    loadElev.close()
+                with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as loadVel:
+                    loadVel.load(uv_2d, name='uv_2d')
+                    loadVel.close()
+
             # Construct metric
             W = TensorFunctionSpace(mesh_H, "CG", 1)
             if approach in ('explicit', 'fluxJump', 'adjointBased', 'goalBased'):
@@ -309,41 +318,37 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
             nEle = msh.meshStats(mesh_H)[0]
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
-            av = op.printToScreen(cnt / op.rm + 1, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, mM, t, dt)
+            av = op.printToScreen(int(cnt/op.rm+1), clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, cnt*dt, dt)
 
             # Solver object and equations
-            solver_obj = solver2d.FlowSolver2d(mesh_H, b)
-            options = solver_obj.options
-            options.element_family = op.family
-            options.timestepper_type = op.timestepper
-            options.use_nonlinear_equations = False
-            options.use_grad_depth_viscosity_term = False
-
-            # Outputs
-            options.output_directory = dirName
-            options.export_diagnostics = True
-            options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+            adapSolver = solver2d.FlowSolver2d(mesh_H, b)
+            adapOpt = adapSolver.options
+            adapOpt.element_family = op.family
+            adapOpt.use_nonlinear_equations = False
+            adapOpt.use_grad_depth_viscosity_term = False
+            adapOpt.simulation_export_time = dt * op.ndump
+            startT = endT
+            endT += dt * op.rm
+            adapOpt.simulation_end_time = endT
+            adapOpt.timestepper_type = op.timestepper
+            adapOpt.timestep = dt
+            adapOpt.output_directory = dirName
+            adapOpt.export_diagnostics = True
+            adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
             field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
             e = exporter.ExportManager(dirName + 'hdf5',
                                        ['elev_2d', 'uv_2d'],
                                        field_dict,
                                        field_metadata,
                                        export_type='hdf5')
-            solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
-
-            # Timestep and index bookkeeping
-            options.timestep = dt
-            startT = endT
-            endT += dt * op.rm
-            options.simulation_end_time = endT
-            solver_obj.i_export = cnt / op.ndump
-            solver_obj.iteration = cnt
-            solver_obj.simulation_time = startT
-            options.simulation_export_time = dt * op.ndump
-            solver_obj.next_export_t = startT + options.simulation_export_time  # For next export
-            for e in solver_obj.exporters.values():
-                e.set_next_export_ix(solver_obj.i_export)
-            solver_obj.iterate()
+            adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
+            adapSolver.i_export = int(cnt / op.ndump)
+            adapSolver.iteration = cnt
+            adapSolver.simulation_time = startT
+            adapSolver.next_export_t = startT + adapOpt.simulation_export_time  # For next export
+            for e in adapSolver.exporters.values():
+                e.set_next_export_ix(adapSolver.i_export)
+            adapSolver.iterate()
             cnt += op.rm
 
             # TODO: Estimate OF using trapezium rule
@@ -380,7 +385,7 @@ if __name__ == '__main__':
                          gauges=False,
                          tAdapt=False,
                          bootstrap=False,
-                         printStats=False,
+                         printStats=True,
                          outputOF=True,
                          orderChange=0,
                          ndump=10,
