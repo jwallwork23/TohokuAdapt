@@ -51,12 +51,8 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
     # Establish filenames
     dirName = 'plots/' + mode + '/'
     if op.plotpvd:
-        forwardFile = File(dirName + "forward.pvd")
         residualFile = File(dirName + "residual.pvd")
         errorFile = File(dirName + "errorIndicator.pvd")
-    adaptiveFile = File(dirName + approach + ".pvd")
-    if op.outputMetric:
-        metricFile = File(dirName + "metric.pvd")
 
     # Load Mesh(es)
     if mode == 'tohoku':
@@ -167,6 +163,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
     Sn = nEle
     nVerT = msh.meshStats(mesh_H)[1] * op.vscale  # Target #Vertices
     t = 0.
+    endT = 0.
     cnt = 0
     save = True
 
@@ -270,63 +267,59 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
             H0 = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(CellSize(mesh_H))
         msc.dis('\nStarting adaptive mesh primal run (forwards in time)', op.printStats)
         adaptTimer = clock()
-        while t <= T:
-            if cnt % op.rm == 0:
-                stepTimer = clock()
+        while cnt < np.ceil(T / dt):
+            stepTimer = clock()
 
-                # Construct metric
-                W = TensorFunctionSpace(mesh_H, "CG", 1)
-                if approach in ('explicit', 'fluxJump', 'adjointBased', 'goalBased'):
-                    # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
-                    with DumbCheckpoint(dirName + 'hdf5/error_' + msc.indexString(cnt), mode=FILE_READ) as loadError:
-                        loadError.load(epsilon)
-                        loadError.close()
-                    errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon)[0])
-                    M = adap.isotropicMetric(W, errEst, op=op, invert=False)
-                else:
-                    if op.mtype != 's':
-                        if op.iso:
-                            M = adap.isotropicMetric(W, elev_2d, op=op)
-                        else:
-                            H = adap.constructHessian(mesh_H, W, elev_2d, op=op)
-                            M = adap.computeSteadyMetric(mesh_H, W, H, elev_2d, nVerT=nVerT, op=op)
-                    if op.mtype != 'f':
-                        spd = Function(FunctionSpace(mesh_H, 'DG', 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
-                        if op.iso:
-                            M2 = adap.isotropicMetric(W, spd, op=op)
-                        else:
-                            H = adap.constructHessian(mesh_H, W, spd, op=op)
-                            M2 = adap.computeSteadyMetric(mesh_H, W, H, spd, nVerT=nVerT, op=op)
-                        M = adap.metricIntersection(mesh_H, W, M, M2) if op.mtype == 'b' else M2
-                if op.gradate:
-                    M_ = adap.isotropicMetric(W, inte.interp(mesh_H, H0)[0], bdy=True, op=op)  # Initial boundary metric
-                    M = adap.metricIntersection(mesh_H, W, M, M_, bdy=True)
-                    adap.metricGradation(mesh_H, M, iso=op.iso)
+            # Construct metric
+            W = TensorFunctionSpace(mesh_H, "CG", 1)
+            if approach in ('explicit', 'fluxJump', 'adjointBased', 'goalBased'):
+                # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
+                with DumbCheckpoint(dirName + 'hdf5/error_' + msc.indexString(cnt), mode=FILE_READ) as loadError:
+                    loadError.load(epsilon)
+                    loadError.close()
+                errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon)[0])
+                M = adap.isotropicMetric(W, errEst, op=op, invert=False)
+            else:
+                if op.mtype != 's':
+                    if op.iso:
+                        M = adap.isotropicMetric(W, elev_2d, op=op)
+                    else:
+                        H = adap.constructHessian(mesh_H, W, elev_2d, op=op)
+                        M = adap.computeSteadyMetric(mesh_H, W, H, elev_2d, nVerT=nVerT, op=op)
+                if op.mtype != 'f':
+                    spd = Function(FunctionSpace(mesh_H, 'DG', 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
+                    if op.iso:
+                        M2 = adap.isotropicMetric(W, spd, op=op)
+                    else:
+                        H = adap.constructHessian(mesh_H, W, spd, op=op)
+                        M2 = adap.computeSteadyMetric(mesh_H, W, H, spd, nVerT=nVerT, op=op)
+                    M = adap.metricIntersection(mesh_H, W, M, M2) if op.mtype == 'b' else M2
+            if op.gradate:
+                M_ = adap.isotropicMetric(W, inte.interp(mesh_H, H0)[0], bdy=True, op=op)  # Initial boundary metric
+                M = adap.metricIntersection(mesh_H, W, M, M_, bdy=True)
+                adap.metricGradation(mesh_H, M, iso=op.iso)
 
-                # Adapt mesh and interpolate variables
-                mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
-                elev_2d, uv_2d, b = inte.interp(mesh_H, elev_2d, uv_2d, b)
-                uv_2d.rename('uv_2d')
-                elev_2d.rename('elev_2d')
+            # Adapt mesh and interpolate variables
+            mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
+            elev_2d, uv_2d, b = inte.interp(mesh_H, elev_2d, uv_2d, b)
+            uv_2d.rename('uv_2d')
+            elev_2d.rename('elev_2d')
 
-                # Get mesh stats
-                nEle = msh.meshStats(mesh_H)[0]
-                mM = [min(nEle, mM[0]), max(nEle, mM[1])]
-                Sn += nEle
-                av = op.printToScreen(cnt / op.rm + 1, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, mM, t, dt)
+            # Get mesh stats
+            nEle = msh.meshStats(mesh_H)[0]
+            mM = [min(nEle, mM[0]), max(nEle, mM[1])]
+            Sn += nEle
+            av = op.printToScreen(cnt / op.rm + 1, clock() - adaptTimer, clock() - stepTimer, nEle, Sn, mM, t, dt)
 
-            # Establish Thetis flow solver object
-            solver_obj = solver2d.FlowSolver2d(mesh, b)
+            # Solver object and equations
+            solver_obj = solver2d.FlowSolver2d(mesh_H, b)
             options = solver_obj.options
             options.element_family = op.family
+            options.timestepper_type = op.timestepper
             options.use_nonlinear_equations = False
             options.use_grad_depth_viscosity_term = False
-            options.simulation_export_time = dt * op.ndump
-            startT = endT
-            endT += dt * rm
-            options.simulation_end_time = endT
-            options.timestepper_type = op.timestepper
-            options.timestep = dt
+
+            # Outputs
             options.output_directory = dirName
             options.export_diagnostics = True
             options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
@@ -338,17 +331,23 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
                                        export_type='hdf5')
             solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
 
-            # Timestepper bookkeeping for export time step and next export
-            solver_obj.i_export = cnt/op.ndump
+            # Timestep and index bookkeeping
+            options.timestep = dt
+            startT = endT
+            endT += dt * op.rm
+            options.simulation_end_time = endT
+            solver_obj.i_export = cnt / op.ndump
             solver_obj.iteration = cnt
             solver_obj.simulation_time = startT
+            options.simulation_export_time = dt * op.ndump
             solver_obj.next_export_t = startT + options.simulation_export_time  # For next export
             for e in solver_obj.exporters.values():
                 e.set_next_export_ix(solver_obj.i_export)
+            solver_obj.iterate()
+            cnt += op.rm
 
             # TODO: Estimate OF using trapezium rule
 
-            cnt += 1
         adaptTimer = clock() - adaptTimer
         # msc.dis('Adaptive primal run complete. Run time: %.3fs \nRelative error = %5.4f' % (adaptTimer, rel),
         #         op.printStats)
@@ -371,7 +370,7 @@ if __name__ == '__main__':
         "Choose error estimator: 'hessianBased', 'explicit', 'fluxJump', 'implicit', 'adjointBased' or 'goalBased': "))
     if mode == 'tohoku':
         op = opt.Options(vscale=0.1 if approach == 'goalBased' else 0.85,
-                         # family='dg-dg',
+                         family='dg-dg',
                          rm=60 if useAdjoint else 30,
                          gradate=True if (useAdjoint or approach == 'explicit') else False,
                          advect=False,
