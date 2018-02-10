@@ -186,22 +186,24 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
         fixedOpt.export_diagnostics = True
         fixedOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
 
+        # TODO: Compute adjoint solutions THIS DOESN'T WORK
+        # def includeIt():
+        #     if useAdjoint:
+        #         # Tell dolfin about timesteps, so it can compute functionals including measures of time other than dt[FINISH_TIME]
+        #         if cnt >= int(T/op.ndump):
+        #             finished = True
+        #         if cnt == 0:
+        #             adj_start_timestep()
+        #         else:
+        #             adj_inc_timestep(time=cnt*dt, finished=finished)
+        #     cnt += 1
+
         # Apply ICs and time integrate
         fixedSolver.assign_initial_conditions(elev=eta0)
+        # fixedSolver.iterate(export_func=includeIt)
         fixedSolver.iterate()
         primalTimer = clock() - primalTimer
         print('Time elapsed for fixed mesh solver: %.1fs (%.2fmins)' % (primalTimer, primalTimer / 60))
-
-        # TODO: somehow integrate this at EACH TIMESTEP...
-
-        # if useAdjoint:
-        #     # Tell dolfin about timesteps, so it can compute functionals including measures of time other than dt[FINISH_TIME]
-        #     if t >= T - dt:
-        #         finished = True
-        #     if t == 0.:
-        #         adj_start_timestep()
-        #     else:
-        #         adj_inc_timestep(time=t, finished=finished)
 
         primalTimer = clock() - primalTimer
         msc.dis('Primal run complete. Run time: %.3fs' % primalTimer, op.printStats)
@@ -351,7 +353,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
             adapSolver.iterate()
             cnt += op.rm
 
-            # TODO: Estimate OF using trapezium rule
+            # TODO: Estimate OF using trapezium rule, using a DiagnosticCallback object
 
         adaptTimer = clock() - adaptTimer
         # msc.dis('Adaptive primal run complete. Run time: %.3fs \nRelative error = %5.4f' % (adaptTimer, rel),
@@ -376,6 +378,7 @@ if __name__ == '__main__':
     if mode == 'tohoku':
         op = opt.Options(vscale=0.1 if approach == 'goalBased' else 0.85,
                          family='dg-dg',
+                         # timestepper='SSPRK33', # 3-stage, 3rd order Strong Stability Preserving Runge Kutta
                          rm=60 if useAdjoint else 30,
                          gradate=True if (useAdjoint or approach == 'explicit') else False,
                          advect=False,
@@ -385,7 +388,7 @@ if __name__ == '__main__':
                          gauges=False,
                          tAdapt=False,
                          bootstrap=False,
-                         printStats=True,
+                         printStats=False,
                          outputOF=True,
                          orderChange=0,
                          ndump=10,

@@ -37,7 +37,8 @@ class Options:
                  dt=1.,
                  ndump=15,
                  rm=30,
-                 orderChange=0):
+                 orderChange=0,
+                 timestepper='CrankNicolson'):
         """
         :param coarseness: mesh coarseness to use, where 1 is x-fine and 5 is x-coarse.
         :param family: mixed function space family, from {'dg-dg', 'dg-cg'}.
@@ -70,6 +71,7 @@ class Options:
         :param ndump: Timesteps per data dump.
         :param rm: Timesteps per remesh. (Should be an integer multiple of ndump.)
         :param orderChange: change in polynomial degree for residual approximation.
+        :param timestepper: timestepping scheme.
         """
         # Initial mesh parameters
         self.coarseness = coarseness
@@ -155,7 +157,7 @@ class Options:
         self.rm = rm
         self.orderChange = orderChange
         assert(type(ndump) == type(rm) == type(orderChange) == int)
-        self.timestepper = 'CrankNicolson'
+        self.timestepper = timestepper
 
         # Solver parameters
         self.params = {'mat_type': 'matfree',
