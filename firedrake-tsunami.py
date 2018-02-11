@@ -24,8 +24,7 @@ date = str(now.day)+'-'+str(now.month)+'-'+str(now.year%2000)
 # TODO: consider dual weighted implicit error, as well as DWR. Perhaps a more generalised setting for error estimates
 
 
-def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, mode='tohoku',
-                     op=opt.Options()):
+def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mode='tohoku', op=opt.Options()):
     """
     Run mesh adaptive simulations for the Tohoku problem.
     
@@ -34,6 +33,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
     :param getData: run forward simulation?
     :param getError: generate error estimates?
     :param useAdjoint: run adjoint simulation?
+    :param aposteriori: error estimator classification.
     :param mode: test case or main script used.
     :param op: parameter values.
     :return: mean element count and relative error in objective functional value.
@@ -143,50 +143,49 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
             dual_oi = Function(V_oi)
             dual_oi_u, dual_oi_e = dual_oi.split()
 
-    # Define Functions relating to DWR approach
-    if approach in ('explicit', 'DWR'):
-        rho = Function(V_oi if op.orderChange else V_h)
-        rho_u, rho_e = rho.split()
-        rho_u.rename("Velocity residual")
-        rho_e.rename("Elevation residual")
-        if useAdjoint:
-            dual_h = Function(V_h)
-            dual_h_u, dual_h_e = dual_h.split()
-            dual_h_u.rename('Fine adjoint velocity')
-            dual_h_e.rename('Fine adjoint elevation')
+    # Define Functions relating to a posteriori estimators
+    if aposteriori:
+        if approach in ('residualNorm', 'residual', 'explicit', 'DWR'):
+            rho = Function(V_oi if op.orderChange else V_h)
+            rho_u, rho_e = rho.split()
+            rho_u.rename("Velocity residual")
+            rho_e.rename("Elevation residual")
+            if useAdjoint:
+                dual_h = Function(V_h)
+                dual_h_u, dual_h_e = dual_h.split()
+                dual_h_u.rename('Fine adjoint velocity')
+                dual_h_e.rename('Fine adjoint elevation')
+            else:
+                qh = Function(V_h)
+                uh, eh = qh.split()
+                uh.rename("Fine velocity")
+                eh.rename("Fine elevation")
+            P0 = FunctionSpace(mesh_h, "DG", 0) if op.orderChange else FunctionSpace(mesh_H, "DG", 0)
         else:
-            qh = Function(V_h)
-            uh, eh = qh.split()
-            uh.rename("Fine velocity")
-            eh.rename("Fine elevation")
-    if useAdjoint:
-        dual = Function(V_H)
-        dual_u, dual_e = dual.split()
-        dual_u.rename("Adjoint velocity")
-        dual_e.rename("Adjoint elevation")
-        if mode == 'tohoku':
-            J = form.objectiveFunctionalSW(q, plot=True)
-        elif mode == 'shallow-water':
-            J = form.objectiveFunctionalSW(q, Tstart=op.Tstart, x1=0., x2=np.pi / 2, y1=0.5 * np.pi, y2=1.5 * np.pi,
-                                           smooth=False)
-        else:
-            raise NotImplementedError
-    if approach == 'implicit':
-        e_ = Function(V_oi)
-        e_0, e_1 = e_.split()
-        e_0.interpolate(Expression([0, 0]))
-        e_1.interpolate(Expression(0))
-        e = Function(V_oi, name="Implicit error estimate")
-        et = TestFunction(V_oi)
-        (et0, et1) = (as_vector((et[0], et[1])), et[2])
-        normal = FacetNormal(mesh_H)
-    if approach in ('explicit', 'fluxJump', 'implicit', 'DWF', 'DWR'):
-        if approach in ('DWF', 'fluxJump', 'implicit') or op.orderChange:
             P0 = FunctionSpace(mesh_H, "DG", 0)
-        else:
-            P0 = FunctionSpace(mesh_h, "DG", 0)
         v = TestFunction(P0)
         epsilon = Function(P0, name="Error indicator")
+        if useAdjoint:
+            dual = Function(V_H)
+            dual_u, dual_e = dual.split()
+            dual_u.rename("Adjoint velocity")
+            dual_e.rename("Adjoint elevation")
+            if mode == 'tohoku':
+                J = form.objectiveFunctionalSW(q, plot=True)
+            elif mode == 'shallow-water':
+                J = form.objectiveFunctionalSW(q, Tstart=op.Tstart, x1=0., x2=np.pi / 2, y1=0.5 * np.pi, y2=1.5 * np.pi,
+                                               smooth=False)
+            else:
+                raise NotImplementedError
+        if approach in ('implicitNorm', 'implicit', 'DWE'):
+            e_ = Function(V_oi)
+            e_0, e_1 = e_.split()
+            e_0.interpolate(Expression([0, 0]))
+            e_1.interpolate(Expression(0))
+            e = Function(V_oi, name="Implicit error estimate")
+            et = TestFunction(V_oi)
+            (et0, et1) = (as_vector((et[0], et[1])), et[2])
+            normal = FacetNormal(mesh_H)
 
     if op.outputOF:
         J_trap = 0.
@@ -427,10 +426,10 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
         errorTimer = clock() - errorTimer
         msc.dis('Errors estimated. Run time: %.3fs' % errorTimer, op.printStats)
 
-    if approach in ('hessianBased', 'explicit', 'fluxJump', 'implicit', 'DWF', 'DWR'):
+    if approach != 'fixedMesh':
 
         # Reset initial conditions
-        if approach != 'hessianBased':
+        if aposteriori:
             t = 0.
             u_.interpolate(Expression([0, 0]))
             eta_.interpolate(eta0)
@@ -444,7 +443,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
 
                 # Construct metric
                 W = TensorFunctionSpace(mesh_H, "CG", 1)
-                if approach in ('explicit', 'fluxJump', 'DWF', 'DWR'):
+                if aposteriori:
                     # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
                     with DumbCheckpoint(dirName + 'hdf5/error_' + msc.indexString(cnt), mode=FILE_READ) as loadError:
                         loadError.load(epsilon)
@@ -554,7 +553,7 @@ if __name__ == '__main__':
 
     # Choose mode and set parameter values
     mode = input("Choose problem: 'tohoku', 'shallow-water', 'rossby-wave': ")
-    approach, getData, getError, useAdjoint = msc.cheatCodes(input("""Choose error estimator from 
+    approach, getData, getError, useAdjoint, aposteriori = msc.cheatCodes(input("""Choose error estimator from 
     'residual', 'explicit', 'fluxJump', 'implicit', 'implicitNorm', 'DWF', 'DWR' or 'DWE': """))
     if mode == 'tohoku':
         op = opt.Options(vscale=0.1 if approach == 'DWR' else 0.85,
@@ -598,7 +597,7 @@ if __name__ == '__main__':
     maxRes = 4 if mode == 'tohoku' else 6
     textfile = open('outdata/outputs/'+mode+'/'+approach+date+'.txt', 'w+')
     for i in range(minRes, maxRes+1):
-        av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, mode=mode, op=op)
+        av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
         print('Run %d:  Mean element count %6d  Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
         textfile.write('%d, %.4f, %.1f\n' % (av, rel, timing))
         # try:

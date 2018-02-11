@@ -18,36 +18,42 @@ def cheatCodes(approach, default='DWR'):
         getData = False
         getError = False
         useAdjoint = False
-    elif approach in ('residual', 'explicit', 'fluxJump', 'implicit', 'implicitNorm'):
+        aposteriori = False
+    elif approach in ('residual', 'residualNorm', 'explicit', 'fluxJump', 'implicit', 'implicitNorm'):
         getData = True
         getError = True
         useAdjoint = False
+        aposteriori = True
     elif approach in ('DWR', 'DWE', 'DWF'):
         getData = True
         getError = True
         useAdjoint = True
+        aposteriori = True
     elif approach == 'saved':
         approach = \
             input("""Choose error estimator from 
-    'residual', 'explicit', 'fluxJump', 'implicit', 'implicitNorm', 'DWF', 'DWR' or 'DWE': """) \
+    'residual', 'residualNorm', 'explicit', 'fluxJump', 'implicit', 'implicitNorm', 'DWF', 'DWR' or 'DWE': """) \
             or 'DWR'
         getData = False
         getError = False
-        useAdjoint = True
+        useAdjoint = approach in ('DWF', 'DWR')
+        aposteriori = True
     elif approach == 'regen':
         approach = input("""Choose error estimator from 
-    'residual', 'explicit', 'fluxJump', 'implicit', 'implicitNorm', 'DWF', 'DWR' or 'DWE',: """) \
+    'residual', 'residualNorm', 'explicit', 'fluxJump', 'implicit', 'implicitNorm', 'DWF', 'DWR' or 'DWE',: """) \
             or 'DWR'
         getData = False
         getError = True
         useAdjoint = approach in ('DWF', 'DWR')
+        aposteriori = True
     else:
         approach = 'fixedMesh'
         getData = True
         getError = False
         useAdjoint = False
+        aposteriori = False
 
-    return approach, getData, getError, useAdjoint
+    return approach, getData, getError, useAdjoint, aposteriori
 
 
 def printTimings(primal, dual=False, error=False, adapt=False, boot=False):
