@@ -27,12 +27,16 @@ def cheatCodes(approach, default='goalBased'):
         getError = True
         useAdjoint = False
     elif approach == 'saved':
-        approach = input("Choose error estimator: 'explicit', 'adjointBased' or 'goalBased': ") or 'goalBased'
+        approach = \
+            input("Choose error estimator: 'explicit', 'fluxJump', 'implicit', 'adjointBased' or 'goalBased': ") \
+            or 'goalBased'
         getData = False
         getError = False
         useAdjoint = True
     elif approach == 'regen':
-        approach = input("Choose error estimator: 'explicit', 'adjointBased' or 'goalBased': ") or 'goalBased'
+        approach = \
+            input("Choose error estimator: 'explicit', 'fluxJump', 'implicit', 'adjointBased' or 'goalBased': ") \
+            or 'goalBased'
         getData = False
         getError = True
         useAdjoint = approach in ('adjointBased', 'goalBased')

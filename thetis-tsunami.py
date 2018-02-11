@@ -245,9 +245,19 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
     if getError:
         msc.dis('\nStarting error estimate generation', op.printStats)
         errorTimer = clock()
-        for k in range(0, iEnd, op.rm):
-            msc.dis('Generating error estimate %d / %d' % (k / op.rm + 1, iEnd / op.rm + 1), op.printStats)
+        for k in range(0, int(iEnd/op.ndump), int(op.rm/op.ndump)):
+            msc.dis('Generating error estimate %d / %d' % (k+1, iEnd/op.ndump + 1), op.printStats)
             indexStr = msc.indexString(k)
+
+            if approach == 'fluxJump':
+                with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as loadVel:
+                    loadVel.load(uv_2d)
+                    loadVel.close()
+                with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as loadElev:
+                    loadElev.load(elev_2d)
+                    loadElev.close()
+                epsilon = err.fluxJumpError(q, v)
+                epsilon.rename("Error indicator")
 
             # TODO: Load forward data from HDF5
             # TODO: estimate OF using trapezium rule and output (inc. fixed mesh case)
@@ -255,6 +265,12 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
             # TODO: load adjoint data from HDF5
             # TODO: form error estimates
 
+            # Store error estimates
+            with DumbCheckpoint(dirName+'hdf5/'+approach+'Error'+indexStr, mode=FILE_CREATE) as saveErr:
+                saveErr.store(epsilon)
+                saveErr.close()
+            if op.plotpvd:
+                errorFile.write(epsilon, time=float(k))
         errorTimer = clock() - errorTimer
         msc.dis('Errors estimated. Run time: %.3fs' % errorTimer, op.printStats)
 
@@ -264,16 +280,17 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
         if approach != 'hessianBased':
             uv_2d.interpolate(Expression([0, 0]))
             elev_2d.interpolate(eta0)
+            epsilon = Function(P0, name="Error indicator")
         if op.gradate:
             H0 = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(CellSize(mesh_H))
         msc.dis('\nStarting adaptive mesh primal run (forwards in time)', op.printStats)
         adaptTimer = clock()
         while cnt < np.ceil(T / dt):
             stepTimer = clock()
+            indexStr = msc.indexString(int(cnt / op.ndump))
 
             # Load variables from disk
             if cnt != 0:
-                indexStr = msc.indexString(int(cnt / op.ndump))
                 with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as loadElev:
                     loadElev.load(elev_2d, name='elev_2d')
                     loadElev.close()
@@ -285,9 +302,9 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
             W = TensorFunctionSpace(mesh_H, "CG", 1)
             if approach in ('explicit', 'fluxJump', 'adjointBased', 'goalBased'):
                 # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
-                with DumbCheckpoint(dirName + 'hdf5/error_' + msc.indexString(cnt), mode=FILE_READ) as loadError:
-                    loadError.load(epsilon)
-                    loadError.close()
+                with DumbCheckpoint(dirName+'hdf5/'+approach+'Error'+indexStr, mode=FILE_READ) as loadErr:
+                    loadErr.load(epsilon)
+                    loadErr.close()
                 errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon)[0])
                 M = adap.isotropicMetric(W, errEst, op=op, invert=False)
             else:
