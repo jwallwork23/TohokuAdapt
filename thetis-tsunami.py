@@ -81,7 +81,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
     elev_2d.rename("elev_2d")
 
     # Establish finer mesh (h < H) upon which to approximate error
-    if approach in ('explicit', 'goalBased'):
+    if approach in ('explicit', 'DWR'):
         mesh_h = adap.isoP2(mesh_H)
         V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
         b_h = msh.TohokuDomain(mesh=mesh_h)[2]
@@ -109,8 +109,8 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
             dual_oi = Function(V_oi)
             dual_oi_u, dual_oi_e = dual_oi.split()
 
-    # Define Functions relating to goalBased approach
-    if approach in ('explicit', 'goalBased'):
+    # Define Functions relating to DWR approach
+    if approach in ('explicit', 'DWR'):
         rho = Function(V_oi if op.orderChange else V_h)
         rho_u, rho_e = rho.split()
         rho_u.rename("Velocity residual")
@@ -146,8 +146,8 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
         et = TestFunction(V_oi)
         (et0, et1) = (as_vector((et[0], et[1])), et[2])
         normal = FacetNormal(mesh_H)
-    if approach in ('explicit', 'fluxJump', 'implicit', 'adjointBased', 'goalBased'):
-        if approach in ('adjointBased', 'fluxJump', 'implicit') or op.orderChange:
+    if approach in ('explicit', 'fluxJump', 'implicit', 'DWF', 'DWR'):
+        if approach in ('DWF', 'fluxJump', 'implicit') or op.orderChange:
             P0 = FunctionSpace(mesh_H, "DG", 0)
         else:
             P0 = FunctionSpace(mesh_h, "DG", 0)
@@ -274,7 +274,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
         errorTimer = clock() - errorTimer
         msc.dis('Errors estimated. Run time: %.3fs' % errorTimer, op.printStats)
 
-    if approach in ('hessianBased', 'explicit', 'fluxJump', 'implicit', 'adjointBased', 'goalBased'):
+    if approach in ('hessianBased', 'explicit', 'fluxJump', 'implicit', 'DWF', 'DWR'):
 
         # Reset initial conditions
         if approach != 'hessianBased':
@@ -300,7 +300,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
 
             # Construct metric
             W = TensorFunctionSpace(mesh_H, "CG", 1)
-            if approach in ('explicit', 'fluxJump', 'adjointBased', 'goalBased'):
+            if approach in ('explicit', 'fluxJump', 'DWF', 'DWR'):
                 # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
                 with DumbCheckpoint(dirName+'hdf5/'+approach+'Error'+indexStr, mode=FILE_READ) as loadErr:
                     loadErr.load(epsilon)
@@ -390,16 +390,16 @@ if __name__ == '__main__':
 
     # Choose mode and set parameter values
     mode = input("Choose problem: 'tohoku', 'shallow-water', 'rossby-wave': ")
-    approach, getData, getError, useAdjoint = msc.cheatCodes(input(
-        "Choose error estimator: 'hessianBased', 'explicit', 'fluxJump', 'implicit', 'adjointBased' or 'goalBased': "))
+    approach, getData, getError, useAdjoint = msc.cheatCodes(input("""Choose error estimator from 
+    'residual', 'explicit', 'fluxJump', 'implicit', 'implicitNorm', 'DWF', 'DWR' or 'DWE': """))
     if mode == 'tohoku':
-        op = opt.Options(vscale=0.1 if approach == 'goalBased' else 0.85,
+        op = opt.Options(vscale=0.1 if approach == 'DWR' else 0.85,
                          family='dg-dg',
                          # timestepper='SSPRK33', # 3-stage, 3rd order Strong Stability Preserving Runge Kutta
                          rm=60 if useAdjoint else 30,
                          gradate=True if (useAdjoint or approach == 'explicit') else False,
                          advect=False,
-                         window=True if approach == 'adjointBased' else False,
+                         window=True if approach == 'DWF' else False,
                          outputMetric=False,
                          plotpvd=False,
                          gauges=False,
@@ -423,7 +423,7 @@ if __name__ == '__main__':
                          printStats=False,
                          outputOF=True,
                          advect=False,
-                         window=True if approach == 'adjointBased' else False,
+                         window=True if approach == 'DWF' else False,
                          vscale=0.4 if useAdjoint else 0.85,
                          orderChange=0,
                          plotpvd=False)

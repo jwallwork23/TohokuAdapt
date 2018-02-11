@@ -6,7 +6,7 @@ def indexString(index):
     return (5 - len(str(index))) * '0' + str(index)
 
 
-def cheatCodes(approach, default='goalBased'):
+def cheatCodes(approach, default='DWR'):
     """
     Enable skipping of sections of code using 'saved' and 'regen'.
     
@@ -14,32 +14,33 @@ def cheatCodes(approach, default='goalBased'):
     :return: approach to use and keys to skip sections.
     """
     approach = approach or default
-    if approach in ('goalBased', 'adjointBased'):
-        getData = True
-        getError = True
-        useAdjoint = True
-    elif approach == 'hessianBased':
+    if approach in ('norm', 'fieldBased', 'gradientBased', 'hessianBased'):
         getData = False
         getError = False
         useAdjoint = False
-    elif approach in ('explicit', 'fluxJump', 'implicit'):
+    elif approach in ('residual', 'explicit', 'fluxJump', 'implicit', 'implicitNorm'):
         getData = True
         getError = True
         useAdjoint = False
+    elif approach in ('DWR', 'DWE', 'DWF'):
+        getData = True
+        getError = True
+        useAdjoint = True
     elif approach == 'saved':
         approach = \
-            input("Choose error estimator: 'explicit', 'fluxJump', 'implicit', 'adjointBased' or 'goalBased': ") \
-            or 'goalBased'
+            input("""Choose error estimator from 
+    'residual', 'explicit', 'fluxJump', 'implicit', 'implicitNorm', 'DWF', 'DWR' or 'DWE': """) \
+            or 'DWR'
         getData = False
         getError = False
         useAdjoint = True
     elif approach == 'regen':
-        approach = \
-            input("Choose error estimator: 'explicit', 'fluxJump', 'implicit', 'adjointBased' or 'goalBased': ") \
-            or 'goalBased'
+        approach = input("""Choose error estimator from 
+    'residual', 'explicit', 'fluxJump', 'implicit', 'implicitNorm', 'DWF', 'DWR' or 'DWE',: """) \
+            or 'DWR'
         getData = False
         getError = True
-        useAdjoint = approach in ('adjointBased', 'goalBased')
+        useAdjoint = approach in ('DWF', 'DWR')
     else:
         approach = 'fixedMesh'
         getData = True

@@ -101,7 +101,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
     eta.rename("elev_2d")
 
     # Establish finer mesh (h < H) upon which to approximate error
-    if approach in ('explicit', 'goalBased'):
+    if approach in ('explicit', 'DWR'):
         mesh_h = adap.isoP2(mesh_H)
         V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
         if mode == 'tohoku':
@@ -143,8 +143,8 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
             dual_oi = Function(V_oi)
             dual_oi_u, dual_oi_e = dual_oi.split()
 
-    # Define Functions relating to goalBased approach
-    if approach in ('explicit', 'goalBased'):
+    # Define Functions relating to DWR approach
+    if approach in ('explicit', 'DWR'):
         rho = Function(V_oi if op.orderChange else V_h)
         rho_u, rho_e = rho.split()
         rho_u.rename("Velocity residual")
@@ -180,8 +180,8 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
         et = TestFunction(V_oi)
         (et0, et1) = (as_vector((et[0], et[1])), et[2])
         normal = FacetNormal(mesh_H)
-    if approach in ('explicit', 'fluxJump', 'implicit', 'adjointBased', 'goalBased'):
-        if approach in ('adjointBased', 'fluxJump', 'implicit') or op.orderChange:
+    if approach in ('explicit', 'fluxJump', 'implicit', 'DWF', 'DWR'):
+        if approach in ('DWF', 'fluxJump', 'implicit') or op.orderChange:
             P0 = FunctionSpace(mesh_H, "DG", 0)
         else:
             P0 = FunctionSpace(mesh_h, "DG", 0)
@@ -244,7 +244,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
                     with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_CREATE) as saveErr:
                         saveErr.store(epsilon)
                         saveErr.close()
-                elif (approach in ('explicit', 'goalBased')):
+                elif (approach in ('explicit', 'DWR')):
                     if op.orderChange:
                         u_oi.interpolate(u)
                         eta_oi.interpolate(eta)
@@ -260,7 +260,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
                             Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt)
                         else:
                             Au, Ae = form.strongResidualSW(qh, q_h, b, Dt)
-                    if approach in ('explicit', 'goalBased'):
+                    if approach in ('explicit', 'DWR'):
                         rho_u.interpolate(Au)
                         rho_e.interpolate(Ae)
                         with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_CREATE) as saveRes:
@@ -269,7 +269,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
                             saveRes.close()
                         if op.plotpvd:
                             residualFile.write(rho_u, rho_e, time=t)
-                if approach in ('adjointBased', 'explicit', 'fluxJump'):
+                if approach in ('DWF', 'explicit', 'fluxJump'):
                     with DumbCheckpoint(dirName + 'hdf5/forward_' + indexStr, mode=FILE_CREATE) as saveFor:
                         saveFor.store(u)
                         saveFor.store(eta)
@@ -329,7 +329,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
                     indexStr = msc.indexString(cnt)
 
                     dual.assign(variable, annotate=False)
-                    if op.window or ((op.orderChange or approach == 'adjointBased') and cnt % op.rm == 0):
+                    if op.window or ((op.orderChange or approach == 'DWF') and cnt % op.rm == 0):
                         dual_u, dual_e = dual.split()
                         dual_u.rename('Adjoint velocity')
                         dual_e.rename('Adjoint elevation')
@@ -337,7 +337,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
                             saveAdjH.store(dual_u)
                             saveAdjH.store(dual_e)
                             saveAdjH.close()
-                    elif (approach == 'goalBased') and cnt % op.rm == 0:
+                    elif (approach == 'DWR') and cnt % op.rm == 0:
                         dual_h = inte.mixedPairInterp(mesh_h, V_h, dual)[0]
                         dual_h_u, dual_h_e = dual_h.split()
                         dual_h_u.rename('Fine adjoint velocity')
@@ -368,7 +368,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
 
             # Load forward / adjoint / residual data from HDF5
             if useAdjoint:
-                if (approach == 'goalBased') and not op.orderChange:
+                if (approach == 'DWR') and not op.orderChange:
                     with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_READ) as loadAdj:
                         loadAdj.load(dual_h_u)
                         loadAdj.load(dual_h_e)
@@ -381,7 +381,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
                     if op.orderChange:
                         dual_oi_u.interpolate(dual_u)
                         dual_oi_e.interpolate(dual_e)
-            if (approach in ('explicit', 'fluxJump', 'adjointBased')):
+            if (approach in ('explicit', 'fluxJump', 'DWF')):
                 with DumbCheckpoint(dirName + 'hdf5/forward_' + indexStr, mode=FILE_READ) as loadFor:
                     loadFor.load(u)
                     loadFor.load(eta)
@@ -389,15 +389,15 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
                 if op.orderChange:
                     u_oi.interpolate(u)
                     eta_oi.interpolate(eta)
-            if (approach in ('explicit', 'goalBased')):
+            if (approach in ('explicit', 'DWR')):
                 with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_READ) as loadRes:
                     loadRes.load(rho_u)
                     loadRes.load(rho_e)
                     loadRes.close()
 
-            if approach == 'adjointBased':
+            if approach == 'DWF':
                 epsilon = err.basicErrorEstimator(q, dual, v)
-            elif approach == 'goalBased':
+            elif approach == 'DWR':
                 epsilon = err.DWR(rho, dual_oi if op.orderChange else dual_h, v)
             elif approach == 'explicit':
                 epsilon = err.explicitErrorEstimator(q_oi if op.orderChange else q, rho, b, v,
@@ -427,7 +427,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
         errorTimer = clock() - errorTimer
         msc.dis('Errors estimated. Run time: %.3fs' % errorTimer, op.printStats)
 
-    if approach in ('hessianBased', 'explicit', 'fluxJump', 'implicit', 'adjointBased', 'goalBased'):
+    if approach in ('hessianBased', 'explicit', 'fluxJump', 'implicit', 'DWF', 'DWR'):
 
         # Reset initial conditions
         if approach != 'hessianBased':
@@ -444,7 +444,7 @@ def solverSW(startRes, approach, getData=True, getError=True, useAdjoint=True, m
 
                 # Construct metric
                 W = TensorFunctionSpace(mesh_H, "CG", 1)
-                if approach in ('explicit', 'fluxJump', 'adjointBased', 'goalBased'):
+                if approach in ('explicit', 'fluxJump', 'DWF', 'DWR'):
                     # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
                     with DumbCheckpoint(dirName + 'hdf5/error_' + msc.indexString(cnt), mode=FILE_READ) as loadError:
                         loadError.load(epsilon)
@@ -554,15 +554,15 @@ if __name__ == '__main__':
 
     # Choose mode and set parameter values
     mode = input("Choose problem: 'tohoku', 'shallow-water', 'rossby-wave': ")
-    approach, getData, getError, useAdjoint = msc.cheatCodes(input(
-        "Choose error estimator: 'hessianBased', 'explicit', 'fluxJump', 'implicit', 'adjointBased' or 'goalBased': "))
+    approach, getData, getError, useAdjoint = msc.cheatCodes(input("""Choose error estimator from 
+    'residual', 'explicit', 'fluxJump', 'implicit', 'implicitNorm', 'DWF', 'DWR' or 'DWE': """))
     if mode == 'tohoku':
-        op = opt.Options(vscale=0.1 if approach == 'goalBased' else 0.85,
+        op = opt.Options(vscale=0.1 if approach == 'DWR' else 0.85,
                          # family='dg-dg',
                          rm=60 if useAdjoint else 30,
                          gradate=True if (useAdjoint or approach == 'explicit') else False,
                          advect=False,
-                         window=True if approach == 'adjointBased' else False,
+                         window=True if approach == 'DWF' else False,
                          outputMetric=False,
                          plotpvd=False,
                          gauges=False,
@@ -586,7 +586,7 @@ if __name__ == '__main__':
                          printStats=False,
                          outputOF=True,
                          advect=False,
-                         window=True if approach == 'adjointBased' else False,
+                         window=True if approach == 'DWF' else False,
                          vscale=0.4 if useAdjoint else 0.85,
                          orderChange=0,
                          plotpvd=False)
