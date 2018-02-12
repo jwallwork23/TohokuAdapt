@@ -52,6 +52,26 @@ def constructHessian(mesh, V, sol, op=None):
     return H
 
 
+def constructGradient(mesh, sol):
+    """
+    Reconstructs the gradient of a scalar solution field with respect to the current mesh.
+
+    :arg mesh: current mesh on which variables are defined.
+    :arg sol: P1 solution field defined on ``mesh``.
+    :param op: Options class object providing min/max cell size values.
+    :return: reconstructed gradient associated with ``sol``.
+    """
+    W = VectorFunctionSpace(mesh, 'CG', 1)
+    g = Function(W)
+    psi = TestFunction(W)
+    Lg = (inner(g, psi) - inner(grad(sol), psi)) * dx
+    NonlinearVariationalSolver(NonlinearVariationalProblem(Lg, g), solver_parameters={'snes_rtol': 1e8,
+                                                                                      'ksp_rtol': 1e-5,
+                                                                                      'ksp_gmres_restart': 20,
+                                                                                      'pc_type': 'sor'}).solve()
+    return g
+
+
 def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=None):
     """
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``computeSteadyMetric``, from 
@@ -147,7 +167,7 @@ def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=None):
 def isotropicMetric(V, f, bdy=False, op=None, invert=True):
     """
     :arg V: tensor function space on which metric will be defined.
-    :arg f: (scalar) function to adapt to.
+    :arg f: function to adapt to.
     :param bdy: toggle boundary metric.
     :param op: Options class object providing min/max cell size values.
     :param invert: toggle cell size vs error.
@@ -167,8 +187,8 @@ def isotropicMetric(V, f, bdy=False, op=None, invert=True):
     if (family == 'Lagrange') & (deg == 1):
         g.assign(f)
     else:
-        print("""Field for adaption is degree %d %s. Interpolation is required to 
-get a degree 1 Lagrange metric.""" % (deg, family))
+    #     print("""Field for adaption is degree %d %s. Interpolation is required to
+# get a degree 1 Lagrange metric.""" % (deg, family))
         g.interpolate(f)
     for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(len(g.dat.data)):
         shape = len(f.ufl_element().value_shape())

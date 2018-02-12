@@ -54,23 +54,21 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         residualFile = File(dirName + "residual.pvd")
         errorFile = File(dirName + "errorIndicator.pvd")
 
-    # Load Mesh(es)
+    # Load Mesh, initial condition and bathymetry
     if mode == 'tohoku':
         nEle = op.meshes[startRes]
-        mesh_H, eta0, b = msh.TohokuDomain(nEle)  # Computational mesh
+        mesh_H, eta0, b = msh.TohokuDomain(nEle)
     elif mode == 'shallow-water':
         lx = 2 * np.pi
         n = pow(2, startRes)
-        mesh_H = SquareMesh(n, n, lx, lx)  # Computational mesh
+        mesh_H = SquareMesh(n, n, lx, lx)
         nEle = msh.meshStats(mesh_H)[0]
         x, y = SpatialCoordinate(mesh_H)
-    else:
-        raise NotImplementedError
-
-    if mode == 'shallow-water':
         P1_2d = FunctionSpace(mesh_H, "CG", 1)
         eta0 = Function(P1_2d).interpolate(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))))
         b = Function(P1_2d).assign(0.1)
+    else:
+        raise NotImplementedError
 
     # Define initial FunctionSpace and variables of problem and apply initial conditions
     V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
@@ -109,49 +107,49 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             dual_oi = Function(V_oi)
             dual_oi_u, dual_oi_e = dual_oi.split()
 
-            # Define Functions relating to a posteriori estimators
-        if aposteriori:
-            if approach in ('residualNorm', 'residual', 'explicit', 'DWR'):
-                rho = Function(V_oi if op.orderChange else V_h)
-                rho_u, rho_e = rho.split()
-                rho_u.rename("Velocity residual")
-                rho_e.rename("Elevation residual")
-                if useAdjoint:
-                    dual_h = Function(V_h)
-                    dual_h_u, dual_h_e = dual_h.split()
-                    dual_h_u.rename('Fine adjoint velocity')
-                    dual_h_e.rename('Fine adjoint elevation')
-                else:
-                    qh = Function(V_h)
-                    uh, eh = qh.split()
-                    uh.rename("Fine velocity")
-                    eh.rename("Fine elevation")
-                P0 = FunctionSpace(mesh_h, "DG", 0) if op.orderChange else FunctionSpace(mesh_H, "DG", 0)
-            else:
-                P0 = FunctionSpace(mesh_H, "DG", 0)
-            v = TestFunction(P0)
-            epsilon = Function(P0, name="Error indicator")
+    # Define Functions relating to a posteriori estimators
+    if aposteriori or approach == 'norm':
+        if approach in ('residualNorm', 'residual', 'explicit', 'DWR'):
+            rho = Function(V_oi if op.orderChange else V_h)
+            rho_u, rho_e = rho.split()
+            rho_u.rename("Velocity residual")
+            rho_e.rename("Elevation residual")
             if useAdjoint:
-                dual = Function(V_H)
-                dual_u, dual_e = dual.split()
-                dual_u.rename("Adjoint velocity")
-                dual_e.rename("Adjoint elevation")
-                if mode == 'tohoku':
-                    J = form.objectiveFunctionalSW(q, plot=True)
-                elif mode == 'shallow-water':
-                    J = form.objectiveFunctionalSW(q, Tstart=op.Tstart, x1=0., x2=np.pi / 2, y1=0.5 * np.pi,y2=1.5 * np.pi,
-                                                   smooth=False)
-                else:
-                    raise NotImplementedError
-            if approach in ('implicitNorm', 'implicit', 'DWE'):
-                e_ = Function(V_oi)
-                e_0, e_1 = e_.split()
-                e_0.interpolate(Expression([0, 0]))
-                e_1.interpolate(Expression(0))
-                e = Function(V_oi, name="Implicit error estimate")
-                et = TestFunction(V_oi)
-                (et0, et1) = (as_vector((et[0], et[1])), et[2])
-                normal = FacetNormal(mesh_H)
+                dual_h = Function(V_h)
+                dual_h_u, dual_h_e = dual_h.split()
+                dual_h_u.rename('Fine adjoint velocity')
+                dual_h_e.rename('Fine adjoint elevation')
+            else:
+                qh = Function(V_h)
+                uh, eh = qh.split()
+                uh.rename("Fine velocity")
+                eh.rename("Fine elevation")
+            P0 = FunctionSpace(mesh_h, "DG", 0) if op.orderChange else FunctionSpace(mesh_H, "DG", 0)
+        else:
+            P0 = FunctionSpace(mesh_H, "DG", 0)
+        v = TestFunction(P0)
+        epsilon = Function(P0, name="Error indicator")
+        if useAdjoint:
+            dual = Function(V_H)
+            dual_u, dual_e = dual.split()
+            dual_u.rename("Adjoint velocity")
+            dual_e.rename("Adjoint elevation")
+            if mode == 'tohoku':
+                J = form.objectiveFunctionalSW(q, plot=True)
+            elif mode == 'shallow-water':
+                J = form.objectiveFunctionalSW(q, Tstart=op.Tstart, x1=0., x2=np.pi / 2, y1=0.5 * np.pi,y2=1.5 * np.pi,
+                                               smooth=False)
+            else:
+                raise NotImplementedError
+        if approach in ('implicitNorm', 'implicit', 'DWE'):
+            e_ = Function(V_oi)
+            e_0, e_1 = e_.split()
+            e_0.interpolate(Expression([0, 0]))
+            e_1.interpolate(Expression(0))
+            e = Function(V_oi, name="Implicit error estimate")
+            et = TestFunction(V_oi)
+            (et0, et1) = (as_vector((et[0], et[1])), et[2])
+            normal = FacetNormal(mesh_H)
 
     if op.outputOF:
         J_trap = 0.
@@ -307,20 +305,31 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon)[0])
                 M = adap.isotropicMetric(W, errEst, op=op, invert=False)
             else:
-                if op.mtype != 's':
-                    if op.iso:
-                        M = adap.isotropicMetric(W, elev_2d, op=op)
-                    else:
-                        H = adap.constructHessian(mesh_H, W, elev_2d, op=op)
-                        M = adap.computeSteadyMetric(mesh_H, W, H, elev_2d, nVerT=nVerT, op=op)
-                if op.mtype != 'f':
-                    spd = Function(FunctionSpace(mesh_H, 'DG', 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
-                    if op.iso:
-                        M2 = adap.isotropicMetric(W, spd, op=op)
-                    else:
-                        H = adap.constructHessian(mesh_H, W, spd, op=op)
-                        M2 = adap.computeSteadyMetric(mesh_H, W, H, spd, nVerT=nVerT, op=op)
-                    M = adap.metricIntersection(mesh_H, W, M, M2) if op.mtype == 'b' else M2
+                if approach == 'norm':
+                    v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
+                    norm = assemble(v * inner(q, q) * dx)
+                    M = adap.isotropicMetric(W, norm, op=op, invert=False)
+                else:
+                    if op.mtype != 's':
+                        if approach == 'fieldBased':
+                            M = adap.isotropicMetric(W, elev_2d, op=op, invert=False)
+                        elif approach == 'gradientBased':
+                            g = adap.constructGradient(mesh_H, elev_2d)
+                            M = adap.isotropicMetric(W, g, op=op, invert=False)
+                        elif approach == 'hessianBased':
+                            H = adap.constructHessian(mesh_H, W, elev_2d, op=op)
+                            M = adap.computeSteadyMetric(mesh_H, W, H, elev_2d, nVerT=nVerT, op=op)
+                    if op.mtype != 'f':
+                        spd = Function(FunctionSpace(mesh_H, 'DG', 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
+                        if approach == 'fieldBased':
+                            M2 = adap.isotropicMetric(W, spd, op=op, invert=False)
+                        elif approach == 'gradientBased':
+                            g = adap.constructGradient(mesh_H, spd)
+                            M = adap.isotropicMetric(W, g, op=op, invert=False)
+                        elif approach == 'hessianBased':
+                            H = adap.constructHessian(mesh_H, W, spd, op=op)
+                            M2 = adap.computeSteadyMetric(mesh_H, W, H, spd, nVerT=nVerT, op=op)
+                        M = adap.metricIntersection(mesh_H, W, M, M2) if op.mtype == 'b' else M2
             if op.gradate:
                 M_ = adap.isotropicMetric(W, inte.interp(mesh_H, H0)[0], bdy=True, op=op)  # Initial boundary metric
                 M = adap.metricIntersection(mesh_H, W, M, M_, bdy=True)
@@ -344,7 +353,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = False
             adapOpt.use_grad_depth_viscosity_term = False
-            adapOpt.simulation_export_time = dt * op.ndump
+            adapOpt.simulation_export_time = dt * op.ndump  # TODO: in this run could save every `rm`?
             startT = endT
             endT += dt * op.rm
             adapOpt.simulation_end_time = endT
@@ -390,7 +399,9 @@ if __name__ == '__main__':
     # Choose mode and set parameter values
     mode = input("Choose problem: 'tohoku', 'shallow-water', 'rossby-wave': ")
     approach, getData, getError, useAdjoint, aposteriori = msc.cheatCodes(input("""Choose error estimator from 
-    'residual', 'explicit', 'fluxJump', 'implicit', 'implicitNorm', 'DWF', 'DWR' or 'DWE': """))
+'norm', 'fieldBased', 'gradientBased', 'hessianBased',
+'residual', 'explicit', 'fluxJump', 'implicit', 'implicitNorm', 
+'DWF', 'DWR' or 'DWE': """))
     if mode == 'tohoku':
         op = opt.Options(vscale=0.1 if approach == 'DWR' else 0.85,
                          family='dg-dg',

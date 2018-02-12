@@ -451,20 +451,31 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon)[0])
                     M = adap.isotropicMetric(W, errEst, op=op, invert=False)
                 else:
-                    if op.mtype != 's':
-                        if op.iso:
-                            M = adap.isotropicMetric(W, eta, op=op)
-                        else:
-                            H = adap.constructHessian(mesh_H, W, eta, op=op)
-                            M = adap.computeSteadyMetric(mesh_H, W, H, eta, nVerT=nVerT, op=op)
-                    if op.mtype != 'f':
-                        spd = Function(FunctionSpace(mesh_H, 'DG', 1)).interpolate(sqrt(dot(u, u)))
-                        if op.iso:
-                            M2 = adap.isotropicMetric(W, spd, op=op)
-                        else:
-                            H = adap.constructHessian(mesh_H, W, spd, op=op)
-                            M2 = adap.computeSteadyMetric(mesh_H, W, H, spd, nVerT=nVerT, op=op)
-                        M = adap.metricIntersection(mesh_H, W, M, M2) if op.mtype == 'b' else M2
+                    if approach == 'norm':
+                        v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
+                        norm = assemble(v*inner(q, q)*dx)
+                        M = adap.isotropicMetric(W, norm, op=op, invert=False)
+                    else:
+                        if op.mtype != 's':
+                            if approach == 'fieldBased':
+                                M = adap.isotropicMetric(W, eta, op=op, invert=False)
+                            elif approach == 'gradientBased':
+                                g = adap.constructGradient(mesh_H, eta)
+                                M = adap.isotropicMetric(W, g, op=op, invert=False)
+                            elif approach == 'hessianBased':
+                                H = adap.constructHessian(mesh_H, W, eta, op=op)
+                                M = adap.computeSteadyMetric(mesh_H, W, H, eta, nVerT=nVerT, op=op)
+                        if op.mtype != 'f':
+                            spd = Function(FunctionSpace(mesh_H, 'DG', 1)).interpolate(sqrt(dot(u, u)))
+                            if approach == 'fieldBased':
+                                M2 = adap.isotropicMetric(W, spd, op=op, invert=False)
+                            elif approach == 'gradientBased':
+                                g = adap.constructGradient(mesh_H, spd)
+                                M = adap.isotropicMetric(W, g, op=op, invert=False)
+                            elif approach == 'hessianBased':
+                                H = adap.constructHessian(mesh_H, W, spd, op=op)
+                                M2 = adap.computeSteadyMetric(mesh_H, W, H, spd, nVerT=nVerT, op=op)
+                            M = adap.metricIntersection(mesh_H, W, M, M2) if op.mtype == 'b' else M2
                 if op.gradate:
                     M_ = adap.isotropicMetric(W, inte.interp(mesh_H, H0)[0], bdy=True, op=op) # Initial boundary metric
                     M = adap.metricIntersection(mesh_H, W, M, M_, bdy=True)
@@ -554,7 +565,9 @@ if __name__ == '__main__':
     # Choose mode and set parameter values
     mode = input("Choose problem: 'tohoku', 'shallow-water', 'rossby-wave': ")
     approach, getData, getError, useAdjoint, aposteriori = msc.cheatCodes(input("""Choose error estimator from 
-    'residual', 'explicit', 'fluxJump', 'implicit', 'implicitNorm', 'DWF', 'DWR' or 'DWE': """))
+'norm', 'fieldBased', 'gradientBased', 'hessianBased',
+'residual', 'explicit', 'fluxJump', 'implicit', 'implicitNorm', 
+'DWF', 'DWR' or 'DWE': """))
     if mode == 'tohoku':
         op = opt.Options(vscale=0.1 if approach == 'DWR' else 0.85,
                          # family='dg-dg',
@@ -582,7 +595,7 @@ if __name__ == '__main__':
                          ndump=1,
                          gradate=False,
                          bootstrap=False,
-                         printStats=False,
+                         printStats=True,
                          outputOF=True,
                          advect=False,
                          window=True if approach == 'DWF' else False,
