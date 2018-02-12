@@ -19,29 +19,16 @@ def cheatCodes(approach, default='DWR'):
         getError = False
         useAdjoint = False
         aposteriori = False
-    elif approach in ('residual', 'explicit', 'fluxJump', 'implicit'):
+    elif approach in ('residual', 'explicit', 'fluxJump', 'implicit', 'DWR', 'DWE', 'DWF'):
         getData = True
         getError = True
-        useAdjoint = False
-        aposteriori = approach in ('residual', 'explicit', 'implicit')
-    elif approach in ('DWR', 'DWE', 'DWF'):
-        getData = True
-        getError = True
-        useAdjoint = True
-        aposteriori = True
-    elif approach == 'saved':
-        approach = \
-            input("""Choose error estimator from 
-    'residual', 'explicit', 'fluxJump', 'implicit', 'DWF', 'DWR' or 'DWE': """) or 'DWR'
-        getData = False
-        getError = False
-        useAdjoint = approach in ('DWF', 'DWR')
-        aposteriori = True
-    elif approach == 'regen':
+        useAdjoint = approach in ('DWR', 'DWE', 'DWF')
+        aposteriori = approach != 'fluxJump'
+    elif approach in ('saved', 'regen'):
         approach = input("""Choose error estimator from 
     'residual', 'explicit', 'fluxJump', 'implicit', 'DWF', 'DWR' or 'DWE': """) or 'DWR'
         getData = False
-        getError = True
+        getError = approach == 'regen'
         useAdjoint = approach in ('DWF', 'DWR')
         aposteriori = True
     else:

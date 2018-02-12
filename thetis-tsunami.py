@@ -95,8 +95,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                * FunctionSpace(mesh_H, op.space2, op.degree2 + op.orderChange)
         q_oi = Function(V_oi)
         uv_2d_oi, elev_2d_oi = q_oi.split()
-        q__oi = Function(V_oi)
-        uv_2d_oi_, elev_2d_oi_ = q__oi.split()
+        q_oi_ = Function(V_oi)
+        uv_2d_oi_, elev_2d_oi_ = q_oi_.split()
         b_oi = Function(V_oi.sub(1)).interpolate(b)
         if useAdjoint:
             dual_oi = Function(V_oi)
@@ -160,9 +160,13 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     # Get timestep
     solver_obj = solver2d.FlowSolver2d(mesh_H, b)
-    solver_obj.create_equations()
-    dt = min(np.abs(solver_obj.compute_time_step().dat.data))
-    iEnd = int(np.ceil(T / (dt * op.rm)))
+    if approach == 'tohoku':
+        solver_obj.create_equations()
+        dt = min(np.abs(solver_obj.compute_time_step().dat.data))
+    else:
+        dt = 0.025
+    Dt = Constant(dt)
+    iEnd = int(T / (dt * op.rm))
 
     if getData:
         msc.dis('Starting fixed mesh primal run (forwards in time)', op.printStats)
@@ -176,14 +180,14 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         options.element_family = op.family
         options.use_nonlinear_equations = False
         options.use_grad_depth_viscosity_term = False
-        options.simulation_export_time = dt * (op.ndump-1) if aposteriori else dt * op.ndump
+        options.simulation_export_time = dt * (op.rm-1) if aposteriori else dt * op.ndump
         options.simulation_end_time = T
         options.timestepper_type = op.timestepper
         options.timestep = dt
         options.output_directory = dirName
         options.export_diagnostics = True
         options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-        solver_obj.export_initial_state = False if aposteriori else True
+        # solver_obj.export_initial_state = False if aposteriori else True
 
         # TODO: Compute adjoint solutions THIS DOESN'T WORK
         # def includeIt():
@@ -200,15 +204,15 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         # Apply ICs and time integrate
         solver_obj.assign_initial_conditions(elev=eta0)
 
-        if approach in ('residual', 'implicit', 'DWR', 'DWE', 'explicit'):
+        if aposteriori:
             def selector():
                 t = solver_obj.simulation_time
-                ndump = 10                          # TODO: what can we do about this?
+                rm = 10                          # TODO: what can we do about this?
                 dt = options.timestep
-                if int(t / dt) % ndump == 0:
+                if int(t / dt) % rm == 0:
                     options.simulation_export_time = dt
                 else:
-                    options.simulation_export_time = (ndump - 1) * dt
+                    options.simulation_export_time = (rm - 1) * dt
             solver_obj.iterate(export_func=selector)
         else:
             solver_obj.iterate()
@@ -260,14 +264,15 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
         # Define implicit error problem
         if approach in ('implicit', 'DWE'):
-            B_, L = form.formsSW(q_oi, q__oi, et, b, Dt, allowNormalFlow=False)
+            B_, L = form.formsSW(q_oi, q_oi_, et, b, Dt, allowNormalFlow=False)
             B = form.formsSW(e, e_, et, b, Dt, allowNormalFlow=False)[0]
             I = form.interelementTerm(et1 * uv_2d_oi, n=normal) * dS
             errorProblem = NonlinearVariationalProblem(B - L + B_ - I, e)
             errorSolver = NonlinearVariationalSolver(errorProblem, solver_parameters=op.params)
 
-        for k in range(0, iEnd):
-            msc.dis('Generating error estimate %d / %d' % (k+1, iEnd + 1), op.printStats)
+        s = 1 if aposteriori else 0
+        for k in range(s, iEnd):
+            msc.dis('Generating error estimate %d / %d' % (k+1, iEnd+1), op.printStats)
 
             if approach in ('fluxJump', 'DWF'):
                 with DumbCheckpoint(dirName+'hdf5/Velocity2d_'+msc.indexString(k), mode=FILE_READ) as loadVel:
@@ -335,7 +340,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         adaptTimer = clock()
         while cnt < np.ceil(T / dt):
             stepTimer = clock()
-            indexStr = msc.indexString(int(cnt / op.ndump))
+            indexStr = msc.indexString(int(cnt / op.rm))
 
             # Load variables from disk
             if cnt != 0:
@@ -478,8 +483,8 @@ if __name__ == '__main__':
                          Tend=2.5,
                          hmin=5e-2,
                          hmax=1.,
-                         rm=5,
-                         ndump=1,
+                         rm=10,
+                         ndump=5,
                          gradate=False,
                          bootstrap=False,
                          printStats=True,
