@@ -14,19 +14,19 @@ def cheatCodes(approach, default='DWR'):
     :return: approach to use and keys to skip sections.
     """
     approach = approach or default
-    if approach in ('norm', 'fieldBased', 'gradientBased', 'hessianBased'):
+    if approach in ('norm', 'fieldBased', 'gradientBased', 'hessianBased', 'fluxJump'):
         getData = False
         getError = False
         useAdjoint = False
         aposteriori = False
-    elif approach in ('residual', 'explicit', 'fluxJump', 'implicit', 'DWR', 'DWE', 'DWF'):
+    elif approach in ('residual', 'explicit', 'implicit', 'DWR', 'DWE', 'DWF'):
         getData = True
         getError = True
         useAdjoint = approach in ('DWR', 'DWE', 'DWF')
-        aposteriori = approach != 'fluxJump'
+        aposteriori = True
     elif approach in ('saved', 'regen'):
         approach = input("""Choose error estimator from 
-    'residual', 'explicit', 'fluxJump', 'implicit', 'DWF', 'DWR' or 'DWE': """) or 'DWR'
+    'residual', 'explicit', 'implicit', 'DWF', 'DWR' or 'DWE': """) or 'DWR'
         getData = False
         getError = approach == 'regen'
         useAdjoint = approach in ('DWF', 'DWR')

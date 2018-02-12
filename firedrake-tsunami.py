@@ -387,7 +387,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     if op.orderChange:
                         dual_oi_u.interpolate(dual_u)
                         dual_oi_e.interpolate(dual_e)
-            if (approach in ('explicit', 'fluxJump', 'DWF')):
+            if (approach in ('explicit', 'DWF')):
                 with DumbCheckpoint(dirName + 'hdf5/forward_' + indexStr, mode=FILE_READ) as loadFor:
                     loadFor.load(u)
                     loadFor.load(eta)
@@ -415,8 +415,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             elif approach == 'explicit':
                 epsilon = err.explicitErrorEstimator(q_oi if op.orderChange else q, rho, b, v,
                                                      maxBathy=True if mode == 'tohoku' else False)
-            elif approach == 'fluxJump':
-                epsilon = err.fluxJumpError(q, v)
 
             # Loop over relevant time window
             if op.window:
@@ -465,9 +463,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon)[0])
                     M = adap.isotropicMetric(W, errEst, op=op, invert=False)
                 else:
-                    if approach == 'norm':
+                    if approach in ('norm', 'fluxJump'):
                         v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
-                        norm = assemble(v*inner(q, q)*dx)
+                        norm = assemble(v * inner(q, q) * dx) if approach == 'norm' else err.fluxJumpError(q, v)
                         M = adap.isotropicMetric(W, norm, invert=False, nVerT=nVerT, op=op)
                     else:
                         if op.mtype != 's':

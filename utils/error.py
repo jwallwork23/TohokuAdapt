@@ -61,10 +61,7 @@ def fluxJumpError(q, v):
     mesh = V.mesh()
     h = CellSize(mesh)
     n = FacetNormal(mesh)
-
-    # Compute boundary residual term on fine mesh
-    qh = interpolation.mixedPairInterp(mesh, V, q)[0]
-    uh, etah = qh.split()
+    uh, etah = q.split()
     j0 = assemble(jump(v * grad(uh[0]), n=n) * dS)
     j1 = assemble(jump(v * grad(uh[1]), n=n) * dS)
     j2 = assemble(jump(v * grad(etah), n=n) * dS)

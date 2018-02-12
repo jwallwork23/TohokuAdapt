@@ -283,7 +283,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         for k in range(s, iEnd):
             msc.dis('Generating error estimate %d / %d' % (k+1, iEnd+1), op.printStats)
 
-            if approach in ('fluxJump', 'DWF'):
+            if approach == 'DWF':
                 with DumbCheckpoint(dirName+'hdf5/Velocity2d_'+msc.indexString(k), mode=FILE_READ) as loadVel:
                     loadVel.load(uv_2d)
                     loadVel.close()
@@ -315,9 +315,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 errorSolver.solve(annotate=False)
                 e_.assign(e)
 
-            if approach == 'fluxJump':
-                epsilon = err.fluxJumpError(q, v)
-            elif approach == 'implicit':
+            if approach == 'implicit':
                 epsilon = assemble(v * sqrt(inner(e, e)) * dx)
             epsilon.rename("Error indicator")
 
@@ -370,9 +368,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon)[0])
                 M = adap.isotropicMetric(W, errEst, op=op, invert=False)
             else:
-                if approach == 'norm':
+                if approach in ('norm', 'fluxJump'):
                     v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
-                    norm = assemble(v * inner(q, q) * dx)
+                    norm = assemble(v * inner(q, q) * dx) if approach == 'norm' else err.fluxJumpError(q, v)
                     M = adap.isotropicMetric(W, norm, invert=False, nVerT=nVerT, op=op)
                 else:
                     if op.mtype != 's':
