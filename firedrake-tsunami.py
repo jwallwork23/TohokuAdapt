@@ -415,7 +415,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 for j in range(len(epsilon.dat.data)):
                     epsilon.dat.data[j] = max(epsilon.dat.data[j], epsilon_.dat.data[j])
             epsilon.dat.data[:] = np.abs(epsilon.dat.data) * nVerT / (np.abs(assemble(epsilon * dx)) or 1.)  # Normalise
-            epsilon.rename("Error indicator")
+            epsilon.rename("Error indicator")   # TODO: use L2 normalisation here ^^^ ?
 
             # Store error estimates
             with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_CREATE) as saveErr:
@@ -454,24 +454,24 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     if approach == 'norm':
                         v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
                         norm = assemble(v*inner(q, q)*dx)
-                        M = adap.isotropicMetric(W, norm, op=op, invert=False)
+                        M = adap.isotropicMetric(W, norm, invert=False, nVerT=nVerT, op=op)
                     else:
                         if op.mtype != 's':
                             if approach == 'fieldBased':
-                                M = adap.isotropicMetric(W, eta, op=op, invert=False)
+                                M = adap.isotropicMetric(W, eta, invert=False, nVerT=nVerT, op=op)
                             elif approach == 'gradientBased':
                                 g = adap.constructGradient(mesh_H, eta)
-                                M = adap.isotropicMetric(W, g, op=op, invert=False)
+                                M = adap.isotropicMetric(W, g, invert=False, nVerT=nVerT, op=op)
                             elif approach == 'hessianBased':
                                 H = adap.constructHessian(mesh_H, W, eta, op=op)
                                 M = adap.computeSteadyMetric(mesh_H, W, H, eta, nVerT=nVerT, op=op)
                         if op.mtype != 'f':
                             spd = Function(FunctionSpace(mesh_H, 'DG', 1)).interpolate(sqrt(dot(u, u)))
                             if approach == 'fieldBased':
-                                M2 = adap.isotropicMetric(W, spd, op=op, invert=False)
+                                M2 = adap.isotropicMetric(W, spd, invert=False, nVerT=nVerT, op=op)
                             elif approach == 'gradientBased':
                                 g = adap.constructGradient(mesh_H, spd)
-                                M2 = adap.isotropicMetric(W, g, op=op, invert=False)
+                                M2 = adap.isotropicMetric(W, g, invert=False, nVerT=nVerT, op=op)
                             elif approach == 'hessianBased':
                                 H = adap.constructHessian(mesh_H, W, spd, op=op)
                                 M2 = adap.computeSteadyMetric(mesh_H, W, H, spd, nVerT=nVerT, op=op)

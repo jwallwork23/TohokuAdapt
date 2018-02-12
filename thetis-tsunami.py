@@ -308,24 +308,24 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 if approach == 'norm':
                     v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
                     norm = assemble(v * inner(q, q) * dx)
-                    M = adap.isotropicMetric(W, norm, op=op, invert=False)
+                    M = adap.isotropicMetric(W, norm, invert=False, nVerT=nVerT, op=op)
                 else:
                     if op.mtype != 's':
                         if approach == 'fieldBased':
-                            M = adap.isotropicMetric(W, elev_2d, op=op, invert=False)
+                            M = adap.isotropicMetric(W, elev_2d, invert=False, nVerT=nVerT, op=op)
                         elif approach == 'gradientBased':
                             g = adap.constructGradient(mesh_H, elev_2d)
-                            M = adap.isotropicMetric(W, g, op=op, invert=False)
+                            M = adap.isotropicMetric(W, g, invert=False, nVerT=nVerT, op=op)
                         elif approach == 'hessianBased':
                             H = adap.constructHessian(mesh_H, W, elev_2d, op=op)
                             M = adap.computeSteadyMetric(mesh_H, W, H, elev_2d, nVerT=nVerT, op=op)
                     if op.mtype != 'f':
                         spd = Function(FunctionSpace(mesh_H, 'DG', 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
                         if approach == 'fieldBased':
-                            M2 = adap.isotropicMetric(W, spd, op=op, invert=False)
+                            M2 = adap.isotropicMetric(W, spd, invert=False, nVerT=nVerT, op=op)
                         elif approach == 'gradientBased':
                             g = adap.constructGradient(mesh_H, spd)
-                            M2 = adap.isotropicMetric(W, g, op=op, invert=False)
+                            M2 = adap.isotropicMetric(W, g, invert=False, nVerT=nVerT, op=op)
                         elif approach == 'hessianBased':
                             H = adap.constructHessian(mesh_H, W, spd, op=op)
                             M2 = adap.computeSteadyMetric(mesh_H, W, H, spd, nVerT=nVerT, op=op)

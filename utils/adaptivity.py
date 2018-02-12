@@ -164,13 +164,14 @@ def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=None):
     return M
 
 
-def isotropicMetric(V, f, bdy=False, op=None, invert=True):
+def isotropicMetric(V, f, bdy=False, invert=True, nVerT=None, op=None):
     """
     :arg V: tensor function space on which metric will be defined.
     :arg f: function to adapt to.
     :param bdy: toggle boundary metric.
-    :param op: Options class object providing min/max cell size values.
     :param invert: toggle cell size vs error.
+    :param nVerT: target number of vertices.
+    :param op: Options class object providing min/max cell size values.
     :return: isotropic metric corresponding to the scalar function.
     """
     if op == None:
@@ -191,6 +192,9 @@ def isotropicMetric(V, f, bdy=False, op=None, invert=True):
     #     print("""Field for adaption is degree %d %s. Interpolation is required to
 # get a degree 1 Lagrange metric.""" % (deg, family))
         g.interpolate(f)
+
+    if nVerT:
+        g.dat.data[:] = np.abs(g.dat.data) * nVerT / (np.abs(sqrt(assemble(inner(g, g)*dx))) or 1.)
     for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(len(g.dat.data)):
         if scalar:
             if invert:
