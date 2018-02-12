@@ -44,6 +44,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     elif mode == 'shallow-water':
         msc.dis('*********************** SHALLOW WATER TEST PROBLEM ********************\n', op.printStats)
     bootTimer = primalTimer = dualTimer = errorTimer = adaptTimer = False
+    if approach in ('implicit', 'implicitNorm', 'DWE'):
+        op.orderChange = 1
 
     # Establish initial mesh resolution
     if op.bootstrap:
@@ -130,7 +132,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         for gauge in gauges:
             v0[gauge] = float(eta.at(op.gaugeCoord(gauge)))
 
-    if op.orderChange or approach == 'implicit':
+    if op.orderChange:
         V_oi = VectorFunctionSpace(mesh_H, op.space1, op.degree1+op.orderChange) \
                * FunctionSpace(mesh_H, op.space2, op.degree2+op.orderChange)
         q_oi = Function(V_oi)
@@ -179,10 +181,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 raise NotImplementedError
         if approach in ('implicitNorm', 'implicit', 'DWE'):
             e_ = Function(V_oi)
-            e_0, e_1 = e_.split()
-            e_0.interpolate(Expression([0, 0]))
-            e_1.interpolate(Expression(0))
-            e = Function(V_oi, name="Implicit error estimate")
+            e = Function(V_oi)
+            e0, e1 = e.split()
+            e0.rename("Implicit error 0")
+            e1.rename("Implicit error 1")
             et = TestFunction(V_oi)
             (et0, et1) = (as_vector((et[0], et[1])), et[2])
             normal = FacetNormal(mesh_H)
@@ -205,7 +207,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
         forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
-        if approach == 'implicit':
+        if approach in ('implicit', 'implicitNorm', 'DWE'):
             B_, L = form.formsSW(q_oi, q__oi, et, b, Dt, allowNormalFlow=False)
             B = form.formsSW(e, e_, et, b, Dt, allowNormalFlow=False)[0]
             I = form.interelementTerm(et1 * u_oi, n=normal) * dS
@@ -227,23 +229,28 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             # Solve problem at current timestep
             forwardSolver.solve()
 
-            if approach == 'implicit':
-                u_oi.interpolate(u)
-                eta_oi.interpolate(eta)
-                u__oi.interpolate(u_)
-                eta__oi.interpolate(eta_)
+            if approach in ('implicit', 'implicitNorm', 'DWE'):
+                u_oi.interpolate(u, annotate=False)
+                eta_oi.interpolate(eta, annotate=False)
+                u__oi.interpolate(u_, annotate=False)
+                eta__oi.interpolate(eta_, annotate=False)
                 errorSolver.solve(annotate=False)
                 e_.assign(e)
 
             # Approximate residual of forward equation and save to HDF5
             if cnt % op.rm == 0:
                 indexStr = msc.indexString(cnt)
-                if approach == 'implicit':
+                if approach == 'implicitNorm':
                     epsilon = assemble(v * sqrt(inner(e, e)) * dx)
                     with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_CREATE) as saveErr:
                         saveErr.store(epsilon)
                         saveErr.close()
-                elif (approach in ('explicit', 'DWR')):
+                elif approach in ('implicit', 'DWE'):
+                    with DumbCheckpoint(dirName + 'hdf5/implicitError_' + indexStr, mode=FILE_CREATE) as saveIE:
+                        saveIE.store(e0)
+                        saveIE.store(e1)
+                        saveIE.close()
+                elif approach in ('explicit', 'DWR'):
                     if op.orderChange:
                         u_oi.interpolate(u)
                         eta_oi.interpolate(eta)
@@ -315,7 +322,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         msc.dis('Primal run complete. Run time: %.3fs' % primalTimer, op.printStats)
 
         # Reset counter in explicit case
-        if approach in ('explicit', 'fluxJump', 'implicit'):
+        if aposteriori and not useAdjoint:
             cnt = 0
 
         if useAdjoint:
@@ -393,11 +400,18 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     loadRes.load(rho_u)
                     loadRes.load(rho_e)
                     loadRes.close()
+            elif approach in ('implicit', 'DWE'):
+                with DumbCheckpoint(dirName + 'hdf5/implicitError_' + indexStr, mode=FILE_READ) as loadIE:
+                    loadIE.load(e0)
+                    loadIE.load(e1)
+                    loadIE.close()
 
             if approach == 'DWF':
                 epsilon = err.basicErrorEstimator(q, dual, v)
             elif approach == 'DWR':
                 epsilon = err.DWR(rho, dual_oi if op.orderChange else dual_h, v)
+            elif approach == 'DWE':
+                epsilon = err.DWR(e, dual_oi, v)
             elif approach == 'explicit':
                 epsilon = err.explicitErrorEstimator(q_oi if op.orderChange else q, rho, b, v,
                                                      maxBathy=True if mode == 'tohoku' else False)

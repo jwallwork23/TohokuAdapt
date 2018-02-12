@@ -39,6 +39,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     elif mode == 'shallow-water':
         msc.dis('*********************** SHALLOW WATER TEST PROBLEM ********************\n', op.printStats)
     bootTimer = primalTimer = dualTimer = errorTimer = adaptTimer = False
+    if approach in ('implicit', 'implicitNorm', 'DWE'):
+        op.orderChange = 1
 
     # Establish initial mesh resolution
     if op.bootstrap:
@@ -95,7 +97,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     iStart = int(op.Tstart / dt)
     iEnd = int(np.ceil(T / dt))
 
-    if op.orderChange or approach == 'implicit':
+    if op.orderChange:
         V_oi = VectorFunctionSpace(mesh_H, op.space1, op.degree1 + op.orderChange) \
                * FunctionSpace(mesh_H, op.space2, op.degree2 + op.orderChange)
         q_oi = Function(V_oi)
@@ -143,10 +145,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 raise NotImplementedError
         if approach in ('implicitNorm', 'implicit', 'DWE'):
             e_ = Function(V_oi)
-            e_0, e_1 = e_.split()
-            e_0.interpolate(Expression([0, 0]))
-            e_1.interpolate(Expression(0))
-            e = Function(V_oi, name="Implicit error estimate")
+            e = Function(V_oi)
+            e0, e1 = e.split()
+            e0.rename("Implicit error 0")
+            e1.rename("Implicit error 1")
             et = TestFunction(V_oi)
             (et0, et1) = (as_vector((et[0], et[1])), et[2])
             normal = FacetNormal(mesh_H)
@@ -206,7 +208,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         msc.dis('Primal run complete. Run time: %.3fs' % primalTimer, op.printStats)
 
         # Reset counters
-        if approach in ('explicit', 'fluxJump', 'implicit'):
+        if aposteriori and not useAdjoint:
             cnt = 0
         else:
             cntT = cnt = np.ceil(T / dt)
