@@ -44,7 +44,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     elif mode == 'shallow-water':
         msc.dis('*********************** SHALLOW WATER TEST PROBLEM ********************\n', op.printStats)
     bootTimer = primalTimer = dualTimer = errorTimer = adaptTimer = False
-    if approach in ('implicit', 'implicitNorm', 'DWE'):
+    if approach in ('implicit', 'DWE'):
         op.orderChange = 1
 
     # Establish initial mesh resolution
@@ -179,7 +179,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                                                smooth=False)
             else:
                 raise NotImplementedError
-        if approach in ('implicitNorm', 'implicit', 'DWE'):
+        if approach in ('implicit', 'DWE'):
             e_ = Function(V_oi)
             e = Function(V_oi)
             e0, e1 = e.split()
@@ -207,7 +207,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
         forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
-        if approach in ('implicit', 'implicitNorm', 'DWE'):
+        if approach in ('implicit', 'DWE'):
             B_, L = form.formsSW(q_oi, q__oi, et, b, Dt, allowNormalFlow=False)
             B = form.formsSW(e, e_, et, b, Dt, allowNormalFlow=False)[0]
             I = form.interelementTerm(et1 * u_oi, n=normal) * dS
@@ -229,7 +229,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             # Solve problem at current timestep
             forwardSolver.solve()
 
-            if approach in ('implicit', 'implicitNorm', 'DWE'):
+            if approach in ('implicit', 'DWE'):
                 u_oi.interpolate(u, annotate=False)
                 eta_oi.interpolate(eta, annotate=False)
                 u__oi.interpolate(u_, annotate=False)
@@ -240,12 +240,12 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             # Approximate residual of forward equation and save to HDF5
             if cnt % op.rm == 0:
                 indexStr = msc.indexString(cnt)
-                if approach == 'implicitNorm':
+                if approach == 'implicit':
                     epsilon = assemble(v * sqrt(inner(e, e)) * dx)
                     with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_CREATE) as saveErr:
                         saveErr.store(epsilon)
                         saveErr.close()
-                elif approach in ('implicit', 'DWE'):
+                elif approach == 'DWE':
                     with DumbCheckpoint(dirName + 'hdf5/implicitError_' + indexStr, mode=FILE_CREATE) as saveIE:
                         saveIE.store(e0)
                         saveIE.store(e1)
@@ -580,10 +580,9 @@ if __name__ == '__main__':
 
     # Choose mode and set parameter values
     mode = input("Choose problem: 'tohoku', 'shallow-water', 'rossby-wave': ")
-    approach, getData, getError, useAdjoint, aposteriori = msc.cheatCodes(input("""Choose error estimator from 
-'norm', 'fieldBased', 'gradientBased', 'hessianBased',
-'residual', 'explicit', 'fluxJump', 'implicit', 'implicitNorm', 
-'DWF', 'DWR' or 'DWE': """))
+    approach, getData, getError, useAdjoint, aposteriori = msc.cheatCodes(input(
+"""Choose error estimator from {'norm', 'fieldBased', 'gradientBased', 'hessianBased', 
+'residual', 'explicit', 'fluxJump', 'implicit', 'DWF', 'DWR' or 'DWE'}: """))
     if mode == 'tohoku':
         op = opt.Options(vscale=0.1 if approach == 'DWR' else 0.85,
                          # family='dg-dg',
@@ -596,7 +595,7 @@ if __name__ == '__main__':
                          gauges=False,
                          tAdapt=False,
                          bootstrap=False,
-                         printStats=False,
+                         printStats=True,
                          outputOF=True,
                          orderChange=0,
                          ndump=10,

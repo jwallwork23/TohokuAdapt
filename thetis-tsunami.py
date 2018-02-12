@@ -39,7 +39,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     elif mode == 'shallow-water':
         msc.dis('*********************** SHALLOW WATER TEST PROBLEM ********************\n', op.printStats)
     bootTimer = primalTimer = dualTimer = errorTimer = adaptTimer = False
-    if approach in ('implicit', 'implicitNorm', 'DWE'):
+    if approach in ('implicit', 'DWE'):
         op.orderChange = 1
 
     # Establish initial mesh resolution
@@ -71,6 +71,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         b = Function(P1_2d).assign(0.1)
     else:
         raise NotImplementedError
+    T = op.Tend
 
     # Define initial FunctionSpace and variables of problem and apply initial conditions
     V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
@@ -79,23 +80,15 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     elev_2d.interpolate(eta0, annotate=False)
     uv_2d.rename("uv_2d")
     elev_2d.rename("elev_2d")
+    if approach in ('residual', 'implicit', 'DWR', 'DWE', 'explicit'):
+        q_ = Function(V_H)
+        uv_2d_, elev_2d_ = q_.split()
 
     # Establish finer mesh (h < H) upon which to approximate error
     if approach in ('explicit', 'DWR'):
         mesh_h = adap.isoP2(mesh_H)
         V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
         b_h = msh.TohokuDomain(mesh=mesh_h)[2]
-
-    # Specify physical and solver parameters
-    if mode == 'tohoku':
-        dt = adap.adaptTimestepSW(mesh_H, b)
-    else:
-        dt = 0.1  # TODO: change this
-    msc.dis('Using initial timestep = %4.3fs\n' % dt, op.printStats)
-    Dt = Constant(dt)
-    T = op.Tend
-    iStart = int(op.Tstart / dt)
-    iEnd = int(np.ceil(T / dt))
 
     if op.orderChange:
         V_oi = VectorFunctionSpace(mesh_H, op.space1, op.degree1 + op.orderChange) \
@@ -143,7 +136,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                                                smooth=False)
             else:
                 raise NotImplementedError
-        if approach in ('implicitNorm', 'implicit', 'DWE'):
+        if approach in ('implicit', 'DWE'):
             e_ = Function(V_oi)
             e = Function(V_oi)
             e0, e1 = e.split()
@@ -165,6 +158,12 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     cnt = 0
     save = True
 
+    # Get timestep
+    solver_obj = solver2d.FlowSolver2d(mesh_H, b)
+    solver_obj.create_equations()
+    dt = min(np.abs(solver_obj.compute_time_step().dat.data))
+    iEnd = int(np.ceil(T / (dt * op.rm)))
+
     if getData:
         msc.dis('Starting fixed mesh primal run (forwards in time)', op.printStats)
         primalTimer = clock()
@@ -173,18 +172,18 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         # TODO: will need only load every other field later on
 
         # Get solver parameter values and construct solver
-        solver_obj = solver2d.FlowSolver2d(mesh_H, b)
         options = solver_obj.options
         options.element_family = op.family
         options.use_nonlinear_equations = False
         options.use_grad_depth_viscosity_term = False
-        options.simulation_export_time = dt * (op.ndump-1)      # This might differ across error estimates
+        options.simulation_export_time = dt * (op.ndump-1) if aposteriori else dt * op.ndump
         options.simulation_end_time = T
         options.timestepper_type = op.timestepper
         options.timestep = dt
         options.output_directory = dirName
         options.export_diagnostics = True
         options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+        solver_obj.export_initial_state = False if aposteriori else True
 
         # TODO: Compute adjoint solutions THIS DOESN'T WORK
         # def includeIt():
@@ -201,7 +200,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         # Apply ICs and time integrate
         solver_obj.assign_initial_conditions(elev=eta0)
 
-        if approach in ('residual', 'residualNorm', 'implicit', 'implicitNorm' 'DWR', 'DWE', 'explicit'):
+        if approach in ('residual', 'implicit', 'DWR', 'DWE', 'explicit'):
             def selector():
                 t = solver_obj.simulation_time
                 ndump = 10                          # TODO: what can we do about this?
@@ -213,6 +212,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             solver_obj.iterate(export_func=selector)
         else:
             solver_obj.iterate()
+
 
         primalTimer = clock() - primalTimer
         print('Time elapsed for fixed mesh solver: %.1fs (%.2fmins)' % (primalTimer, primalTimer / 60))
@@ -257,19 +257,55 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     if getError:
         msc.dis('\nStarting error estimate generation', op.printStats)
         errorTimer = clock()
-        for k in range(0, int(iEnd/op.ndump), int(op.rm/op.ndump)):
-            msc.dis('Generating error estimate %d / %d' % (k+1, iEnd/op.ndump + 1), op.printStats)
-            indexStr = msc.indexString(k)
 
-            if approach == 'fluxJump':
-                with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as loadVel:
+        # Define implicit error problem
+        if approach in ('implicit', 'DWE'):
+            B_, L = form.formsSW(q_oi, q__oi, et, b, Dt, allowNormalFlow=False)
+            B = form.formsSW(e, e_, et, b, Dt, allowNormalFlow=False)[0]
+            I = form.interelementTerm(et1 * uv_2d_oi, n=normal) * dS
+            errorProblem = NonlinearVariationalProblem(B - L + B_ - I, e)
+            errorSolver = NonlinearVariationalSolver(errorProblem, solver_parameters=op.params)
+
+        for k in range(0, iEnd):
+            msc.dis('Generating error estimate %d / %d' % (k+1, iEnd + 1), op.printStats)
+
+            if approach in ('fluxJump', 'DWF'):
+                with DumbCheckpoint(dirName+'hdf5/Velocity2d_'+msc.indexString(k), mode=FILE_READ) as loadVel:
                     loadVel.load(uv_2d)
                     loadVel.close()
-                with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as loadElev:
+                with DumbCheckpoint(dirName+'hdf5/Elevation2d_'+msc.indexString(k), mode=FILE_READ) as loadElev:
                     loadElev.load(elev_2d)
                     loadElev.close()
+            elif approach in ('residual', 'implicit', 'DWR', 'DWE', 'explicit'):
+                with DumbCheckpoint(dirName+'hdf5/Velocity2d_'+msc.indexString(2*k), mode=FILE_READ) as loadVel:
+                    loadVel.load(uv_2d)
+                    loadVel.close()
+                with DumbCheckpoint(dirName+'hdf5/Elevation2d_'+msc.indexString(2*k), mode=FILE_READ) as loadElev:
+                    loadElev.load(elev_2d)
+                    loadElev.close()
+                uv_2d_.assign(uv_2d)
+                elev_2d_.assign(elev_2d)
+                with DumbCheckpoint(dirName+'hdf5/Velocity2d_'+msc.indexString(2*k+1), mode=FILE_READ) as loadVel:
+                    loadVel.load(uv_2d)
+                    loadVel.close()
+                with DumbCheckpoint(dirName+'hdf5/Elevation2d_'+msc.indexString(2*k+1), mode=FILE_READ) as loadElev:
+                    loadElev.load(elev_2d)
+                    loadElev.close()
+
+            # Solve implicit error problem
+            if approach in ('implicit', 'DWE'):
+                uv_2d_oi.interpolate(uv_2d, annotate=False)
+                elev_2d_oi.interpolate(elev_2d, annotate=False)
+                uv_2d_oi_.interpolate(uv_2d_, annotate=False)
+                elev_2d_oi_.interpolate(elev_2d_, annotate=False)
+                errorSolver.solve(annotate=False)
+                e_.assign(e)
+
+            if approach == 'fluxJump':
                 epsilon = err.fluxJumpError(q, v)
-                epsilon.rename("Error indicator")
+            elif approach == 'implicit':
+                epsilon = assemble(v * sqrt(inner(e, e)) * dx)
+            epsilon.rename("Error indicator")
 
             # TODO: Load forward data from HDF5
             # TODO: estimate OF using trapezium rule and output (inc. fixed mesh case)
@@ -278,7 +314,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             # TODO: form error estimates
 
             # Store error estimates
-            with DumbCheckpoint(dirName+'hdf5/'+approach+'Error'+indexStr, mode=FILE_CREATE) as saveErr:
+            with DumbCheckpoint(dirName+'hdf5/'+approach+'Error'+msc.indexString(k), mode=FILE_CREATE) as saveErr:
                 saveErr.store(epsilon)
                 saveErr.close()
             if op.plotpvd:
@@ -358,12 +394,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 uv_2d.rename('uv_2d')
                 elev_2d.rename('elev_2d')
 
-            # Get mesh stats
-            nEle = msh.meshStats(mesh_H)[0]
-            mM = [min(nEle, mM[0]), max(nEle, mM[1])]
-            Sn += nEle
-            av = op.printToScreen(int(cnt/op.rm+1), clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, cnt*dt, dt)
-
             # Solver object and equations
             adapSolver = solver2d.FlowSolver2d(mesh_H, b)
             adapOpt = adapSolver.options
@@ -393,6 +423,12 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             for e in adapSolver.exporters.values():
                 e.set_next_export_ix(adapSolver.i_export)
             adapSolver.iterate()
+
+            # Get mesh stats
+            nEle = msh.meshStats(mesh_H)[0]
+            mM = [min(nEle, mM[0]), max(nEle, mM[1])]
+            Sn += nEle
+            av = op.printToScreen(int(cnt/op.rm+1), clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, cnt*dt, dt)
             cnt += op.rm
 
             # TODO: Estimate OF using trapezium rule, using a DiagnosticCallback object
@@ -415,10 +451,9 @@ if __name__ == '__main__':
 
     # Choose mode and set parameter values
     mode = input("Choose problem: 'tohoku', 'shallow-water', 'rossby-wave': ")
-    approach, getData, getError, useAdjoint, aposteriori = msc.cheatCodes(input("""Choose error estimator from 
-'norm', 'fieldBased', 'gradientBased', 'hessianBased',
-'residual', 'explicit', 'fluxJump', 'implicit', 'implicitNorm', 
-'DWF', 'DWR' or 'DWE': """))
+    approach, getData, getError, useAdjoint, aposteriori = msc.cheatCodes(input(
+"""Choose error estimator from {'norm', 'fieldBased', 'gradientBased', 'hessianBased', 
+'residual', 'explicit', 'fluxJump', 'implicit', 'DWF', 'DWR' or 'DWE'}: """))
     if mode == 'tohoku':
         op = opt.Options(vscale=0.1 if approach == 'DWR' else 0.85,
                          family='dg-dg',
@@ -447,7 +482,7 @@ if __name__ == '__main__':
                          ndump=1,
                          gradate=False,
                          bootstrap=False,
-                         printStats=False,
+                         printStats=True,
                          outputOF=True,
                          advect=False,
                          window=True if approach == 'DWF' else False,
