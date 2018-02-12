@@ -160,7 +160,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     # Get timestep
     solver_obj = solver2d.FlowSolver2d(mesh_H, b)
-    if approach == 'tohoku':
+    if mode == 'tohoku':
         solver_obj.create_equations()
         dt = min(np.abs(solver_obj.compute_time_step().dat.data))
     else:
@@ -205,18 +205,27 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         solver_obj.assign_initial_conditions(elev=eta0)
 
         if aposteriori:
-            def selector():
-                t = solver_obj.simulation_time
-                rm = 10                          # TODO: what can we do about this?
-                dt = options.timestep
-                if int(t / dt) % rm == 0:
-                    options.simulation_export_time = dt
-                else:
-                    options.simulation_export_time = (rm - 1) * dt
+            if mode == 'tohoku':
+                def selector():
+                    t = solver_obj.simulation_time
+                    rm = 30                          # TODO: what can we do about this? Needs changing for adjoint
+                    dt = options.timestep
+                    if int(t / dt) % rm == 0:
+                        options.simulation_export_time = dt
+                    else:
+                        options.simulation_export_time = (rm - 1) * dt
+            else:
+                def selector():
+                    t = solver_obj.simulation_time
+                    rm = 10                          # TODO: what can we do about this? Needs changing for adjoint
+                    dt = options.timestep
+                    if int(t / dt) % rm == 0:
+                        options.simulation_export_time = dt
+                    else:
+                        options.simulation_export_time = (rm - 1) * dt
             solver_obj.iterate(export_func=selector)
         else:
             solver_obj.iterate()
-
 
         primalTimer = clock() - primalTimer
         print('Time elapsed for fixed mesh solver: %.1fs (%.2fmins)' % (primalTimer, primalTimer / 60))
