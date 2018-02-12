@@ -471,7 +471,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                                 M2 = adap.isotropicMetric(W, spd, op=op, invert=False)
                             elif approach == 'gradientBased':
                                 g = adap.constructGradient(mesh_H, spd)
-                                M = adap.isotropicMetric(W, g, op=op, invert=False)
+                                M2 = adap.isotropicMetric(W, g, op=op, invert=False)
                             elif approach == 'hessianBased':
                                 H = adap.constructHessian(mesh_H, W, spd, op=op)
                                 M2 = adap.computeSteadyMetric(mesh_H, W, H, spd, nVerT=nVerT, op=op)

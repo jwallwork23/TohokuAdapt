@@ -181,7 +181,8 @@ def isotropicMetric(V, f, bdy=False, op=None, invert=True):
     hmin2 = pow(op.hmin, 2)
     hmax2 = pow(op.hmax, 2)
     M = Function(V)
-    g = Function(FunctionSpace(V.mesh(), 'CG', 1))
+    scalar = len(f.ufl_element().value_shape()) == 0
+    g = Function(FunctionSpace(V.mesh(), 'CG', 1) if scalar else VectorFunctionSpace(V.mesh(), 'CG', 1))
     family = f.ufl_element().family()
     deg = f.ufl_element().degree()
     if (family == 'Lagrange') & (deg == 1):
@@ -191,20 +192,19 @@ def isotropicMetric(V, f, bdy=False, op=None, invert=True):
 # get a degree 1 Lagrange metric.""" % (deg, family))
         g.interpolate(f)
     for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(len(g.dat.data)):
-        shape = len(f.ufl_element().value_shape())
-        if shape == 0:
+        if scalar:
             if invert:
                 alpha = 1. / max(hmin2, min(pow(g.dat.data[i], 2), hmax2))
             else:
                 alpha = max(1. / hmax2, min(g.dat.data[i], 1. / hmin2))
             beta = alpha
-        elif shape == 2:
+        else:
             if invert:
-                alpha = 1. / max(hmin2, min(pow(g.dat.data[0, i], 2), hmax2))
-                beta = 1. / max(hmin2, min(pow(g.dat.data[1, i], 2), hmax2))
+                alpha = 1. / max(hmin2, min(pow(g.dat.data[i, 0], 2), hmax2))
+                beta = 1. / max(hmin2, min(pow(g.dat.data[i, 1], 2), hmax2))
             else:
-                alpha = max(1. / hmax2, min(g.dat.data[0, i], 1. / hmin2))
-                beta = max(1. / hmax2, min(g.dat.data[1, i], 1. / hmin2))
+                alpha = max(1. / hmax2, min(g.dat.data[i, 0], 1. / hmin2))
+                beta = max(1. / hmax2, min(g.dat.data[i, 1], 1. / hmin2))
         M.dat.data[i][0, 0] = alpha
         M.dat.data[i][1, 1] = beta
     return M
