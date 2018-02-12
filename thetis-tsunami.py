@@ -170,20 +170,21 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         primalTimer = clock()
 
         # TODO: use proper Thetis forms to calculate implicit error and residuals
+        # TODO: will need only load every other field later on
 
         # Get solver parameter values and construct solver
-        fixedSolver = solver2d.FlowSolver2d(mesh_H, b)
-        fixedOpt = fixedSolver.options
-        fixedOpt.element_family = op.family
-        fixedOpt.use_nonlinear_equations = False
-        fixedOpt.use_grad_depth_viscosity_term = False
-        fixedOpt.simulation_export_time = dt * op.ndump      # This might differ across error estimates
-        fixedOpt.simulation_end_time = T
-        fixedOpt.timestepper_type = op.timestepper
-        fixedOpt.timestep = dt
-        fixedOpt.output_directory = dirName
-        fixedOpt.export_diagnostics = True
-        fixedOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+        solver_obj = solver2d.FlowSolver2d(mesh_H, b)
+        options = solver_obj.options
+        options.element_family = op.family
+        options.use_nonlinear_equations = False
+        options.use_grad_depth_viscosity_term = False
+        options.simulation_export_time = dt * (op.ndump-1)      # This might differ across error estimates
+        options.simulation_end_time = T
+        options.timestepper_type = op.timestepper
+        options.timestep = dt
+        options.output_directory = dirName
+        options.export_diagnostics = True
+        options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
 
         # TODO: Compute adjoint solutions THIS DOESN'T WORK
         # def includeIt():
@@ -198,9 +199,21 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         #     cnt += 1
 
         # Apply ICs and time integrate
-        fixedSolver.assign_initial_conditions(elev=eta0)
-        # fixedSolver.iterate(export_func=includeIt)
-        fixedSolver.iterate()
+        solver_obj.assign_initial_conditions(elev=eta0)
+
+        if approach in ('residual', 'residualNorm', 'implicit', 'implicitNorm' 'DWR', 'DWE', 'explicit'):
+            def selector():
+                t = solver_obj.simulation_time
+                ndump = 10                          # TODO: what can we do about this?
+                dt = options.timestep
+                if int(t / dt) % ndump == 0:
+                    options.simulation_export_time = dt
+                else:
+                    options.simulation_export_time = (ndump - 1) * dt
+            solver_obj.iterate(export_func=selector)
+        else:
+            solver_obj.iterate()
+
         primalTimer = clock() - primalTimer
         print('Time elapsed for fixed mesh solver: %.1fs (%.2fmins)' % (primalTimer, primalTimer / 60))
 
