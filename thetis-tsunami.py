@@ -319,27 +319,29 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                         elif approach == 'hessianBased':
                             H = adap.constructHessian(mesh_H, W, elev_2d, op=op)
                             M = adap.computeSteadyMetric(mesh_H, W, H, elev_2d, nVerT=nVerT, op=op)
-                    if op.mtype != 'f':
-                        spd = Function(FunctionSpace(mesh_H, 'DG', 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
-                        if approach == 'fieldBased':
-                            M2 = adap.isotropicMetric(W, spd, invert=False, nVerT=nVerT, op=op)
-                        elif approach == 'gradientBased':
-                            g = adap.constructGradient(mesh_H, spd)
-                            M2 = adap.isotropicMetric(W, g, invert=False, nVerT=nVerT, op=op)
-                        elif approach == 'hessianBased':
-                            H = adap.constructHessian(mesh_H, W, spd, op=op)
-                            M2 = adap.computeSteadyMetric(mesh_H, W, H, spd, nVerT=nVerT, op=op)
-                        M = adap.metricIntersection(mesh_H, W, M, M2) if op.mtype == 'b' else M2
+                    if cnt != 0:    # Can't adapt to zero velocity
+                        if op.mtype != 'f':
+                            spd = Function(FunctionSpace(mesh_H, 'DG', 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
+                            if approach == 'fieldBased':
+                                M2 = adap.isotropicMetric(W, spd, invert=False, nVerT=nVerT, op=op)
+                            elif approach == 'gradientBased':
+                                g = adap.constructGradient(mesh_H, spd)
+                                M2 = adap.isotropicMetric(W, g, invert=False, nVerT=nVerT, op=op)
+                            elif approach == 'hessianBased':
+                                H = adap.constructHessian(mesh_H, W, spd, op=op)
+                                M2 = adap.computeSteadyMetric(mesh_H, W, H, spd, nVerT=nVerT, op=op)
+                            M = adap.metricIntersection(mesh_H, W, M, M2) if op.mtype == 'b' else M2
             if op.gradate:
                 M_ = adap.isotropicMetric(W, inte.interp(mesh_H, H0)[0], bdy=True, op=op)  # Initial boundary metric
                 M = adap.metricIntersection(mesh_H, W, M, M_, bdy=True)
                 adap.metricGradation(mesh_H, M, iso=op.iso)
 
             # Adapt mesh and interpolate variables
-            mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
-            elev_2d, uv_2d, b = inte.interp(mesh_H, elev_2d, uv_2d, b)
-            uv_2d.rename('uv_2d')
-            elev_2d.rename('elev_2d')
+            if not (approach in ('fieldBased', 'gradientBased', 'hessianBased') and op.mtype != 'f' and cnt == 0):
+                mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
+                elev_2d, uv_2d, b = inte.interp(mesh_H, elev_2d, uv_2d, b)
+                uv_2d.rename('uv_2d')
+                elev_2d.rename('elev_2d')
 
             # Get mesh stats
             nEle = msh.meshStats(mesh_H)[0]
