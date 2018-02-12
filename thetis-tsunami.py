@@ -204,7 +204,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         # Apply ICs and time integrate
         solver_obj.assign_initial_conditions(elev=eta0)
 
-        if aposteriori:
+        if aposteriori and approach != 'DWF':
             if mode == 'tohoku':
                 def selector():
                     t = solver_obj.simulation_time
@@ -279,7 +279,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             errorProblem = NonlinearVariationalProblem(B - L + B_ - I, e)
             errorSolver = NonlinearVariationalSolver(errorProblem, solver_parameters=op.params)
 
-        s = 1 if aposteriori else 0
+        s = 0 if approach == 'DWF' else 1
         for k in range(s, iEnd):
             msc.dis('Generating error estimate %d / %d' % (k+1, iEnd+1), op.printStats)
 
@@ -290,7 +290,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 with DumbCheckpoint(dirName+'hdf5/Elevation2d_'+msc.indexString(k), mode=FILE_READ) as loadElev:
                     loadElev.load(elev_2d)
                     loadElev.close()
-            elif approach in ('residual', 'implicit', 'DWR', 'DWE', 'explicit'):
+            else:
                 with DumbCheckpoint(dirName+'hdf5/Velocity2d_'+msc.indexString(2*k), mode=FILE_READ) as loadVel:
                     loadVel.load(uv_2d)
                     loadVel.close()
@@ -314,16 +314,14 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 elev_2d_oi_.interpolate(elev_2d_, annotate=False)
                 errorSolver.solve(annotate=False)
                 e_.assign(e)
-
-            if approach == 'implicit':
-                epsilon = assemble(v * sqrt(inner(e, e)) * dx)
+                if approach == 'implicit':
+                    epsilon = assemble(v * sqrt(inner(e, e)) * dx)
             epsilon.rename("Error indicator")
 
-            # TODO: Load forward data from HDF5
-            # TODO: estimate OF using trapezium rule and output (inc. fixed mesh case)
-            # TODO: approximate residuals / implicit error (this might be better done in initial forward solve)
-            # TODO: load adjoint data from HDF5
-            # TODO: form error estimates
+            # TODO: Estimate OF using trapezium rule and output (inc. fixed mesh case)
+            # TODO: Approximate residuals
+            # TODO: Load adjoint data from HDF5
+            # TODO: Form remaining error estimates
 
             # Store error estimates
             with DumbCheckpoint(dirName+'hdf5/'+approach+'Error'+msc.indexString(k), mode=FILE_CREATE) as saveErr:
