@@ -160,8 +160,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     # Get timestep
     solver_obj = solver2d.FlowSolver2d(mesh_H, b)
+    solver_obj.create_equations()
     if mode == 'tohoku':
-        solver_obj.create_equations()
         dt = min(np.abs(solver_obj.compute_time_step().dat.data))
     else:
         dt = 0.025
@@ -199,6 +199,12 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         #         else:
         #             adj_inc_timestep(time=cnt*dt, finished=finished)
         #     cnt += 1
+
+        # # Add callbacks     TODO: figure this out
+        # if approach == 'fixedMesh':
+        #     solver_obj.add_callback(callback.ScalarConservationCallback(
+        #         form.indicatorTohoku(solver_obj) if approach == 'tohoku' else form.indicatorSW(solver_obj),
+        #         solver_obj), eval_interval='timestep')
 
         # Apply ICs and time integrate
         solver_obj.assign_initial_conditions(elev=eta0)
@@ -260,7 +266,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         msc.dis('\nStarting error estimate generation', op.printStats)
         errorTimer = clock()
 
-        # Define implicit error problem
+        # Define implicit error problem     # TODO: use Thetis forms
         if approach in ('implicit', 'DWE'):
             B_, L = form.formsSW(q_oi, q_oi_, et, b, Dt, allowNormalFlow=False)
             B = form.formsSW(e, e_, et, b, Dt, allowNormalFlow=False)[0]
@@ -316,12 +322,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     Au, Ae = form.strongResidualSW(q_oi, q_oi_, b, Dt)
                 else:
                     qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
-                    if mode == 'tohoku':
-                        Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt)
-                    else:
-                        Au, Ae = form.strongResidualSW(qh, q_h, b, Dt)
+                    Au, Ae = form.strongResidualSW(qh, q_h, b_h if mode == 'tohoku' else b, Dt)
                 rho_u.interpolate(Au)
-                rho_e.interpolate(Ae)   # TODO: No idea why this isn't working.
+                rho_e.interpolate(Ae)   # TODO: No idea why this isn't working in refinement case.
                 if op.plotpvd:
                     residualFile.write(rho_u, rho_e, time=float(k))
                 if approach == 'residual':
@@ -382,10 +385,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                         as loadErr:
                     loadErr.load(epsilon)
                     loadErr.close()
-                errEst = Function(FunctionSpace(mesh_H, "CG", 1))
-                # errEst.interpolate(inte.interp(mesh_H, epsilon)[0]
-                #                    if approach in ('explicit', 'DWR', 'residual') and not op.orderChange else epsilon)
-                errEst.interpolate(inte.interp(mesh_H, epsilon)[0])
+                errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon)[0])
                 M = adap.isotropicMetric(W, errEst, op=op, invert=False)
             else:
                 if approach == 'norm':

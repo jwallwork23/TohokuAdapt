@@ -1,9 +1,8 @@
-from firedrake import *
+from thetis import *
 
 import numpy as np
 import cmath
 
-from . import forms
 from . import interpolation
 from . import options
 
