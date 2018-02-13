@@ -24,13 +24,11 @@ def explicitErrorEstimator(q, residual, b, v, maxBathy=False):
     mesh = V.mesh()
     h = CellSize(mesh)
     n = FacetNormal(mesh)
-    b0 = Constant(max(b.dat.data)) if maxBathy else Function(V.sub(1)).assign(b)
+    b0 = Constant(max(b.dat.data)) if maxBathy else Function(V.sub(1)).interpolate(b)
 
     # Compute element residual term
-    if m == 1:
-        resTerm = assemble(v * h * h * inner(residual, residual) * dx)
-    else:
-        resTerm = assemble(v * h * h * sum([inner(residual.split()[k], residual.split()[k]) for k in range(m)]) * dx)
+    resTerm = assemble(v * h * h * inner(residual, residual) * dx) if m == 1 else \
+        assemble(v * h * h * sum([inner(residual.split()[k], residual.split()[k]) for k in range(m)]) * dx)
 
     # Compute boundary residual term on fine mesh
     qh = interpolation.mixedPairInterp(mesh, V, q)[0]       # TODO: not needed if changing order
