@@ -1,6 +1,6 @@
 from thetis import *
 from thetis.field_defs import field_metadata
-from firedrake_adjoint import *
+# from firedrake_adjoint import *               # TODO: need this!
 
 import numpy as np
 from time import clock
@@ -54,6 +54,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     dirName = 'plots/' + mode + '/'
     if op.plotpvd:
         residualFile = File(dirName + "residual.pvd")
+        implicitErrorFile = File(dirName + "implicitError.pvd")
         errorFile = File(dirName + "errorIndicator.pvd")
 
     # Load Mesh, initial condition and bathymetry
@@ -117,7 +118,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 dual_h_u, dual_h_e = dual_h.split()
                 dual_h_u.rename('Fine adjoint velocity')
                 dual_h_e.rename('Fine adjoint elevation')
-            P0 = FunctionSpace(mesh_H, "DG", 0) if op.orderChange else FunctionSpace(mesh_h, "DG", 0)
+            P0 = FunctionSpace(mesh_H if op.orderChange else mesh_h, "DG", 0)
         else:
             P0 = FunctionSpace(mesh_H, "DG", 0)
         v = TestFunction(P0)
@@ -207,26 +208,16 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     t = solver_obj.simulation_time
                     rm = 30                          # TODO: what can we do about this? Needs changing for adjoint
                     dt = options.timestep
-                    if int(t / dt) % rm == 0:
-                        options.simulation_export_time = dt
-                    else:
-                        options.simulation_export_time = (rm - 1) * dt
+                    options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
             else:
                 def selector():
                     t = solver_obj.simulation_time
                     rm = 10                          # TODO: what can we do about this? Needs changing for adjoint
                     dt = options.timestep
-                    if int(t / dt) % rm == 0:
-                        options.simulation_export_time = dt
-                    else:
-                        options.simulation_export_time = (rm - 1) * dt
+                    options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
             solver_obj.iterate(export_func=selector)
         else:
             solver_obj.iterate()
-
-        primalTimer = clock() - primalTimer
-        print('Time elapsed for fixed mesh solver: %.1fs (%.2fmins)' % (primalTimer, primalTimer / 60))
-
         primalTimer = clock() - primalTimer
         msc.dis('Primal run complete. Run time: %.3fs' % primalTimer, op.printStats)
 
@@ -260,7 +251,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 if cnt == -1:
                     break
             dualTimer = clock() - dualTimer
-            msc.dis('Adjoint run complete. Run time: %.3fs' % dualTimer, op.printStats)
+            msc.dis('Dual run complete. Run time: %.3fs' % dualTimer, op.printStats)
             cnt += 1
 
     # Loop back over times to generate error estimators
@@ -306,15 +297,17 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
             # Solve implicit error problem
             if approach in ('implicit', 'DWE') or op.orderChange:
-                uv_2d_oi.interpolate(uv_2d, annotate=False)
-                elev_2d_oi.interpolate(elev_2d, annotate=False)
-                uv_2d_oi_.interpolate(uv_2d_, annotate=False)
-                elev_2d_oi_.interpolate(elev_2d_, annotate=False)
+                uv_2d_oi.interpolate(uv_2d)
+                elev_2d_oi.interpolate(elev_2d)
+                uv_2d_oi_.interpolate(uv_2d_)
+                elev_2d_oi_.interpolate(elev_2d_)
                 if approach in ('implicit', 'DWE'):
-                    errorSolver.solve(annotate=False)
+                    errorSolver.solve()
                     e_.assign(e)
                     if approach == 'implicit':
                         epsilon = assemble(v * sqrt(inner(e, e)) * dx)
+                    if op.plotpvd:
+                        implicitErrorFile.write(e0, e1, time=float(k))
 
             # Approximate residuals
             if approach in ('explicit', 'residual', 'DWR'):
@@ -332,6 +325,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     residualFile.write(rho_u, rho_e, time=float(k))
                 if approach == 'residual':
                     epsilon = assemble(v * sqrt(inner(rho, rho)) * dx)
+                elif approach == 'explicit':
+                    epsilon = err.explicitErrorEstimator(q_oi if op.orderChange else q_h, rho,
+                                                         b if op.orderChange else b_h, v,
+                                                         maxBathy=True if mode == 'tohoku' else False)
 
             epsilon.rename("Error indicator")
 
@@ -362,24 +359,29 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         adaptTimer = clock()
         while cnt < np.ceil(T / dt):
             stepTimer = clock()
-            indexStr = msc.indexString(int(cnt / op.rm))
 
             # Load variables from disk
             if cnt != 0:
-                with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as loadElev:
+                with DumbCheckpoint(dirName+'hdf5/Elevation2d_'+msc.indexString(int(cnt/op.ndump)), mode=FILE_READ) \
+                        as loadElev:
                     loadElev.load(elev_2d, name='elev_2d')
                     loadElev.close()
-                with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as loadVel:
+                with DumbCheckpoint(dirName+'hdf5/Velocity2d_'+msc.indexString(int(cnt/op.ndump)), mode=FILE_READ) \
+                        as loadVel:
                     loadVel.load(uv_2d, name='uv_2d')
                     loadVel.close()
 
             # Construct metric
             W = TensorFunctionSpace(mesh_H, "CG", 1)
             if aposteriori:
-                with DumbCheckpoint(dirName+'hdf5/'+approach+'Error'+indexStr, mode=FILE_READ) as loadErr:
+                with DumbCheckpoint(dirName+'hdf5/'+approach+'Error'+msc.indexString(int(cnt/op.rm)), mode=FILE_READ) \
+                        as loadErr:
                     loadErr.load(epsilon)
                     loadErr.close()
-                errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon)[0])
+                errEst = Function(FunctionSpace(mesh_H, "CG", 1))
+                # errEst.interpolate(inte.interp(mesh_H, epsilon)[0]
+                #                    if approach in ('explicit', 'DWR', 'residual') and not op.orderChange else epsilon)
+                errEst.interpolate(inte.interp(mesh_H, epsilon)[0])
                 M = adap.isotropicMetric(W, errEst, op=op, invert=False)
             else:
                 if approach in ('norm', 'fluxJump'):
@@ -412,6 +414,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 M_ = adap.isotropicMetric(W, inte.interp(mesh_H, H0)[0], bdy=True, op=op)  # Initial boundary metric
                 M = adap.metricIntersection(mesh_H, W, M, M_, bdy=True)
                 adap.metricGradation(mesh_H, M, iso=op.iso)
+            if op.plotpvd:
+                File('plots/'+mode+'/mesh.pvd').write(mesh_H.coordinates, time=float(cnt))
 
             # Adapt mesh and interpolate variables
             if not (approach in ('fieldBased', 'gradientBased', 'hessianBased') and op.mtype != 'f' and cnt == 0):
@@ -426,7 +430,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = False
             adapOpt.use_grad_depth_viscosity_term = False
-            adapOpt.simulation_export_time = dt * op.ndump  # TODO: in this run could save every `rm`?
+            adapOpt.simulation_export_time = dt * op.ndump
             startT = endT
             endT += dt * op.rm
             adapOpt.simulation_end_time = endT
@@ -496,6 +500,7 @@ if __name__ == '__main__':
                          printStats=False,
                          outputOF=True,
                          orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
+                         # orderChange=0,
                          ndump=10,
                          # iso=False if approach == 'hessianBased' else True,       # TODO: fix isotropic gradation
                          iso=False)
@@ -514,17 +519,17 @@ if __name__ == '__main__':
                          window=True if approach == 'DWF' else False,
                          vscale=0.4 if useAdjoint else 0.85,
                          orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
+                         # orderChange=0,
                          plotpvd=True)
     else:
         raise NotImplementedError
 
     # Run simulation(s)
-    minRes = 0 if mode == 'tohoku' else 1
-    maxRes = 4 if mode == 'tohoku' else 6
+    minRes = 0 if mode == 'tohoku' else 4       # TODO: change this back
+    maxRes = 1 if mode == 'tohoku' else 5
     textfile = open('outdata/outputs/' + mode + '/' + approach + date + '.txt', 'w+')
     for i in range(minRes, maxRes + 1):
         av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
-        exit(23)
         print('Run %d:  Mean element count %6d  Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
         textfile.write('%d, %.4f, %.1f\n' % (av, rel, timing))
         # try:
@@ -534,5 +539,3 @@ if __name__ == '__main__':
         # except:
         #     print("#### ERROR: Failed to run simulation %d." % i)
     textfile.close()
-
-    # TODO: loop over all mesh adaptive approaches consistently and then plot

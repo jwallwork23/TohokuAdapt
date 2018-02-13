@@ -103,17 +103,14 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     eta.rename("elev_2d")
 
     # Establish finer mesh (h < H) upon which to approximate error
-    if approach in ('explicit', 'DWR'):
+    if not op.orderChange:
         mesh_h = adap.isoP2(mesh_H)
         V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
         if mode == 'tohoku':
             b_h = msh.TohokuDomain(mesh=mesh_h)[2]
 
     # Specify physical and solver parameters
-    if mode == 'tohoku':
-        dt = adap.adaptTimestepSW(mesh_H, b)
-    else:
-        dt = 0.1        # TODO: change this
+    dt = adap.adaptTimestepSW(mesh_H, b) if mode == 'tohoku' else 0.1        # TODO: change this
     msc.dis('Using initial timestep = %4.3fs\n' % dt, op.printStats)
     Dt = Constant(dt)
     T = op.Tend
@@ -147,7 +144,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     # Define Functions relating to a posteriori estimators
     if aposteriori:
-        if approach in ('residualNorm', 'residual', 'explicit', 'DWR'):
+        if approach in ('residual', 'explicit', 'DWR'):
             rho = Function(V_oi if op.orderChange else V_h)
             rho_u, rho_e = rho.split()
             rho_u.rename("Velocity residual")
@@ -162,7 +159,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 uh, eh = qh.split()
                 uh.rename("Fine velocity")
                 eh.rename("Fine elevation")
-            P0 = FunctionSpace(mesh_h, "DG", 0) if op.orderChange else FunctionSpace(mesh_H, "DG", 0)
+            P0 = FunctionSpace(mesh_H, "DG", 0) if op.orderChange else FunctionSpace(mesh_h, "DG", 0)
         else:
             P0 = FunctionSpace(mesh_H, "DG", 0)
         v = TestFunction(P0)
