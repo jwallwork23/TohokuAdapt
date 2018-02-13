@@ -89,7 +89,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     if not op.orderChange:
         mesh_h = adap.isoP2(mesh_H)
         V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
-        b_h = msh.TohokuDomain(mesh=mesh_h)[2]
+        if mode == 'tohoku':
+            b_h = msh.TohokuDomain(mesh=mesh_h)[2]
         qh = Function(V_h)
         uh, eh = qh.split()
         uh.rename("Fine velocity")
@@ -320,7 +321,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     else:
                         Au, Ae = form.strongResidualSW(qh, q_h, b, Dt)
                 rho_u.interpolate(Au)
-                rho_e.interpolate(Ae)
+                rho_e.interpolate(Ae)   # TODO: No idea why this isn't working.
                 if op.plotpvd:
                     residualFile.write(rho_u, rho_e, time=float(k))
                 if approach == 'residual':
@@ -487,20 +488,19 @@ if __name__ == '__main__':
     if mode == 'tohoku':
         op = opt.Options(vscale=0.1 if approach == 'DWR' else 0.85,
                          family='dg-dg',
-                         # timestepper='SSPRK33', # 3-stage, 3rd order Strong Stability Preserving Runge Kutta
                          rm=60 if useAdjoint else 30,
                          gradate=True if (useAdjoint or approach == 'explicit') else False,
                          advect=False,
                          window=True if approach == 'DWF' else False,
                          outputMetric=False,
-                         plotpvd=False,
+                         plotpvd=True,
                          gauges=False,
                          tAdapt=False,
                          bootstrap=False,
                          printStats=False,
                          outputOF=True,
-                         orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
-                         # orderChange=0,
+                         # orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
+                         orderChange=0,
                          ndump=10,
                          # iso=False if approach == 'hessianBased' else True,       # TODO: fix isotropic gradation
                          iso=False)
@@ -518,8 +518,8 @@ if __name__ == '__main__':
                          advect=False,
                          window=True if approach == 'DWF' else False,
                          vscale=0.4 if useAdjoint else 0.85,
-                         orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
-                         # orderChange=0,
+                         # orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
+                         orderChange=0,
                          plotpvd=True)
     else:
         raise NotImplementedError

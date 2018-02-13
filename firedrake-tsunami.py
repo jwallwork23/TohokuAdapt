@@ -69,29 +69,20 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     if mode == 'tohoku':
         nEle = op.meshes[startRes]
         mesh_H, eta0, b = msh.TohokuDomain(nEle)    # Computational mesh
-        if op.bAdapt:                                   # TODO: adapt to gradients in bathymetry?
-            W = TensorFunctionSpace(mesh_H, "CG", 1)
-            H = adap.constructHessian(mesh_H, W, b, op=op)
-            M = adap.computeSteadyMetric(mesh_H, W, H, b, op=op)
-            adap.metricGradation(mesh_H, M)
-            mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
     elif mode == 'shallow-water':
         lx = 2 * np.pi
         n = pow(2, startRes)
         mesh_H = SquareMesh(n, n, lx, lx)  # Computational mesh
         nEle = msh.meshStats(mesh_H)[0]
         x, y = SpatialCoordinate(mesh_H)
+        P1_2d = FunctionSpace(mesh_H, "CG", 1)
+        eta0 = Function(P1_2d).interpolate(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))))
+        b = Function(P1_2d).assign(0.1)
     else:
         raise NotImplementedError
 
-    # Define initial FunctionSpace
+    # Define initial FunctionSpace and variables of problem and apply initial conditions
     V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
-
-    if mode == 'shallow-water':
-        eta0 = project(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))), V_H.sub(1))
-        b = Constant(0.1)
-
-    # Define variables of problem and apply initial conditions
     q_ = Function(V_H)
     u_, eta_ = q_.split()
     u_.interpolate(Expression([0, 0]), annotate=False)
@@ -108,6 +99,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
         if mode == 'tohoku':
             b_h = msh.TohokuDomain(mesh=mesh_h)[2]
+        qh = Function(V_h)
+        uh, eh = qh.split()
+        uh.rename("Fine velocity")
+        eh.rename("Fine elevation")
 
     # Specify physical and solver parameters
     dt = adap.adaptTimestepSW(mesh_H, b) if mode == 'tohoku' else 0.1        # TODO: change this
@@ -134,16 +129,14 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                * FunctionSpace(mesh_H, op.space2, op.degree2+op.orderChange)
         q_oi = Function(V_oi)
         u_oi, eta_oi = q_oi.split()
-        q__oi = Function(V_oi)
-        u__oi, eta__oi = q__oi.split()
-        if mode == 'tohoku':
-            b_oi = Function(V_oi.sub(1)).interpolate(b)
+        q_oi_ = Function(V_oi)
+        u_oi_, eta_oi_ = q_oi_.split()
         if useAdjoint:
             dual_oi = Function(V_oi)
             dual_oi_u, dual_oi_e = dual_oi.split()
 
     # Define Functions relating to a posteriori estimators
-    if aposteriori:
+    if aposteriori or approach == 'norm':
         if approach in ('residual', 'explicit', 'DWR'):
             rho = Function(V_oi if op.orderChange else V_h)
             rho_u, rho_e = rho.split()
@@ -154,12 +147,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 dual_h_u, dual_h_e = dual_h.split()
                 dual_h_u.rename('Fine adjoint velocity')
                 dual_h_e.rename('Fine adjoint elevation')
-            else:
-                qh = Function(V_h)
-                uh, eh = qh.split()
-                uh.rename("Fine velocity")
-                eh.rename("Fine elevation")
-            P0 = FunctionSpace(mesh_H, "DG", 0) if op.orderChange else FunctionSpace(mesh_h, "DG", 0)
+            P0 = FunctionSpace(mesh_H if op.orderChange else mesh_h, "DG", 0)
         else:
             P0 = FunctionSpace(mesh_H, "DG", 0)
         v = TestFunction(P0)
@@ -205,7 +193,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
         if approach in ('implicit', 'DWE'):
-            B_, L = form.formsSW(q_oi, q__oi, et, b, Dt, allowNormalFlow=False)
+            B_, L = form.formsSW(q_oi, q_oi_, et, b, Dt, allowNormalFlow=False)
             B = form.formsSW(e, e_, et, b, Dt, allowNormalFlow=False)[0]
             I = form.interelementTerm(et1 * u_oi, n=normal) * dS
             errorProblem = NonlinearVariationalProblem(B - L + B_ - I, e)
@@ -229,8 +217,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             if approach in ('implicit', 'DWE'):
                 u_oi.interpolate(u, annotate=False)
                 eta_oi.interpolate(eta, annotate=False)
-                u__oi.interpolate(u_, annotate=False)
-                eta__oi.interpolate(eta_, annotate=False)
+                u_oi_.interpolate(u_, annotate=False)
+                eta_oi_.interpolate(eta_, annotate=False)
                 errorSolver.solve(annotate=False)
                 e_.assign(e)
 
@@ -251,12 +239,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     if op.orderChange:
                         u_oi.interpolate(u)
                         eta_oi.interpolate(eta)
-                        u__oi.interpolate(u_)
-                        eta__oi.interpolate(eta_)
-                        if mode == 'tohoku':
-                            Au, Ae = form.strongResidualSW(q_oi, q__oi, b_oi, Dt)
-                        else:
-                            Au, Ae = form.strongResidualSW(q_oi, q__oi, b, Dt)
+                        u_oi_.interpolate(u_)
+                        eta_oi_.interpolate(eta_)
+                        Au, Ae = form.strongResidualSW(q_oi, q_oi_, b, Dt)
                     else:
                         qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
                         if mode == 'tohoku':

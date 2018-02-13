@@ -54,7 +54,6 @@ def strongResidualSW(q, q_, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=Fal
     :return: strong residual for shallow water equations at current timestep.
     """
     # TODO: include optionality for BCs
-
     # TODO: implement Galerkin Least Squares (GLS) stabilisation
 
     (u, eta) = (as_vector((q[0], q[1])), q[2])
