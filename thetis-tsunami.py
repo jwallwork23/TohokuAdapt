@@ -85,10 +85,14 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         uv_2d_, elev_2d_ = q_.split()
 
     # Establish finer mesh (h < H) upon which to approximate error
-    if approach in ('explicit', 'DWR'):
+    if not op.orderChange:
         mesh_h = adap.isoP2(mesh_H)
         V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
         b_h = msh.TohokuDomain(mesh=mesh_h)[2]
+        qh = Function(V_h)
+        uh, eh = qh.split()
+        uh.rename("Fine velocity")
+        eh.rename("Fine elevation")
 
     if op.orderChange:
         V_oi = VectorFunctionSpace(mesh_H, op.space1, op.degree1 + op.orderChange) \
@@ -97,14 +101,13 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         uv_2d_oi, elev_2d_oi = q_oi.split()
         q_oi_ = Function(V_oi)
         uv_2d_oi_, elev_2d_oi_ = q_oi_.split()
-        b_oi = Function(V_oi.sub(1)).interpolate(b)
         if useAdjoint:
             dual_oi = Function(V_oi)
             dual_oi_u, dual_oi_e = dual_oi.split()
 
     # Define Functions relating to a posteriori estimators
     if aposteriori or approach == 'norm':
-        if approach in ('residualNorm', 'residual', 'explicit', 'DWR'):
+        if approach in ('residual', 'explicit', 'DWR'):
             rho = Function(V_oi if op.orderChange else V_h)
             rho_u, rho_e = rho.split()
             rho_u.rename("Velocity residual")
@@ -114,12 +117,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 dual_h_u, dual_h_e = dual_h.split()
                 dual_h_u.rename('Fine adjoint velocity')
                 dual_h_e.rename('Fine adjoint elevation')
-            else:
-                qh = Function(V_h)
-                uh, eh = qh.split()
-                uh.rename("Fine velocity")
-                eh.rename("Fine elevation")
-            P0 = FunctionSpace(mesh_h, "DG", 0) if op.orderChange else FunctionSpace(mesh_H, "DG", 0)
+            P0 = FunctionSpace(mesh_H, "DG", 0) if op.orderChange else FunctionSpace(mesh_h, "DG", 0)
         else:
             P0 = FunctionSpace(mesh_H, "DG", 0)
         v = TestFunction(P0)
@@ -173,7 +171,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         primalTimer = clock()
 
         # TODO: use proper Thetis forms to calculate implicit error and residuals
-        # TODO: will need only load every other field later on
 
         # Get solver parameter values and construct solver
         options = solver_obj.options
@@ -279,9 +276,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             errorProblem = NonlinearVariationalProblem(B - L + B_ - I, e)
             errorSolver = NonlinearVariationalSolver(errorProblem, solver_parameters=op.params)
 
-        s = 0 if approach == 'DWF' else 1
-        for k in range(s, iEnd):
-            msc.dis('Generating error estimate %d / %d' % (k+1, iEnd+1), op.printStats)
+        for k in range(0, iEnd):
+            msc.dis('Generating error estimate %d / %d' % (k+1, iEnd), op.printStats)
 
             if approach == 'DWF':
                 with DumbCheckpoint(dirName+'hdf5/Velocity2d_'+msc.indexString(k), mode=FILE_READ) as loadVel:
@@ -291,31 +287,52 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     loadElev.load(elev_2d)
                     loadElev.close()
             else:
-                with DumbCheckpoint(dirName+'hdf5/Velocity2d_'+msc.indexString(2*k), mode=FILE_READ) as loadVel:
+                i1 = 0 if k == 0 else 2*k
+                i2 = 0 if k == 0 else 2*k+1
+                with DumbCheckpoint(dirName+'hdf5/Velocity2d_'+msc.indexString(i1), mode=FILE_READ) as loadVel:
                     loadVel.load(uv_2d)
                     loadVel.close()
-                with DumbCheckpoint(dirName+'hdf5/Elevation2d_'+msc.indexString(2*k), mode=FILE_READ) as loadElev:
+                with DumbCheckpoint(dirName+'hdf5/Elevation2d_'+msc.indexString(i1), mode=FILE_READ) as loadElev:
                     loadElev.load(elev_2d)
                     loadElev.close()
                 uv_2d_.assign(uv_2d)
                 elev_2d_.assign(elev_2d)
-                with DumbCheckpoint(dirName+'hdf5/Velocity2d_'+msc.indexString(2*k+1), mode=FILE_READ) as loadVel:
+                with DumbCheckpoint(dirName+'hdf5/Velocity2d_'+msc.indexString(i2), mode=FILE_READ) as loadVel:
                     loadVel.load(uv_2d)
                     loadVel.close()
-                with DumbCheckpoint(dirName+'hdf5/Elevation2d_'+msc.indexString(2*k+1), mode=FILE_READ) as loadElev:
+                with DumbCheckpoint(dirName+'hdf5/Elevation2d_'+msc.indexString(i2), mode=FILE_READ) as loadElev:
                     loadElev.load(elev_2d)
                     loadElev.close()
 
             # Solve implicit error problem
-            if approach in ('implicit', 'DWE'):
+            if approach in ('implicit', 'DWE') or op.orderChange:
                 uv_2d_oi.interpolate(uv_2d, annotate=False)
                 elev_2d_oi.interpolate(elev_2d, annotate=False)
                 uv_2d_oi_.interpolate(uv_2d_, annotate=False)
                 elev_2d_oi_.interpolate(elev_2d_, annotate=False)
-                errorSolver.solve(annotate=False)
-                e_.assign(e)
-                if approach == 'implicit':
-                    epsilon = assemble(v * sqrt(inner(e, e)) * dx)
+                if approach in ('implicit', 'DWE'):
+                    errorSolver.solve(annotate=False)
+                    e_.assign(e)
+                    if approach == 'implicit':
+                        epsilon = assemble(v * sqrt(inner(e, e)) * dx)
+
+            # Approximate residuals
+            if approach in ('explicit', 'residual', 'DWR'):
+                if op.orderChange:
+                    Au, Ae = form.strongResidualSW(q_oi, q_oi_, b, Dt)
+                else:
+                    qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
+                    if mode == 'tohoku':
+                        Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt)
+                    else:
+                        Au, Ae = form.strongResidualSW(qh, q_h, b, Dt)
+                rho_u.interpolate(Au)
+                rho_e.interpolate(Ae)
+                if op.plotpvd:
+                    residualFile.write(rho_u, rho_e, time=float(k))
+                if approach == 'residual':
+                    epsilon = assemble(v * sqrt(inner(rho, rho)) * dx)
+
             epsilon.rename("Error indicator")
 
             # TODO: Estimate OF using trapezium rule and output (inc. fixed mesh case)
@@ -359,7 +376,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             # Construct metric
             W = TensorFunctionSpace(mesh_H, "CG", 1)
             if aposteriori:
-                # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
                 with DumbCheckpoint(dirName+'hdf5/'+approach+'Error'+indexStr, mode=FILE_READ) as loadErr:
                     loadErr.load(epsilon)
                     loadErr.close()
@@ -479,7 +495,7 @@ if __name__ == '__main__':
                          bootstrap=False,
                          printStats=False,
                          outputOF=True,
-                         orderChange=0,
+                         orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
                          ndump=10,
                          # iso=False if approach == 'hessianBased' else True,       # TODO: fix isotropic gradation
                          iso=False)
@@ -497,8 +513,8 @@ if __name__ == '__main__':
                          advect=False,
                          window=True if approach == 'DWF' else False,
                          vscale=0.4 if useAdjoint else 0.85,
-                         orderChange=0,
-                         plotpvd=False)
+                         orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
+                         plotpvd=True)
     else:
         raise NotImplementedError
 
@@ -508,6 +524,7 @@ if __name__ == '__main__':
     textfile = open('outdata/outputs/' + mode + '/' + approach + date + '.txt', 'w+')
     for i in range(minRes, maxRes + 1):
         av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
+        exit(23)
         print('Run %d:  Mean element count %6d  Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
         textfile.write('%d, %.4f, %.1f\n' % (av, rel, timing))
         # try:
