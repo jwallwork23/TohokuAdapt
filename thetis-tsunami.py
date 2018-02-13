@@ -330,7 +330,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     epsilon = err.explicitErrorEstimator(q_oi if op.orderChange else q_h, rho,
                                                          b if op.orderChange else b_h, v,
                                                          maxBathy=True if mode == 'tohoku' else False)
-
+            epsilon.dat.data[:] = np.abs(epsilon.dat.data) * nVerT / (np.abs(assemble(epsilon * dx)) or 1.)  # Normalise
             epsilon.rename("Error indicator")
 
             # TODO: Estimate OF using trapezium rule and output (inc. fixed mesh case)
