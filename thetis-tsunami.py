@@ -497,13 +497,11 @@ if __name__ == '__main__':
                          gauges=False,
                          tAdapt=False,
                          bootstrap=False,
-                         printStats=False,
+                         printStats=True,
                          outputOF=True,
                          # orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
                          orderChange=0,
-                         ndump=10,
-                         # iso=False if approach == 'hessianBased' else True,       # TODO: fix isotropic gradation
-                         iso=False)
+                         ndump=10)
     elif mode == 'shallow-water':
         op = opt.Options(Tstart=0.5,
                          Tend=2.5,
@@ -527,15 +525,11 @@ if __name__ == '__main__':
     # Run simulation(s)
     minRes = 0 if mode == 'tohoku' else 4       # TODO: change this back
     maxRes = 1 if mode == 'tohoku' else 5
+    # minRes = 0 if mode == 'tohoku' else 1
+    # maxRes = 4 if mode == 'tohoku' else 6
     textfile = open('outdata/outputs/' + mode + '/' + approach + date + '.txt', 'w+')
     for i in range(minRes, maxRes + 1):
         av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
         print('Run %d:  Mean element count %6d  Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
         textfile.write('%d, %.4f, %.1f\n' % (av, rel, timing))
-        # try:
-        #     av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, mode=mode, op=op)
-        #     print('Run %d:  Mean element count %6d  Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
-        #     textfile.write('%d , %.4f, %.1f\n' % (av, rel, timing))
-        # except:
-        #     print("#### ERROR: Failed to run simulation %d." % i)
     textfile.close()

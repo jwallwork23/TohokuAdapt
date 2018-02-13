@@ -578,19 +578,17 @@ if __name__ == '__main__':
                          printStats=True,
                          outputOF=True,
                          orderChange=0,
-                         ndump=10,
-                         # iso=False if approach == 'hessianBased' else True,       # TODO: fix isotropic gradation
-                         iso=False)
+                         ndump=10)
     elif mode == 'shallow-water':
         op = opt.Options(Tstart=0.5,
                          Tend=2.5,
                          hmin=5e-2,
                          hmax=1.,
-                         rm=5,
-                         ndump=1,
+                         rm=10,
+                         ndump=5,
                          gradate=False,
                          bootstrap=False,
-                         printStats=False,
+                         printStats=True,
                          outputOF=True,
                          advect=False,
                          window=True if approach == 'DWF' else False,
@@ -608,12 +606,4 @@ if __name__ == '__main__':
         av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
         print('Run %d:  Mean element count %6d  Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
         textfile.write('%d, %.4f, %.1f\n' % (av, rel, timing))
-        # try:
-        #     av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, mode=mode, op=op)
-        #     print('Run %d:  Mean element count %6d  Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
-        #     textfile.write('%d , %.4f, %.1f\n' % (av, rel, timing))
-        # except:
-        #     print("#### ERROR: Failed to run simulation %d." % i)
     textfile.close()
-
-    # TODO: loop over all mesh adaptive approaches consistently and then plot

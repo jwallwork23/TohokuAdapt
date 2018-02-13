@@ -265,17 +265,13 @@ def analyticHuang(V, t=0., B=0.395):
     :param B: Parameter controlling amplitude of soliton.
     :return: Initial condition for test problem of Huang.
     """
-
-    # Establish phi functions
-    q = Function(V)
     x_phi = " * 0.771 * %f * %f / pow(cosh(%f * (x[0] + 0.395 * %f * %f * %f)), 2)" % (B, B, B, B, B, t)
     x_dphidx = " * -2 * %f * tanh(%f * (x[0] + 0.395 * %f * %f * %f))" % (B, B, B, B, t)
-
-    # Set components of q
+    q = Function(V)
     u, eta = q.split()
-    u.interpolate(Expression(["(-9 + 6 * pow(x[1], 2)) * exp(-0.5 * pow(x[1], 2)) / 4" + x_phi,
-                              "2 * x[1] * exp(-0.5 * pow(x[1], 2))" + x_dphidx]))
-    eta.interpolate(Expression("(3 + 6 * pow(x[1], 2)) * exp(-0.5 * pow(x[1], 2)) / 4" + x_phi))
+    u.interpolate(Expression(["0.25 * (-9 + 6 * x[1] * x[1]) * exp(-0.5 * x[1] * x[1])" + x_phi,
+                              "2 * x[1] * exp(-0.5 * x[1] * x[1])" + x_dphidx]))
+    eta.interpolate(Expression("0.25 * (3 + 6 * x[1] * x[1]) * exp(-0.5 * x[1] * x[1])" + x_phi))
 
     return q
 
