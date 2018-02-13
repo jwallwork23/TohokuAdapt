@@ -363,6 +363,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
             # Load variables from disk
             if cnt != 0:
+                V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
+                q = Function(V_H)
+                uv_2d, elev_2d = q.split()
                 with DumbCheckpoint(dirName+'hdf5/Elevation2d_'+msc.indexString(int(cnt/op.ndump)), mode=FILE_READ) \
                         as loadElev:
                     loadElev.load(elev_2d, name='elev_2d')
@@ -385,10 +388,14 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 errEst.interpolate(inte.interp(mesh_H, epsilon)[0])
                 M = adap.isotropicMetric(W, errEst, op=op, invert=False)
             else:
-                if approach in ('norm', 'fluxJump'):
+                if approach == 'norm':
                     v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
-                    norm = assemble(v * inner(q, q) * dx) if approach == 'norm' else err.fluxJumpError(q, v)
-                    M = adap.isotropicMetric(W, norm, invert=False, nVerT=nVerT, op=op)
+                    epsilon = assemble(v * inner(q, q) * dx)
+                    M = adap.isotropicMetric(W, epsilon, invert=False, nVerT=nVerT, op=op)
+                elif approach =='fluxJump' and cnt != 0:
+                    v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
+                    epsilon = err.fluxJumpError(q, v)
+                    M = adap.isotropicMetric(W, epsilon, invert=False, nVerT=nVerT, op=op)
                 else:
                     if op.mtype != 's':
                         if approach == 'fieldBased':
@@ -419,7 +426,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 File('plots/'+mode+'/mesh.pvd').write(mesh_H.coordinates, time=float(cnt))
 
             # Adapt mesh and interpolate variables
-            if not (approach in ('fieldBased', 'gradientBased', 'hessianBased') and op.mtype != 'f' and cnt == 0):
+            if not (((approach in ('fieldBased', 'gradientBased', 'hessianBased') and op.mtype != 'f')
+                     or approach == 'fluxJump') and cnt == 0):
                 mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
                 elev_2d, uv_2d, b = inte.interp(mesh_H, elev_2d, uv_2d, b)
                 uv_2d.rename('uv_2d')
@@ -489,7 +497,7 @@ if __name__ == '__main__':
         op = opt.Options(vscale=0.1 if approach == 'DWR' else 0.85,
                          family='dg-dg',
                          rm=60 if useAdjoint else 30,
-                         gradate=True if (useAdjoint or approach == 'explicit') else False,
+                         gradate=True if (useAdjoint or approach in ('explicit', 'implicit')) else False,
                          advect=False,
                          window=True if approach == 'DWF' else False,
                          outputMetric=False,
