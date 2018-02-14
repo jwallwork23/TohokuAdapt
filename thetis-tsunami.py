@@ -461,15 +461,15 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             for e in adapSolver.exporters.values():
                 e.set_next_export_ix(adapSolver.i_export)
 
+            # Evaluate callbacks and iterate
             if op.outputOF:
-                # Evaluate callbacks and iterate
-                cb = err.TohokuCallback(solver_obj) if mode == 'tohoku' else err.ShallowWaterCallback(solver_obj)
+                cb = err.TohokuCallback(adapSolver) if mode == 'tohoku' else err.ShallowWaterCallback(adapSolver)
                 cb.output_dir = dirName
                 cb.append_to_log = True
                 cb.export_to_hdf5 = False
                 if cnt != 0:
                     cb.objective_functional = J_h
-                solver_obj.add_callback(cb, 'timestep')
+                adapSolver.add_callback(cb, 'timestep')
             adapSolver.iterate()
             if op.outputOF:
                 J_h = err.getOF(dirName)  # Evaluate objective functional
