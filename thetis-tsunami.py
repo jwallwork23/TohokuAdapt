@@ -219,9 +219,15 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                             :return: objective functional value for callbacks.
                             """
                             elev_2d = solver_obj.fields.solution_2d.split()[1]
-                            k = form.indicator(elev_2d.function_space(), 490e3, 640e3, 4160e3, 4360e3, smooth=True)
+                            ks = form.indicator(elev_2d.function_space(), 490e3, 640e3, 4160e3, 4360e3, smooth=True)
+                            kt = Constant(0.)
+                            kt = Constant(0.)
+                            if solver_obj.simulation_time > op.Tstart:
+                                kt.assign(
+                                    1. if solver_obj.simulation_time > op.Tstart
+                                                                       + 0.5 * solver_obj.options.timestep else 0.5)
 
-                            return elev_2d * k
+                            return assemble(elev_2d * ks * kt * dx)
 
                         super(TohokuCallback, self).__init__(indicatorTohoku, solver_obj, **kwargs)
 
@@ -242,9 +248,13 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                             :return: objective functional value for callbacks.
                             """
                             elev_2d = solver_obj.fields.solution_2d.split()[1]
-                            k = form.indicator(elev_2d.function_space(), 0., np.pi / 2, 0.5 * np.pi, 1.5 * np.pi)
+                            ks = form.indicator(elev_2d.function_space(), 0., np.pi / 2, 0.5 * np.pi, 1.5 * np.pi)
+                            kt = Constant(0.)
+                            if solver_obj.simulation_time > 0.5:
+                                kt.assign(
+                                    1. if solver_obj.simulation_time > 0.5 + 0.5 * solver_obj.options.timestep else 0.5)
 
-                            return elev_2d * k
+                            return assemble(elev_2d * ks * kt * dx)
 
                         super(ShallowWaterCallback, self).__init__(indicatorSW, solver_obj, **kwargs)
 

@@ -299,7 +299,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         cntT = cnt  # Total number of steps
         primalTimer = clock() - primalTimer
         if op.outputOF:
-            rel = np.abs((op.J(mode) - J_trap * dt) / op.J(mode))
+            rel = np.abs((op.J(mode) - 0.5* J_trap * dt) / op.J(mode))
             # print('#### DEBUG: J_h = ', J_trap * dt)
         msc.dis('Primal run complete. Run time: %.3fs' % primalTimer, op.printStats)
 
@@ -537,8 +537,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             t += dt
             cnt += 1
         adaptTimer = clock() - adaptTimer
-        # print('#### DEBUG: J_h = ', J_trap * dt)
-        rel = np.abs((op.J(mode) - J_trap * dt) / op.J(mode))
+        rel = np.abs((op.J(mode) - 0.5 * J_trap * dt) / op.J(mode))
         msc.dis('Adaptive primal run complete. Run time: %.3fs \nRelative error = %5.4f' % (adaptTimer, rel), op.printStats)
     else:
         av = nEle

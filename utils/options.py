@@ -198,7 +198,7 @@ class Options:
         :param mode: test problem choice.
         :return: 'exact' objective functional value, converged to 3 s.f.
         """
-        dat = {'tohoku': 2.4391e+13, 'shallow-water': 0.00224}  # TODO: advection-diffusion and rossby-wave
+        dat = {'tohoku': 1.2185e+13, 'shallow-water': 0.00112}  # TODO: advection-diffusion and rossby-wave
         if mode in dat.keys():
             return dat[mode]
         else:
