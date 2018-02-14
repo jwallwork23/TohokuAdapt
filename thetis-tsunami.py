@@ -7,7 +7,6 @@ from time import clock
 import datetime
 
 import utils.adaptivity as adap
-import utils.bootstrapping as boot
 import utils.error as err
 import utils.forms as form
 import utils.interpolation as inte
@@ -22,7 +21,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     """
     Run mesh adaptive simulations for the Tohoku problem.
 
-    :param startRes: Starting resolution, if bootstrapping is not used.
+    :param startRes: Starting resolution.
     :param approach: meshing method.
     :param getData: run forward simulation?
     :param getError: generate error estimates?
@@ -37,17 +36,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         msc.dis('*********************** TOHOKU TSUNAMI SIMULATION *********************\n', op.printStats)
     elif mode == 'shallow-water':
         msc.dis('*********************** SHALLOW WATER TEST PROBLEM ********************\n', op.printStats)
-    bootTimer = primalTimer = dualTimer = errorTimer = adaptTimer = False
+    primalTimer = dualTimer = errorTimer = adaptTimer = False
     if approach in ('implicit', 'DWE'):
         op.orderChange = 1
-
-    # Establish initial mesh resolution
-    if op.bootstrap:
-        bootTimer = clock()
-        msc.dis('\nBootstrapping to establish optimal mesh resolution', op.printStats)
-        startRes = boot.bootstrap(mode, tol=2e10 if mode == 'tohoku' else 1e-3)[0]
-        bootTimer = clock() - bootTimer
-        msc.dis('Bootstrapping run time: %.3fs\n' % bootTimer, op.printStats)
 
     # Establish filenames
     dirName = 'plots/'+mode+'/'
@@ -455,10 +446,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     # Print to screen timing analyses and plot timeseries
     if op.printStats:
-        msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer, bootTimer)
+        msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer)
     rel = np.abs(op.J(mode) - J_h)/np.abs(op.J(mode))
 
-    return av, rel, clock() - tic
+    return av, J_h if op.bootstrap else rel, clock() - tic
 
 
 if __name__ == '__main__':
@@ -478,7 +469,7 @@ if __name__ == '__main__':
                      plotpvd=True,
                      gauges=False,
                      tAdapt=False,
-                     bootstrap=False,
+                     bootstrap=True,
                      printStats=True,
                      outputOF=True,
                      orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
@@ -493,9 +484,21 @@ if __name__ == '__main__':
         op.ndump = 10
 
     # Run simulation(s)
-    textfile = open('outdata/outputs/'+mode+'/'+approach+date+'.txt', 'w+')
-    for i in range(0, 7):
-        av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
-        print('Run %d:  Mean element count %6d  Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
-        textfile.write('%d, %.4f, %.1f\n' % (av, rel, timing))
+    s = '_BOOTSTRAP' if op.bootstrap else ''
+    textfile = open('outdata/outputs/'+mode+'/'+approach+date+s+'.txt', 'w+')
+    if op.bootstrap:
+        for i in range(9):
+            av, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
+            if i > 0:
+                diff = np.abs(J_h - J_h_)
+                J_h_ = J_h
+            print('Run %d:  Mean element count %6d      Objective value %.4f        Timing %.1fs    Difference %.4f'
+                  % (i, av, J_h, timing, diff))
+            textfile.write('%d, %.4f, %.1f, %.4f\n' % (av, J_h, timing, diff))
+    else:
+        for i in range(6):
+            av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
+            print('Run %d:  Mean element count %6d      Relative error %.4f         Timing %.1fs'
+                  % (i, av, rel, timing))
+            textfile.write('%d, %.4f, %.1f\n' % (av, rel, timing))
     textfile.close()

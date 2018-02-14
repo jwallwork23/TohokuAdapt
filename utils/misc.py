@@ -41,7 +41,7 @@ def cheatCodes(approach, default='DWR'):
     return approach, getData, getError, useAdjoint, aposteriori
 
 
-def printTimings(primal, dual=False, error=False, adapt=False, boot=False):
+def printTimings(primal, dual=False, error=False, adapt=False):
     """
     Print timings for the various sections of code.
     
@@ -49,20 +49,18 @@ def printTimings(primal, dual=False, error=False, adapt=False, boot=False):
     :arg dual: dual solver.
     :arg error: error estimation phase.
     :arg adapt: adaptive primal solver.
-    :arg boot: bootstrapping routine.
     :return: 
     """
     print("TIMINGS:")
-    if bool(boot):
-        print("Bootstrap run %5.3fs" % boot)
-    print("Forward run   %5.3fs" % primal)
+    if bool(primal):
+        print("Forward run   %5.3fs" % primal)
     if bool(dual):
         print("Adjoint run   %5.3fs" % dual)
     if bool(error):
         print("Error run     %5.3fs" % error)
     if bool(adapt):
         print("Adaptive run  %5.3fs" % adapt)
-    print("Total         %5.3fs\n" % (primal + float(dual) + float(error) + float(adapt) + float(boot)))
+    print("Total         %5.3fs\n" % (primal + float(dual) + float(error) + float(adapt)))
 
 
 def dis(string, printStats=True):
