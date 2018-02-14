@@ -248,7 +248,7 @@ def readErrors(date, approach, mode='tohoku'):
     return nEls, err, tim
 
 
-def errorVsElements(mode='tohoku'):
+def errorVsElements(mode='tohoku', bootstrapping=False):
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     plt.rc('legend', fontsize='x-large')
@@ -288,37 +288,48 @@ def errorVsElements(mode='tohoku'):
     # nEls[labels[5]] = [8146, 11291, 41811]
     # tim[labels[5]] = [295.8, 548.9, 1445.5]
 
-    for i in range(1, 8):
-        # Plot errors
-        cnt = 0
-        for mesh in labels:
-            plt.loglog(nEls[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
-            cnt += 1
-            if cnt == i:
-                break
+    if bootstrapping:
+        # Plot OF values
+        mesh = 'Fixed mesh'
+        plt.loglog(nEls[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
         plt.gcf()
-        plt.legend(bbox_to_anchor=(0.6, 1.1), loc=2)
         plt.xlabel(r'Mean element count')
-        plt.ylabel(r'Relative error $\frac{|J(\textbf{q})-J(\textbf{q}_h)|}{|J(\textbf{q})|}$')
-        if mode == 'tohoku':
-            plt.xlim([5000, 50000])
-            plt.ylim([1e-4, 5e-1])
-        plt.savefig('outdata/outputs/'+mode+'/errorVsElements' + str(i) + '.pdf', bbox_inches='tight')
+        plt.ylabel(r'Objective value $J(\textbf{q})=\int_{T_{\mathrm{start}}}^{T_{\mathrm{end}}}\iint_A'
+                   +'\eta(x,y,t)\mathrm{d}x\mathrm{d}y\mathrm{d}t$')
+        plt.savefig('outdata/outputs/' + mode + '/ObjectiveVsElements.pdf', bbox_inches='tight')
         plt.clf()
+    else:
+        for i in range(1, 8):
+            # Plot errors
+            cnt = 0
+            for mesh in labels:
+                plt.loglog(nEls[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
+                cnt += 1
+                if cnt == i:
+                    break
+            plt.gcf()
+            plt.legend(bbox_to_anchor=(0.6, 1.1), loc=2)
+            plt.xlabel(r'Mean element count')
+            plt.ylabel(r'Relative error $\frac{|J(\textbf{q})-J(\textbf{q}_h)|}{|J(\textbf{q})|}$')
+            if mode == 'tohoku':
+                plt.xlim([5000, 50000])
+                plt.ylim([1e-4, 5e-1])
+            plt.savefig('outdata/outputs/'+mode+'/errorVsElements' + str(i) + '.pdf', bbox_inches='tight')
+            plt.clf()
 
-        # Plot timings
-        cnt = 0
-        for mesh in labels:
-            plt.loglog(nEls[mesh], tim[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
-            cnt += 1
-            if cnt == i:
-                break
-        plt.gcf()
-        # plt.legend(bbox_to_anchor=(0.2, -0.1), loc=4)
-        plt.xlabel(r'Mean element count')
-        plt.ylabel(r'CPU time (s)')
-        if mode == 'tohoku':
-            plt.xlim([0, 55000])
-            plt.ylim([0, 5000])
-        plt.savefig('outdata/outputs/'+mode+'/timeVsElements' + str(i) + '.pdf', bbox_inches='tight')
-        plt.clf()
+            # Plot timings
+            cnt = 0
+            for mesh in labels:
+                plt.loglog(nEls[mesh], tim[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
+                cnt += 1
+                if cnt == i:
+                    break
+            plt.gcf()
+            # plt.legend(bbox_to_anchor=(0.2, -0.1), loc=4)
+            plt.xlabel(r'Mean element count')
+            plt.ylabel(r'CPU time (s)')
+            if mode == 'tohoku':
+                plt.xlim([0, 55000])
+                plt.ylim([0, 5000])
+            plt.savefig('outdata/outputs/'+mode+'/timeVsElements' + str(i) + '.pdf', bbox_inches='tight')
+            plt.clf()

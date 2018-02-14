@@ -94,7 +94,7 @@ class ShallowWaterCallback(IntegralCallback):
             :return: objective functional value for callbacks.
             """
             elev_2d = solver_obj.fields.solution_2d.split()[1]
-            ks = forms.indicator(elev_2d.function_space(), 0., np.pi / 2, 0.5 * np.pi, 1.5 * np.pi)
+            ks = forms.indicator(elev_2d.function_space(), 0., 0.5 * np.pi, 0.5 * np.pi, 1.5 * np.pi)
             kt = Constant(0.)
             if solver_obj.simulation_time > 0.5:
                 kt.assign(

@@ -489,12 +489,11 @@ if __name__ == '__main__':
     if op.bootstrap:
         for i in range(9):
             av, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
-            if i > 0:
-                diff = np.abs(J_h - J_h_)
-                J_h_ = J_h
+            var = np.abs(J_h - J_h_) if i > 0 else 0.
+            J_h_ = J_h
             print('Run %d:  Mean element count %6d      Objective value %.4f        Timing %.1fs    Difference %.4f'
-                  % (i, av, J_h, timing, diff))
-            textfile.write('%d, %.4f, %.1f, %.4f\n' % (av, J_h, timing, diff))
+                  % (i, av, J_h, timing, var))
+            textfile.write('%d, %.4f, %.1f, %.4f\n' % (av, J_h, timing, var))
     else:
         for i in range(6):
             av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)

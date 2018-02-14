@@ -105,9 +105,6 @@ def solverSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg',)):
     return J_trap * dt, nEle
 
 
-# TODO: Rossby Wave test problem
-
-
 def solverFiredrake(nEle, isoP2=0, op=opt.Options()):
 
     # Define Mesh and FunctionSpace
@@ -159,43 +156,6 @@ def solverFiredrake(nEle, isoP2=0, op=opt.Options()):
         t += dt
 
     return J_trap * dt
-
-
-def solverThetis(nEle, op=opt.Options()):
-
-    # Get Mesh and initial condition and bathymetry defined thereupon
-    mesh, eta0, b = msh.TohokuDomain(nEle)
-    V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
-
-    # Set up solver
-    solver_obj = solver2d.FlowSolver2d(mesh, b)
-    options = solver_obj.options
-    options.element_family = op.family
-    options.use_nonlinear_equations = False
-    options.use_grad_depth_viscosity_term = False
-    options.simulation_end_time = op.Tend
-    options.timestepper_type = op.timestepper
-    options.timestep = op.dt
-    options.no_exports = True
-    options.log_output = True
-
-    # Define OF
-    t = 0.
-    iA = form.indicator(V.sub(1), x1=490e3, x2=640e3, y1=4160e3, y2=4360e3, smooth=True)
-    J_trap = 0.
-    def getJ(elev_2d, t, J_trap):
-        step = assemble(elev_2d * iA * dx)
-        t += op.dt
-        if (t == 0.) | (op.Tend - t <= op.dt):
-            J_trap += step
-        else:
-            J_trap += 2 * step
-
-    # Apply ICs and time integrate
-    solver_obj.assign_initial_conditions(elev=eta0)
-    solver_obj.iterate(export_func=getJ(elev_2d, t, J_trap))
-
-    return J_trap * op.dt
 
 
 def bootstrap(problem='advection-diffusion', maxIter=12, tol=1e-3, slowTol=10., op=opt.Options()):
