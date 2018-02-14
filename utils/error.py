@@ -4,12 +4,13 @@ from thetis.callback import DiagnosticCallback
 import numpy as np
 import cmath
 
+from . import forms
 from . import interpolation
 from . import options
 
 
 class IntegralCallback(DiagnosticCallback):
-    """Base class for callbacks that integrals of a scalar quantity in time and space. Time integration is achieved
+    """Base class for callbacks that integrate a scalar quantity in time and space. Time integration is achieved
     using the trapezium rule."""
     variable_names = ['current integral', 'objective value']
 
@@ -37,6 +38,61 @@ class IntegralCallback(DiagnosticCallback):
     def message_str(self, *args):
         line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
         return line
+
+
+class TohokuCallback(IntegralCallback):
+    """Integrates objective functional."""
+    name = 'objective functional'
+
+    def __init__(self, solver_obj, **kwargs):
+        """
+        :arg solver_obj: Thetis solver object
+        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+        """
+
+        def indicatorTohoku():
+            """
+            :param solver_obj: FlowSolver2d object.
+            :return: objective functional value for callbacks.
+            """
+            elev_2d = solver_obj.fields.solution_2d.split()[1]
+            ks = forms.indicator(elev_2d.function_space(), 490e3, 640e3, 4160e3, 4360e3, smooth=True)
+            kt = Constant(0.)
+            if solver_obj.simulation_time > op.Tstart:
+                kt.assign(1. if solver_obj.simulation_time >
+                                300. + 0.5 * solver_obj.options.timestep else 0.5)
+
+            return assemble(elev_2d * ks * kt * dx)
+
+        super(TohokuCallback, self).__init__(indicatorTohoku, solver_obj, **kwargs)
+
+
+class ShallowWaterCallback(IntegralCallback):
+    """Integrates objective functional."""
+    name = 'objective functional'
+
+    def __init__(self, solver_obj, **kwargs):
+        """
+        :arg solver_obj: Thetis solver object
+        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+        """
+
+        def indicatorSW():
+            """
+            :param solver_obj: FlowSolver2d object.
+            :return: objective functional value for callbacks.
+            """
+            elev_2d = solver_obj.fields.solution_2d.split()[1]
+            ks = forms.indicator(elev_2d.function_space(), 0., np.pi / 2, 0.5 * np.pi, 1.5 * np.pi)
+            kt = Constant(0.)
+            if solver_obj.simulation_time > 0.5:
+                kt.assign(
+                    1. if solver_obj.simulation_time >
+                          0.5 + 0.5 * solver_obj.options.timestep else 0.5)
+
+            return assemble(elev_2d * ks * kt * dx)
+
+        super(ShallowWaterCallback, self).__init__(indicatorSW, solver_obj, **kwargs)
 
 
 def explicitErrorEstimator(q, residual, b, v, maxBathy=False):
