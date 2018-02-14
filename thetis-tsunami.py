@@ -1,6 +1,6 @@
 from thetis import *
 from thetis.field_defs import field_metadata
-# from firedrake_adjoint import *               # TODO: need this!
+from firedrake_adjoint import *
 
 import numpy as np
 from time import clock
@@ -84,45 +84,32 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         q_ = Function(V_H)
         uv_2d_, elev_2d_ = q_.split()
 
-    # Establish finer mesh (h < H) upon which to approximate error
-    if not op.orderChange:
-        mesh_h = adap.isoP2(mesh_H)
-        V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
-        if mode == 'tohoku':
-            b_h = msh.TohokuDomain(mesh=mesh_h)[2]
-        qh = Function(V_h)
-        uh, eh = qh.split()
-        uh.rename("Fine velocity")
-        eh.rename("Fine elevation")
-
-    if op.orderChange:
-        V_oi = VectorFunctionSpace(mesh_H, op.space1, op.degree1 + op.orderChange) \
-               * FunctionSpace(mesh_H, op.space2, op.degree2 + op.orderChange)
-        q_oi = Function(V_oi)
-        uv_2d_oi, elev_2d_oi = q_oi.split()
-        q_oi_ = Function(V_oi)
-        uv_2d_oi_, elev_2d_oi_ = q_oi_.split()
-        if useAdjoint:
-            dual_oi = Function(V_oi)
-            dual_oi_u, dual_oi_e = dual_oi.split()
-
     # Define Functions relating to a posteriori estimators
     if aposteriori or approach == 'norm':
-        if approach in ('residual', 'explicit', 'DWR'):
-            rho = Function(V_oi if op.orderChange else V_h)
-            rho_u, rho_e = rho.split()
-            rho_u.rename("Velocity residual")
-            rho_e.rename("Elevation residual")
+        if op.orderChange:
+            V_oi = VectorFunctionSpace(mesh_H, op.space1, op.degree1 + op.orderChange) \
+                   * FunctionSpace(mesh_H, op.space2, op.degree2 + op.orderChange)
+            q_oi = Function(V_oi)
+            uv_2d_oi, elev_2d_oi = q_oi.split()
+            q_oi_ = Function(V_oi)
+            uv_2d_oi_, elev_2d_oi_ = q_oi_.split()
+            if useAdjoint:
+                dual_oi = Function(V_oi)
+                dual_oi_u, dual_oi_e = dual_oi.split()
+        else:
+            mesh_h = adap.isoP2(mesh_H)
+            V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
+            if mode == 'tohoku':
+                b_h = msh.TohokuDomain(mesh=mesh_h)[2]
+            qh = Function(V_h)
+            uh, eh = qh.split()
+            uh.rename("Fine velocity")
+            eh.rename("Fine elevation")
             if useAdjoint:
                 dual_h = Function(V_h)
                 dual_h_u, dual_h_e = dual_h.split()
                 dual_h_u.rename('Fine adjoint velocity')
                 dual_h_e.rename('Fine adjoint elevation')
-            P0 = FunctionSpace(mesh_H if op.orderChange else mesh_h, "DG", 0)
-        else:
-            P0 = FunctionSpace(mesh_H, "DG", 0)
-        v = TestFunction(P0)
-        epsilon = Function(P0, name="Error indicator")
         if useAdjoint:
             dual = Function(V_H)
             dual_u, dual_e = dual.split()
@@ -131,7 +118,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             if mode == 'tohoku':
                 J = form.objectiveFunctionalSW(q, plot=True)
             elif mode == 'shallow-water':
-                J = form.objectiveFunctionalSW(q, Tstart=op.Tstart, x1=0., x2=np.pi / 2, y1=0.5 * np.pi,y2=1.5 * np.pi,
+                J = form.objectiveFunctionalSW(q, Tstart=op.Tstart, x1=0., x2=0.5*np.pi, y1=0.5 * np.pi,y2=1.5 * np.pi,
                                                smooth=False)
         if approach in ('implicit', 'DWE'):
             e_ = Function(V_oi)
@@ -142,6 +129,16 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             et = TestFunction(V_oi)
             (et0, et1) = (as_vector((et[0], et[1])), et[2])
             normal = FacetNormal(mesh_H)
+        if approach in ('residual', 'explicit', 'DWR'):
+            rho = Function(V_oi if op.orderChange else V_h)
+            rho_u, rho_e = rho.split()
+            rho_u.rename("Velocity residual")
+            rho_e.rename("Elevation residual")
+            P0 = FunctionSpace(mesh_H if op.orderChange else mesh_h, "DG", 0)
+        else:
+            P0 = FunctionSpace(mesh_H, "DG", 0)
+        v = TestFunction(P0)
+        epsilon = Function(P0, name="Error indicator")
 
     # Initialise adaptivity placeholders and counters
     mM = [nEle, nEle]                               # Min/max #Elements
@@ -149,7 +146,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     nVerT = msh.meshStats(mesh_H)[1] * op.vscale    # Target #Vertices
     endT = 0.
     cnt = 0
-    save = True
 
     # Get timestep
     solver_obj = solver2d.FlowSolver2d(mesh_H, b)
@@ -174,19 +170,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         options.output_directory = dirName
         options.export_diagnostics = True
         options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-        # solver_obj.export_initial_state = False if aposteriori else True
-
-        # TODO: Compute adjoint solutions THIS DOESN'T WORK
-        # def includeIt():
-        #     if useAdjoint:
-        #         # Tell dolfin about timesteps, so it can compute functionals including measures of time other than dt[FINISH_TIME]
-        #         if cnt >= int(T/op.ndump):
-        #             finished = True
-        #         if cnt == 0:
-        #             adj_start_timestep()
-        #         else:
-        #             adj_inc_timestep(time=cnt*dt, finished=finished)
-        #     cnt += 1
 
         # Output error data
         if approach == 'fixedMesh' and op.outputOF:
@@ -205,12 +188,25 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     rm = 30                         # TODO: what can we do about this? Needs changing for adjoint
                     dt = options.timestep
                     options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
+
+                    finished = True if t > solver_obj.options.simulation_end_time - 0.5 * dt else False
+                    if t < 0.5 * dt:
+                        adj_start_timestep()
+                    else:
+                        adj_inc_timestep(time=t, finished=finished)     # TODO: test this. Shouldn't we use at every timestep?
+
             else:
                 def selector():
                     t = solver_obj.simulation_time
                     rm = 10                         # TODO: what can we do about this? Needs changing for adjoint
                     dt = options.timestep
                     options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
+
+                    finished = True if t > solver_obj.options.simulation_end_time - 0.5 * dt else False
+                    if t < 0.5 * dt:
+                        adj_start_timestep()
+                    else:
+                        adj_inc_timestep(time=t, finished=finished)
             solver_obj.iterate(export_func=selector)
         else:
             solver_obj.iterate()
@@ -220,12 +216,11 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         msc.dis('Primal run complete. Run time: %.3fs' % primalTimer, op.printStats)
 
         # Reset counters
-        if aposteriori and not useAdjoint:
-            cnt = 0
-        else:
-            cntT = cnt = np.ceil(T / dt)
+        cntT = int(np.ceil(T/dt))
+        cnt = 0 if aposteriori and not useAdjoint else cntT
 
         if useAdjoint:
+            save = True
             parameters["adjoint"]["stop_annotating"] = True  # Stop registering equations
             msc.dis('\nStarting fixed mesh dual run (backwards in time)', op.printStats)
             dualTimer = clock()
@@ -240,8 +235,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                         saveAdj.store(dual_u)
                         saveAdj.store(dual_e)
                         saveAdj.close()
-                    if op.printStats:
-                        print('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT * 100))
+                    msc.dis('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT * 100), op.printStats)
                     cnt -= 1
                     save = False
                 else:
@@ -322,12 +316,11 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     epsilon = assemble(v * sqrt(inner(rho, rho)) * dx)
                 elif approach == 'explicit':
                     epsilon = err.explicitErrorEstimator(q_oi if op.orderChange else q_h, rho,
-                                                         b if op.orderChange else b_h, v,
+                                                         b if (op.orderChange or mode != 'tohoku') else b_h, v,
                                                          maxBathy=True if mode == 'tohoku' else False)
             epsilon.dat.data[:] = np.abs(epsilon.dat.data) * nVerT / (np.abs(assemble(epsilon * dx)) or 1.)  # Normalise
             epsilon.rename("Error indicator")
 
-            # TODO: Approximate residuals
             # TODO: Load adjoint data from HDF5
             # TODO: Form remaining error estimates
 

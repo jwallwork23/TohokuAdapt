@@ -1,7 +1,5 @@
 from firedrake import *
 
-import numpy as np
-
 
 def timestepCoeffs(timestepper):
     """

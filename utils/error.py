@@ -105,8 +105,12 @@ def getOF(dirName):
     i = 0
     for line in logfile:
         i += 1
-        if i == l:
-            J_h = line.split()[-1]
+        if i == l-1:
+            text_ = line.split()
+        elif i == l:
+            text = line.split()
+            J_h = text[-1] if text[0] == 'objective' else text_[-1]
+
     return float(J_h)
 
 
