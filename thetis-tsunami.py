@@ -146,10 +146,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             (et0, et1) = (as_vector((et[0], et[1])), et[2])
             normal = FacetNormal(mesh_H)
 
-    if op.outputOF:
-        J_trap = 0.
-        started = False
-
     # Initialise adaptivity placeholders and counters
     mM = [nEle, nEle]  # Min/max #Elements
     Sn = nEle
@@ -200,17 +196,17 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         #             adj_inc_timestep(time=cnt*dt, finished=finished)
         #     cnt += 1
 
-        if approach == 'fixedMesh':
-
-            cm = callback.CallbackManager()
-            cb1 = err.TohokuCallback(solver_obj) if mode == 'tohoku' else err.ShallowWaterCallback(solver_obj)
-            cm.add(cb1, 'timestep')
-            solver_obj.callbacks = cm
+        # Output error data
+        if approach == 'fixedMesh' and op.outputOF:
+            cb = err.TohokuCallback(solver_obj) if mode == 'tohoku' else err.ShallowWaterCallback(solver_obj)
+            cb.output_dir = dirName
+            cb.append_to_log = True
+            cb.export_to_hdf5 = False
+            solver_obj.add_callback(cb, 'timestep')
 
         # Apply ICs and time integrate
         solver_obj.assign_initial_conditions(elev=eta0)
-
-        if aposteriori and approach != 'DWF':
+        if aposteriori and approach != 'DWF':       # TODO: can these not go somewhere else?
             if mode == 'tohoku':
                 def selector():
                     t = solver_obj.simulation_time
@@ -226,6 +222,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             solver_obj.iterate(export_func=selector)
         else:
             solver_obj.iterate()
+        if op.outputOF:
+            J_h = err.getOF(dirName)    # Evaluate objective functional
         primalTimer = clock() - primalTimer
         msc.dis('Primal run complete. Run time: %.3fs' % primalTimer, op.printStats)
 
@@ -462,7 +460,19 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             adapSolver.next_export_t = startT + adapOpt.simulation_export_time  # For next export
             for e in adapSolver.exporters.values():
                 e.set_next_export_ix(adapSolver.i_export)
+
+            if op.outputOF:
+                # Evaluate callbacks and iterate
+                cb = err.TohokuCallback(solver_obj) if mode == 'tohoku' else err.ShallowWaterCallback(solver_obj)
+                cb.output_dir = dirName
+                cb.append_to_log = True
+                cb.export_to_hdf5 = False
+                if cnt != 0:
+                    cb.objective_functional = J_h
+                solver_obj.add_callback(cb, 'timestep')
             adapSolver.iterate()
+            if op.outputOF:
+                J_h = err.getOF(dirName)  # Evaluate objective functional
 
             # Get mesh stats
             nEle = msh.meshStats(mesh_H)[0]
@@ -471,18 +481,15 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             av = op.printToScreen(int(cnt/op.rm+1), clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, cnt*dt, dt)
             cnt += op.rm
 
-            # TODO: Estimate OF using trapezium rule, using a DiagnosticCallback object
-
         adaptTimer = clock() - adaptTimer
-        # msc.dis('Adaptive primal run complete. Run time: %.3fs \nRelative error = %5.4f' % (adaptTimer, rel),
-        #         op.printStats)
+        msc.dis('Adaptive primal run complete. Run time: %.3fs' % adaptTimer, op.printStats)
     else:
         av = nEle
 
     # Print to screen timing analyses and plot timeseries
     if op.printStats:
         msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer, bootTimer)
-    rel = 0.        # TODO: compute this
+    rel = np.abs(op.J(mode) - J_h)/np.abs(op.J(mode))
 
     return av, rel, clock() - tic
 

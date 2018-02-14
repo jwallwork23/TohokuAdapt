@@ -95,6 +95,21 @@ class ShallowWaterCallback(IntegralCallback):
         super(ShallowWaterCallback, self).__init__(indicatorSW, solver_obj, **kwargs)
 
 
+def getOF(dirName):
+    """
+    :arg dirName: directory in which log file is saved
+    :return: final value of objective functional.
+    """
+    l = len([line for line in open(dirName + 'log', 'r')])
+    logfile = open(dirName + 'log', 'r')
+    i = 0
+    for line in logfile:
+        i += 1
+        if i == l:
+            J_h = line.split()[-1]
+    return float(J_h)
+
+
 def explicitErrorEstimator(q, residual, b, v, maxBathy=False):
     """
     Estimate error locally using an a posteriori error indicator.
