@@ -252,8 +252,8 @@ def errorVsElements(mode='tohoku'):
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     plt.rc('legend', fontsize='x-large')
-    labels = ("Fixed mesh", "Hessian based", "Explicit estimator", "Flux jump", "Implicit", "Adjoint based",
-              "Goal based", "Goal based (h.o.)")
+    labels = ("Fixed mesh", "Hessian based", "Explicit", "Flux jump", "Implicit", "Adjoint based",
+              "Goal based")
     names = ("fixedMesh", "hessianBased", "explicit", "fluxJump", "implicit", "adjointBased", "goalBased")
     styles = {labels[0]: 's', labels[1]: '^', labels[2]: 'x', labels[3]: 'o', labels[4]: '*', labels[5]: 'h',
               labels[6]: 't'}
@@ -263,8 +263,8 @@ def errorVsElements(mode='tohoku'):
     for i in range(len(names)):
         try:
             av, rel, timing = readErrors(input("Date to use for %s approach: " % labels[i]), names[i], mode)
-            err[labels[i]] = av
-            nEls[labels[i]] = rel
+            err[labels[i]] = rel
+            nEls[labels[i]] = av
             tim[labels[i]] = timing
         except:
             pass
@@ -301,8 +301,8 @@ def errorVsElements(mode='tohoku'):
         plt.xlabel(r'Mean element count')
         plt.ylabel(r'Relative error $\frac{|J(\textbf{q})-J(\textbf{q}_h)|}{|J(\textbf{q})|}$')
         if mode == 'tohoku':
-            plt.xlim([0, 55000])
-            plt.ylim([0, 0.1])
+            plt.xlim([5000, 50000])
+            plt.ylim([1e-4, 5e-1])
         plt.savefig('outdata/outputs/'+mode+'/errorVsElements' + str(i) + '.pdf', bbox_inches='tight')
         plt.clf()
 

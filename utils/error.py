@@ -58,7 +58,7 @@ class TohokuCallback(IntegralCallback):
             elev_2d = solver_obj.fields.solution_2d.split()[1]
             ks = forms.indicator(elev_2d.function_space(), 490e3, 640e3, 4160e3, 4360e3, smooth=True)
             kt = Constant(0.)
-            if solver_obj.simulation_time > op.Tstart:
+            if solver_obj.simulation_time > 300.:
                 kt.assign(1. if solver_obj.simulation_time >
                                 300. + 0.5 * solver_obj.options.timestep else 0.5)
 

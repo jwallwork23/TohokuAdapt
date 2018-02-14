@@ -14,7 +14,6 @@ import utils.interpolation as inte
 import utils.mesh as msh
 import utils.misc as msc
 import utils.options as opt
-import utils.timeseries as tim
 
 now = datetime.datetime.now()
 date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
@@ -51,7 +50,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         msc.dis('Bootstrapping run time: %.3fs\n' % bootTimer, op.printStats)
 
     # Establish filenames
-    dirName = 'plots/' + mode + '/'
+    dirName = 'plots/'+mode+'/'
     if op.plotpvd:
         residualFile = File(dirName + "residual.pvd")
         implicitErrorFile = File(dirName + "implicitError.pvd")
@@ -134,8 +133,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             elif mode == 'shallow-water':
                 J = form.objectiveFunctionalSW(q, Tstart=op.Tstart, x1=0., x2=np.pi / 2, y1=0.5 * np.pi,y2=1.5 * np.pi,
                                                smooth=False)
-            else:
-                raise NotImplementedError
         if approach in ('implicit', 'DWE'):
             e_ = Function(V_oi)
             e = Function(V_oi)
@@ -147,9 +144,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             normal = FacetNormal(mesh_H)
 
     # Initialise adaptivity placeholders and counters
-    mM = [nEle, nEle]  # Min/max #Elements
+    mM = [nEle, nEle]                               # Min/max #Elements
     Sn = nEle
-    nVerT = msh.meshStats(mesh_H)[1] * op.vscale  # Target #Vertices
+    nVerT = msh.meshStats(mesh_H)[1] * op.vscale    # Target #Vertices
     endT = 0.
     cnt = 0
     save = True
@@ -157,18 +154,13 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     # Get timestep
     solver_obj = solver2d.FlowSolver2d(mesh_H, b)
     solver_obj.create_equations()
-    if mode == 'tohoku':
-        dt = min(np.abs(solver_obj.compute_time_step().dat.data))
-    else:
-        dt = 0.025
+    dt = min(np.abs(solver_obj.compute_time_step().dat.data)) if mode == 'tohoku' else 0.025
     Dt = Constant(dt)
     iEnd = int(T / (dt * op.rm))
 
     if getData:
         msc.dis('Starting fixed mesh primal run (forwards in time)', op.printStats)
         primalTimer = clock()
-
-        # TODO: use proper Thetis forms to calculate implicit error and residuals
 
         # Get solver parameter values and construct solver
         options = solver_obj.options
@@ -210,13 +202,13 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             if mode == 'tohoku':
                 def selector():
                     t = solver_obj.simulation_time
-                    rm = 30                          # TODO: what can we do about this? Needs changing for adjoint
+                    rm = 30                         # TODO: what can we do about this? Needs changing for adjoint
                     dt = options.timestep
                     options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
             else:
                 def selector():
                     t = solver_obj.simulation_time
-                    rm = 10                          # TODO: what can we do about this? Needs changing for adjoint
+                    rm = 10                         # TODO: what can we do about this? Needs changing for adjoint
                     dt = options.timestep
                     options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
             solver_obj.iterate(export_func=selector)
@@ -335,7 +327,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             epsilon.dat.data[:] = np.abs(epsilon.dat.data) * nVerT / (np.abs(assemble(epsilon * dx)) or 1.)  # Normalise
             epsilon.rename("Error indicator")
 
-            # TODO: Estimate OF using trapezium rule and output (inc. fixed mesh case)
             # TODO: Approximate residuals
             # TODO: Load adjoint data from HDF5
             # TODO: Form remaining error estimates
@@ -350,13 +341,11 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         msc.dis('Errors estimated. Run time: %.3fs' % errorTimer, op.printStats)
 
     if approach != 'fixedMesh':
-
-        # Reset initial conditions
-        if aposteriori:
+        if aposteriori:     # Reset initial conditions
             uv_2d.interpolate(Expression([0, 0]))
             elev_2d.interpolate(eta0)
             epsilon = Function(P0, name="Error indicator")
-        if op.gradate:
+        if op.gradate:      # Get initial boundary metric
             H0 = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(CellSize(mesh_H))
         msc.dis('\nStarting adaptive mesh primal run (forwards in time)', op.printStats)
         adaptTimer = clock()
@@ -501,7 +490,6 @@ if __name__ == '__main__':
     approach, getData, getError, useAdjoint, aposteriori = msc.cheatCodes(input(
 """Choose error estimator from {'norm', 'fieldBased', 'gradientBased', 'hessianBased', 
 'residual', 'explicit', 'fluxJump', 'implicit', 'DWF', 'DWR' or 'DWE'}: """))
-
     op = opt.Options(vscale=0.1 if approach == 'DWR' else 0.85,
                      family='dg-dg',
                      rm=60 if useAdjoint else 30,
@@ -527,12 +515,8 @@ if __name__ == '__main__':
         op.ndump = 10
 
     # Run simulation(s)
-    minRes = 0 if mode == 'tohoku' else 4       # TODO: change this back
-    maxRes = 0 if mode == 'tohoku' else 4
-    # minRes = 0 if mode == 'tohoku' else 1
-    # maxRes = 4 if mode == 'tohoku' else 6
-    textfile = open('outdata/outputs/' + mode + '/' + approach + date + '.txt', 'w+')
-    for i in range(minRes, maxRes + 1):
+    textfile = open('outdata/outputs/'+mode+'/'+approach+date+'.txt', 'w+')
+    for i in range(0, 7):
         av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
         print('Run %d:  Mean element count %6d  Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
         textfile.write('%d, %.4f, %.1f\n' % (av, rel, timing))
