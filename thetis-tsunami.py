@@ -200,11 +200,58 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         #             adj_inc_timestep(time=cnt*dt, finished=finished)
         #     cnt += 1
 
-        # # Add callbacks     TODO: figure this out
-        # if approach == 'fixedMesh':
-        #     solver_obj.add_callback(callback.ScalarConservationCallback(
-        #         form.indicatorTohoku(solver_obj) if approach == 'tohoku' else form.indicatorSW(solver_obj),
-        #         solver_obj), eval_interval='timestep')
+        if approach == 'fixedMesh':
+
+            if mode == 'tohoku':
+
+                class TohokuCallback(err.IntegralCallback):
+                    """Integrates objective functional."""
+                    name = 'objective functional'
+
+                    def __init__(self, solver_obj, **kwargs):
+                        """
+                        :arg solver_obj: Thetis solver object
+                        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+                        """
+                        def indicatorTohoku():
+                            """
+                            :param solver_obj: FlowSolver2d object.
+                            :return: objective functional value for callbacks.
+                            """
+                            elev_2d = solver_obj.fields.solution_2d.split()[1]
+                            k = form.indicator(elev_2d.function_space(), 490e3, 640e3, 4160e3, 4360e3, smooth=True)
+
+                            return elev_2d * k
+
+                        super(TohokuCallback, self).__init__(indicatorTohoku, solver_obj, **kwargs)
+
+            else:
+
+                class ShallowWaterCallback(err.IntegralCallback):
+                    """Integrates objective functional."""
+                    name = 'objective functional'
+
+                    def __init__(self, solver_obj, **kwargs):
+                        """
+                        :arg solver_obj: Thetis solver object
+                        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+                        """
+                        def indicatorSW():
+                            """
+                            :param solver_obj: FlowSolver2d object.
+                            :return: objective functional value for callbacks.
+                            """
+                            elev_2d = solver_obj.fields.solution_2d.split()[1]
+                            k = form.indicator(elev_2d.function_space(), 0., np.pi / 2, 0.5 * np.pi, 1.5 * np.pi)
+
+                            return elev_2d * k
+
+                        super(ShallowWaterCallback, self).__init__(indicatorSW, solver_obj, **kwargs)
+
+            cm = callback.CallbackManager()
+            cb1 = TohokuCallback(solver_obj) if approach == 'tohoku' else ShallowWaterCallback(solver_obj)
+            cm.add(cb1, 'timestep')
+            solver_obj.callbacks = cm
 
         # Apply ICs and time integrate
         solver_obj.assign_initial_conditions(elev=eta0)

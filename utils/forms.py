@@ -402,25 +402,3 @@ def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=416
         File("plots/adjointBased/kernel.pvd").write(ke)
 
     return Functional(inner(q, k) * dx * dt[Tstart:Tend])
-
-
-def indicatorTohoku(solver_obj):
-    """
-    :param solver_obj: FlowSolver2d object.
-    :return: objective functional value for callbacks.
-    """
-    elev_2d = solver_obj.fields.solution_2d.split()[1]
-    k = indicator(elev_2d.function_space(), 490e3, 640e3, 4160e3, 4360e3, smooth=True)
-
-    return elev_2d * k
-
-
-def indicatorSW(solver_obj):
-    """
-    :param solver_obj: FlowSolver2d object.
-    :return: objective functional value for callbacks.
-    """
-    elev_2d = solver_obj.fields.solution_2d.split()[1]
-    k = indicator(elev_2d.function_space(), 0., np.pi / 2, 0.5 * np.pi, 1.5 * np.pi)
-
-    return elev_2d * k

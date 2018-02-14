@@ -1,10 +1,41 @@
 from thetis import *
+from thetis.callback import DiagnosticCallback
 
 import numpy as np
 import cmath
 
 from . import interpolation
 from . import options
+
+
+class IntegralCallback(DiagnosticCallback):
+    """Base class for callbacks that integrals of a scalar quantity in time and space"""
+    variable_names = ['current integral', 'objective value']
+
+    def __init__(self, scalar_callback, solver_obj, **kwargs):
+        """
+        Creates error comparison check callback object
+
+        :arg scalar_callback: Python function that takes the solver object as an argument and
+            returns a scalar quantity of interest
+        :arg solver_obj: Thetis solver object
+        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+        """
+        super(IntegralCallback, self).__init__(solver_obj, **kwargs)
+        self.scalar_callback = scalar_callback
+        self.objective_value = 0.5 * scalar_callback() * solver_obj.options.timestep
+
+    def __call__(self):
+        dt = self.solver_obj.options.timestep
+        value = self.scalar_callback() * dt
+        if self.solver_obj.simulation_time > self.solver_obj.options.simulation_end_time - 0.5 * dt:
+            value *= 0.5
+        self.objective_value += value
+        return value, self.objective_value
+
+    def message_str(self, *args):
+        line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
+        return line
 
 
 def explicitErrorEstimator(q, residual, b, v, maxBathy=False):
