@@ -1,5 +1,6 @@
 from thetis import *
 from thetis.callback import DiagnosticCallback
+# from firedrake_adjoint import adj_start_timestep, adj_inc_timestep
 
 import numpy as np
 import cmath
@@ -28,11 +29,21 @@ class IntegralCallback(DiagnosticCallback):
         self.objective_value = 0.5 * scalar_callback() * solver_obj.options.timestep
 
     def __call__(self):
+        # Output OF value
+        t = self.solver_obj.simulation_time
         dt = self.solver_obj.options.timestep
         value = self.scalar_callback() * dt
-        if self.solver_obj.simulation_time > self.solver_obj.options.simulation_end_time - 0.5 * dt:
+        if t > self.solver_obj.options.simulation_end_time - 0.5 * dt:
             value *= 0.5
         self.objective_value += value
+
+        # # Track adjoint data
+        # finished = True if t > self.solver_obj.options.simulation_end_time - 0.5 * dt else False
+        # if t < 0.5 * dt:
+        #     adj_start_timestep()
+        # else:
+        #     adj_inc_timestep(time=t, finished=finished)
+
         return value, self.objective_value
 
     def message_str(self, *args):

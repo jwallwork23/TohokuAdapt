@@ -1,6 +1,6 @@
 from thetis import *
 from thetis.field_defs import field_metadata
-from firedrake_adjoint import *
+# from firedrake_adjoint import *
 
 import numpy as np
 from time import clock
@@ -145,7 +145,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     Sn = nEle
     nVerT = msh.meshStats(mesh_H)[1] * op.vscale    # Target #Vertices
     endT = 0.
-    cnt = 0
 
     # Get timestep
     solver_obj = solver2d.FlowSolver2d(mesh_H, b)
@@ -188,25 +187,12 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     rm = 30                         # TODO: what can we do about this? Needs changing for adjoint
                     dt = options.timestep
                     options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
-
-                    finished = True if t > solver_obj.options.simulation_end_time - 0.5 * dt else False
-                    if t < 0.5 * dt:
-                        adj_start_timestep()
-                    else:
-                        adj_inc_timestep(time=t, finished=finished)     # TODO: test this. Shouldn't we use at every timestep?
-
             else:
                 def selector():
                     t = solver_obj.simulation_time
                     rm = 10                         # TODO: what can we do about this? Needs changing for adjoint
                     dt = options.timestep
                     options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
-
-                    finished = True if t > solver_obj.options.simulation_end_time - 0.5 * dt else False
-                    if t < 0.5 * dt:
-                        adj_start_timestep()
-                    else:
-                        adj_inc_timestep(time=t, finished=finished)
             solver_obj.iterate(export_func=selector)
         else:
             solver_obj.iterate()
@@ -218,7 +204,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         # Reset counters
         cntT = int(np.ceil(T/dt))
         cnt = 0 if aposteriori and not useAdjoint else cntT
-
         if useAdjoint:
             save = True
             parameters["adjoint"]["stop_annotating"] = True  # Stop registering equations
@@ -244,7 +229,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     break
             dualTimer = clock() - dualTimer
             msc.dis('Dual run complete. Run time: %.3fs' % dualTimer, op.printStats)
-            cnt += 1
+    cnt = 0
 
     # Loop back over times to generate error estimators
     if getError:
