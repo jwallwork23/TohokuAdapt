@@ -9,7 +9,8 @@ from . import options
 
 
 class IntegralCallback(DiagnosticCallback):
-    """Base class for callbacks that integrals of a scalar quantity in time and space"""
+    """Base class for callbacks that integrals of a scalar quantity in time and space. Time integration is achieved
+    using the trapezium rule."""
     variable_names = ['current integral', 'objective value']
 
     def __init__(self, scalar_callback, solver_obj, **kwargs):

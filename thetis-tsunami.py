@@ -221,11 +221,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                             elev_2d = solver_obj.fields.solution_2d.split()[1]
                             ks = form.indicator(elev_2d.function_space(), 490e3, 640e3, 4160e3, 4360e3, smooth=True)
                             kt = Constant(0.)
-                            kt = Constant(0.)
                             if solver_obj.simulation_time > op.Tstart:
-                                kt.assign(
-                                    1. if solver_obj.simulation_time > op.Tstart
-                                                                       + 0.5 * solver_obj.options.timestep else 0.5)
+                                kt.assign(1. if solver_obj.simulation_time >
+                                                op.Tstart + 0.5 * solver_obj.options.timestep else 0.5)
 
                             return assemble(elev_2d * ks * kt * dx)
 
@@ -252,14 +250,15 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                             kt = Constant(0.)
                             if solver_obj.simulation_time > 0.5:
                                 kt.assign(
-                                    1. if solver_obj.simulation_time > 0.5 + 0.5 * solver_obj.options.timestep else 0.5)
+                                    1. if solver_obj.simulation_time >
+                                          op.Tstart + 0.5 * solver_obj.options.timestep else 0.5)
 
                             return assemble(elev_2d * ks * kt * dx)
 
                         super(ShallowWaterCallback, self).__init__(indicatorSW, solver_obj, **kwargs)
 
             cm = callback.CallbackManager()
-            cb1 = TohokuCallback(solver_obj) if approach == 'tohoku' else ShallowWaterCallback(solver_obj)
+            cb1 = TohokuCallback(solver_obj) if mode == 'tohoku' else ShallowWaterCallback(solver_obj)
             cm.add(cb1, 'timestep')
             solver_obj.callbacks = cm
 
