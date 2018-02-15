@@ -228,19 +228,23 @@ Absolute total variation : %6.3f Relative total variation : %6.3f""" %
     plt.show()
 
 
-def readErrors(date, approach, mode='tohoku'):
+def readErrors(date, approach, mode='tohoku', bootstrapping=False):
     """
     :arg date: date simulation was run.
     :arg approach: mesh adaptive approach.
-    :arg mode: problem considered.
+    :param mode: problem considered.
+    :param bootstrapping: was bootstrapping used?
     :return: mean element count, relative error and CPU time.
     """
-    textfile = open('outdata/outputs/'+mode+'/'+approach+date+'.txt', 'r')
+    filename = 'outdata/outputs/'+mode+'/'+approach+date
+    if bootstrapping:
+        filename += '_BOOTSTRAP'
+    textfile = open(filename+'.txt', 'r')
     nEls = []
     err = []
     tim = []
     for line in textfile:
-        av, rel, timing = line.split(',')
+        av, rel, timing = line.split(',')[:3]
         nEls.append(int(av))
         err.append(float(rel))
         tim.append(float(timing))
@@ -262,7 +266,8 @@ def errorVsElements(mode='tohoku', bootstrapping=False):
     tim = {}
     for i in range(len(names)):
         try:
-            av, rel, timing = readErrors(input("Date to use for %s approach: " % labels[i]), names[i], mode)
+            av, rel, timing = readErrors(input("Date to use for %s approach: " % labels[i]), names[i], mode,
+                                         bootstrapping=bootstrapping)
             err[labels[i]] = rel
             nEls[labels[i]] = av
             tim[labels[i]] = timing
@@ -291,11 +296,11 @@ def errorVsElements(mode='tohoku', bootstrapping=False):
     if bootstrapping:
         # Plot OF values
         mesh = 'Fixed mesh'
-        plt.loglog(nEls[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
+        plt.loglog(nEls[mesh], err[mesh], marker=styles[mesh], linewidth=1.)
         plt.gcf()
         plt.xlabel(r'Mean element count')
-        plt.ylabel(r'Objective value $J(\textbf{q})=\int_{T_{\mathrm{start}}}^{T_{\mathrm{end}}}\iint_A'
-                   +'\eta(x,y,t)\mathrm{d}x\mathrm{d}y\mathrm{d}t$')
+        plt.ylabel(r'Objective value $J(\textbf{q})=\int_{T_{\mathrm{start}}}^{T_{\mathrm{end}}}\int\int_A'
+                   +r'\eta(x,y,t)\mathrm{d}x\mathrm{d}y\mathrm{d}t$')
         plt.savefig('outdata/outputs/' + mode + '/ObjectiveVsElements.pdf', bbox_inches='tight')
         plt.clf()
     else:
@@ -312,7 +317,7 @@ def errorVsElements(mode='tohoku', bootstrapping=False):
             plt.xlabel(r'Mean element count')
             plt.ylabel(r'Relative error $\frac{|J(\textbf{q})-J(\textbf{q}_h)|}{|J(\textbf{q})|}$')
             if mode == 'tohoku':
-                plt.xlim([5000, 50000])
+                plt.xlim([5000, 60000])
                 plt.ylim([1e-4, 5e-1])
             plt.savefig('outdata/outputs/'+mode+'/errorVsElements' + str(i) + '.pdf', bbox_inches='tight')
             plt.clf()

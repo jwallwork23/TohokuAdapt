@@ -466,7 +466,7 @@ if __name__ == '__main__':
                      advect=False,
                      window=True if approach == 'DWF' else False,
                      outputMetric=False,
-                     plotpvd=True,
+                     plotpvd=False,
                      gauges=False,
                      tAdapt=False,
                      bootstrap=True,
@@ -487,17 +487,17 @@ if __name__ == '__main__':
     s = '_BOOTSTRAP' if op.bootstrap else ''
     textfile = open('outdata/outputs/'+mode+'/'+approach+date+s+'.txt', 'w+')
     if op.bootstrap:
-        for i in range(9):
+        for i in range(10):
             av, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
             var = np.abs(J_h - J_h_) if i > 0 else 0.
             J_h_ = J_h
-            print('Run %d:  Mean element count %6d      Objective value %.4f        Timing %.1fs    Difference %.4f'
+            print('Run %d:  Mean element count %6d      Objective value %.4e        Timing %.1fs    Difference %.4e'
                   % (i, av, J_h, timing, var))
-            textfile.write('%d, %.4f, %.1f, %.4f\n' % (av, J_h, timing, var))
+            textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, J_h, timing, var))
     else:
         for i in range(6):
             av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
-            print('Run %d:  Mean element count %6d      Relative error %.4f         Timing %.1fs'
+            print('Run %d:  Mean element count %6d      Relative error %.4e         Timing %.1fs'
                   % (i, av, rel, timing))
-            textfile.write('%d, %.4f, %.1f\n' % (av, rel, timing))
+            textfile.write('%d, %.4e, %.1f\n' % (av, rel, timing))
     textfile.close()
