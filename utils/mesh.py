@@ -32,7 +32,7 @@ class MeshSetup:
                                    81902: 1., 52998: 1., 33784: 1., 20724: 0.75,
                                    16656: 0.65, 11020: 0.5, 8782: 0.5, 6176: 0.5}[nEle]
 
-    def generateMesh(self):
+    def generateMesh(self, wd=False):
         """
         Generate mesh using QMESH. This script is based on work by Alexandros Advis et al, 2017.
         """
@@ -40,7 +40,11 @@ class MeshSetup:
         # Reading in the shapefile describing the domain boundaries, and creating a GMSH file.
         bdyLoc = 'resources/boundaries/'
         boundaries = qmesh.vector.Shapes()
-        boundaries.fromFile(bdyLoc + 'final_bdys.shp')
+        if wd:
+            boundaries.fromFile(bdyLoc + 'wd_final_bdys.shp')
+            self.meshName = 'wd_'+self.meshName
+        else:
+            boundaries.fromFile(bdyLoc+'final_bdys.shp')
         loopShapes = qmesh.vector.identifyLoops(boundaries, isGlobal=False, defaultPhysID=1000, fixOpenLoops=True)
         polygonShapes = qmesh.vector.identifyPolygons(loopShapes, meshedAreaPhysID=1,
                                                       smallestNotMeshedArea=5e6, smallestMeshedArea=2e8)
@@ -60,7 +64,10 @@ class MeshSetup:
 
         # Create raster for mesh gradation towards rest of coast
         gebcoCoastlines = qmesh.vector.Shapes()
-        gebcoCoastlines.fromFile(bdyLoc + 'coastline.shp')
+        if wd:
+            gebcoCoastlines.fromFile(bdyLoc + 'wd_coastline.shp')
+        else:
+            gebcoCoastlines.fromFile(bdyLoc + 'coastline.shp')
         gradationRaster_gebcoCoastlines = qmesh.raster.gradationToShapes()
         gradationRaster_gebcoCoastlines.setShapes(gebcoCoastlines)
         gradationRaster_gebcoCoastlines.setRasterBounds(135., 149., 30., 45.)
@@ -104,7 +111,8 @@ if __name__ == '__main__':
                    or 6176)
     qmesh.setLogOutputFile(ms.dirName + 'generateMesh.log')     # Store QMESH log for later reference
     qmesh.initialise()                                          # Initialise QGIS API
-    ms.generateMesh()                                           # Generate the mesh
+    wd = bool(input("Press 0 for a standard mesh or 1 to generate a mesh for wetting and drying. "))
+    ms.generateMesh(wd=wd)                                      # Generate the mesh
     ms.convertMesh()                                            # Convert to shapefile, for visualisation with QGIS
 else:
     from firedrake import *
