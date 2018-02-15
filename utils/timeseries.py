@@ -295,12 +295,12 @@ def errorVsElements(mode='tohoku', bootstrapping=False):
 
     if bootstrapping:
         # Plot OF values
-        mesh = 'Fixed mesh'
+        mesh = "Fixed mesh"
         plt.loglog(nEls[mesh], err[mesh], marker=styles[mesh], linewidth=1.)
         plt.gcf()
         plt.xlabel(r'Mean element count')
         plt.ylabel(r'Objective value $J(\textbf{q})=\int_{T_{\mathrm{start}}}^{T_{\mathrm{end}}}\int\int_A'
-                   +r'\eta(x,y,t)\mathrm{d}x\mathrm{d}y\mathrm{d}t$')
+                   +r'\eta(x,y,t)\,\mathrm{d}x\,\mathrm{d}y\,\mathrm{d}t$')
         plt.savefig('outdata/outputs/' + mode + '/ObjectiveVsElements.pdf', bbox_inches='tight')
         plt.clf()
     else:
