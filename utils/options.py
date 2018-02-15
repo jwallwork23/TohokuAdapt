@@ -38,7 +38,8 @@ class Options:
                  ndump=15,
                  rm=30,
                  orderChange=0,
-                 timestepper='CrankNicolson'):
+                 timestepper='CrankNicolson',
+                 wd=False):
         """
         :param coarseness: mesh coarseness to use, where 1 is x-fine and 5 is x-coarse.
         :param family: mixed function space family, from {'dg-dg', 'dg-cg'}.
@@ -72,6 +73,7 @@ class Options:
         :param rm: Timesteps per remesh. (Should be an integer multiple of ndump.)
         :param orderChange: change in polynomial degree for residual approximation.
         :param timestepper: timestepping scheme.
+        :param wd: toggle wetting and drying.
         """
         # Initial mesh parameters
         self.coarseness = coarseness
@@ -130,9 +132,10 @@ class Options:
         self.outputMetric = outputMetric
         self.plotpvd = plotpvd
         self.gauges = gauges
+        self.wd = wd
         assert(type(advect) == type(gradate) == type(window) == type(iso) == type(tAdapt) == type(bAdapt)
                == type(bootstrap) == type(outputOF) == type(printStats) == type(capBathymetry) == type(outputMetric)
-               == type(plotpvd) == type(gauges) == bool)
+               == type(plotpvd) == type(gauges) == type(wd) == bool)
         self.hessMeth = hessMeth
         try:
             assert hessMeth in ('dL2', 'parts')
