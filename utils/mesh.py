@@ -41,14 +41,22 @@ class MeshSetup:
         bdyLoc = 'resources/boundaries/'
         boundaries = qmesh.vector.Shapes()
         if wd:
-            boundaries.fromFile(bdyLoc + 'wd_final_bdys.shp')
+            boundaries.fromFile(bdyLoc+'wd_final_bdys.shp')
             self.meshName = 'wd_'+self.meshName
         else:
             boundaries.fromFile(bdyLoc+'final_bdys.shp')
         loopShapes = qmesh.vector.identifyLoops(boundaries, isGlobal=False, defaultPhysID=1000, fixOpenLoops=True)
         polygonShapes = qmesh.vector.identifyPolygons(loopShapes, meshedAreaPhysID=1,
                                                       smallestNotMeshedArea=5e6, smallestMeshedArea=2e8)
-        polygonShapes.writeFile(self.dirName + 'polygons.shp')
+        polygonShapes.writeFile(bdyLoc+'polygons.shp')
+
+        if wd:
+            boundaries2 = qmesh.vector.Shapes()
+            boundaries2.fromFile(bdyLoc+'poly_bdys.shp')
+            loopShapes2 = qmesh.vector.identifyLoops(boundaries2, isGlobal=False, defaultPhysID=1000, fixOpenLoops=True)
+            polygonShapes2 = qmesh.vector.identifyPolygons(loopShapes2, meshedAreaPhysID=1,
+                                                          smallestNotMeshedArea=5e6, smallestMeshedArea=2e8)
+            polygonShapes2.writeFile(bdyLoc + 'coast_poly.shp')
 
         # Create raster for mesh gradation towards coastal region of importance
         fukushimaCoast = qmesh.vector.Shapes()
@@ -65,11 +73,11 @@ class MeshSetup:
         # Create raster for mesh gradation towards rest of coast
         gebcoCoastlines = qmesh.vector.Shapes()
         if wd:
-            gebcoCoastlines.fromFile(bdyLoc + 'wd_coastline.shp')
+            gebcoCoastlines.fromFile(bdyLoc+'coast_poly.shp')
         else:
-            gebcoCoastlines.fromFile(bdyLoc + 'coastline.shp')
+            gebcoCoastlines.fromFile(bdyLoc+'coastline.shp')
         gradationRaster_gebcoCoastlines = qmesh.raster.gradationToShapes()
-        gradationRaster_gebcoCoastlines.setShapes(gebcoCoastlines)
+        gradationRaster_gebcoCoastlines.setShapes(gebcoCoastlines)      # Could be a polygon, line or point
         gradationRaster_gebcoCoastlines.setRasterBounds(135., 149., 30., 45.)
         gradationRaster_gebcoCoastlines.setRasterResolution(300, 300)
         gradationRaster_gebcoCoastlines.setGradationParameters(self.innerGradation2, self.outerGradation2,
