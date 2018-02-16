@@ -1,3 +1,5 @@
+import numpy as np
+
 class MeshSetup:
     def __init__(self, level, wd=False):
 
@@ -12,17 +14,14 @@ class MeshSetup:
             raise ValueError('Number of elements not recognised.')
 
         # Define gradations (in metres)
-        self.innerGradation1 = (7500., 6000., 5500., 4500., 4000., 3000., 2000., 1500., 1200., 1000., 1000., 900.)[level]
-        self.outerGradation1 = (25000., 20000., 17500., 14000., 12500., 10000., 8000., 6500., 5000., 4000., 2500.,
-                                2000.)[level]
-        self.innerGradation2 = (10000., 10000., 10000., 9000., 8000., 6000., 6000., 5000., 4000., 3500., 3000., 2500.,
-                                2000.)[level]
-        self.outerGradation2 = (25000., 20000., 17500., 14000., 12500., 10000., 9000., 7000., 7500., 8000., 5000.,
-                                4000.)[level]
+        self.innerGradation1 = np.linspace(7500., 1000., 11)[level]
+        self.outerGradation1 = np.linspace(25000., 2000., 11)[level]
+        self.innerGradation2 = np.linspace(10000., 2000., 11)[level]
+        self.outerGradation2 = np.linspace(25000., 4000., 11)[level]
 
         # Define gradation distances (in degrees)
-        self.gradationDistance1 = 1.
-        self.gradationDistance2 = (0.5, 0.5, 0.5, 0.65, 0.75, 1., 1., 1., 1., 1., 1., 1.)[level]
+        self.gradationDistance1 = np.linspace(0.5, 1., 11)[level]
+        self.gradationDistance2 = np.linspace(0.5, 1., 11)[level]
 
     def generateMesh(self, wd=False):
         """
@@ -61,14 +60,14 @@ class MeshSetup:
         gradationRaster_fukushimaCoast.calculateLinearGradation()
         gradationRaster_fukushimaCoast.writeNetCDF(self.dirName + 'gradationFukushima.nc')
 
-        # Create raster for mesh gradation towards rest of coast
+        # Create raster for mesh gradation towards rest of coast (Could be a polygon, line or point)
         gebcoCoastlines = qmesh.vector.Shapes()
         if wd:
             gebcoCoastlines.fromFile(bdyLoc+'coast_poly.shp')
         else:
             gebcoCoastlines.fromFile(bdyLoc+'coastline.shp')
         gradationRaster_gebcoCoastlines = qmesh.raster.gradationToShapes()
-        gradationRaster_gebcoCoastlines.setShapes(gebcoCoastlines)      # Could be a polygon, line or point
+        gradationRaster_gebcoCoastlines.setShapes(gebcoCoastlines)
         gradationRaster_gebcoCoastlines.setRasterBounds(135., 149., 30., 45.)
         gradationRaster_gebcoCoastlines.setRasterResolution(300, 300)
         gradationRaster_gebcoCoastlines.setGradationParameters(self.innerGradation2, self.outerGradation2,
@@ -105,12 +104,21 @@ class MeshSetup:
 if __name__ == '__main__':
     import qmesh
 
+    generateAll = bool(input("Press 0 to generate a single mesh or 1 to generate all meshes in the hierarchy. "))
     wd = bool(input("Press 0 for a standard mesh or 1 to generate a mesh for wetting and drying. "))
-    ms = MeshSetup(input('Choose refinement level from 0-11: ') or 0, wd=wd)
-    qmesh.setLogOutputFile(ms.dirName + 'generateMesh.log')     # Store QMESH log for later reference
-    qmesh.initialise()                                          # Initialise QGIS API
-    ms.generateMesh(wd=wd)                                      # Generate the mesh
-    ms.convertMesh()                                            # Convert to shapefile, for visualisation with QGIS
+    if generateAll:
+        for i in range(12):
+            ms = MeshSetup(i, wd=wd)
+            qmesh.setLogOutputFile(ms.dirName+'generateMesh.log')   # Store QMESH log for later reference
+            qmesh.initialise()                                      # Initialise QGIS API
+            ms.generateMesh(wd=wd)                                  # Generate the mesh
+            ms.convertMesh()                                        # Convert to shapefile, for visualisation with QGIS
+    else:
+        ms = MeshSetup(input('Choose refinement level from 0-11: ') or 0, wd=wd)
+        qmesh.setLogOutputFile(ms.dirName+'generateMesh.log')
+        qmesh.initialise()
+        ms.generateMesh(wd=wd)
+        ms.convertMesh()
 else:
     from firedrake import *
     from firedrake.petsc import PETSc
