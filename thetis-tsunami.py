@@ -50,7 +50,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     # Load Mesh, initial condition and bathymetry
     if mode == 'tohoku':
         nEle = op.meshes[startRes]
-        mesh_H, eta0, b = msh.TohokuDomain(nEle, capBathymetry=op.wd)
+        mesh_H, eta0, b = msh.TohokuDomain(nEle, wd=op.wd)
     elif mode == 'shallow-water':
         lx = 2 * np.pi
         n = pow(2, startRes)
@@ -143,6 +143,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     dt = min(np.abs(solver_obj.compute_time_step().dat.data)) if mode == 'tohoku' else 0.025
     Dt = Constant(dt)
     iEnd = int(T / (dt * op.rm))
+    if op.wd:
+        alpha = Constant(0.5)       # TODO: derive and set wetting-and-drying parameter
 
     if getData:
         msc.dis('Starting fixed mesh primal run (forwards in time)', op.printStats)
@@ -161,7 +163,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         options.export_diagnostics = True
         options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
         options.use_wetting_and_drying = op.wd
-        # options.wetting_and_drying_alpha = 0.5    # TODO: set this
+        if op.wd:
+            options.wetting_and_drying_alpha = alpha
 
         # Output error data
         if approach == 'fixedMesh' and op.outputOF:
@@ -409,7 +412,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             adapOpt.export_diagnostics = True
             adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
             adapOpt.use_wetting_and_drying = op.wd
-            # adapOpt.wetting_and_drying_alpha = 0.5    # TODO: set this
+            if op.wd:
+                adapOpt.wetting_and_drying_alpha = alpha
             field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
             e = exporter.ExportManager(dirName + 'hdf5',
                                        ['elev_2d', 'uv_2d'],
@@ -482,8 +486,9 @@ if __name__ == '__main__':
                      outputOF=True,
                      orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
                      # orderChange=0,
-                     ndump=10,
-                     wd=False)
+                     wd=False,
+                     # wd=True if mode == 'tohoku' else False,
+                     ndump=10)
     if mode == 'shallow-water':
         op.Tstart = 0.5
         op.Tend = 2.5
