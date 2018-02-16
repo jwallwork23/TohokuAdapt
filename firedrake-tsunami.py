@@ -67,8 +67,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     # Load Mesh(es)
     if mode == 'tohoku':
-        nEle = op.meshes[startRes]
-        mesh_H, eta0, b = msh.TohokuDomain(nEle)    # Computational mesh
+        mesh_H, eta0, b = msh.TohokuDomain(startRes)    # Computational mesh
     elif mode == 'shallow-water':
         lx = 2 * np.pi
         n = pow(2, startRes)

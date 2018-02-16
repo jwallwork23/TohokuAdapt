@@ -192,9 +192,6 @@ class Options:
                        labels[4]: 'explicit', labels[5]: 'adjointBased', labels[6]: 'goalBased'}
         # TODO: needs updating
 
-        # Mesh element counts currently generated in QMESH
-        self.meshes = (6176, 8782, 11020, 16656, 20724, 33784, 52998, 81902, 129442, 196560, 450386, 691750)
-
 
     def J(self, mode):
         """

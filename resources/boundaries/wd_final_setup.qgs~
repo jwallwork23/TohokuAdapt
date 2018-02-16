@@ -31,10 +31,10 @@
   <mapcanvas>
     <units>meters</units>
     <extent>
-      <xmin>15108590.67786499112844467</xmin>
-      <ymin>3496259.45727098453789949</ymin>
-      <xmax>16595938.0173177644610405</xmax>
-      <ymax>5360538.38214371632784605</ymax>
+      <xmin>nan</xmin>
+      <ymin>nan</ymin>
+      <xmax>nan</xmax>
+      <ymax>nan</ymax>
     </extent>
     <rotation>0</rotation>
     <projections>1</projections>
@@ -58,6 +58,7 @@
       <layer_coordinate_transform destAuthId="EPSG:53004" srcAuthId="EPSG:4326" srcDatumTransform="-1" destDatumTransform="-1" layerid="Polygons_from_lines20180216150745964"/>
       <layer_coordinate_transform destAuthId="EPSG:53004" srcAuthId="EPSG:4326" srcDatumTransform="-1" destDatumTransform="-1" layerid="wd_coastline20180215145555699"/>
       <layer_coordinate_transform destAuthId="EPSG:53004" srcAuthId="EPSG:4326" srcDatumTransform="-1" destDatumTransform="-1" layerid="poly_bdys20180216150511493"/>
+      <layer_coordinate_transform destAuthId="EPSG:53004" srcAuthId="EPSG:3857" srcDatumTransform="-1" destDatumTransform="-1" layerid="wd_Tohoku617620180216163536812"/>
       <layer_coordinate_transform destAuthId="EPSG:53004" srcAuthId="EPSG:4326" srcDatumTransform="-1" destDatumTransform="-1" layerid="wd_final_ocean20180215160818690"/>
       <layer_coordinate_transform destAuthId="EPSG:53004" srcAuthId="EPSG:4326" srcDatumTransform="-1" destDatumTransform="-1" layerid="poly_bdys20180216151210433"/>
       <layer_coordinate_transform destAuthId="EPSG:53004" srcAuthId="EPSG:4326" srcDatumTransform="-1" destDatumTransform="-1" layerid="final_bdys20170629151141574"/>
@@ -1806,7 +1807,7 @@ def my_form_open(dialog, layer, feature):
         <xmin>136.19329736297629552</xmin>
         <ymin>30.31894433022274171</ymin>
         <xmax>148.93237924750599177</xmax>
-        <ymax>43.06654465078528204</ymax>
+        <ymax>43.09015712693054212</ymax>
       </extent>
       <id>wd_final_bdys20180215145535274</id>
       <datasource>./wd_final_bdys.shp</datasource>
@@ -1836,6 +1837,7 @@ def my_form_open(dialog, layer, feature):
         <default field="PhysID" expression=""/>
         <default field="length" expression=""/>
         <default field="length2" expression=""/>
+        <default field="length3" expression=""/>
       </defaults>
       <map-layer-style-manager current="">
         <map-layer-style name=""/>
@@ -1851,6 +1853,9 @@ def my_form_open(dialog, layer, feature):
           <widgetv2config IsMultiline="0" fieldEditable="1" constraint="" UseHtml="0" labelOnTop="0" constraintDescription="" notNull="0"/>
         </edittype>
         <edittype widgetv2type="TextEdit" name="length2">
+          <widgetv2config IsMultiline="0" fieldEditable="1" constraint="" UseHtml="0" labelOnTop="0" constraintDescription="" notNull="0"/>
+        </edittype>
+        <edittype widgetv2type="TextEdit" name="length3">
           <widgetv2config IsMultiline="0" fieldEditable="1" constraint="" UseHtml="0" labelOnTop="0" constraintDescription="" notNull="0"/>
         </edittype>
       </edittypes>
@@ -2083,11 +2088,12 @@ def my_form_open(dialog, layer, feature):
         <alias field="PhysID" index="1" name=""/>
         <alias field="length" index="2" name=""/>
         <alias field="length2" index="3" name=""/>
+        <alias field="length3" index="4" name=""/>
       </aliases>
       <excludeAttributesWMS/>
       <excludeAttributesWFS/>
       <attributeactions default="-1"/>
-      <attributetableconfig actionWidgetStyle="dropDown" sortExpression="&quot;length&quot;" sortOrder="1">
+      <attributetableconfig actionWidgetStyle="dropDown" sortExpression="&quot;length3&quot;" sortOrder="1">
         <columns>
           <column width="-1" hidden="0" type="field" name="id"/>
           <column width="-1" hidden="0" type="field" name="PhysID"/>
@@ -2183,8 +2189,10 @@ def my_form_open(dialog, layer, feature):
         <value>wd_final_bdys20180215145535274</value>
         <value>fukushima20180216150244226</value>
         <value>poly_bdys20180216150511493</value>
+        <value>final_ocean20180216162707147</value>
       </LayerSnappingList>
       <LayerSnappingEnabledList type="QStringList">
+        <value>disabled</value>
         <value>disabled</value>
         <value>disabled</value>
         <value>enabled</value>
@@ -2198,7 +2206,8 @@ def my_form_open(dialog, layer, feature):
       <LayerSnappingToleranceUnitList type="QStringList">
         <value>2</value>
         <value>2</value>
-        <value>2</value>
+        <value>0</value>
+        <value>0</value>
         <value>2</value>
         <value>2</value>
         <value>2</value>
@@ -2210,10 +2219,12 @@ def my_form_open(dialog, layer, feature):
         <value>to_vertex_and_segment</value>
         <value>to_vertex_and_segment</value>
         <value>to_vertex_and_segment</value>
+        <value>to_vertex_and_segment</value>
       </LayerSnapToList>
       <DefaultSnapType type="QString">to vertex</DefaultSnapType>
       <DefaultSnapTolerance type="double">1</DefaultSnapTolerance>
       <LayerSnappingToleranceList type="QStringList">
+        <value>0.000000</value>
         <value>0.000000</value>
         <value>0.000000</value>
         <value>1.000000</value>

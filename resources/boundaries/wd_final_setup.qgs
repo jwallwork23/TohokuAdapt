@@ -3,24 +3,24 @@
   <title></title>
   <autotransaction active="0"/>
   <evaluateDefaultValues active="0"/>
-  <layer-tree-group expanded="1" checked="Qt::PartiallyChecked" name="">
+  <layer-tree-group expanded="1" checked="Qt::Checked" name="">
     <customproperties/>
-    <layer-tree-layer expanded="1" checked="Qt::Unchecked" id="coastline20180215150717343" name="coastline">
+    <layer-tree-layer expanded="1" checked="Qt::Checked" id="coastline20180215150717343" name="coastline">
       <customproperties/>
     </layer-tree-layer>
-    <layer-tree-layer expanded="1" checked="Qt::Unchecked" id="wd_coastline20180215145555699" name="wd_coastline">
+    <layer-tree-layer expanded="1" checked="Qt::Checked" id="wd_coastline20180215145555699" name="wd_coastline">
       <customproperties/>
     </layer-tree-layer>
-    <layer-tree-layer expanded="1" checked="Qt::Unchecked" id="final_bdys20180215154520334" name="final_bdys">
+    <layer-tree-layer expanded="1" checked="Qt::Checked" id="final_bdys20180215154520334" name="final_bdys">
       <customproperties/>
     </layer-tree-layer>
-    <layer-tree-layer expanded="1" checked="Qt::Unchecked" id="poly_bdys20180216150511493" name="poly_bdys">
+    <layer-tree-layer expanded="1" checked="Qt::Checked" id="poly_bdys20180216150511493" name="poly_bdys">
       <customproperties/>
     </layer-tree-layer>
-    <layer-tree-layer expanded="1" checked="Qt::Unchecked" id="fukushima20180216150244226" name="fukushima">
+    <layer-tree-layer expanded="1" checked="Qt::Checked" id="fukushima20180216150244226" name="fukushima">
       <customproperties/>
     </layer-tree-layer>
-    <layer-tree-layer expanded="1" checked="Qt::Unchecked" id="final_ocean20180216162707147" name="final_ocean">
+    <layer-tree-layer expanded="1" checked="Qt::Checked" id="final_ocean20180216162707147" name="final_ocean">
       <customproperties/>
     </layer-tree-layer>
     <layer-tree-layer expanded="1" checked="Qt::Checked" id="wd_final_bdys20180215145535274" name="wd_final_bdys">
@@ -58,6 +58,7 @@
       <layer_coordinate_transform destAuthId="EPSG:53004" srcAuthId="EPSG:4326" srcDatumTransform="-1" destDatumTransform="-1" layerid="Polygons_from_lines20180216150745964"/>
       <layer_coordinate_transform destAuthId="EPSG:53004" srcAuthId="EPSG:4326" srcDatumTransform="-1" destDatumTransform="-1" layerid="wd_coastline20180215145555699"/>
       <layer_coordinate_transform destAuthId="EPSG:53004" srcAuthId="EPSG:4326" srcDatumTransform="-1" destDatumTransform="-1" layerid="poly_bdys20180216150511493"/>
+      <layer_coordinate_transform destAuthId="EPSG:53004" srcAuthId="EPSG:3857" srcDatumTransform="-1" destDatumTransform="-1" layerid="wd_Tohoku617620180216163536812"/>
       <layer_coordinate_transform destAuthId="EPSG:53004" srcAuthId="EPSG:4326" srcDatumTransform="-1" destDatumTransform="-1" layerid="wd_final_ocean20180215160818690"/>
       <layer_coordinate_transform destAuthId="EPSG:53004" srcAuthId="EPSG:4326" srcDatumTransform="-1" destDatumTransform="-1" layerid="poly_bdys20180216151210433"/>
       <layer_coordinate_transform destAuthId="EPSG:53004" srcAuthId="EPSG:4326" srcDatumTransform="-1" destDatumTransform="-1" layerid="final_bdys20170629151141574"/>
@@ -86,34 +87,34 @@
     </custom-order>
   </layer-tree-canvas>
   <legend updateDrawingOrder="true">
-    <legendlayer drawingOrder="-1" open="true" checked="Qt::Unchecked" name="coastline" showFeatureCount="0">
+    <legendlayer drawingOrder="-1" open="true" checked="Qt::Checked" name="coastline" showFeatureCount="0">
       <filegroup open="true" hidden="false">
-        <legendlayerfile isInOverview="0" layerid="coastline20180215150717343" visible="0"/>
+        <legendlayerfile isInOverview="0" layerid="coastline20180215150717343" visible="1"/>
       </filegroup>
     </legendlayer>
-    <legendlayer drawingOrder="-1" open="true" checked="Qt::Unchecked" name="wd_coastline" showFeatureCount="0">
+    <legendlayer drawingOrder="-1" open="true" checked="Qt::Checked" name="wd_coastline" showFeatureCount="0">
       <filegroup open="true" hidden="false">
-        <legendlayerfile isInOverview="0" layerid="wd_coastline20180215145555699" visible="0"/>
+        <legendlayerfile isInOverview="0" layerid="wd_coastline20180215145555699" visible="1"/>
       </filegroup>
     </legendlayer>
-    <legendlayer drawingOrder="-1" open="true" checked="Qt::Unchecked" name="final_bdys" showFeatureCount="0">
+    <legendlayer drawingOrder="-1" open="true" checked="Qt::Checked" name="final_bdys" showFeatureCount="0">
       <filegroup open="true" hidden="false">
-        <legendlayerfile isInOverview="0" layerid="final_bdys20180215154520334" visible="0"/>
+        <legendlayerfile isInOverview="0" layerid="final_bdys20180215154520334" visible="1"/>
       </filegroup>
     </legendlayer>
-    <legendlayer drawingOrder="-1" open="true" checked="Qt::Unchecked" name="poly_bdys" showFeatureCount="0">
+    <legendlayer drawingOrder="-1" open="true" checked="Qt::Checked" name="poly_bdys" showFeatureCount="0">
       <filegroup open="true" hidden="false">
-        <legendlayerfile isInOverview="0" layerid="poly_bdys20180216150511493" visible="0"/>
+        <legendlayerfile isInOverview="0" layerid="poly_bdys20180216150511493" visible="1"/>
       </filegroup>
     </legendlayer>
-    <legendlayer drawingOrder="-1" open="true" checked="Qt::Unchecked" name="fukushima" showFeatureCount="0">
+    <legendlayer drawingOrder="-1" open="true" checked="Qt::Checked" name="fukushima" showFeatureCount="0">
       <filegroup open="true" hidden="false">
-        <legendlayerfile isInOverview="0" layerid="fukushima20180216150244226" visible="0"/>
+        <legendlayerfile isInOverview="0" layerid="fukushima20180216150244226" visible="1"/>
       </filegroup>
     </legendlayer>
-    <legendlayer drawingOrder="-1" open="true" checked="Qt::Unchecked" name="final_ocean" showFeatureCount="0">
+    <legendlayer drawingOrder="-1" open="true" checked="Qt::Checked" name="final_ocean" showFeatureCount="0">
       <filegroup open="true" hidden="false">
-        <legendlayerfile isInOverview="0" layerid="final_ocean20180216162707147" visible="0"/>
+        <legendlayerfile isInOverview="0" layerid="final_ocean20180216162707147" visible="1"/>
       </filegroup>
     </legendlayer>
     <legendlayer drawingOrder="-1" open="true" checked="Qt::Checked" name="wd_final_bdys" showFeatureCount="0">

@@ -49,8 +49,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     # Load Mesh, initial condition and bathymetry
     if mode == 'tohoku':
-        nEle = op.meshes[startRes]
-        mesh_H, eta0, b = msh.TohokuDomain(nEle, wd=op.wd)
+        mesh_H, eta0, b = msh.TohokuDomain(startRes, wd=op.wd)
     elif mode == 'shallow-water':
         lx = 2 * np.pi
         n = pow(2, startRes)
