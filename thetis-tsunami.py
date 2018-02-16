@@ -54,7 +54,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         lx = 2 * np.pi
         n = pow(2, startRes)
         mesh_H = SquareMesh(n, n, lx, lx)
-        nEle = msh.meshStats(mesh_H)[0]
         x, y = SpatialCoordinate(mesh_H)
         P1_2d = FunctionSpace(mesh_H, "CG", 1)
         eta0 = Function(P1_2d).interpolate(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))))
@@ -131,6 +130,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         epsilon = Function(P0, name="Error indicator")
 
     # Initialise adaptivity placeholders and counters
+    nEle = msh.meshStats(mesh_H)[0]
     mM = [nEle, nEle]                               # Min/max #Elements
     Sn = nEle
     nVerT = msh.meshStats(mesh_H)[1] * op.vscale    # Target #Vertices
