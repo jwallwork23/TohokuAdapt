@@ -1,5 +1,5 @@
 class MeshSetup:
-    def __init__(self, nEle=6176):
+    def __init__(self, nEle=6176, wd=False):
 
         # Get mesh descriptions
         self.nEle = nEle
@@ -9,6 +9,8 @@ class MeshSetup:
                              129442: 'Tohoku129442',81902: 'Tohoku81902', 52998: 'Tohoku52998',
                              33784: 'Tohoku33784', 20724: 'Tohoku20724', 16656: 'Tohoku16656',
                              11020: 'Tohoku11020', 8782: 'Tohoku8782', 6176: 'Tohoku6176'}[nEle]
+            if wd:
+                self.meshName = 'wd_' + self.meshName
         except:
             raise ValueError('Number of elements not recognised.')
 
@@ -42,7 +44,6 @@ class MeshSetup:
         boundaries = qmesh.vector.Shapes()
         if wd:
             boundaries.fromFile(bdyLoc+'wd_final_bdys.shp')
-            self.meshName = 'wd_'+self.meshName
         else:
             boundaries.fromFile(bdyLoc+'final_bdys.shp')
         loopShapes = qmesh.vector.identifyLoops(boundaries, isGlobal=False, defaultPhysID=1000, fixOpenLoops=True)
@@ -114,12 +115,12 @@ class MeshSetup:
 if __name__ == '__main__':
     import qmesh
 
+    wd = bool(input("Press 0 for a standard mesh or 1 to generate a mesh for wetting and drying. "))
     ms = MeshSetup(input('Choose #Elements from:\n '
                          '{6176, 8782, 11020, 16656, 20724, 33784, 52998, 81902, 129442, 196560, 450386, 691750}:\n')
-                   or 6176)
+                   or 6176, wd=wd)
     qmesh.setLogOutputFile(ms.dirName + 'generateMesh.log')     # Store QMESH log for later reference
     qmesh.initialise()                                          # Initialise QGIS API
-    wd = bool(input("Press 0 for a standard mesh or 1 to generate a mesh for wetting and drying. "))
     ms.generateMesh(wd=wd)                                      # Generate the mesh
     ms.convertMesh()                                            # Convert to shapefile, for visualisation with QGIS
 else:
@@ -131,20 +132,20 @@ else:
     from . import conversion
 
 
-def TohokuDomain(nEle=6176, mesh=None, output=False, capBathymetry=True):
+def TohokuDomain(nEle=6176, mesh=None, output=False, wd=False):
     """
     Load the mesh, initial condition and bathymetry profile for the 2D ocean domain of the Tohoku tsunami problem.
     
     :arg nEle: number of elements considered.
     :param mesh: user specified mesh, if already generated.
     :param output: toggle plotting of bathymetry and initial surface.
-    :param capBathymetry: in the case of no wetting-and-drying.
+    :param wd: toggle wetting-and-drying.
     :return: associated mesh, initial condition and bathymetry field. 
     """
 
     # Define mesh and an associated elevation function space and establish initial condition and bathymetry functions
     if mesh == None:
-        ms = MeshSetup(nEle)
+        ms = MeshSetup(nEle, wd)
         mesh = Mesh(ms.dirName + ms.meshName + '.msh')
     meshCoords = mesh.coordinates.dat.data
     P1 = FunctionSpace(mesh, 'CG', 1)
@@ -176,8 +177,8 @@ def TohokuDomain(nEle=6176, mesh=None, output=False, capBathymetry=True):
         eta0vec[i] = interpolatorSurf(p[1], p[0])
         b_vec[i] = - interpolatorSurf(p[1], p[0]) - interpolatorBath(p[1], p[0])
 
-    # Post-process the bathymetry to have a minimum depth of 30m and plot
-    if capBathymetry:
+    # Post-process the bathymetry to have a minimum depth of 30m and if no wetting-and-drying
+    if not wd:
         b.assign(conditional(lt(30, b), b, 30))
     if output:
         File('plots/initialisation/surf.pvd').write(eta0)
