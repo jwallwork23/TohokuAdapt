@@ -7,11 +7,12 @@ class MeshSetup:
         self.level = level
         self.dirName = 'resources/meshes/'
         try:
-            self.meshName = 'Tohoku'+str(level)
-            if wd:
-                self.meshName = 'wd_' + self.meshName
+            assert(isinstance(level, int) and (level >= 0) and (level < 11))
         except:
-            raise ValueError('Number of elements not recognised.')
+            raise ValueError('Invalid input. Refinement level should be an integer from 0-10.')
+        self.meshName = 'Tohoku' + str(level)
+        if wd:
+            self.meshName = 'wd_' + self.meshName
 
         # Define gradations (in metres)
         self.innerGradation1 = np.linspace(7500., 1000., 11)[level]
@@ -31,10 +32,7 @@ class MeshSetup:
         # Reading in the shapefile describing the domain boundaries, and creating a GMSH file.
         bdyLoc = 'resources/boundaries/'
         boundaries = qmesh.vector.Shapes()
-        if wd:
-            boundaries.fromFile(bdyLoc+'wd_final_bdys.shp')
-        else:
-            boundaries.fromFile(bdyLoc+'final_bdys.shp')
+        boundaries.fromFile(bdyLoc+'wd_final_bdys.shp' if wd else bdyLoc+'final_bdys.shp')
         loopShapes = qmesh.vector.identifyLoops(boundaries, isGlobal=False, defaultPhysID=1000, fixOpenLoops=True)
         polygonShapes = qmesh.vector.identifyPolygons(loopShapes, meshedAreaPhysID=1,
                                                       smallestNotMeshedArea=5e6, smallestMeshedArea=2e8)
@@ -62,10 +60,7 @@ class MeshSetup:
 
         # Create raster for mesh gradation towards rest of coast (Could be a polygon, line or point)
         gebcoCoastlines = qmesh.vector.Shapes()
-        if wd:
-            gebcoCoastlines.fromFile(bdyLoc+'coast_poly.shp')
-        else:
-            gebcoCoastlines.fromFile(bdyLoc+'coastline.shp')
+        gebcoCoastlines.fromFile(bdyLoc+'coast_poly.shp' if wd else bdyLoc+'coastline.shp')
         gradationRaster_gebcoCoastlines = qmesh.raster.gradationToShapes()
         gradationRaster_gebcoCoastlines.setShapes(gebcoCoastlines)
         gradationRaster_gebcoCoastlines.setRasterBounds(135., 149., 30., 45.)
@@ -107,14 +102,14 @@ if __name__ == '__main__':
     generateAll = bool(input("Press 0 to generate a single mesh or 1 to generate all meshes in the hierarchy. "))
     wd = bool(input("Press 0 for a standard mesh or 1 to generate a mesh for wetting and drying. "))
     if generateAll:
-        for i in range(12):
+        for i in range(11):
             ms = MeshSetup(i, wd=wd)
             qmesh.setLogOutputFile(ms.dirName+'generateMesh.log')   # Store QMESH log for later reference
             qmesh.initialise()                                      # Initialise QGIS API
             ms.generateMesh(wd=wd)                                  # Generate the mesh
             ms.convertMesh()                                        # Convert to shapefile, for visualisation with QGIS
     else:
-        ms = MeshSetup(input('Choose refinement level from 0-11: ') or 0, wd=wd)
+        ms = MeshSetup(input('Choose refinement level from 0-10: ') or 0, wd=wd)
         qmesh.setLogOutputFile(ms.dirName+'generateMesh.log')
         qmesh.initialise()
         ms.generateMesh(wd=wd)
