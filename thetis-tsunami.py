@@ -160,7 +160,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         options.output_directory = dirName
         options.export_diagnostics = True
         options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-        options.use_.wetting_and_drying = op.wd
+        options.use_wetting_and_drying = op.wd
         # options.wetting_and_drying_alpha = 0.5    # TODO: set this
 
         # Output error data
@@ -296,13 +296,13 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     epsilon = err.explicitErrorEstimator(q_oi if op.orderChange else q_h, rho,
                                                          b if (op.orderChange or mode != 'tohoku') else b_h, v,
                                                          maxBathy=True if mode == 'tohoku' else False)
-            epsilon.dat.data[:] = np.abs(epsilon.dat.data) * nVerT / (np.abs(assemble(epsilon * dx)) or 1.)  # Normalise
-            epsilon.rename("Error indicator")
 
             # TODO: Load adjoint data from HDF5
             # TODO: Form remaining error estimates
+            # TODO: maximise DWF over time window
 
             # Store error estimates
+            epsilon.rename("Error indicator")
             with DumbCheckpoint(dirName+'hdf5/'+approach+'Error'+msc.indexString(k), mode=FILE_CREATE) as saveErr:
                 saveErr.store(epsilon)
                 saveErr.close()
@@ -345,7 +345,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     loadErr.load(epsilon)
                     loadErr.close()
                 errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon)[0])
-                M = adap.isotropicMetric(W, errEst, op=op, invert=False)
+                M = adap.isotropicMetric(W, errEst, op=op, invert=False, nVerT=nVerT)
             else:
                 if approach == 'norm':
                     v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
@@ -372,6 +372,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                                 M2 = adap.isotropicMetric(W, spd, invert=False, nVerT=nVerT, op=op)
                             elif approach == 'gradientBased':
                                 g = adap.constructGradient(mesh_H, spd)
+                                g.dat.data[:] = np.abs(g.dat.data)
                                 M2 = adap.isotropicMetric(W, g, invert=False, nVerT=nVerT, op=op)
                             elif approach == 'hessianBased':
                                 H = adap.constructHessian(mesh_H, W, spd, op=op)
@@ -407,7 +408,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             adapOpt.output_directory = dirName
             adapOpt.export_diagnostics = True
             adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-            adapOpt.use_.wetting_and_drying = op.wd
+            adapOpt.use_wetting_and_drying = op.wd
             # adapOpt.wetting_and_drying_alpha = 0.5    # TODO: set this
             field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
             e = exporter.ExportManager(dirName + 'hdf5',
@@ -453,7 +454,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer)
     rel = np.abs(op.J(mode) - J_h)/np.abs(op.J(mode))
 
-    return av, J_h if op.bootstrap else rel, clock() - tic
+    return av, rel, J_h, clock() - tic
 
 
 if __name__ == '__main__':
@@ -466,15 +467,17 @@ if __name__ == '__main__':
     op = opt.Options(vscale=0.1 if approach == 'DWR' else 0.85,
                      family='dg-dg',
                      rm=60 if useAdjoint else 30,
-                     gradate=True if (useAdjoint or approach in ('explicit', 'implicit')) else False,
+                     gradate=True if aposteriori else False,
                      advect=False,
                      window=True if approach == 'DWF' else False,
                      outputMetric=False,
                      plotpvd=False,
                      gauges=False,
                      tAdapt=False,
-                     bootstrap=True if approach == 'fixedMesh' else False,
-                     # bootstrap=False,
+                     # iso=True,      # TODO: fix isotropic metric gradation
+                     iso=False,
+                     # bootstrap=True if approach == 'fixedMesh' else False,
+                     bootstrap=False,
                      printStats=True,
                      outputOF=True,
                      orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
@@ -494,7 +497,7 @@ if __name__ == '__main__':
     textfile = open('outdata/outputs/'+mode+'/'+approach+date+s+'.txt', 'w+')
     if op.bootstrap:
         for i in range(10):
-            av, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
+            av, rel, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
             var = np.abs(J_h - J_h_) if i > 0 else 0.
             J_h_ = J_h
             print('Run %d:  Mean element count %6d      Objective value %.4e        Timing %.1fs    Difference %.4e'
@@ -502,8 +505,8 @@ if __name__ == '__main__':
             textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, J_h, timing, var))
     else:
         for i in range(6):
-            av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
+            av, rel, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
             print('Run %d:  Mean element count %6d      Relative error %.4e         Timing %.1fs'
                   % (i, av, rel, timing))
-            textfile.write('%d, %.4e, %.1f\n' % (av, rel, timing))
+            textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, timing, J_h))
     textfile.close()

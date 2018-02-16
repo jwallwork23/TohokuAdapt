@@ -145,7 +145,7 @@ def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=None):
             detH.dat.data[i] = pow(det, op.p / (2. * op.p + 2))
 
         detH_integral = assemble(detH * dx)
-        M *= nVerT / detH_integral  # Scale by the target number of vertices
+        M *= nVerT / detH_integral                      # Scale by the target number of vertices
         for i in range(mesh.topology.num_vertices()):
             # Find eigenpairs of metric and truncate eigenvalues
             lam, v = la.eig(M.dat.data[i])
@@ -189,8 +189,6 @@ def isotropicMetric(V, f, bdy=False, invert=True, nVerT=None, op=None):
     if (family == 'Lagrange') & (deg == 1):
         g.assign(f)
     else:
-    #     print("""Field for adaption is degree %d %s. Interpolation is required to
-# get a degree 1 Lagrange metric.""" % (deg, family))
         g.interpolate(f)
 
     if nVerT:
