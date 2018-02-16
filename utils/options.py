@@ -29,6 +29,9 @@ class Options:
                  hessMeth='dL2',
                  beta=1.4,
                  gamma=1.,
+                 g=9.81,
+                 coriolis0=0.,      # TODO: feasible dimensional value?
+                 coriolis1=1.,      # TODO: feasible dimensional value?
                  outputMetric=False,
                  plotpvd=True,
                  gauges=False,
@@ -63,6 +66,9 @@ class Options:
         :param hessMeth: Method of Hessian reconstruction: 'dL2' or 'parts'.
         :param beta: metric gradation scaling parameter.
         :param gamma: metric rescaling parameter.
+        :param g: gravitational acceleration.
+        :param coriolis0: constant coefficient of beta-plane Coriolis term.
+        :param coriolis1: linear coefficient of beta-plane Coriolis term. 
         :param outputMetric: toggle saving metric to PVD.
         :param plotpvd: toggle saving solution fields to PVD.
         :param gauges: toggle saving of elevation to HDF5 for timeseries analysis. 
@@ -149,7 +155,14 @@ class Options:
             raise ValueError('Invalid value for scaling parameter.')
 
         # Physical parameters
-        self.g = 9.81           # Gravitational acceleration (m s^{-2})
+        self.g = g
+        self.coriolis0 = coriolis0
+        self.coriolis1 = coriolis1
+        try:
+            assert(g > 0)
+            assert(type(coriolis0) == type(coriolis1) == float)
+        except:
+            raise ValueError('Unphysical physical parameters!')
 
         # Timestepping parameters
         self.Tstart = Tstart
@@ -162,7 +175,7 @@ class Options:
         assert(type(ndump) == type(rm) == type(orderChange) == int)
         self.timestepper = timestepper
 
-        # Solver parameters
+        # Solver parameters for ``firedrake-tsunami`` case
         self.params = {'mat_type': 'matfree',
                        'snes_type': 'ksponly',
                        'pc_type': 'python',
@@ -198,7 +211,7 @@ class Options:
         :param mode: test problem choice.
         :return: 'exact' objective functional value, converged to 3 s.f.
         """
-        dat = {'tohoku': 1.2185e+13,            # On mesh of 196,560 elements
+        dat = {'tohoku': 1.2185e+13,            # On mesh of 196,560 elements   TODO: need verify on refined hierarchy
                'shallow-water': 1.0647e-03,     # On mesh of 524,288 elements
                }
         # TODO: other test cases

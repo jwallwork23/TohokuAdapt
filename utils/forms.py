@@ -1,5 +1,7 @@
 from firedrake import *
 
+import utils.options as opt
+
 
 def timestepCoeffs(timestepper):
     """
@@ -20,8 +22,6 @@ def timestepCoeffs(timestepper):
 
     return a1, a2
 
-# TODO: consider RK4 timestepping
-
 
 def timestepScheme(u, u_, timestepper):
     """
@@ -35,8 +35,7 @@ def timestepScheme(u, u_, timestepper):
     return a1 * u + a2 * u_
 
 
-def strongResidualSW(q, q_, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, nonlinear=False,
-                     timestepper='CrankNicolson'):
+def strongResidualSW(q, q_, b, Dt, nu=0., rotational=False, nonlinear=False, op=opt.Options()):
     """
     Construct the strong residual for the semi-discrete linear shallow water equations at the current timestep.
 
@@ -45,28 +44,26 @@ def strongResidualSW(q, q_, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=Fal
     :arg b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: coefficient for stress term.
-    :param g: gravitational acceleration.
-    :param f0: 0th order coefficient for asymptotic Coriolis expansion.
-    :param beta: 1st order coefficient for asymptotic Coriolis expansion.
     :param rotational: toggle rotational / non-rotational equations.
     :param nonlinear: toggle nonlinear / linear equations.
-    :param timestepper: scheme of choice.
+    :param op: parameter holding class.
     :return: strong residual for shallow water equations at current timestep.
     """
     # TODO: include optionality for BCs
     # TODO: implement Galerkin Least Squares (GLS) stabilisation
 
+
     (u, eta) = (as_vector((q[0], q[1])), q[2])
     (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
-    um = timestepScheme(u, u_, timestepper)
-    em = timestepScheme(eta, eta_, timestepper)
+    um = timestepScheme(u, u_, op.timestepper)
+    em = timestepScheme(eta, eta_, op.timestepper)
 
-    Au = (u - u_) / Dt + g * grad(em)
+    Au = (u - u_) / Dt + op.g * grad(em)
     Ae = (eta - eta_) / Dt + div(b * um)
     if nu != 0.:
         Au += div(nu * (grad(um) + transpose(grad(um))))
     if rotational:
-        f = f0 + beta * SpatialCoordinate(q.function_space().mesh())[1]
+        f = op.coriolis0 + op.coriolis1 * SpatialCoordinate(q.function_space().mesh())[1]
         Au += f * as_vector((-u[1], u[0]))
     if nonlinear:
         Au += dot(u, nabla_grad(u))
@@ -74,8 +71,7 @@ def strongResidualSW(q, q_, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=Fal
     return Au, Ae
 
 
-def formsSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, nonlinear=False, allowNormalFlow=True,
-            timestepper='CrankNicolson'):
+def formsSW(q, q_, qt, b, Dt, nu=0., rotational=False, nonlinear=False, allowNormalFlow=True, op=opt.Options()):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
 
@@ -85,12 +81,9 @@ def formsSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, n
     :arg b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: coefficient for stress term.
-    :param g: gravitational acceleration.
-    :param f0: 0th order coefficient for asymptotic Coriolis expansion.
-    :param beta: 1st order coefficient for asymptotic Coriolis expansion.
     :param rotational: toggle rotational / non-rotational equations.
     :param nonlinear: toggle nonlinear / linear equations.
-    :param timestepper: scheme of choice.
+    :param op: parameter holding class.
     :return: weak residual for shallow water equations at current timestep.
     """
     V = q.function_space()
@@ -98,7 +91,8 @@ def formsSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, n
     (u, eta) = (as_vector((q[0], q[1])), q[2])
     (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
     (w, xi) = (as_vector((qt[0], qt[1])), qt[2])
-    a1, a2 = timestepCoeffs(timestepper)
+    a1, a2 = timestepCoeffs(op.timestepper)
+    g = op.g
 
     B = (inner(u, w) + eta * xi) / Dt * dx  # LHS bilinear form
     L = (inner(u_, w) + eta_ * xi) / Dt * dx  # RHS linear functional
@@ -119,7 +113,7 @@ def formsSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, n
         B -= a1 * nu * inner(grad(u) + transpose(grad(u)), grad(w)) * dx
         L += a2 * nu * inner(grad(u_) + transpose(grad(u_)), grad(w)) * dx
     if rotational:
-        f = f0 + beta * SpatialCoordinate(mesh)[1]
+        f = op.coriolis0 + op.coriolis1 * SpatialCoordinate(mesh)[1]
         B += a1 * f * inner(as_vector((-u[1], u[0])), w) * dx
         L -= a2 * f * inner(as_vector((-u_[1], u_[0])), w) * dx
     if nonlinear:
@@ -129,8 +123,7 @@ def formsSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, n
     return B, L
 
 
-def adjointSW(l, l_, lt, b, Dt, g=9.81, timestepper='CrankNicolson', x1=2.5, x2=3.5, y1=0.1, y2=0.9, smooth=False,
-              switch=Constant(1.)):
+def adjointSW(l, l_, lt, b, Dt, x1=2.5, x2=3.5, y1=0.1, y2=0.9, smooth=False, switch=Constant(1.), op=opt.Options()):
     """
     Semi-discrete (time-discretised) weak form adjoint shallow water equations with no normal flow boundary conditions.
 
@@ -139,25 +132,24 @@ def adjointSW(l, l_, lt, b, Dt, g=9.81, timestepper='CrankNicolson', x1=2.5, x2=
     :arg lt: test function tuple.
     :arg b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
-    :param g: gravitational acceleration.
-    :param timestepper: scheme of choice.
+    :param op: parameter-holding class.
     :return: weak residual for shallow water equations at current timestep.
     """
     (lu, le) = (as_vector((l[0], l[1])), l[2])
     (lu_, le_) = (as_vector((l_[0], l_[1])), l_[2])
     (w, xi) = (as_vector((lt[0], lt[1])), lt[2])
-    a1, a2 = timestepCoeffs(timestepper)
+    a1, a2 = timestepCoeffs(op.timestepper)
     iA = indicator(l.function_space().sub(1), x1=x1, x2=x2, y1=y1, y2=y2, smooth=smooth)
 
-    B = ((inner(lu, w) + le * xi) / Dt + a1 * b * inner(grad(le), w) - a1 * g * inner(lu, grad(xi))) * dx
-    L = ((inner(lu_, w) + le_ * xi) / Dt - a2 * b * inner(grad(le_), w) + a2 * g * inner(lu_, grad(xi))) * dx
+    B = ((inner(lu, w) + le * xi) / Dt + a1 * b * inner(grad(le), w) - a1 * op.g * inner(lu, grad(xi))) * dx
+    L = ((inner(lu_, w) + le_ * xi) / Dt - a2 * b * inner(grad(le_), w) + a2 * op.g * inner(lu_, grad(xi))) * dx
     L -= switch * iA * xi * dx
 
     return B, L
 
 
-def weakResidualSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, nonlinear=False,
-                   allowNormalFlow=True, timestepper='CrankNicolson', adjoint=False, switch=Constant(0.)):
+def weakResidualSW(q, q_, qt, b, Dt, nu=0., rotational=False, nonlinear=False, allowNormalFlow=True, adjoint=False,
+                   switch=Constant(0.), op=opt.Options()):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
 
@@ -167,21 +159,16 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=F
     :arg b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: coefficient for stress term.
-    :param g: gravitational acceleration.
-    :param f0: 0th order coefficient for asymptotic Coriolis expansion.
-    :param beta: 1st order coefficient for asymptotic Coriolis expansion.
     :param rotational: toggle rotational / non-rotational equations.
     :param nonlinear: toggle nonlinear / linear equations.
-    :param timestepper: scheme of choice.
+    :param op: parameter-holding class.
     :return: weak residual for shallow water equations at current timestep.
     """
     if adjoint:
-        B, L = adjointSW(q, q_, qt, b, Dt, g=9.81, timestepper='CrankNicolson', x1=2.5, x2=3.5, y1=0.1, y2=0.9,
-                         smooth=False, switch=switch)
+        B, L = adjointSW(q, q_, qt, b, Dt, x1=2.5, x2=3.5, y1=0.1, y2=0.9, smooth=False, switch=switch, op=op)
     else:
-        B, L = formsSW(q, q_, qt, b, Dt, nu=nu, g=g, f0=f0, beta=beta, rotational=rotational, nonlinear=nonlinear,
-                       allowNormalFlow=allowNormalFlow, timestepper=timestepper)
-
+        B, L = formsSW(q, q_, qt, b, Dt, nu=nu, rotational=rotational, nonlinear=nonlinear,
+                       allowNormalFlow=allowNormalFlow, op=op)
     return B - L
 
 
@@ -220,8 +207,7 @@ def outwardFlux(v, n=None, inward=False):
         return (dot(v(sign), n(sign)))
 
 
-def localProblemSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=False, nonlinear=False,
-                   allowNormalFlow=True, timestepper='CrankNicolson'):
+def localProblemSW(q, q_, qt, b, Dt, nu=0., rotational=False, nonlinear=False, allowNormalFlow=True, op=opt.Options()):
     """
     Semi-discrete (time-discretised) local variational problem for the shallow water equations with no normal flow 
     boundary conditions, under the element residual method.
@@ -232,12 +218,9 @@ def localProblemSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=F
     :arg b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: coefficient for stress term.
-    :param g: gravitational acceleration.
-    :param f0: 0th order coefficient for asymptotic Coriolis expansion.
-    :param beta: 1st order coefficient for asymptotic Coriolis expansion.
     :param rotational: toggle rotational / non-rotational equations.
     :param nonlinear: toggle nonlinear / linear equations.
-    :param timestepper: scheme of choice.
+    :param op: parameter-holding class.
     :return: residual of local problem.
     """
     V = q.function_space()
@@ -246,11 +229,11 @@ def localProblemSW(q, q_, qt, b, Dt, nu=0., g=9.81, f0=0., beta=1., rotational=F
     ut, et = qt.split()
 
     # Establish variational form for residual equation
-    B_, L = formsSW(q, q_, qt, b, Dt, nu=nu, g=g, f0=f0, beta=beta, rotational=rotational, nonlinear=nonlinear,
-                    allowNormalFlow=allowNormalFlow, timestepper=timestepper)
+    B_, L = formsSW(q, q_, qt, b, Dt, nu=nu, rotational=rotational, nonlinear=nonlinear,
+                    allowNormalFlow=allowNormalFlow, op=op)
     phi = Function(V, name='Local solution')
-    B = formsSW(phi, q_, qt, b, Dt, nu=nu, g=g, f0=f0, beta=beta, rotational=rotational, nonlinear=nonlinear,
-                allowNormalFlow=allowNormalFlow, timestepper=timestepper)[0]
+    B = formsSW(phi, q_, qt, b, Dt, nu=nu, rotational=rotational, nonlinear=nonlinear,
+                allowNormalFlow=allowNormalFlow, op=op)[0]
     F = B + B_ - L + interelementTerm(grad(u) * et, n=n) * dS
 
     # TODO: test this
@@ -305,14 +288,13 @@ def weakResidualAD(c, c_, ct, w, Dt, nu=1e-3, timestepper='CrankNicolson'):
     return ((c - c_) * ct / Dt + inner(grad(cm), w * ct) + Constant(nu) * inner(grad(cm), grad(ct))) * dx
 
 
-def adjointAD(l, l_, lt, w, Dt, nu=1e-3, timestepper='CrankNicolson', x1=2.75, x2=3.25, y1=0.25, y2=0.75):
+def adjointAD(l, l_, lt, w, Dt,  timestepper='CrankNicolson', x1=2.75, x2=3.25, y1=0.25, y2=0.75):
     """
     :arg l: adjoint concentration solution at current timestep. 
     :arg l_: adjoint concentration at previous timestep.
     :arg lt: test function.
     :arg w: wind field.
     :param Dt: timestep expressed as a FiredrakeConstant.
-    :param nu: diffusivity parameter.
     :param timestepper: time integration scheme used.
     :return: weak residual for advection diffusion equation at current timestep.
     """

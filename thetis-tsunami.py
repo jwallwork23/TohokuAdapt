@@ -231,7 +231,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         msc.dis('\nStarting error estimate generation', op.printStats)
         errorTimer = clock()
 
-        # Define implicit error problem     # TODO: use Thetis forms
+        # Define implicit error problem     # TODO: use Thetis forms. Also put these in utils.forms
         if approach in ('implicit', 'DWE'):
             B_, L = form.formsSW(q_oi, q_oi_, et, b, Dt, allowNormalFlow=False)
             B = form.formsSW(e, e_, et, b, Dt, allowNormalFlow=False)[0]
@@ -284,10 +284,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             # Approximate residuals
             if approach in ('explicit', 'residual', 'DWR'):
                 if op.orderChange:
-                    Au, Ae = form.strongResidualSW(q_oi, q_oi_, b, Dt)
+                    Au, Ae = form.strongResidualSW(q_oi, q_oi_, b, Dt, op=op)
                 else:
                     qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
-                    Au, Ae = form.strongResidualSW(qh, q_h, b_h if mode == 'tohoku' else b, Dt)
+                    Au, Ae = form.strongResidualSW(qh, q_h, b_h if mode == 'tohoku' else b, Dt, op=op)
                 rho_u.interpolate(Au)
                 rho_e.interpolate(Ae)   # TODO: No idea why this isn't working in refinement case.
                 if op.plotpvd:
@@ -500,7 +500,7 @@ if __name__ == '__main__':
     s = '_BOOTSTRAP' if op.bootstrap else ''
     textfile = open('outdata/outputs/'+mode+'/'+approach+date+s+'.txt', 'w+')
     if op.bootstrap:
-        for i in range(10):
+        for i in range(11):
             av, rel, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
             var = np.abs(J_h - J_h_) if i > 0 else 0.
             J_h_ = J_h
