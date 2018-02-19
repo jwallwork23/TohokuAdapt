@@ -17,6 +17,10 @@
 .idea/
 plots/
 resources/meshes/
+resources/GMT/
+resources/bathymetry/atsea
+resources/bathymetry/coastline
+resources/bathymetry/inland
 utils/.idea/
 outdata/
 outputs/

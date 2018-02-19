@@ -74,6 +74,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         uv_2d_, elev_2d_ = q_.split()
 
     # Define Functions relating to a posteriori estimators
+    P0 = FunctionSpace(mesh_H, "DG", 0)
     if aposteriori or approach == 'norm':
         if op.orderChange:
             V_oi = VectorFunctionSpace(mesh_H, op.space1, op.degree1 + op.orderChange) \
@@ -123,17 +124,16 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             rho_u, rho_e = rho.split()
             rho_u.rename("Velocity residual")
             rho_e.rename("Elevation residual")
-            P0 = FunctionSpace(mesh_H if op.orderChange else mesh_h, "DG", 0)
-        else:
-            P0 = FunctionSpace(mesh_H, "DG", 0)
-        v = TestFunction(P0)
+            if not op.orderChange:
+                P0 = FunctionSpace(mesh_h, "DG", 0)
         epsilon = Function(P0, name="Error indicator")
+    v = TestFunction(P0)
 
     # Initialise adaptivity placeholders and counters
-    nEle = msh.meshStats(mesh_H)[0]
-    mM = [nEle, nEle]                               # Min/max #Elements
+    nEle, nVerT = msh.meshStats(mesh_H)
+    nVerT *= op.vscale                      # Target #Vertices
+    mM = [nEle, nEle]                       # Min/max #Elements
     Sn = nEle
-    nVerT = msh.meshStats(mesh_H)[1] * op.vscale    # Target #Vertices
     endT = 0.
 
     # Get timestep
@@ -142,8 +142,18 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     dt = min(np.abs(solver_obj.compute_time_step().dat.data)) if mode == 'tohoku' else 0.025
     Dt = Constant(dt)
     iEnd = int(T / (dt * op.rm))
+    if op.gradate or op.wd:                 # Get initial boundary metric
+        P1 = FunctionSpace(mesh_H, "CG", 1)
+        H0 = Function(P1).interpolate(CellSize(mesh_H))
     if op.wd:
-        alpha = Constant(0.5)       # TODO: derive and set wetting-and-drying parameter
+        g = adap.constructGradient(mesh_H, elev_2d)
+        spd = assemble(v * sqrt(inner(g, g)) * dx)
+        gs = np.average(np.abs(spd.dat.data))
+        print('#### gradient = ', gs)
+        ls = np.average([H0.dat.data[i] for i in DirichletBC(P1, 0, 'on_boundary').nodes])
+        print('#### ls = ', ls)
+        alpha = Constant(gs * ls)       # TODO: derive and set wetting-and-drying parameter
+        print('#### alpha = ', alpha.dat.data)
 
     if getData:
         msc.dis('Starting fixed mesh primal run (forwards in time)', op.printStats)
@@ -318,8 +328,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             uv_2d.interpolate(Expression([0, 0]))
             elev_2d.interpolate(eta0)
             epsilon = Function(P0, name="Error indicator")
-        if op.gradate:      # Get initial boundary metric
-            H0 = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(CellSize(mesh_H))
         msc.dis('\nStarting adaptive mesh primal run (forwards in time)', op.printStats)
         adaptTimer = clock()
         while cnt < np.ceil(T / dt):
@@ -485,7 +493,7 @@ if __name__ == '__main__':
                      outputOF=True,
                      orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
                      # orderChange=0,
-                     wd=False,
+                     wd=True,
                      # wd=True if mode == 'tohoku' else False,
                      ndump=10)
     if mode == 'shallow-water':
