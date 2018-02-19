@@ -32,7 +32,17 @@ class MeshSetup:
         # Reading in the shapefile describing the domain boundaries, and creating a GMSH file.
         bdyLoc = 'resources/boundaries/'
         boundaries = qmesh.vector.Shapes()
-        boundaries.fromFile(bdyLoc+'wd_final_bdys.shp' if wd else bdyLoc+'final_bdys.shp')
+        if wd:
+            if self.level > 5:
+                bdyfile = bdyLoc+'wd_final_bdys.shp'
+                coastfile = bdyLoc+'grad_box.shp'
+            else:
+                bdyfile = bdyLoc+'coarse_setup.shp'
+                coastfile = bdyLoc+'box_coarse.shp'
+        else:
+            bdyfile = bdyLoc+'final_bdys.shp'
+            coastfile = bdyLoc+'coastline.shp'
+        boundaries.fromFile(bdyfile)
         loopShapes = qmesh.vector.identifyLoops(boundaries, isGlobal=False, defaultPhysID=1000, fixOpenLoops=True)
         polygonShapes = qmesh.vector.identifyPolygons(loopShapes, meshedAreaPhysID=1,
                                                       smallestNotMeshedArea=5e6, smallestMeshedArea=2e8)
@@ -56,11 +66,11 @@ class MeshSetup:
         gradationRaster_fukushimaCoast.setGradationParameters(self.innerGradation1, self.outerGradation1,
                                                               self.gradationDistance1, 0.05)
         gradationRaster_fukushimaCoast.calculateLinearGradation()
-        gradationRaster_fukushimaCoast.writeNetCDF(self.dirName + 'gradationFukushima.nc')
+        gradationRaster_fukushimaCoast.writeNetCDF(self.dirName+'gradationFukushima.nc')
 
         # Create raster for mesh gradation towards rest of coast (Could be a polygon, line or point)
         gebcoCoastlines = qmesh.vector.Shapes()
-        gebcoCoastlines.fromFile(bdyLoc+'coast_poly.shp' if wd else bdyLoc+'coastline.shp')
+        gebcoCoastlines.fromFile(coastfile)
         gradationRaster_gebcoCoastlines = qmesh.raster.gradationToShapes()
         gradationRaster_gebcoCoastlines.setShapes(gebcoCoastlines)
         gradationRaster_gebcoCoastlines.setRasterBounds(135., 149., 30., 45.)
@@ -68,12 +78,12 @@ class MeshSetup:
         gradationRaster_gebcoCoastlines.setGradationParameters(self.innerGradation2, self.outerGradation2,
                                                                self.gradationDistance2)
         gradationRaster_gebcoCoastlines.calculateLinearGradation()
-        gradationRaster_gebcoCoastlines.writeNetCDF(self.dirName + 'gradationCoastlines.nc')
+        gradationRaster_gebcoCoastlines.writeNetCDF(self.dirName+'gradationCoastlines.nc')
 
         # Create overall mesh metric
         meshMetricRaster = qmesh.raster.meshMetricTools.minimumRaster([gradationRaster_fukushimaCoast,
                                                                        gradationRaster_gebcoCoastlines])
-        meshMetricRaster.writeNetCDF(self.dirName + 'meshMetricRaster.nc')
+        meshMetricRaster.writeNetCDF(self.dirName+'meshMetricRaster.nc')
 
         # Create domain object and write GMSH files
         domain = qmesh.mesh.Domain()
