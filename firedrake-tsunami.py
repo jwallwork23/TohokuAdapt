@@ -1,5 +1,5 @@
 from firedrake import *
-from firedrake_adjoint import *
+# from dolfin_adjoint import *
 
 import numpy as np
 from time import clock
@@ -21,7 +21,6 @@ date = str(now.day)+'-'+str(now.month)+'-'+str(now.year%2000)
 
 # TODO: Homotopy method to consider a convex combination of error estimators?
 # TODO: combine rossby-wave test case into this script
-# TODO: consider dual weighted implicit error, as well as DWR. Perhaps a more generalised setting for error estimates
 
 
 def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mode='tohoku', op=opt.Options()):
@@ -43,17 +42,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         msc.dis('*********************** TOHOKU TSUNAMI SIMULATION *********************\n', op.printStats)
     elif mode == 'shallow-water':
         msc.dis('*********************** SHALLOW WATER TEST PROBLEM ********************\n', op.printStats)
-    bootTimer = primalTimer = dualTimer = errorTimer = adaptTimer = False
+    primalTimer = dualTimer = errorTimer = adaptTimer = False
     if approach in ('implicit', 'DWE'):
         op.orderChange = 1
-
-    # Establish initial mesh resolution
-    if op.bootstrap:
-        bootTimer = clock()
-        msc.dis('\nBootstrapping to establish optimal mesh resolution', op.printStats)
-        startRes = boot.bootstrap(mode, tol=2e10 if mode == 'tohoku' else 1e-3)[0]
-        bootTimer = clock() - bootTimer
-        msc.dis('Bootstrapping run time: %.3fs\n' % bootTimer, op.printStats)
 
     # Establish filenames
     dirName = 'plots/' + mode + '/'
@@ -83,8 +74,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
     q_ = Function(V_H)
     u_, eta_ = q_.split()
-    u_.interpolate(Expression([0, 0]), annotate=False)
-    eta_.interpolate(eta0, annotate=False)
+    u_.interpolate(Expression([0, 0]))
+    eta_.interpolate(eta0)
     q = Function(V_H)
     q.assign(q_)
     u, eta = q.split()
@@ -217,11 +208,11 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             forwardSolver.solve()
 
             if approach in ('implicit', 'DWE'):
-                u_oi.interpolate(u, annotate=False)
-                eta_oi.interpolate(eta, annotate=False)
-                u_oi_.interpolate(u_, annotate=False)
-                eta_oi_.interpolate(eta_, annotate=False)
-                errorSolver.solve(annotate=False)
+                u_oi.interpolate(u)
+                eta_oi.interpolate(eta)
+                u_oi_.interpolate(u_)
+                eta_oi_.interpolate(eta_)
+                errorSolver.solve()
                 e_.assign(e)
 
             # Approximate residual of forward equation and save to HDF5
@@ -384,7 +375,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     loadRes.load(rho_u)
                     loadRes.load(rho_e)
                     loadRes.close()
-            elif approach in ('implicit', 'DWE'):
+            elif approach == 'DWE':
                 with DumbCheckpoint(dirName + 'hdf5/implicitError_' + indexStr, mode=FILE_READ) as loadIE:
                     loadIE.load(e0)
                     loadIE.load(e1)
@@ -547,7 +538,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     # Print to screen timing analyses and plot timeseries
     if op.printStats:
-        msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer, bootTimer)
+        msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer)
     if op.gauges:
         name = approach+date
         for gauge in gauges:
@@ -576,7 +567,6 @@ if __name__ == '__main__':
                          plotpvd=False,
                          gauges=False,
                          tAdapt=False,
-                         bootstrap=False,
                          printStats=True,
                          outputOF=True,
                          orderChange=0,
@@ -589,7 +579,6 @@ if __name__ == '__main__':
                          rm=10,
                          ndump=5,
                          gradate=False,
-                         bootstrap=False,
                          printStats=True,
                          outputOF=True,
                          advect=False,
