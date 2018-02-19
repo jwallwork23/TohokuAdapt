@@ -133,7 +133,7 @@ else:
     from . import conversion
 
 
-def TohokuDomain(level, mesh=None, output=False, wd=False):
+def TohokuDomain(level=0, mesh=None, output=False, wd=False):
     """
     Load the mesh, initial condition and bathymetry profile for the 2D ocean domain of the Tohoku tsunami problem.
     

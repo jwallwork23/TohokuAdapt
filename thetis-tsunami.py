@@ -516,7 +516,8 @@ if __name__ == '__main__':
                   % (i, av, J_h, timing, var))
             textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, J_h, timing, var))
     else:
-        for i in range(6):
+        # for i in range(6):
+        for i in range(1, 6):
             av, rel, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
             print('Run %d:  Mean element count %6d      Relative error %.4e         Timing %.1fs'
                   % (i, av, rel, timing))

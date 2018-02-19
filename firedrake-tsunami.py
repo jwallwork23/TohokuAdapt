@@ -72,7 +72,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         lx = 2 * np.pi
         n = pow(2, startRes)
         mesh_H = SquareMesh(n, n, lx, lx)  # Computational mesh
-        nEle = msh.meshStats(mesh_H)[0]
         x, y = SpatialCoordinate(mesh_H)
         P1_2d = FunctionSpace(mesh_H, "CG", 1)
         eta0 = Function(P1_2d).interpolate(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))))
@@ -178,9 +177,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         started = False
 
     # Initialise adaptivity placeholders and counters
+    nEle, nVerT = msh.meshStats(mesh_H)
+    nVerT *= op.vscale                              # Target #Vertices
     mM = [nEle, nEle]                               # Min/max #Elements
     Sn = nEle
-    nVerT = msh.meshStats(mesh_H)[1] * op.vscale    # Target #Vertices
     t = 0.
     cnt = 0
     save = True
@@ -204,6 +204,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 iA = form.indicator(V_H.sub(1), x1=490e3, x2=640e3, y1=4160e3, y2=4360e3, smooth=True)
             elif mode == 'shallow-water':
                 iA = form.indicator(V_H.sub(1), x1=0., x2=0.5 * np.pi, y1=0.5 * np.pi, y2=1.5 * np.pi, smooth=False)
+            iA.rename("Region of interest")
+            File(dirName+"indicator.pvd").write(iA)
 
         msc.dis('Starting fixed mesh primal run (forwards in time)', op.printStats)
         finished = False
