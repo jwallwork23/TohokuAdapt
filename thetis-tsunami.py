@@ -66,7 +66,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
     q = Function(V_H)
     uv_2d, elev_2d = q.split()
-    elev_2d.interpolate(eta0, annotate=False)
+    elev_2d.interpolate(eta0)
     uv_2d.rename("uv_2d")
     elev_2d.rename("elev_2d")
     if approach in ('residual', 'implicit', 'DWR', 'DWE', 'explicit'):
@@ -152,8 +152,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         print('#### gradient = ', gs)
         ls = np.average([H0.dat.data[i] for i in DirichletBC(P1, 0, 'on_boundary').nodes])
         print('#### ls = ', ls)
-        alpha = Constant(gs * ls)       # TODO: derive and set wetting-and-drying parameter
-        print('#### alpha = ', alpha.dat.data)
+        alpha = Constant(0.5)
+        # alpha = Constant(gs * ls)       # TODO: derive and set wetting-and-drying parameter
+        # print('#### alpha = ', alpha.dat.data)
 
     if getData:
         msc.dis('Starting fixed mesh primal run (forwards in time)', op.printStats)
@@ -162,7 +163,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         # Get solver parameter values and construct solver
         options = solver_obj.options
         options.element_family = op.family
-        options.use_nonlinear_equations = False
+        # options.use_nonlinear_equations = False           # TODO: convert to nonlinear everywhere
         options.use_grad_depth_viscosity_term = False
         options.simulation_export_time = dt * (op.rm-1) if aposteriori else dt * op.ndump
         options.simulation_end_time = T
@@ -487,14 +488,13 @@ if __name__ == '__main__':
                      tAdapt=False,
                      # iso=True,      # TODO: fix isotropic metric gradation
                      iso=False,
-                     # bootstrap=True if approach == 'fixedMesh' else False,
                      bootstrap=False,
                      printStats=True,
                      outputOF=True,
                      orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
                      # orderChange=0,
-                     wd=True,
-                     # wd=True if mode == 'tohoku' else False,
+                     # wd=False,
+                     wd=True if mode == 'tohoku' else False,
                      ndump=10)
     if mode == 'shallow-water':
         op.Tstart = 0.5

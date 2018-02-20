@@ -1,12 +1,11 @@
 from firedrake import *
-# from dolfin_adjoint import *
+from firedrake_adjoint import *
 
 import numpy as np
 from time import clock
 import datetime
 
 import utils.adaptivity as adap
-import utils.bootstrapping as boot
 import utils.error as err
 import utils.forms as form
 import utils.interpolation as inte
@@ -65,8 +64,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         mesh_H = SquareMesh(n, n, lx, lx)  # Computational mesh
         x, y = SpatialCoordinate(mesh_H)
         P1_2d = FunctionSpace(mesh_H, "CG", 1)
-        eta0 = Function(P1_2d).interpolate(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))))
-        b = Function(P1_2d).assign(0.1)
+        eta0 = Function(P1_2d).interpolate(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))), annotate=False)
+        b = Function(P1_2d).assign(0.1, annotate=False)
     else:
         raise NotImplementedError
 
@@ -208,12 +207,12 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             forwardSolver.solve()
 
             if approach in ('implicit', 'DWE'):
-                u_oi.interpolate(u)
-                eta_oi.interpolate(eta)
-                u_oi_.interpolate(u_)
-                eta_oi_.interpolate(eta_)
-                errorSolver.solve()
-                e_.assign(e)
+                u_oi.interpolate(u, annotate=False)
+                eta_oi.interpolate(eta, annotate=False)
+                u_oi_.interpolate(u_, annotate=False)
+                eta_oi_.interpolate(eta_, annotate=False)
+                errorSolver.solve(annotate=False)
+                e_.assign(e, annotate=False)
 
             # Approximate residual of forward equation and save to HDF5
             if cnt % op.rm == 0:
@@ -402,7 +401,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 for j in range(len(epsilon.dat.data)):
                     epsilon.dat.data[j] = max(epsilon.dat.data[j], epsilon_.dat.data[j])
             epsilon.dat.data[:] = np.abs(epsilon.dat.data) * nVerT / (np.abs(assemble(epsilon * dx)) or 1.)  # Normalise
-            epsilon.rename("Error indicator")   # TODO: use L2 normalisation here ^^^ ?
+            epsilon.rename("Error indicator")
 
             # Store error estimates
             with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_CREATE) as saveErr:
