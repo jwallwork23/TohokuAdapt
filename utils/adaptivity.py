@@ -6,9 +6,10 @@ from numpy import linalg as la
 from scipy import linalg as sla
 
 import utils.forms as form
+import utils.options as opt
 
 
-def constructHessian(mesh, V, sol, op=None):
+def constructHessian(mesh, V, sol, op=opt.Options()):
     """
     Reconstructs the hessian of a scalar solution field with respect to the current mesh. The code for the integration 
     by parts reconstruction approach is based on the Monge-Amp\`ere tutorial provided in the Firedrake website 
@@ -20,11 +21,6 @@ def constructHessian(mesh, V, sol, op=None):
     :param op: Options class object providing min/max cell size values.
     :return: reconstructed Hessian associated with ``sol``.
     """
-    if op == None:
-        from . import options
-
-        op = options.Options()
-
     H = Function(V)
     tau = TestFunction(V)
     nhat = FacetNormal(mesh)  # Normal vector
@@ -72,7 +68,7 @@ def constructGradient(mesh, sol):
     return g
 
 
-def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=None):
+def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=opt.Options()):
     """
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``computeSteadyMetric``, from 
     ``adapt.py``, 2016.
@@ -86,17 +82,12 @@ def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=None):
     :param op: Options class object providing min/max cell size values.
     :return: steady metric associated with Hessian H.
     """
-    if op == None:
-        from . import options
-
-        op = options.Options()
-
     ia2 = 1. / pow(op.a, 2)         # Inverse square aspect ratio
     ihmin2 = 1. / pow(op.hmin, 2)   # Inverse square minimal side-length
     ihmax2 = 1. / pow(op.hmax, 2)   # Inverse square maximal side-length
     M = Function(V)
     if op.ntype == 'manual':
-        sol_min = 1e-3  # Minimum tolerated value for the solution field
+        sol_min = 1e-6  # Minimum tolerated value for the solution field
 
         for i in range(mesh.topology.num_vertices()):
 
@@ -144,8 +135,7 @@ def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=None):
             M.dat.data[i] *= pow(det, -1. / (2 * op.p + 2))
             detH.dat.data[i] = pow(det, op.p / (2. * op.p + 2))
 
-        detH_integral = assemble(detH * dx)
-        M *= nVerT / detH_integral                      # Scale by the target number of vertices
+        M *= nVerT / assemble(detH * dx)    # Scale by the target number of vertices and Hessian complexity
         for i in range(mesh.topology.num_vertices()):
             # Find eigenpairs of metric and truncate eigenvalues
             lam, v = la.eig(M.dat.data[i])
@@ -164,7 +154,7 @@ def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=None):
     return M
 
 
-def isotropicMetric(V, f, bdy=False, invert=True, nVerT=None, op=None):
+def isotropicMetric(V, f, bdy=False, invert=True, nVerT=None, op=opt.Options()):
     """
     :arg V: tensor function space on which metric will be defined.
     :arg f: function to adapt to.
@@ -174,11 +164,6 @@ def isotropicMetric(V, f, bdy=False, invert=True, nVerT=None, op=None):
     :param op: Options class object providing min/max cell size values.
     :return: isotropic metric corresponding to the scalar function.
     """
-    if op == None:
-        from . import options
-
-        op = options.Options()
-
     hmin2 = pow(op.hmin, 2)
     hmax2 = pow(op.hmax, 2)
     M = Function(V)
@@ -192,7 +177,11 @@ def isotropicMetric(V, f, bdy=False, invert=True, nVerT=None, op=None):
         g.interpolate(f)
 
     if nVerT:
-        g.dat.data[:] = np.abs(g.dat.data) * nVerT / (np.abs(sqrt(assemble(inner(g, g)*dx))) or 1.)
+        # gmin = min(g.dat.data) if scalar else min(g.dat.data[:, 0]**2 + g.dat.data[:, 1]**2)  # Minimum value
+        gmin = 1e-6     # Minimum tolerated value
+        # gnorm = max(sqrt(assemble(inner(g, g)*dx)), gmin)   # L2 norm
+        gnorm = max(assemble(sqrt(inner(g, g))*dx), gmin)   # Equivalent to scaling by metric complexity
+        g.dat.data[:] = np.abs(g.dat.data) * nVerT / gnorm  # TODO: changes in 3D case
     for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(len(g.dat.data)):
         if scalar:
             if invert:
@@ -444,7 +433,6 @@ def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEul
     :param timestepper: time integration scheme used.
     :param fieldToAdvect: individial enties ('Mij') eigenvalues ('li'), eigenpairs ('ei') or metric itself ('M').
     """
-
     V = M_.function_space()
     mesh = V.mesh()
     M = Function(V)

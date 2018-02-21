@@ -148,13 +148,14 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     if op.wd:
         g = adap.constructGradient(mesh_H, elev_2d)
         spd = assemble(v * sqrt(inner(g, g)) * dx)
-        gs = np.average(np.abs(spd.dat.data))
+        gs = np.min(np.abs(spd.dat.data))
         print('#### gradient = ', gs)
-        ls = np.average([H0.dat.data[i] for i in DirichletBC(P1, 0, 'on_boundary').nodes])
+        ls = np.min([H0.dat.data[i] for i in DirichletBC(P1, 0, 'on_boundary').nodes])
         print('#### ls = ', ls)
-        alpha = Constant(0.5)
-        # alpha = Constant(gs * ls)       # TODO: derive and set wetting-and-drying parameter
-        # print('#### alpha = ', alpha.dat.data)
+        alpha = Constant(gs * ls)       # TODO: how to set wetting-and-drying parameter?
+        print('#### alpha = ', alpha.dat.data)
+        # alpha = Constant(0.5)
+        # exit(23)
 
     if getData:
         msc.dis('Starting fixed mesh primal run (forwards in time)', op.printStats)
@@ -163,7 +164,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         # Get solver parameter values and construct solver
         options = solver_obj.options
         options.element_family = op.family
-        # options.use_nonlinear_equations = False           # TODO: convert to nonlinear everywhere
+        options.use_nonlinear_equations = True if op.wd else False           # TODO: convert to nonlinear everywhere
         options.use_grad_depth_viscosity_term = False
         options.simulation_export_time = dt * (op.rm-1) if aposteriori else dt * op.ndump
         options.simulation_end_time = T
@@ -383,7 +384,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                                 M2 = adap.isotropicMetric(W, spd, invert=False, nVerT=nVerT, op=op)
                             elif approach == 'gradientBased':
                                 g = adap.constructGradient(mesh_H, spd)
-                                g.dat.data[:] = np.abs(g.dat.data)
                                 M2 = adap.isotropicMetric(W, g, invert=False, nVerT=nVerT, op=op)
                             elif approach == 'hessianBased':
                                 H = adap.constructHessian(mesh_H, W, spd, op=op)
@@ -493,8 +493,8 @@ if __name__ == '__main__':
                      outputOF=True,
                      orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
                      # orderChange=0,
-                     # wd=False,
-                     wd=True if mode == 'tohoku' else False,
+                     wd=False,
+                     # wd=True if mode == 'tohoku' else False,
                      ndump=10)
     if mode == 'shallow-water':
         op.Tstart = 0.5
