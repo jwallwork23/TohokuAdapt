@@ -25,7 +25,7 @@ x, y = SpatialCoordinate(mesh)
 # Set initial/boundary conditions and bathymetry
 V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
 # q_ = form.analyticHuang(V)
-q = form.icHuang(V)
+q_ = form.icHuang(V)
 uv0, elev0 = q_.split()
 BCs = {}
 BCs[1] = {'uv': Function(V.sub(0))}     # Zero velocity on South boundary
@@ -44,10 +44,10 @@ options.element_family = op.family
 options.use_nonlinear_equations = True
 options.use_grad_depth_viscosity_term = False
 options.coriolis_frequency = y
-options.timestep = 0.1
 options.timestepper_type = op.timestepper
 solver_obj.create_equations()
-options.timestep = min(np.abs(solver_obj.compute_time_step().dat.data))
+# options.timestep = min(np.abs(solver_obj.compute_time_step().dat.data))
+options.timestep = 0.1
 options.simulation_export_time = options.timestep * op.ndump
 options.simulation_end_time = op.Tend
 options.output_directory = 'plots/rossby-wave'
