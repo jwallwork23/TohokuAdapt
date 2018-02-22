@@ -283,14 +283,16 @@ def icHuang(V, B=0.395):
     return q
 
 def val(X, t):
-   from math import cosh,tanh,exp
-   B = 0.395
-   A = 0.771*B*B
-   v = [0, 0, 0]
-   v[0] = A*(1/((cosh(B*X[0]))**(2)))*0.25*(-9+ 6*X[1]**2)*exp(-0.5*X[1]**2)
-   v[1] = -2*B*tanh(B*X[0])*A*(1/((cosh(B*X[0])**2)))*2*X[1]*exp(-0.5*X[1]**2)
-   v[2] = 0
-   return v
+    """
+    From Matt's code. 
+    """
+    from math import cosh,tanh,exp
+    B = 0.395
+    A = 0.771*B*B
+    v = [0, 0]
+    v[0] = A*(1/((cosh(B*X[0]))**(2)))*0.25*(-9+ 6*X[1]**2)*exp(-0.5*X[1]**2)
+    v[1] = -2*B*tanh(B*X[0])*A*(1/((cosh(B*X[0])**2)))*2*X[1]*exp(-0.5*X[1]**2)
+    return v
 
 
 def strongResidualAD(c, c_, w, Dt, nu=1e-3, timestepper='CrankNicolson'):
