@@ -24,13 +24,18 @@ x, y = SpatialCoordinate(mesh)
 
 # Set initial/boundary conditions and bathymetry
 V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
-q_ = form.analyticHuang(V)
+# q_ = form.analyticHuang(V)
+q = form.icHuang(V)
 uv0, elev0 = q_.split()
 BCs = {}
 BCs[1] = {'uv': Function(V.sub(0))}     # Zero velocity on South boundary
 BCs[2] = {'uv': Function(V.sub(0))}     # Zero velocity on North boundary
 b = Function(FunctionSpace(mesh, "CG", 1)).assign(1.)
 physical_constants['g_grav'] = Constant(1.)
+
+# Matt's parameters
+# timestep 0.1
+# viscosity 1e-6
 
 # Construct solver
 solver_obj = solver2d.FlowSolver2d(mesh, b)
@@ -39,6 +44,7 @@ options.element_family = op.family
 options.use_nonlinear_equations = True
 options.use_grad_depth_viscosity_term = False
 options.coriolis_frequency = y
+options.timestep = 0.1
 options.timestepper_type = op.timestepper
 solver_obj.create_equations()
 options.timestep = min(np.abs(solver_obj.compute_time_step().dat.data))

@@ -248,15 +248,52 @@ def analyticHuang(V, t=0., B=0.395):
     :param B: Parameter controlling amplitude of soliton.
     :return: Initial condition for test problem of Huang.
     """
-    x_phi = " * 0.771 * %f * %f / pow(cosh(%f * (x[0] + 0.395 * %f * %f * %f)), 2)" % (B, B, B, B, B, t)
-    x_dphidx = " * -2 * %f * tanh(%f * (x[0] + 0.395 * %f * %f * %f))" % (B, B, B, B, t)
+    x, y = SpatialCoordinate(V.mesh())
     q = Function(V)
     u, eta = q.split()
+    # u.interpolate([0.25*(-9+6*y*y)*exp(-0.5*y*y)*0.771*B*B/pow(cosh(B*(x+0.395*B*B*t)), 2),
+    #                -0.5*(-9+6*y*y)*exp(-0.5*y*y)*B*tanh(B*(x+0.395*B*B*t))])
+
+
+    x_phi = " * 0.771 * %f * %f / pow(cosh(%f * (x[0] + 0.395 * %f * %f * %f)), 2)" % (B, B, B, B, B, t)
+    x_dphidx = " * -2 * %f * tanh(%f * (x[0] + 0.395 * %f * %f * %f))/ pow(cosh(%f * (x[0] + 0.395 * %f * %f * %f)), 2)" \
+               % (B, B, B, B, t, B, B, B, t)
+
     u.interpolate(Expression(["0.25 * (-9 + 6 * x[1] * x[1]) * exp(-0.5 * x[1] * x[1])" + x_phi,
                               "2 * x[1] * exp(-0.5 * x[1] * x[1])" + x_dphidx]))
     eta.interpolate(Expression("0.25 * (3 + 6 * x[1] * x[1]) * exp(-0.5 * x[1] * x[1])" + x_phi))
 
     return q
+
+def icHuang(V, B=0.395):
+    x, y = SpatialCoordinate(V.mesh())
+    q = Function(V)
+    u, eta = q.split()
+    A = 0.771*B*B
+    u.interpolate([A*(1/((cosh(B*x)**2)))*0.25*(-9+6*y*y)*exp(-0.5*y*y),
+                   -2*B*tanh(B*x)*A*(1/((cosh(B*x)**2)))*2*y*exp(-0.5*y*y)])
+    eta.interpolate(A*(1/((cosh(B*x)**2)))*0.25*(3+6*y*y)*exp(-0.5*y*y))
+
+
+    # x_phi = " * 0.771 * %f * %f / pow(cosh(%f * (x[0] + 0.395 * %f * %f * %f)), 2)" % (B, B, B, B, B, t)
+    # x_dphidx = " * -2 * %f * tanh(%f * (x[0] + 0.395 * %f * %f * %f))/ pow(cosh(%f * (x[0] + 0.395 * %f * %f * %f)), 2)" \
+    #            % (B, B, B, B, t, B, B, B, t)
+    #
+    # u.interpolate(Expression(["0.25 * (-9 + 6 * x[1] * x[1]) * exp(-0.5 * x[1] * x[1])" + x_phi,
+    #                           "2 * x[1] * exp(-0.5 * x[1] * x[1])" + x_dphidx]))
+    # eta.interpolate(Expression("0.25 * (3 + 6 * x[1] * x[1]) * exp(-0.5 * x[1] * x[1])" + x_phi))
+
+    return q
+
+def val(X, t):
+   from math import cosh,tanh,exp
+   B = 0.395
+   A = 0.771*B*B
+   v = [0, 0, 0]
+   v[0] = A*(1/((cosh(B*X[0]))**(2)))*0.25*(-9+ 6*X[1]**2)*exp(-0.5*X[1]**2)
+   v[1] = -2*B*tanh(B*X[0])*A*(1/((cosh(B*X[0])**2)))*2*X[1]*exp(-0.5*X[1]**2)
+   v[2] = 0
+   return v
 
 
 def strongResidualAD(c, c_, w, Dt, nu=1e-3, timestepper='CrankNicolson'):
