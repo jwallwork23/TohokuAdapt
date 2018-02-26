@@ -187,7 +187,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
         # Apply ICs and time integrate
         solver_obj.assign_initial_conditions(elev=eta0)
-        if aposteriori and approach != 'DWF':       # TODO: can these not go somewhere else?
+        if aposteriori and approach != 'DWF':
             if mode == 'tohoku':
                 def selector():
                     t = solver_obj.simulation_time
@@ -388,10 +388,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                             elif approach == 'hessianBased':
                                 H = adap.constructHessian(mesh_H, W, spd, op=op)
                                 M2 = adap.computeSteadyMetric(mesh_H, W, H, spd, nVerT=nVerT, op=op)
-                            M = adap.metricIntersection(mesh_H, W, M, M2) if op.mtype == 'b' else M2
+                            M = adap.metricIntersection(M, M2) if op.mtype == 'b' else M2
             if op.gradate:
                 M_ = adap.isotropicMetric(W, inte.interp(mesh_H, H0)[0], bdy=True, op=op)  # Initial boundary metric
-                M = adap.metricIntersection(mesh_H, W, M, M_, bdy=True)
+                M = adap.metricIntersection(M, M_, bdy=True)
                 adap.metricGradation(mesh_H, M, iso=op.iso)
             if op.plotpvd:
                 File('plots/'+mode+'/mesh.pvd').write(mesh_H.coordinates, time=float(cnt))

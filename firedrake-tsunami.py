@@ -18,7 +18,6 @@ import utils.timeseries as tim
 now = datetime.datetime.now()
 date = str(now.day)+'-'+str(now.month)+'-'+str(now.year%2000)
 
-# TODO: Homotopy method to consider a convex combination of error estimators?
 # TODO: combine rossby-wave test case into this script
 
 
@@ -462,10 +461,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                                 elif approach == 'hessianBased':
                                     H = adap.constructHessian(mesh_H, W, spd, op=op)
                                     M2 = adap.computeSteadyMetric(mesh_H, W, H, spd, nVerT=nVerT, op=op)
-                                M = adap.metricIntersection(mesh_H, W, M, M2) if op.mtype == 'b' else M2
+                                M = adap.metricIntersection(M, M2) if op.mtype == 'b' else M2
                 if op.gradate:
                     M_ = adap.isotropicMetric(W, inte.interp(mesh_H, H0)[0], bdy=True, op=op) # Initial boundary metric
-                    M = adap.metricIntersection(mesh_H, W, M, M_, bdy=True)
+                    M = adap.metricIntersection(M, M_, bdy=True)
                     adap.metricGradation(mesh_H, M, iso=op.iso)
                     # TODO: always gradate to coast
                 if op.advect:

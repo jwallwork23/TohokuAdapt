@@ -381,40 +381,40 @@ def indicator(V, x1=2.5, x2=3.5, y1=0.1, y2=0.9, smooth=False):
     return Function(V).interpolate(Expression(ind))
 
 
-# from firedrake_adjoint import dt, Functional
-#
-#
-# def objectiveFunctionalAD(c, x1=2.5, x2=3.5, y1=0.1, y2=0.9):
-#     """
-#     :arg c: concentration.
-#     :param x1: West-most coordinate for region A (m).
-#     :param x2: East-most coordinate for region A (m).
-#     :param y1: South-most coordinate for region A (m).
-#     :param y2: North-most coordinate for region A (m).
-#     :return: objective functional for advection diffusion problem.
-#     """
-#     return Functional(c * indicator(c.function_space(), x1, x2, y1, y2) * dx * dt)
-#
-#
-# def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=4160e3, y2=4360e3,
-#                           plot=False, smooth=True):
-#     """
-#     :arg q: forward solution tuple.
-#     :param Tstart: first time considered as relevant (s).
-#     :param Tend: last time considered as relevant (s).
-#     :param x1: West-most coordinate for region A (m).
-#     :param x2: East-most coordinate for region A (m).
-#     :param y1: South-most coordinate for region A (m).
-#     :param y2: North-most coordinate for region A (m).
-#     :param plot: toggle plotting of indicator function.
-#     :param smooth: toggle 'smoothening' of the indicator function.
-#     :return: objective functional for shallow water equations.
-#     """
-#     V = q.function_space()
-#     k = Function(V)
-#     ku, ke = k.split()
-#     ke.assign(indicator(V.sub(1), x1, x2, y1, y2))
-#     if plot:
-#         File("plots/adjointBased/kernel.pvd").write(ke)
-#
-#     return Functional(inner(q, k) * dx * dt[Tstart:Tend])
+from firedrake_adjoint import dt, Functional
+
+
+def objectiveFunctionalAD(c, x1=2.5, x2=3.5, y1=0.1, y2=0.9):
+    """
+    :arg c: concentration.
+    :param x1: West-most coordinate for region A (m).
+    :param x2: East-most coordinate for region A (m).
+    :param y1: South-most coordinate for region A (m).
+    :param y2: North-most coordinate for region A (m).
+    :return: objective functional for advection diffusion problem.
+    """
+    return Functional(c * indicator(c.function_space(), x1, x2, y1, y2) * dx * dt)
+
+
+def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=4160e3, y2=4360e3,
+                          plot=False, smooth=True):
+    """
+    :arg q: forward solution tuple.
+    :param Tstart: first time considered as relevant (s).
+    :param Tend: last time considered as relevant (s).
+    :param x1: West-most coordinate for region A (m).
+    :param x2: East-most coordinate for region A (m).
+    :param y1: South-most coordinate for region A (m).
+    :param y2: North-most coordinate for region A (m).
+    :param plot: toggle plotting of indicator function.
+    :param smooth: toggle 'smoothening' of the indicator function.
+    :return: objective functional for shallow water equations.
+    """
+    V = q.function_space()
+    k = Function(V)
+    ku, ke = k.split()
+    ke.assign(indicator(V.sub(1), x1, x2, y1, y2))
+    if plot:
+        File("plots/adjointBased/kernel.pvd").write(ke)
+
+    return Functional(inner(q, k) * dx * dt[Tstart:Tend])

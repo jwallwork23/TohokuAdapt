@@ -317,11 +317,9 @@ def metricGradation(mesh, M, beta=1.4, iso=False):
 
 def localMetricIntersection(M1, M2):
     """
-    Intersect two metrics (i.e. two 2x2 matrices).
-
     :arg M1: first metric to be intersected.
     :arg M2: second metric to be intersected.
-    :return: intersection of metrics M1 and M2.
+    :return: intersection of local metrics M1 and M2.
     """
     # print('#### localMetricIntersection DEBUG: attempting to compute sqrtm of matrix with determinant ', la.det(M1))
     sqM1 = sla.sqrtm(M1)
@@ -330,19 +328,35 @@ def localMetricIntersection(M1, M2):
     return np.transpose(sqM1) * v * [[max(lam[0], 1), 0], [0, max(lam[1], 1)]] * np.transpose(v) * sqM1
 
 
-def metricIntersection(mesh, V, M1, M2, bdy=False):
+def metricIntersection(M1, M2, bdy=False):
     """
-    :arg mesh: current mesh on which variables are defined.
-    :arg V: TensorFunctionSpace defined on current mesh.
     :arg M1: first metric to be intersected.
     :arg M2: second metric to be intersected.
     :param bdy: when True, intersection with M2 only contributes on the domain boundary.
     :return: intersection of metrics M1 and M2.
     """
+    V = M1.function_space()
+    assert V == M2.function_space()
+    M = Function(V)
+    mesh = V.mesh()
     for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(mesh.topology.num_vertices()):
-        M1.dat.data[i] = localMetricIntersection(M1.dat.data[i], M2.dat.data[i])
+        M.dat.data[i] = localMetricIntersection(M1.dat.data[i], M2.dat.data[i])
         # print('#### metricIntersection DEBUG: det(Mi) = ', la.det(M1.dat.data[i]))
-    return M1
+    return M
+
+
+def metricConvexCombination(M1, M2, alpha=0.5):
+    """
+    :arg M1: first metric to be intersected.
+    :arg M2: second metric to be intersected.
+    :param alpha: scalar parameter in [0,1].
+    :return: convex combination of metrics M1 and M2 with parameter alpha.
+    """
+    V = M1.function_space()
+    assert V == M2.function_space()
+    M = Function(V)
+    M.dat.data[:] = alpha * M1.dat.data + (1-alpha) * M2.dat.data
+    return M
 
 
 def symmetricProduct(A, b):
@@ -412,7 +426,7 @@ def isotropicAdvection(M_, h_, w, Dt, n=1, timestepper='ImplicitEuler'):
     # Time integrate
     for i in range(1, n + 1):
         solve(F == 0, h)
-        M_.assign(metricIntersection(mesh, V, M_, isotropicMetric(V, h)))
+        M_.assign(metricIntersection(M_, isotropicMetric(V, h)))
         h_.assign(h)
 
     return M_
@@ -454,7 +468,7 @@ def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEul
         # Time integrate
         for i in range(1, n+1):
             solv.solve()
-            M_.assign(metricIntersection(mesh, V, M_, M))
+            M_.assign(metricIntersection(M_, M))
             if outfile != None:
                 Mfile.write(M_, time=i)
 
@@ -489,7 +503,7 @@ def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEul
             for i in range(mesh.topology.num_vertices()):
                 M.dat.data[i] = v.dat.data[i] * [[max(l.dat.data[i, 0], 1), 0], [0, max(l.dat.data[i, 1], 1)]] \
                               * np.transpose(v.dat.data[i])
-            M_.assign(metricIntersection(mesh, V, M_, M))
+            M_.assign(metricIntersection(M_, M))
             if outfile != None:
                 Mfile.write(M_, time=i)
 
