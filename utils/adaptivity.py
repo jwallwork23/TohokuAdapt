@@ -9,18 +9,18 @@ import utils.forms as form
 import utils.options as opt
 
 
-def constructHessian(mesh, V, sol, op=opt.Options()):
+def constructHessian(f, op=opt.Options()):
     """
     Reconstructs the hessian of a scalar solution field with respect to the current mesh. The code for the integration 
     by parts reconstruction approach is based on the Monge-Amp\`ere tutorial provided in the Firedrake website 
     documentation.
 
-    :arg mesh: current mesh on which variables are defined.
-    :arg V: TensorFunctionSpace defined on ``mesh``.
-    :arg sol: P1 solution field defined on ``mesh``.
+    :arg f: P1 solution field.
     :param op: Options class object providing min/max cell size values.
     :return: reconstructed Hessian associated with ``sol``.
     """
+    mesh = f.function_space().mesh()
+    V = TensorFunctionSpace(mesh, "CG", 1)
     H = Function(V)
     tau = TestFunction(V)
     nhat = FacetNormal(mesh)  # Normal vector
@@ -29,14 +29,14 @@ def constructHessian(mesh, V, sol, op=opt.Options()):
               'ksp_gmres_restart': 20,
               'pc_type': 'sor'}
     if op.mtype == 'parts':
-        Lh = (inner(tau, H) + inner(div(tau), grad(sol))) * dx
-        Lh -= (tau[0, 1] * nhat[1] * sol.dx(0) + tau[1, 0] * nhat[0] * sol.dx(1)) * ds
-        Lh -= (tau[0, 0] * nhat[1] * sol.dx(0) + tau[1, 1] * nhat[0] * sol.dx(1)) * ds  # Term not in Firedrake tutorial
+        Lh = (inner(tau, H) + inner(div(tau), grad(f))) * dx
+        Lh -= (tau[0, 1] * nhat[1] * f.dx(0) + tau[1, 0] * nhat[0] * f.dx(1)) * ds
+        Lh -= (tau[0, 0] * nhat[1] * f.dx(0) + tau[1, 1] * nhat[0] * f.dx(1)) * ds  # Term not in Firedrake tutorial
     else:
-        W = VectorFunctionSpace(mesh, 'CG', 1)
+        W = VectorFunctionSpace(mesh, "CG", 1)
         g = Function(W)
         psi = TestFunction(W)
-        Lg = (inner(g, psi) - inner(grad(sol), psi)) * dx
+        Lg = (inner(g, psi) - inner(grad(f), psi)) * dx
         NonlinearVariationalSolver(NonlinearVariationalProblem(Lg, g), solver_parameters=params).solve()
         Lh = (inner(tau, H) + inner(div(tau), g)) * dx
         Lh -= (tau[0, 1] * nhat[1] * g[0] + tau[1, 0] * nhat[0] * g[1]) * ds
@@ -48,19 +48,18 @@ def constructHessian(mesh, V, sol, op=opt.Options()):
     return H
 
 
-def constructGradient(mesh, sol):
+def constructGradient(f):
     """
     Reconstructs the gradient of a scalar solution field with respect to the current mesh.
 
-    :arg mesh: current mesh on which variables are defined.
-    :arg sol: P1 solution field defined on ``mesh``.
+    :arg f: P1 solution field.
     :param op: Options class object providing min/max cell size values.
-    :return: reconstructed gradient associated with ``sol``.
+    :return: reconstructed gradient associated with f.
     """
-    W = VectorFunctionSpace(mesh, 'CG', 1)
+    W = VectorFunctionSpace(f.function_space().mesh(), "CG", 1)
     g = Function(W)
     psi = TestFunction(W)
-    Lg = (inner(g, psi) - inner(grad(sol), psi)) * dx
+    Lg = (inner(g, psi) - inner(grad(f), psi)) * dx
     NonlinearVariationalSolver(NonlinearVariationalProblem(Lg, g), solver_parameters={'snes_rtol': 1e8,
                                                                                       'ksp_rtol': 1e-5,
                                                                                       'ksp_gmres_restart': 20,
@@ -68,31 +67,31 @@ def constructGradient(mesh, sol):
     return g
 
 
-def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=opt.Options()):
+def computeSteadyMetric(H, f, nVerT=1000., iError=1000., op=opt.Options()):
     """
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``computeSteadyMetric``, from 
     ``adapt.py``, 2016.
 
-    :arg mesh: current mesh on which variables are defined.
-    :arg V: TensorFunctionSpace defined on ``mesh``.
     :arg H: reconstructed Hessian, usually chosen to be associated with ``sol``.
-    :arg sol: P1 solution field defined on ``mesh``.
+    :arg f: P1 solution field.
     :param nVerT: target number of vertices, in the case of Lp normalisation.
     :param iError: inverse of the target error, in the case of manual normalisation.
     :param op: Options class object providing min/max cell size values.
     :return: steady metric associated with Hessian H.
     """
+    V = H.function_space()
+    mesh = V.mesh()
     ia2 = 1. / pow(op.a, 2)         # Inverse square aspect ratio
     ihmin2 = 1. / pow(op.hmin, 2)   # Inverse square minimal side-length
     ihmax2 = 1. / pow(op.hmax, 2)   # Inverse square maximal side-length
     M = Function(V)
     if op.ntype == 'manual':
-        sol_min = 1e-6  # Minimum tolerated value for the solution field
+        f_min = 1e-6  # Minimum tolerated value for the solution field
 
         for i in range(mesh.topology.num_vertices()):
 
             # Generate local Hessian
-            H_loc = H.dat.data[i] * iError / (max(np.sqrt(assemble(sol * sol * dx)), sol_min))  # Avoid round-off error
+            H_loc = H.dat.data[i] * iError / (max(np.sqrt(assemble(f * f * dx)), f_min))  # Avoid round-off error
             mean_diag = 0.5 * (H_loc[0][1] + H_loc[1][0])
             H_loc[0][1] = mean_diag
             H_loc[1][0] = mean_diag
@@ -112,7 +111,7 @@ def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=opt.Optio
             M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
             M.dat.data[i][1, 1] = lam1 * v1[1] * v1[1] + lam2 * v2[1] * v2[1]
     else:
-        detH = Function(FunctionSpace(mesh, 'CG', 1))
+        detH = Function(FunctionSpace(mesh, "CG", 1))
         for i in range(mesh.topology.num_vertices()):
             # Generate local Hessian
             H_loc = H.dat.data[i]
@@ -154,9 +153,8 @@ def computeSteadyMetric(mesh, V, H, sol, nVerT=1000., iError=1000., op=opt.Optio
     return M
 
 
-def isotropicMetric(V, f, bdy=False, invert=True, nVerT=None, op=opt.Options()):
+def isotropicMetric(f, bdy=False, invert=True, nVerT=None, op=opt.Options()):
     """
-    :arg V: tensor function space on which metric will be defined.
     :arg f: function to adapt to.
     :param bdy: toggle boundary metric.
     :param invert: toggle cell size vs error.
@@ -164,11 +162,13 @@ def isotropicMetric(V, f, bdy=False, invert=True, nVerT=None, op=opt.Options()):
     :param op: Options class object providing min/max cell size values.
     :return: isotropic metric corresponding to the scalar function.
     """
+    mesh = f.function_space().mesh()
+    V = TensorFunctionSpace(mesh, "CG", 1)
     hmin2 = pow(op.hmin, 2)
     hmax2 = pow(op.hmax, 2)
     M = Function(V)
     scalar = len(f.ufl_element().value_shape()) == 0
-    g = Function(FunctionSpace(V.mesh(), 'CG', 1) if scalar else VectorFunctionSpace(V.mesh(), 'CG', 1))
+    g = Function(FunctionSpace(mesh, "CG", 1) if scalar else VectorFunctionSpace(mesh, "CG", 1))
     family = f.ufl_element().family()
     deg = f.ufl_element().degree()
     if (family == 'Lagrange') & (deg == 1):
@@ -230,19 +230,19 @@ def anisoRefine(M, direction=0):
 # TODO: test this
 
 
-def metricGradation(mesh, M, beta=1.4, iso=False):
+def metricGradation(M, beta=1.4, iso=False):
     """
     Perform anisotropic metric gradation in the method described in Alauzet 2010, using linear interpolation. Python
     code based on Nicolas Barral's function ``DMPlexMetricGradation2d_Internal`` in ``plex-metGradation.c``, 2017.
 
-    :arg mesh: current mesh on which variables are defined.
-    :arg metric: metric to be gradated.
+    :arg M: metric to be gradated.
     :param beta: scale factor used.
     :param iso: specify whether isotropic or anisotropic mesh adaptivity is being used.
     :return: gradated ``metric``.
     """
 
     # Get vertices and edges of mesh
+    mesh = M.function_space().mesh()
     plex = mesh._plex
     vStart, vEnd = plex.getDepthStratum(0)  # Vertices
     eStart, eEnd = plex.getDepthStratum(1)  # Edges
@@ -389,18 +389,24 @@ def pointwiseMax(f, g):
     :arg g: second field to be considered.
     :return: field taking pointwise maximal values in modulus.
     """
-    fdat = f.dat.data
-    gdat = g.dat.data
     try:
-        assert(len(fdat) == len(gdat))
+        assert(len(f.dat.data) == len(g.dat.data))
     except:
         fu = f.function_space().ufl_element()
         gu = g.function_space().ufl_element()
         raise ValueError("Function space mismatch: ", fu.family(), fu.degree(), " vs. ", gu.family(), gu.degree())
-    for i in range(len(fdat)):
-        if np.abs(gdat[i]) > np.abs(fdat[i]):
-            f.dat.data[i] = gdat[i]
+    for i in range(len(f.dat.data)):
+        if np.abs(g.dat.data[i]) > np.abs(f.dat.data[i]):
+            f.dat.data[i] = g.dat.data[i]
     return f
+
+
+def metricComplexity(M):
+    """
+    :param M: metric field.
+    :return: Complexity thereof. This provides a continuous analogue for the number of mesh vertices.
+    """
+    return assemble(sqrt(det(M)) * dx)
 
 
 def isotropicAdvection(M_, h_, w, Dt, n=1, timestepper='ImplicitEuler'):
@@ -418,7 +424,6 @@ def isotropicAdvection(M_, h_, w, Dt, n=1, timestepper='ImplicitEuler'):
     # Set up variational problem
     V = M_.function_space()
     W = h_.function_space()
-    mesh = W.mesh()
     h = Function(W)
     ht = TestFunction(W)
     F = form.weakResidualAD(h, h_, ht, w, Dt, nu=0., timestepper=timestepper)
@@ -512,14 +517,6 @@ def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEul
         # TODO: investigate and implement other methods. Check BCs work.
 
     return M_
-
-
-def metricComplexity(M):
-    """
-    :param M: metric field.
-    :return: Complexity thereof. This provides a continuous analogue for the number of mesh vertices.
-    """
-    return assemble(sqrt(det(M)) * dx)
 
 
 def adaptTimestepSW(mesh, b, sigma=0.9, g=9.81):

@@ -146,7 +146,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         P1 = FunctionSpace(mesh_H, "CG", 1)
         H0 = Function(P1).interpolate(CellSize(mesh_H))
     if op.wd:
-        g = adap.constructGradient(mesh_H, elev_2d)
+        g = adap.constructGradient(elev_2d)
         spd = assemble(v * sqrt(inner(g, g)) * dx)
         gs = np.min(np.abs(spd.dat.data))
         print('#### gradient = ', gs)
@@ -357,42 +357,42 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     loadErr.load(epsilon)
                     loadErr.close()
                 errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon)[0])
-                M = adap.isotropicMetric(W, errEst, op=op, invert=False, nVerT=nVerT)
+                M = adap.isotropicMetric(errEst, op=op, invert=False, nVerT=nVerT)
             else:
                 if approach == 'norm':
                     v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
                     epsilon = assemble(v * inner(q, q) * dx)
-                    M = adap.isotropicMetric(W, epsilon, invert=False, nVerT=nVerT, op=op)
+                    M = adap.isotropicMetric(epsilon, invert=False, nVerT=nVerT, op=op)
                 elif approach =='fluxJump' and cnt != 0:
                     v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
                     epsilon = err.fluxJumpError(q, v)
-                    M = adap.isotropicMetric(W, epsilon, invert=False, nVerT=nVerT, op=op)
+                    M = adap.isotropicMetric(epsilon, invert=False, nVerT=nVerT, op=op)
                 else:
                     if op.mtype != 's':
                         if approach == 'fieldBased':
-                            M = adap.isotropicMetric(W, elev_2d, invert=False, nVerT=nVerT, op=op)
+                            M = adap.isotropicMetric(elev_2d, invert=False, nVerT=nVerT, op=op)
                         elif approach == 'gradientBased':
-                            g = adap.constructGradient(mesh_H, elev_2d)
-                            M = adap.isotropicMetric(W, g, invert=False, nVerT=nVerT, op=op)
+                            g = adap.constructGradient(elev_2d)
+                            M = adap.isotropicMetric(g, invert=False, nVerT=nVerT, op=op)
                         elif approach == 'hessianBased':
-                            H = adap.constructHessian(mesh_H, W, elev_2d, op=op)
-                            M = adap.computeSteadyMetric(mesh_H, W, H, elev_2d, nVerT=nVerT, op=op)
+                            H = adap.constructHessian(elev_2d, op=op)
+                            M = adap.computeSteadyMetric(H, elev_2d, nVerT=nVerT, op=op)
                     if cnt != 0:    # Can't adapt to zero velocity
                         if op.mtype != 'f':
                             spd = Function(FunctionSpace(mesh_H, 'DG', 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
                             if approach == 'fieldBased':
-                                M2 = adap.isotropicMetric(W, spd, invert=False, nVerT=nVerT, op=op)
+                                M2 = adap.isotropicMetric(spd, invert=False, nVerT=nVerT, op=op)
                             elif approach == 'gradientBased':
-                                g = adap.constructGradient(mesh_H, spd)
-                                M2 = adap.isotropicMetric(W, g, invert=False, nVerT=nVerT, op=op)
+                                g = adap.constructGradient(spd)
+                                M2 = adap.isotropicMetric(g, invert=False, nVerT=nVerT, op=op)
                             elif approach == 'hessianBased':
-                                H = adap.constructHessian(mesh_H, W, spd, op=op)
-                                M2 = adap.computeSteadyMetric(mesh_H, W, H, spd, nVerT=nVerT, op=op)
+                                H = adap.constructHessian(spd, op=op)
+                                M2 = adap.computeSteadyMetric(H, spd, nVerT=nVerT, op=op)
                             M = adap.metricIntersection(M, M2) if op.mtype == 'b' else M2
             if op.gradate:
-                M_ = adap.isotropicMetric(W, inte.interp(mesh_H, H0)[0], bdy=True, op=op)  # Initial boundary metric
+                M_ = adap.isotropicMetric(inte.interp(mesh_H, H0)[0], bdy=True, op=op)  # Initial boundary metric
                 M = adap.metricIntersection(M, M_, bdy=True)
-                adap.metricGradation(mesh_H, M, iso=op.iso)
+                adap.metricGradation(M, iso=op.iso)
             if op.plotpvd:
                 File('plots/'+mode+'/mesh.pvd').write(mesh_H.coordinates, time=float(cnt))
 
