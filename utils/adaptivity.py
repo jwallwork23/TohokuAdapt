@@ -273,8 +273,8 @@ def metricGradation(M, op=opt.Options()):
             v21[1] = - v12[1]
 
             if op.iso:
-                eta2_12 = 1. / pow(1 + np.sqrt(v12[0] * v12[0] + v12[1] * v12[1]) * ln_beta / met1[0, 0], 2)
-                eta2_21 = 1. / pow(1 + np.sqrt(v21[0] * v21[0] + v21[1] * v21[1]) * ln_beta / met2[0, 0], 2)
+                eta2_12 = 1. / pow(1 + np.sqrt(v12[0] * v12[0] + v12[1] * v12[1]) * ln_beta / max(met1[0, 0], 1e-3), 2)
+                eta2_21 = 1. / pow(1 + np.sqrt(v21[0] * v21[0] + v21[1] * v21[1]) * ln_beta / max(met2[0, 0], 1e-3), 2)
                 redMet1 = eta2_12 * met2
                 redMet2 = eta2_21 * met1
             else:
@@ -288,7 +288,7 @@ def metricGradation(M, op=opt.Options()):
             # Calculate difference in order to ascertain whether the metric is modified
             diff = np.abs(met1[0, 0] - redMet1[0, 0]) + np.abs(met1[0, 1] - redMet1[0, 1]) \
                    + np.abs(met1[1, 1] - redMet1[1, 1])
-            diff /= (np.abs(met1[0, 0]) + np.abs(met1[0, 1]) + np.abs(met1[1, 1]))
+            diff /= max(np.abs(met1[0, 0]) + np.abs(met1[0, 1]) + np.abs(met1[1, 1]), 1e-6)
             if diff > 1e-3:
                 M.dat.data[iVer1][0, 0] = redMet1[0, 0]
                 M.dat.data[iVer1][0, 1] = redMet1[0, 1]
@@ -300,7 +300,7 @@ def metricGradation(M, op=opt.Options()):
             # Repeat above process
             diff = np.abs(met2[0, 0] - redMet2[0, 0]) + np.abs(met2[0, 1] - redMet2[0, 1]) \
                    + np.abs(met2[1, 1] - redMet2[1, 1])
-            diff /= (np.abs(met2[0, 0]) + np.abs(met2[0, 1]) + np.abs(met2[1, 1]))
+            diff /= max(np.abs(met2[0, 0]) + np.abs(met2[0, 1]) + np.abs(met2[1, 1]), 1e-6)
             if diff > 1e-3:
                 M.dat.data[iVer2][0, 0] = redMet2[0, 0]
                 M.dat.data[iVer2][0, 1] = redMet2[0, 1]

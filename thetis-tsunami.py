@@ -303,7 +303,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
                     Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt, op=op)
                 rho_u.interpolate(Au)
-                rho_e.interpolate(Ae)   # TODO: No idea why this isn't working in refinement case.
+                rho_e.interpolate(Ae)
                 if op.plotpvd:
                     residualFile.write(rho_u, rho_e, time=float(k))
                 if approach == 'residual':
@@ -479,10 +479,11 @@ if __name__ == '__main__':
     approach, getData, getError, useAdjoint, aposteriori = msc.cheatCodes(input(
 """Choose error estimator from {'norm', 'fieldBased', 'gradientBased', 'hessianBased', 
 'residual', 'explicit', 'fluxJump', 'implicit', 'DWF', 'DWR' or 'DWE'}: """))
-    op = opt.Options(vscale=0.1 if approach == 'DWR' else 0.85,
+    op = opt.Options(vscale=0.1 if approach in ('DWR', 'gradientBased') else 0.85,
                      family='dg-dg',
                      rm=60 if useAdjoint else 30,
-                     gradate=True if useAdjoint else False,
+                     # gradate=True if useAdjoint else False,
+                     gradate=True,
                      advect=False,
                      window=True if approach == 'DWF' else False,
                      outputMetric=False,
@@ -519,7 +520,7 @@ if __name__ == '__main__':
             textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, J_h, timing, var))
     else:
         # for i in range(6):
-        for i in range(5, 6):   # TODO: change back
+        for i in range(1, 6):
             av, rel, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
             print('Run %d:  Mean element count %6d      Relative error %.4e         Timing %.1fs'
                   % (i, av, rel, timing))
