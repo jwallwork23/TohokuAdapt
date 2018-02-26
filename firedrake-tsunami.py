@@ -462,7 +462,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 if op.gradate:
                     M_ = adap.isotropicMetric(inte.interp(mesh_H, H0)[0], bdy=True, op=op) # Initial boundary metric
                     M = adap.metricIntersection(M, M_, bdy=True)
-                    adap.metricGradation(M, iso=op.iso)
+                    adap.metricGradation(M, op=op)
                     # TODO: always gradate to coast
                 if op.advect:
                     M = adap.advectMetric(M, u, 2*Dt, n=3*op.rm)

@@ -225,16 +225,16 @@ def anisoRefine(M, direction=0):
 # TODO: test this
 
 
-def metricGradation(M, beta=1.4, iso=False):
+def metricGradation(M, op=opt.Options()):
     """
     Perform anisotropic metric gradation in the method described in Alauzet 2010, using linear interpolation. Python
     code based on Nicolas Barral's function ``DMPlexMetricGradation2d_Internal`` in ``plex-metGradation.c``, 2017.
 
     :arg M: metric to be gradated.
-    :param beta: scale factor used.
-    :param iso: specify whether isotropic or anisotropic mesh adaptivity is being used.
-    :return: gradated ``metric``.
+    :param op: Options class object providing parameter values.
+    :return: gradated metric.
     """
+    ln_beta = np.log(op.beta)
 
     # Get vertices and edges of mesh
     mesh = M.function_space().mesh()
@@ -245,12 +245,12 @@ def metricGradation(M, beta=1.4, iso=False):
     xy = mesh.coordinates.dat.data
 
     # Establish arrays for storage and a list of tags for vertices
-    v12 = v21 = np.zeros(2)
+    v12 = np.zeros(2)
+    v21 = np.zeros(2)
     # TODO: work only with the upper triangular part for speed
     verTag = np.zeros(numVer) + 1
     correction = True
     i = 0
-    ln_beta = np.log(beta)
 
     while correction & (i < 500):
         i += 1
@@ -272,10 +272,10 @@ def metricGradation(M, beta=1.4, iso=False):
             v21[0] = - v12[0]
             v21[1] = - v12[1]
 
-            if iso:
-                eta2_12 = 1. / pow(1 + (v12[0] * v12[0] + v12[1] * v12[1]) * ln_beta / met1[0, 0], 2)
-                eta2_21 = 1. / pow(1 + (v21[0] * v21[0] + v21[1] * v21[1]) * ln_beta / met2[0, 0], 2)
-                redMet1 = eta2_12 * met2                        # TODO: should this ^^^ be a multiplication?
+            if op.iso:
+                eta2_12 = 1. / pow(1 + np.sqrt(v12[0] * v12[0] + v12[1] * v12[1]) * ln_beta / met1[0, 0], 2)
+                eta2_21 = 1. / pow(1 + np.sqrt(v21[0] * v21[0] + v21[1] * v21[1]) * ln_beta / met2[0, 0], 2)
+                redMet1 = eta2_12 * met2
                 redMet2 = eta2_21 * met1
             else:
                 # Intersect metric with a scaled 'grown' metric to get reduced metric
@@ -306,7 +306,7 @@ def metricGradation(M, beta=1.4, iso=False):
                 M.dat.data[iVer2][0, 1] = redMet2[0, 1]
                 M.dat.data[iVer2][1, 0] = redMet2[1, 0]
                 M.dat.data[iVer2][1, 1] = redMet2[1, 1]
-                verTag[iVer2] = i + 1
+                verTag[iVer2] = i+1
                 correction = True
 
 

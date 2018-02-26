@@ -46,7 +46,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         residualFile = File(dirName + "residual.pvd")
         implicitErrorFile = File(dirName + "implicitError.pvd")
         errorFile = File(dirName + "errorIndicator.pvd")
-        metricFile = File(dirName + 'metric.pvd')
 
     # Load Mesh, initial condition and bathymetry
     if mode == 'tohoku':
@@ -92,6 +91,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
             if mode == 'tohoku':
                 b_h = msh.TohokuDomain(mesh=mesh_h)[2]
+            elif mode == 'shallow-water':
+                b_h = Function(FunctionSpace(mesh_h, "CG", 1)).assign(0.1)
             qh = Function(V_h)
             uh, eh = qh.split()
             uh.rename("Fine velocity")
@@ -300,7 +301,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     Au, Ae = form.strongResidualSW(q_oi, q_oi_, b, Dt, op=op)
                 else:
                     qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
-                    Au, Ae = form.strongResidualSW(qh, q_h, b_h if mode == 'tohoku' else b, Dt, op=op)
+                    Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt, op=op)
                 rho_u.interpolate(Au)
                 rho_e.interpolate(Ae)   # TODO: No idea why this isn't working in refinement case.
                 if op.plotpvd:
@@ -388,11 +389,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                                 M2 = adap.computeSteadyMetric(spd, nVerT=nVerT, op=op)
                             M = adap.metricIntersection(M, M2) if op.mtype == 'b' else M2
             if op.gradate:
-                M.rename("Metric")
-                metricFile.write(M)
                 M_ = adap.isotropicMetric(inte.interp(mesh_H, H0)[0], bdy=True, op=op)  # Initial boundary metric
                 M = adap.metricIntersection(M, M_, bdy=True)
-                adap.metricGradation(M, iso=op.iso)
+                adap.metricGradation(M, op=op)
             if op.plotpvd:
                 File('plots/'+mode+'/mesh.pvd').write(mesh_H.coordinates, time=float(cnt))
 
@@ -483,7 +482,7 @@ if __name__ == '__main__':
     op = opt.Options(vscale=0.1 if approach == 'DWR' else 0.85,
                      family='dg-dg',
                      rm=60 if useAdjoint else 30,
-                     gradate=True if aposteriori else False,
+                     gradate=True if useAdjoint else False,
                      advect=False,
                      window=True if approach == 'DWF' else False,
                      outputMetric=False,
@@ -495,8 +494,8 @@ if __name__ == '__main__':
                      bootstrap=False,
                      printStats=True,
                      outputOF=True,
-                     orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
-                     # orderChange=0,
+                     # orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
+                     orderChange=0,
                      wd=False,
                      # wd=True if mode == 'tohoku' else False,
                      ndump=10)
