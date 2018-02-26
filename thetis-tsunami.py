@@ -106,7 +106,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             dual_u.rename("Adjoint velocity")
             dual_e.rename("Adjoint elevation")
             if mode == 'tohoku':
-                J = form.objectiveFunctionalSW(q, plot=True)
+                J = form.objectiveFunctionalSW(q, plot=True)    # TODO: this no longer exists in pyadjoint
             elif mode == 'shallow-water':
                 J = form.objectiveFunctionalSW(q, Tstart=op.Tstart, x1=0., x2=0.5*np.pi, y1=0.5 * np.pi,y2=1.5 * np.pi,
                                                smooth=False)
@@ -350,7 +350,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     loadVel.close()
 
             # Construct metric
-            W = TensorFunctionSpace(mesh_H, "CG", 1)
             if aposteriori:
                 with DumbCheckpoint(dirName+'hdf5/'+approach+'Error'+msc.indexString(int(cnt/op.rm)), mode=FILE_READ) \
                         as loadErr:
@@ -379,7 +378,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                             M = adap.computeSteadyMetric(H, elev_2d, nVerT=nVerT, op=op)
                     if cnt != 0:    # Can't adapt to zero velocity
                         if op.mtype != 'f':
-                            spd = Function(FunctionSpace(mesh_H, 'DG', 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
+                            spd = Function(FunctionSpace(mesh_H, "DG", 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
                             if approach == 'fieldBased':
                                 M2 = adap.isotropicMetric(spd, invert=False, nVerT=nVerT, op=op)
                             elif approach == 'gradientBased':
@@ -400,7 +399,11 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             if not (((approach in ('fieldBased', 'gradientBased', 'hessianBased') and op.mtype != 'f')
                      or approach == 'fluxJump') and cnt == 0):
                 mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
-                elev_2d, uv_2d, b = inte.interp(mesh_H, elev_2d, uv_2d, b)
+                elev_2d, uv_2d = inte.interp(mesh_H, elev_2d, uv_2d)
+                if mode == 'tohoku':
+                    b = inte.interp(mesh_H, b)[0]
+                elif mode == 'shallow-water':
+                    b = Function(FunctionSpace(mesh_H, "CG", 1)).assign(0.1)
                 uv_2d.rename('uv_2d')
                 elev_2d.rename('elev_2d')
 

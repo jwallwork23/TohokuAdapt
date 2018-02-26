@@ -145,7 +145,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             dual_u.rename("Adjoint velocity")
             dual_e.rename("Adjoint elevation")
             if mode == 'tohoku':
-                J = form.objectiveFunctionalSW(q, plot=True)
+                J = form.objectiveFunctionalSW(q, plot=True)    # TODO: this no longer exists in pyadjoint
             elif mode == 'shallow-water':
                 J = form.objectiveFunctionalSW(q, Tstart=op.Tstart, x1=0., x2=np.pi / 2, y1=0.5 * np.pi, y2=1.5 * np.pi,
                                                smooth=False)
@@ -427,7 +427,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 stepTimer = clock()
 
                 # Construct metric
-                W = TensorFunctionSpace(mesh_H, "CG", 1)
                 if aposteriori:
                     # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
                     with DumbCheckpoint(dirName + 'hdf5/error_' + msc.indexString(cnt), mode=FILE_READ) as loadError:
@@ -481,6 +480,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     q_ = inte.mixedPairInterp(mesh_H, V_H, q_)[0]
                     if mode == 'tohoku':
                         b = inte.interp(mesh_H, b)[0]
+                    elif mode == 'shallow-water':
+                        b = Function(FunctionSpace(mesh_H, "CG", 1)).assign(0.1, annotate=False)
                     q = Function(V_H)
                     u, eta = q.split()
                     u.rename("uv_2d")
@@ -501,10 +502,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 Sn += nEle
                 av = op.printToScreen(cnt/op.rm+1, clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, t, dt)
                 if op.outputOF:
-                    if mode == 'tohoku':
-                        iA = form.indicator(V_H.sub(1), x1=490e3, x2=640e3, y1=4160e3, y2=4360e3, smooth=True)
-                    elif mode == 'shallow-water':
-                        iA = form.indicator(V_H.sub(1), x1=0., x2=0.5*np.pi, y1=0.5*np.pi, y2=1.5*np.pi, smooth=False)
+                    iA = form.indicator(V_H.sub(1), mode=mode, smooth=True if mode == 'tohoku' else False)
 
             # Solve problem at current timestep
             adaptSolver.solve()

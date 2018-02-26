@@ -359,16 +359,31 @@ def weakMetricAdvection(M, M_, Mt, w, Dt, timestepper='ImplicitEuler'):
     return F
 
 
-def indicator(V, x1=2.5, x2=3.5, y1=0.1, y2=0.9, smooth=False):
+def indicator(V, mode='tohoku', smooth=False):
     """
     :arg V: Function space to use.
-    :param x1: West-most coordinate for region A (m).
-    :param x2: East-most coordinate for region A (m).
-    :param y1: South-most coordinate for region A (m).
-    :param y2: North-most coordinate for region A (m).
+    :param mode: test problem considered.
     :param smooth: toggle smoothening.
     :return: ('Smoothened') indicator function for region A = [x1, x2] x [y1, y1]
     """
+    # Define extent of region A
+    if mode == 'tohoku':
+        x1 = 490e3
+        x2 = 640e3
+        y1 = 4160e3
+        y2 = 4360e3
+    elif mode == 'shallow-water':
+        x1 = 2.5
+        x2 = 3.5
+        y1 = 0.1
+        y2 = 0.9
+    elif mode == 'advection-diffusion':
+        x1 = 2.5
+        x2 = 3.5
+        y1 = 0.1
+        y2 = 0.9
+    else:
+        raise NotImplementedError
     if smooth:
         xd = (x2 - x1) / 2
         yd = (y2 - y1) / 2
@@ -377,44 +392,8 @@ def indicator(V, x1=2.5, x2=3.5, y1=0.1, y2=0.9, smooth=False):
               % (x1, x2, y1, y2, x1 + xd, xd, y1 + yd, yd)
     else:
         ind = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' % (x1, x2, y1, y2)
-
-    return Function(V).interpolate(Expression(ind))
-
-
-from firedrake_adjoint import dt, Functional
-
-
-def objectiveFunctionalAD(c, x1=2.5, x2=3.5, y1=0.1, y2=0.9):
-    """
-    :arg c: concentration.
-    :param x1: West-most coordinate for region A (m).
-    :param x2: East-most coordinate for region A (m).
-    :param y1: South-most coordinate for region A (m).
-    :param y2: North-most coordinate for region A (m).
-    :return: objective functional for advection diffusion problem.
-    """
-    return Functional(c * indicator(c.function_space(), x1, x2, y1, y2) * dx * dt)
-
-
-def objectiveFunctionalSW(q, Tstart=300., Tend=1500., x1=490e3, x2=640e3, y1=4160e3, y2=4360e3,
-                          plot=False, smooth=True):
-    """
-    :arg q: forward solution tuple.
-    :param Tstart: first time considered as relevant (s).
-    :param Tend: last time considered as relevant (s).
-    :param x1: West-most coordinate for region A (m).
-    :param x2: East-most coordinate for region A (m).
-    :param y1: South-most coordinate for region A (m).
-    :param y2: North-most coordinate for region A (m).
-    :param plot: toggle plotting of indicator function.
-    :param smooth: toggle 'smoothening' of the indicator function.
-    :return: objective functional for shallow water equations.
-    """
-    V = q.function_space()
-    k = Function(V)
-    ku, ke = k.split()
-    ke.assign(indicator(V.sub(1), x1, x2, y1, y2))
+    iA = Function(V, name="Region of interest").interpolate(Expression(ind))
     if plot:
-        File("plots/adjointBased/kernel.pvd").write(ke)
+        File("plots/adjointBased/kernel.pvd").write(iA)
 
-    return Functional(inner(q, k) * dx * dt[Tstart:Tend])
+    return iA
