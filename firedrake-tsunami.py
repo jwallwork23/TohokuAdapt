@@ -550,38 +550,32 @@ if __name__ == '__main__':
     approach, getData, getError, useAdjoint, aposteriori = msc.cheatCodes(input(
 """Choose error estimator from {'norm', 'fieldBased', 'gradientBased', 'hessianBased', 
 'residual', 'explicit', 'fluxJump', 'implicit', 'DWF', 'DWR' or 'DWE'}: """))
-    if mode == 'tohoku':
-        op = opt.Options(vscale=0.1 if approach == 'DWR' else 0.85,
-                         # family='dg-dg',
-                         rm=60 if useAdjoint else 30,
-                         gradate=True if (useAdjoint or approach == 'explicit') else False,
-                         advect=False,
-                         window=True if approach == 'DWF' else False,
-                         outputMetric=False,
-                         plotpvd=False,
-                         gauges=False,
-                         tAdapt=False,
-                         printStats=True,
-                         outputOF=True,
-                         orderChange=0,
-                         ndump=10)
-    elif mode == 'shallow-water':
-        op = opt.Options(Tstart=0.5,
-                         Tend=2.5,
-                         hmin=5e-2,
-                         hmax=1.,
-                         rm=10,
-                         ndump=5,
-                         gradate=False,
-                         printStats=True,
-                         outputOF=True,
-                         advect=False,
-                         window=True if approach == 'DWF' else False,
-                         vscale=0.4 if useAdjoint else 0.85,
-                         orderChange=0,
-                         plotpvd=False)
-    else:
-        raise NotImplementedError
+    op = opt.Options(vscale=0.1 if approach == 'DWR' else 0.85,
+                     family='dg-dg',
+                     rm=60 if useAdjoint else 30,
+                     gradate=True if useAdjoint else False,
+                     advect=False,
+                     window=True if approach == 'DWF' else False,
+                     outputMetric=False,
+                     plotpvd=True,
+                     gauges=False,
+                     tAdapt=False,
+                     iso=False if approach in ('gradientBased', 'hessianBased') else True,
+                     bootstrap=False,
+                     printStats=True,
+                     outputOF=True,
+                     orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
+                     # orderChange=0,
+                     wd=False,
+                     # wd=True if mode == 'tohoku' else False,
+                     ndump=10)
+    if mode == 'shallow-water':
+        op.Tstart = 0.5
+        op.Tend = 2.5
+        op.hmin = 5e-2
+        op.hmax = 1.
+        op.rm = 20 if useAdjoint else 10
+        op.ndump = 10
 
     # Run simulation(s)
     minRes = 0 if mode == 'tohoku' else 1

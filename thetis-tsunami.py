@@ -489,13 +489,12 @@ if __name__ == '__main__':
                      plotpvd=True,
                      gauges=False,
                      tAdapt=False,
-                     # iso=True,      # TODO: fix isotropic metric gradation
-                     iso=False,
+                     iso=False if approach in ('gradientBased', 'hessianBased') else True,
                      bootstrap=False,
                      printStats=True,
                      outputOF=True,
-                     # orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
-                     orderChange=0,
+                     orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
+                     # orderChange=0,
                      wd=False,
                      # wd=True if mode == 'tohoku' else False,
                      ndump=10)
