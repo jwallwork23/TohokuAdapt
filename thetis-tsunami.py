@@ -46,6 +46,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         residualFile = File(dirName + "residual.pvd")
         implicitErrorFile = File(dirName + "implicitError.pvd")
         errorFile = File(dirName + "errorIndicator.pvd")
+        metricFile = File(dirName + 'metric.pvd')
 
     # Load Mesh, initial condition and bathymetry
     if mode == 'tohoku':
@@ -374,8 +375,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                             g = adap.constructGradient(elev_2d)
                             M = adap.isotropicMetric(g, invert=False, nVerT=nVerT, op=op)
                         elif approach == 'hessianBased':
-                            H = adap.constructHessian(elev_2d, op=op)
-                            M = adap.computeSteadyMetric(H, elev_2d, nVerT=nVerT, op=op)
+                            M = adap.computeSteadyMetric(elev_2d, nVerT=nVerT, op=op)
                     if cnt != 0:    # Can't adapt to zero velocity
                         if op.mtype != 'f':
                             spd = Function(FunctionSpace(mesh_H, "DG", 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
@@ -385,10 +385,11 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                                 g = adap.constructGradient(spd)
                                 M2 = adap.isotropicMetric(g, invert=False, nVerT=nVerT, op=op)
                             elif approach == 'hessianBased':
-                                H = adap.constructHessian(spd, op=op)
-                                M2 = adap.computeSteadyMetric(H, spd, nVerT=nVerT, op=op)
+                                M2 = adap.computeSteadyMetric(spd, nVerT=nVerT, op=op)
                             M = adap.metricIntersection(M, M2) if op.mtype == 'b' else M2
             if op.gradate:
+                M.rename("Metric")
+                metricFile.write(M)
                 M_ = adap.isotropicMetric(inte.interp(mesh_H, H0)[0], bdy=True, op=op)  # Initial boundary metric
                 M = adap.metricIntersection(M, M_, bdy=True)
                 adap.metricGradation(M, iso=op.iso)
@@ -486,7 +487,7 @@ if __name__ == '__main__':
                      advect=False,
                      window=True if approach == 'DWF' else False,
                      outputMetric=False,
-                     plotpvd=False,
+                     plotpvd=True,
                      gauges=False,
                      tAdapt=False,
                      # iso=True,      # TODO: fix isotropic metric gradation
@@ -520,7 +521,7 @@ if __name__ == '__main__':
             textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, J_h, timing, var))
     else:
         # for i in range(6):
-        for i in range(1, 6):
+        for i in range(5, 6):   # TODO: change back
             av, rel, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
             print('Run %d:  Mean element count %6d      Relative error %.4e         Timing %.1fs'
                   % (i, av, rel, timing))

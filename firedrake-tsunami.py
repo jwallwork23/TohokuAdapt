@@ -447,8 +447,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                                 g = adap.constructGradient(eta)
                                 M = adap.isotropicMetric(g, invert=False, nVerT=nVerT, op=op)
                             elif approach == 'hessianBased':
-                                H = adap.constructHessian(eta, op=op)
-                                M = adap.computeSteadyMetric(H, eta, nVerT=nVerT, op=op)
+                                M = adap.computeSteadyMetric(eta, nVerT=nVerT, op=op)
                         if cnt != 0:    # Can't adapt to zero velocity
                             if op.mtype != 'f':
                                 spd = Function(FunctionSpace(mesh_H, 'DG', 1)).interpolate(sqrt(dot(u, u)))
@@ -458,8 +457,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                                     g = adap.constructGradient(spd)
                                     M2 = adap.isotropicMetric(g, invert=False, nVerT=nVerT, op=op)
                                 elif approach == 'hessianBased':
-                                    H = adap.constructHessian(spd, op=op)
-                                    M2 = adap.computeSteadyMetric(H, spd, nVerT=nVerT, op=op)
+                                    M2 = adap.computeSteadyMetric(spd, nVerT=nVerT, op=op)
                                 M = adap.metricIntersection(M, M2) if op.mtype == 'b' else M2
                 if op.gradate:
                     M_ = adap.isotropicMetric(inte.interp(mesh_H, H0)[0], bdy=True, op=op) # Initial boundary metric

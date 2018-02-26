@@ -9,45 +9,6 @@ import utils.forms as form
 import utils.options as opt
 
 
-def constructHessian(f, op=opt.Options()):
-    """
-    Reconstructs the hessian of a scalar solution field with respect to the current mesh. The code for the integration 
-    by parts reconstruction approach is based on the Monge-Amp\`ere tutorial provided in the Firedrake website 
-    documentation.
-
-    :arg f: P1 solution field.
-    :param op: Options class object providing min/max cell size values.
-    :return: reconstructed Hessian associated with ``sol``.
-    """
-    mesh = f.function_space().mesh()
-    V = TensorFunctionSpace(mesh, "CG", 1)
-    H = Function(V)
-    tau = TestFunction(V)
-    nhat = FacetNormal(mesh)  # Normal vector
-    params = {'snes_rtol': 1e8,
-              'ksp_rtol': 1e-5,
-              'ksp_gmres_restart': 20,
-              'pc_type': 'sor'}
-    if op.mtype == 'parts':
-        Lh = (inner(tau, H) + inner(div(tau), grad(f))) * dx
-        Lh -= (tau[0, 1] * nhat[1] * f.dx(0) + tau[1, 0] * nhat[0] * f.dx(1)) * ds
-        Lh -= (tau[0, 0] * nhat[1] * f.dx(0) + tau[1, 1] * nhat[0] * f.dx(1)) * ds  # Term not in Firedrake tutorial
-    else:
-        W = VectorFunctionSpace(mesh, "CG", 1)
-        g = Function(W)
-        psi = TestFunction(W)
-        Lg = (inner(g, psi) - inner(grad(f), psi)) * dx
-        NonlinearVariationalSolver(NonlinearVariationalProblem(Lg, g), solver_parameters=params).solve()
-        Lh = (inner(tau, H) + inner(div(tau), g)) * dx
-        Lh -= (tau[0, 1] * nhat[1] * g[0] + tau[1, 0] * nhat[0] * g[1]) * ds
-        Lh -= (tau[0, 0] * nhat[1] * g[0] + tau[1, 1] * nhat[0] * g[1]) * ds
-    H_prob = NonlinearVariationalProblem(Lh, H)
-    H_solv = NonlinearVariationalSolver(H_prob, solver_parameters=params)
-    H_solv.solve()
-
-    return H
-
-
 def constructGradient(f):
     """
     Reconstructs the gradient of a scalar solution field with respect to the current mesh.
@@ -67,18 +28,52 @@ def constructGradient(f):
     return g
 
 
-def computeSteadyMetric(H, f, nVerT=1000., iError=1000., op=opt.Options()):
+def constructHessian(f, op=opt.Options()):
+    """
+    Reconstructs the hessian of a scalar solution field with respect to the current mesh. The code for the integration 
+    by parts reconstruction approach is based on the Monge-Amp\`ere tutorial provided in the Firedrake website 
+    documentation.
+
+    :arg f: P1 solution field.
+    :param op: Options class object providing min/max cell size values.
+    :return: reconstructed Hessian associated with ``sol``.
+    """
+    mesh = f.function_space().mesh()
+    V = TensorFunctionSpace(mesh, "CG", 1)
+    H = Function(V)
+    tau = TestFunction(V)
+    nhat = FacetNormal(mesh)  # Normal vector
+    if op.mtype == 'parts':
+        Lh = (inner(tau, H) + inner(div(tau), grad(f))) * dx
+        Lh -= (tau[0, 1] * nhat[1] * f.dx(0) + tau[1, 0] * nhat[0] * f.dx(1)) * ds
+        Lh -= (tau[0, 0] * nhat[1] * f.dx(0) + tau[1, 1] * nhat[0] * f.dx(1)) * ds  # Term not in Firedrake tutorial
+    else:
+        g = constructGradient(f)
+        Lh = (inner(tau, H) + inner(div(tau), g)) * dx
+        Lh -= (tau[0, 1] * nhat[1] * g[0] + tau[1, 0] * nhat[0] * g[1]) * ds
+        Lh -= (tau[0, 0] * nhat[1] * g[0] + tau[1, 1] * nhat[0] * g[1]) * ds
+    H_prob = NonlinearVariationalProblem(Lh, H)
+    NonlinearVariationalSolver(H_prob, solver_parameters={'snes_rtol': 1e8,
+                                                          'ksp_rtol': 1e-5,
+                                                          'ksp_gmres_restart': 20,
+                                                          'pc_type': 'sor'}).solve()
+    return H
+
+
+def computeSteadyMetric(f, H=None, nVerT=1000., iError=1000., op=opt.Options()):
     """
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``computeSteadyMetric``, from 
     ``adapt.py``, 2016.
 
-    :arg H: reconstructed Hessian, usually chosen to be associated with ``sol``.
     :arg f: P1 solution field.
+    :arg H: reconstructed Hessian, usually chosen to be associated with ``sol``.
     :param nVerT: target number of vertices, in the case of Lp normalisation.
     :param iError: inverse of the target error, in the case of manual normalisation.
     :param op: Options class object providing min/max cell size values.
     :return: steady metric associated with Hessian H.
     """
+    if not H:
+        H = constructHessian(f, op=op)
     V = H.function_space()
     mesh = V.mesh()
     ia2 = 1. / pow(op.a, 2)         # Inverse square aspect ratio
