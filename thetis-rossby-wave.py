@@ -6,8 +6,8 @@ import utils.options as opt
 
 # Get parameters
 op = opt.Options(Tend=120.,
-                 family='dg-cg',
-                 ndump=6)
+                 family='dg-dg',
+                 ndump=12)
 physical_constants['g_grav'] = Constant(1.)
 dirName = 'plots/rossby-wave/'
 dt = 0.1    # In Matt's parameters timestep=0.1
@@ -40,7 +40,7 @@ while t < op.Tend:
     t += op.ndump * dt
 
 # Solve problem numerically
-q_ = form.icHuang(V)
+q_ = form.solutionHuang(V, t=0.)
 uv0, elev0 = q_.split()
 BCs = {}
 BCs[1] = {'uv': Function(V.sub(0))}     # Zero velocity on South boundary
