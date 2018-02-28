@@ -265,6 +265,24 @@ def analyticHuang(V, t=0., B=0.395):
 
     return q
 
+def solutionHuang(V, t=0., B=0.395):
+    x, y = SpatialCoordinate(V.mesh())
+    q = Function(V)
+    u, eta = q.split()
+
+    A = 0.771 * B * B
+    W = FunctionSpace(V.mesh(), V.sub(0).ufl_element().family(), V.sub(0).ufl_element().degree())
+    u0 = Function(W).interpolate(
+        A * (1 / (cosh(B * (x + B * B * t)) ** 2)) * 0.25 * (-9 + 6 * y * y) * exp(-0.5 * y * y))
+    u1 = Function(W).interpolate(
+        -2 * B * tanh(B * (x + B * B * t)) * A * (1 / (cosh(B * (x + B * B * t)) ** 2)) * 2 * y * exp(-0.5 * y * y))
+    u.dat.data[:,0] = u0.dat.data
+    u.dat.data[:,1] = u1.dat.data
+    eta.interpolate(A*(1/(cosh(B*(x + B * B * t))**2))*0.25*(3+6*y*y)*exp(-0.5*y*y))
+
+    return q
+
+
 def icHuang(V, B=0.395):
     x, y = SpatialCoordinate(V.mesh())
     q = Function(V)
@@ -272,10 +290,8 @@ def icHuang(V, B=0.395):
 
     A = 0.771 * B * B
     W = FunctionSpace(V.mesh(), V.sub(0).ufl_element().family(), V.sub(0).ufl_element().degree())
-    u0 = Function(W)
-    u1 = Function(W)
-    u0.interpolate(A * (1 / ((cosh(B * x) ** 2))) * 0.25 * (-9 + 6 * y * y) * exp(-0.5 * y * y))
-    u1.interpolate(-2 * B * tanh(B * x) * A * (1 / ((cosh(B * x) ** 2))) * 2 * y * exp(-0.5 * y * y))
+    u0 = Function(W).interpolate(A * (1 / ((cosh(B * x) ** 2))) * 0.25 * (-9 + 6 * y * y) * exp(-0.5 * y * y))
+    u1 = Function(W).interpolate(-2 * B * tanh(B * x) * A * (1 / ((cosh(B * x) ** 2))) * 2 * y * exp(-0.5 * y * y))
     u.dat.data[:,0] = u0.dat.data
     u.dat.data[:,1] = u1.dat.data
     eta.interpolate(A*(1/((cosh(B*x)**2)))*0.25*(3+6*y*y)*exp(-0.5*y*y))

@@ -143,7 +143,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     solver_obj.create_equations()
     dt = min(np.abs(solver_obj.compute_time_step().dat.data)) if mode == 'tohoku' else 0.025
     Dt = Constant(dt)
-    iEnd = int(T / (dt * op.rm))
+    iEnd = int(np.ceil(T / (dt * op.rm)))
     if op.gradate or op.wd:                 # Get initial boundary metric
         P1 = FunctionSpace(mesh_H, "CG", 1)
         H0 = Function(P1).interpolate(CellSize(mesh_H))
@@ -264,7 +264,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     loadElev.load(elev_2d)
                     loadElev.close()
             else:
-                i1 = 0 if k == 0 else 2*k
+                i1 = 2*k
                 i2 = 0 if k == 0 else 2*k+1
                 with DumbCheckpoint(dirName+'hdf5/Velocity2d_'+msc.indexString(i1), mode=FILE_READ) as loadVel:
                     loadVel.load(uv_2d)
@@ -482,15 +482,16 @@ if __name__ == '__main__':
     op = opt.Options(vscale=0.1 if approach in ('DWR', 'gradientBased') else 0.85,
                      family='dg-dg',
                      rm=60 if useAdjoint else 30,
-                     # gradate=True if useAdjoint else False,
-                     gradate=True,
+                     gradate=True if useAdjoint else False,
+                     # gradate=True,
                      advect=False,
                      window=True if approach == 'DWF' else False,
                      outputMetric=False,
                      plotpvd=True,
                      gauges=False,
                      tAdapt=False,
-                     iso=False if approach in ('gradientBased', 'hessianBased') else True,
+                     # iso=False if approach in ('gradientBased', 'hessianBased') else True,
+                     iso=False,
                      bootstrap=False,
                      printStats=True,
                      outputOF=True,
