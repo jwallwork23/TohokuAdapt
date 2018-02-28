@@ -28,7 +28,6 @@ b = Function(FunctionSpace(mesh, "CG", 1)).assign(1.)
 
 # Plot analytic solution
 t = 0.
-cnt = 0
 solFile = File(dirName + 'analytic.pvd')
 print('Generating analytic solution')
 while t < op.Tend:
@@ -36,11 +35,9 @@ while t < op.Tend:
     u, eta = q.split()
     u.rename('Analytic fluid velocity')
     eta.rename('Analytic free surface')
-    if cnt % op.ndump == 0:
-        solFile.write(u, eta, time=t)
-        print('t = %.1fs' % t)
-    t += dt
-    cnt += 1
+    solFile.write(u, eta, time=t)
+    print('t = %.1fs' % t)
+    t += op.ndump * dt
 
 # Solve problem numerically
 q_ = form.icHuang(V)
