@@ -1,5 +1,7 @@
 from firedrake import *
 
+import numpy as np
+
 import utils.options as opt
 
 
@@ -292,10 +294,10 @@ def indicator(V, mode='tohoku', smooth=False):
         y1 = 4160e3
         y2 = 4360e3
     elif mode == 'shallow-water':
-        x1 = 2.5
-        x2 = 3.5
-        y1 = 0.1
-        y2 = 0.9
+        x1 = 0.
+        x2 = 0.5 * np.pi
+        y1 = 0.5 * np.pi
+        y2 = 1.5 * np.pi
     elif mode == 'advection-diffusion':
         x1 = 2.5
         x2 = 3.5

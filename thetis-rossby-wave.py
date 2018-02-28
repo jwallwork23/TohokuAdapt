@@ -54,7 +54,7 @@ solver_obj = solver2d.FlowSolver2d(mesh, b)
 options = solver_obj.options
 options.element_family = op.family
 options.use_nonlinear_equations = True
-options.use_grad_depth_viscosity_term = False       # In Matt's parameters viscosity=1e-6
+options.use_grad_depth_viscosity_term = True       # In Matt's parameters viscosity=1e-6
 options.coriolis_frequency = f
 options.simulation_export_time = op.dt * op.ndump
 options.simulation_end_time = op.Tend
