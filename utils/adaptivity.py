@@ -273,8 +273,10 @@ def metricGradation(M, op=opt.Options()):
             v21[1] = - v12[1]
 
             if op.iso:
-                eta2_12 = 1. / pow(1 + np.sqrt(v12[0] * v12[0] + v12[1] * v12[1]) * ln_beta / met1[0, 0], 2)
-                eta2_21 = 1. / pow(1 + np.sqrt(v21[0] * v21[0] + v21[1] * v21[1]) * ln_beta / met2[0, 0], 2)
+                eta2_12 = 1. / pow(1 + (v12[0] * v12[0] + v12[1] * v12[1]) * ln_beta / met1[0, 0], 2)
+                eta2_21 = 1. / pow(1 + (v21[0] * v21[0] + v21[1] * v21[1]) * ln_beta / met2[0, 0], 2)
+                # print('#### metricGradation DEBUG: 1,1 entries ', met1[0, 0], met2[0, 0])
+                print('#### metricGradation DEBUG: scale factors', eta2_12, eta2_21)
                 redMet1 = eta2_21 * met2
                 redMet2 = eta2_12 * met1
             else:
@@ -298,7 +300,7 @@ def metricGradation(M, op=opt.Options()):
                 verTag[iVer1] = i+1
                 correction = True
 
-            # Repeat above process
+            # Repeat above process using other reduced metric
             diff = np.abs(met2[0, 0] - redMet2[0, 0]) + np.abs(met2[0, 1] - redMet2[0, 1]) \
                    + np.abs(met2[1, 1] - redMet2[1, 1])
             diff /= (np.abs(met2[0, 0]) + np.abs(met2[0, 1]) + np.abs(met2[1, 1]))
@@ -333,8 +335,7 @@ def metricIntersection(M1, M2, bdy=False):
     """
     V = M1.function_space()
     assert V == M2.function_space()
-    M = Function(V)
-    M.assign(M1)
+    M = Function(V).assign(M1)
     mesh = V.mesh()
     for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(mesh.topology.num_vertices()):
         M.dat.data[i] = localMetricIntersection(M1.dat.data[i], M2.dat.data[i])

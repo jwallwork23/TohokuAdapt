@@ -195,7 +195,7 @@ def solutionHuang(V, t=0., B=0.395):
     :arg V: Mixed function space upon which to define solutions.
     :arg t: current time.
     :param B: Parameter controlling amplitude of soliton.
-    :return: Initial condition for test problem of Huang.
+    :return: Analytic solution for test problem of Huang.
     """
     x, y = SpatialCoordinate(V.mesh())
     q = Function(V)
