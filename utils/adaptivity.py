@@ -281,6 +281,7 @@ def metricGradation(M, op=opt.Options()):
                 # Intersect metric with a scaled 'grown' metric to get reduced metric
                 eta2_12 = 1. / pow(1 + symmetricProduct(met1, v12) * ln_beta, 2)
                 eta2_21 = 1. / pow(1 + symmetricProduct(met2, v21) * ln_beta, 2)
+                # print('#### metricGradation DEBUG: scale factors', eta2_12, eta2_21)
                 # print('#### metricGradation DEBUG: determinants', la.det(met1), la.det(met2))
                 redMet1 = localMetricIntersection(met1, eta2_21 * met2)
                 redMet2 = localMetricIntersection(met2, eta2_12 * met1)
@@ -333,6 +334,7 @@ def metricIntersection(M1, M2, bdy=False):
     V = M1.function_space()
     assert V == M2.function_space()
     M = Function(V)
+    M.assign(M1)
     mesh = V.mesh()
     for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(mesh.topology.num_vertices()):
         M.dat.data[i] = localMetricIntersection(M1.dat.data[i], M2.dat.data[i])
