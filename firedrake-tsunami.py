@@ -81,7 +81,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     eta.rename("elev_2d")
 
     # Establish finer mesh (h < H) upon which to approximate error
-    if not op.orderChange:
+    if op.orderChange == 0:
         mesh_h = adap.isoP2(mesh_H)
         V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
         if mode == 'tohoku':
@@ -92,16 +92,12 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         eh.rename("Fine elevation")
 
     # Specify physical and solver parameters
-    dt = adap.adaptTimestepSW(mesh_H, b) if mode == 'tohoku' else 0.1        # TODO: change this
+    dt = adap.adaptTimestepSW(mesh_H, b) if mode == 'tohoku' else 0.01        # TODO: change this
     msc.dis('Using initial timestep = %4.3fs\n' % dt, op.printStats)
     Dt = Constant(dt)
     T = op.Tend
-    if op.tAdapt:
-        # TODO: t-adaptive goal-based needs to acknowledge timestep change in initial run
-        raise NotImplementedError("Mesh adaptive routines not quite calibrated for t-adaptivity")
-    else:
-        iStart = int(op.Tstart / dt)
-        iEnd = int(np.ceil(T / dt))
+    iStart = int(op.Tstart / dt)
+    iEnd = int(np.ceil(T / dt))
 
     # Get initial gauge values
     if op.gauges:
@@ -129,7 +125,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             rho_u, rho_e = rho.split()
             rho_u.rename("Velocity residual")
             rho_e.rename("Elevation residual")
-            if useAdjoint:
+            if useAdjoint and op.orderChange == 0:
                 dual_h = Function(V_h)
                 dual_h_u, dual_h_e = dual_h.split()
                 dual_h_u.rename('Fine adjoint velocity')
@@ -144,13 +140,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             dual_u, dual_e = dual.split()
             dual_u.rename("Adjoint velocity")
             dual_e.rename("Adjoint elevation")
-            if mode == 'tohoku':
-                J = form.objectiveFunctionalSW(q, plot=True)    # TODO: this no longer exists in pyadjoint
-            elif mode == 'shallow-water':
-                J = form.objectiveFunctionalSW(q, Tstart=op.Tstart, x1=0., x2=np.pi / 2, y1=0.5 * np.pi, y2=1.5 * np.pi,
-                                               smooth=False)
-            else:
-                raise NotImplementedError
         if approach in ('implicit', 'DWE'):
             e_ = Function(V_oi)
             e = Function(V_oi)
@@ -161,10 +150,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             (et0, et1) = (as_vector((et[0], et[1])), et[2])
             normal = FacetNormal(mesh_H)
 
-    if op.outputOF:
-        J_trap = 0.
-        started = False
-
     # Initialise adaptivity placeholders and counters
     nEle, nVerT = msh.meshStats(mesh_H)
     nVerT *= op.vscale                              # Target #Vertices
@@ -173,6 +158,17 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     t = 0.
     cnt = 0
     save = True
+
+    # Calculate OF value
+    switch = Constant(0.)
+    k = Function(V_H)
+    k0, k1 = k.split()
+    k1.assign(form.indicator(V_H.sub(1), mode=mode))
+    if useAdjoint:
+        Jfunc = Functional(switch * inner(k, q_) * dx)
+        Jfuncs = [Jfunc]
+    Jval = assemble(switch * inner(k, q_) * dx)
+    Jvals = [Jval]
 
     if getData:
         # Define variational problem
@@ -188,16 +184,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             errorProblem = NonlinearVariationalProblem(B - L + B_ - I, e)
             errorSolver = NonlinearVariationalSolver(errorProblem, solver_parameters=op.params)
 
-        if op.outputOF:
-            if mode == 'tohoku':
-                iA = form.indicator(V_H.sub(1), x1=490e3, x2=640e3, y1=4160e3, y2=4360e3, smooth=True)
-            elif mode == 'shallow-water':
-                iA = form.indicator(V_H.sub(1), x1=0., x2=0.5 * np.pi, y1=0.5 * np.pi, y2=1.5 * np.pi, smooth=False)
-            iA.rename("Region of interest")
-            File(dirName+"indicator.pvd").write(iA)
-
         msc.dis('Starting fixed mesh primal run (forwards in time)', op.printStats)
-        finished = False
         primalTimer = clock()
         if op.plotpvd:
             forwardFile.write(u, eta, time=t)
@@ -256,26 +243,21 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
             # Update solution at previous timestep
             q_.assign(q)
+            if t >= op.Tstart:
+                switch.assign(1.)
+            if useAdjoint:
+                Jfunc = Functional(switch * inner(k, q_) * dx)
+                Jfuncs.append(Jfunc)
+            if approach == 'fixedMesh':
+                Jval = assemble(switch * inner(k, q_) * dx)
+                Jvals.append(Jval)
 
             # Mark timesteps to be used in adjoint simulation
             if useAdjoint:
-                if t >= T:
-                    finished = True
                 if t == 0.:
                     adj_start_timestep()
                 else:
-                    adj_inc_timestep(time=t, finished=finished)
-
-            # Estimate OF using trapezium rule TODO: allow for t-adaptivity
-            if op.outputOF and approach == 'fixedMesh':
-                step = assemble(eta * iA * dx)
-                if (t >= op.Tstart) and not started:
-                    started = True
-                    J_trap = step
-                elif t >= op.Tend:
-                    J_trap += step
-                elif started:
-                    J_trap += 2 * step
+                    adj_inc_timestep(time=t, finished=t >= T)
 
             if cnt % op.ndump == 0:
                 if op.plotpvd:
@@ -289,10 +271,18 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         cnt -=1
         cntT = cnt  # Total number of steps
         primalTimer = clock() - primalTimer
-        if op.outputOF:
-            rel = np.abs((op.J(mode) - 0.5* J_trap * dt) / op.J(mode))
-            # print('#### DEBUG: J_h = ', J_trap * dt)
         msc.dis('Primal run complete. Run time: %.3fs' % primalTimer, op.printStats)
+
+        # Establish OF
+        if useAdjoint:
+            J = Functional(Constant(0.) * inner(k, q_) * dx)
+            for i in range(1, len(Jfuncs)):
+                J += 0.5 * (Jfuncs[i - 1] + Jfuncs[i]) * dt
+        if op.outputOF and approach == 'fixedMesh':
+            J_h = 0
+            for i in range(1, len(Jvals)):
+                J_h += 0.5 * (Jvals[i - 1] + Jvals[i]) * dt
+            print('Estimated objective value J_h = ', J_h)
 
         # Reset counter in explicit case
         if aposteriori and not useAdjoint:
@@ -416,6 +406,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         # Reset initial conditions
         if aposteriori:
             t = 0.
+            switch.assign(0.)
             u_.interpolate(Expression([0, 0]))
             eta_.interpolate(eta0)
         if op.gradate:
@@ -423,7 +414,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         msc.dis('\nStarting adaptive mesh primal run (forwards in time)', op.printStats)
         adaptTimer = clock()
         while t <= T:
-            if cnt % op.rm == 0:      # TODO: change this condition for t-adaptivity?
+            if cnt % op.rm == 0:
                 stepTimer = clock()
 
                 # Construct metric
@@ -499,23 +490,16 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 mM = [min(nEle, mM[0]), max(nEle, mM[1])]
                 Sn += nEle
                 av = op.printToScreen(cnt/op.rm+1, clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, t, dt)
-                if op.outputOF:
-                    iA = form.indicator(V_H.sub(1), mode=mode, smooth=True if mode == 'tohoku' else False)
 
             # Solve problem at current timestep
             adaptSolver.solve()
             q_.assign(q)
 
-            # Estimate OF using trapezium rule TODO: allow for t-adaptivity
-            if op.outputOF:
-                step = assemble(eta * iA * dx)
-                if (t >= op.Tstart) and not started:
-                    started = True
-                    J_trap = step
-                elif t >= op.Tend:
-                    J_trap += step
-                elif started:
-                    J_trap += 2 * step
+            # Calculate OF value
+            if t >= op.Tstart:
+                switch.assign(1.)
+            Jval = assemble(switch * inner(k, q_) * dx)
+            Jvals.append(Jval)
 
             if cnt % op.ndump == 0:
                 adaptiveFile.write(u, eta, time=t)
@@ -525,7 +509,14 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             t += dt
             cnt += 1
         adaptTimer = clock() - adaptTimer
-        rel = np.abs((op.J(mode) - 0.5 * J_trap * dt) / op.J(mode))
+
+        # Establish OF
+        J_h = 0
+        for i in range(1, len(Jvals)):
+            J_h += 0.5 * (Jvals[i - 1] + Jvals[i]) * dt
+        if op.outputOF:
+            print('Estimated objective value J_h = ', J_h)
+        rel = np.abs((op.J(mode) - J_h) / op.J(mode))
         msc.dis('Adaptive primal run complete. Run time: %.3fs \nRelative error = %5.4f' % (adaptTimer, rel), op.printStats)
     else:
         av = nEle
@@ -559,9 +550,8 @@ if __name__ == '__main__':
                      outputMetric=False,
                      plotpvd=True,
                      gauges=False,
-                     tAdapt=False,
-                     iso=False if approach in ('gradientBased', 'hessianBased') else True,
-                     bootstrap=False,
+                     # iso=False if approach in ('gradientBased', 'hessianBased') else True,
+                     iso=False,
                      printStats=True,
                      outputOF=True,
                      orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,

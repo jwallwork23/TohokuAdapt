@@ -280,13 +280,14 @@ def weakMetricAdvection(M, M_, Mt, w, Dt, timestepper='ImplicitEuler'):
     return F
 
 
-def indicator(V, mode='tohoku', smooth=False):
+def indicator(V, mode='tohoku'):
     """
     :arg V: Function space to use.
     :param mode: test problem considered.
-    :param smooth: toggle smoothening.
     :return: ('Smoothened') indicator function for region A = [x1, x2] x [y1, y1]
     """
+    smooth = True if mode == 'tohoku' else False
+
     # Define extent of region A
     if mode == 'tohoku':
         x1 = 490e3
