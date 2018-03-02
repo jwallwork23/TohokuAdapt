@@ -60,7 +60,7 @@ def constructHessian(f, op=opt.Options()):
     return H
 
 
-def computeSteadyMetric(f, H=None, nVerT=1000., iError=1000., op=opt.Options()):
+def computeSteadyMetric(f, H=None, nVerT=None, iError=1000., op=opt.Options()):
     """
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``computeSteadyMetric``, from 
     ``adapt.py``, 2016.
@@ -76,6 +76,11 @@ def computeSteadyMetric(f, H=None, nVerT=1000., iError=1000., op=opt.Options()):
         H = constructHessian(f, op=op)
     V = H.function_space()
     mesh = V.mesh()
+    if not nVerT:
+        import utils.mesh as msh
+
+        nVerT = op.vscale * msh.meshStats(mesh)[0]
+
     ia2 = 1. / pow(op.a, 2)         # Inverse square aspect ratio
     ihmin2 = 1. / pow(op.hmin, 2)   # Inverse square minimal side-length
     ihmax2 = 1. / pow(op.hmax, 2)   # Inverse square maximal side-length
