@@ -43,7 +43,7 @@ def helmholtzSolve(mesh, p, f=None, space="CG"):
     return u_h, u, f
 
 
-def fixedTests():
+def fixed():
     print("\nFixed mesh runs\nRefinement   Degree    Error   Timing")
     for p in range(1, 4):
         for i in range(8):
@@ -54,7 +54,7 @@ def fixedTests():
             err = la.norm(u_h.dat.data - u.dat.data)
             print("     %d          %d      %.4f    %.2fs" % (i, p, err, clock() - tic))
 
-def adaptiveTests(meshIterations=3, op=op):
+def adaptive(meshIterations=3, degree=1, approach='hessianBased', op=op):
     errors = []
     nEls = []
     times = []
@@ -63,15 +63,26 @@ def adaptiveTests(meshIterations=3, op=op):
         n = pow(2, i)
         mesh = UnitSquareMesh(n, n)
         nVerT = op.vscale * msh.meshStats(mesh)[1]
-        u_h, u, f = helmholtzSolve(mesh, 1)
+        u_h, u, f = helmholtzSolve(mesh, degree)
         err = la.norm(u_h.dat.data - u.dat.data)
         for cnt in range(meshIterations):
-            M = adap.computeSteadyMetric(u_h, nVerT=nVerT, op=op)
+            if approach == 'hessianBased':
+                M = adap.computeSteadyMetric(u_h, nVerT=nVerT, op=op)
+            elif approach == 'higherOrderResidual':
+                x, y = SpatialCoordinate(mesh)
+                V_oi = FunctionSpace(mesh, "CG", degree+1)
+                u_h_oi = Function(V_oi).interpolate(u_h)
+                f_oi = Function(V_oi).interpolate((1+8*pi*pi)*cos(2*pi*x)*cos(2*pi*y))
+                v_DG0 = TestFunction(FunctionSpace(mesh, "DG", 0))
+                R = assemble(v_DG0 * (- div(grad(u_h_oi)) + u_h_oi - f_oi) * dx)
+                M = adap.isotropicMetric(R, invert=False, nVerT=nVerT, op=op)
+            else:
+                raise NotImplementedError
             if op.gradate:
                 adap.metricGradation(M, op=op)
             mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
             f = inte.interp(mesh, f)[0]
-            u_h, u, f = helmholtzSolve(mesh, 1, f)
+            u_h, u, f = helmholtzSolve(mesh, degree, f)
             err = la.norm(u_h.dat.data - u.dat.data)
         nEle = msh.meshStats(mesh)[0]
         tic = clock()-tic
@@ -90,7 +101,8 @@ def adaptiveTests(meshIterations=3, op=op):
 
 
 if __name__ == '__main__':
-    mode = input("Choose parameter to vary from {'meshIterations', 'hessMeth', 'ntype', 'p', 'vscale', 'gradate'}: ")\
+    mode = input("""Choose parameter to vary from 
+                        {'meshIterations', 'hessMeth', 'ntype', 'p', 'vscale', 'gradate', 'approach'}: """)\
            or 'meshIterations'
 
     errors = []
@@ -101,7 +113,7 @@ if __name__ == '__main__':
         S = range(1, 4)
         for i in S:
             print("\nTesting use of %d mesh iterations\n" % i)
-            err, nEle, tic = adaptiveTests(i, op=op)
+            err, nEle, tic = adaptive(i, op=op)
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
@@ -110,7 +122,7 @@ if __name__ == '__main__':
         for hessMeth in S:
             print("\nTesting use of %s Hessian reconstruction\n" % hessMeth)
             op.hessMeth = hessMeth
-            err, nEle, tic = adaptiveTests(op=op)
+            err, nEle, tic = adaptive(op=op)
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
@@ -119,7 +131,7 @@ if __name__ == '__main__':
         for ntype in S:
             print("\nTesting use of %s metric normalisation\n" % ntype)
             op.ntype = ntype
-            err, nEle, tic = adaptiveTests(op=op)
+            err, nEle, tic = adaptive(op=op)
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
@@ -128,7 +140,7 @@ if __name__ == '__main__':
         for p in S:
             print("\nTesting Lp metric normalisation with p = %d\n" % p)
             op.p = p
-            err, nEle, tic = adaptiveTests(op=op)
+            err, nEle, tic = adaptive(op=op)
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
@@ -137,7 +149,7 @@ if __name__ == '__main__':
         for vscale in S:
             print("\nTesting metric rescaling by %.2f\n" % vscale)
             op.vscale = vscale
-            err, nEle, tic = adaptiveTests(op=op)
+            err, nEle, tic = adaptive(op=op)
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
@@ -146,7 +158,15 @@ if __name__ == '__main__':
         for gradate in S:
             print("\nTesting metric gradation: ", gradate, "\n")
             op.gradate = gradate
-            err, nEle, tic = adaptiveTests(op=op)
+            err, nEle, tic = adaptive(op=op)
+            errors.append(err)
+            nEls.append(nEle)
+            times.append(tic)
+    elif mode == 'approach':
+        S = ('hessianBased', 'higherOrderResidual')     # TODO: More to do: Implicit
+        for approach in S:
+            print("\nTesting use of error estimator %s\n" % approach)
+            err, nEle, tic = adaptive(approach=approach, op=op)
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)

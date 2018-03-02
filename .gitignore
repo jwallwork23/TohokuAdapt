@@ -48,6 +48,10 @@ outdata/errors.txt
 # Plot timeseries at a later time
 quickPlot.py
 
-# Thetis sanity checks
+# Thetis sanity checks and testing
 thetisTest.py
 wdTest.py
+
+# Pyadjoint testing
+pyadjoint-test.py
+pyadjoint-test-firedrake.py
