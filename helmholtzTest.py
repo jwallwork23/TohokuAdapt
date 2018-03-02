@@ -6,6 +6,7 @@ from time import clock
 import matplotlib.pyplot as plt
 
 import utils.adaptivity as adap
+import utils.interpolation as inte
 import utils.mesh as msh
 import utils.options as opt
 
@@ -13,12 +14,13 @@ import utils.options as opt
 op = opt.Options(hmin=1e-3,
                  hmax=0.5)
 
-def helmholtzSolve(mesh, p, space="CG"):
+def helmholtzSolve(mesh, p, f=None, space="CG"):
     """
     Solve Helmholtz' equation in CG2 space. By method of reconstructed solns exact soln is u=cos(2*pi*x)cos(2*pi*y).
     
     :param mesh: mesh of [0,1]x[0,1] upon which problem is solved.
     :param p: degree of polynomials used.
+    :param f: RHS function.
     :param space: type of test space considered.
     :return: approximation on ``mesh``, under ``space`` of order ``p``, along with exact solution.
     """
@@ -26,7 +28,8 @@ def helmholtzSolve(mesh, p, space="CG"):
     # Establish numerical solution
     x, y = SpatialCoordinate(mesh)
     V = FunctionSpace(mesh, space, p)
-    f = Function(V).interpolate((1+8*pi*pi)*cos(2*pi*x)*cos(2*pi*y))
+    if not f:
+        f = Function(V).interpolate((1+8*pi*pi)*cos(2*pi*x)*cos(2*pi*y))
     u_h = Function(V)
     v = TestFunction(V)
     B = (inner(grad(u_h), grad(v)) + u_h*v)*dx
@@ -37,7 +40,7 @@ def helmholtzSolve(mesh, p, space="CG"):
     # Establish analytic solution
     u = Function(V).interpolate(cos(2*pi*x)*cos(2*pi*y))
 
-    return u_h, u
+    return u_h, u, f
 
 
 def fixedTests():
@@ -47,7 +50,7 @@ def fixedTests():
             tic = clock()
             n = pow(2, i)
             mesh = UnitSquareMesh(n, n)
-            u_h, u = helmholtzSolve(mesh, p)
+            u_h, u = helmholtzSolve(mesh, p)[:2]
             err = la.norm(u_h.dat.data - u.dat.data)
             print("     %d          %d      %.4f    %.2fs" % (i, p, err, clock() - tic))
 
@@ -60,12 +63,13 @@ def adaptiveTests(meshIterations=3, op=op):
         n = pow(2, i)
         mesh = UnitSquareMesh(n, n)
         nVerT = op.vscale * msh.meshStats(mesh)[1]
-        u_h, u = helmholtzSolve(mesh, 1)
+        u_h, u, f = helmholtzSolve(mesh, 1)
         err = la.norm(u_h.dat.data - u.dat.data)
         for cnt in range(meshIterations):
             M = adap.computeSteadyMetric(u_h, nVerT=nVerT, op=op)
             mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-            u_h, u = helmholtzSolve(mesh, 1)
+            f = inte.interp(mesh, f)[0]
+            u_h, u, f = helmholtzSolve(mesh, 1, f)
             err = la.norm(u_h.dat.data - u.dat.data)
         nEle = msh.meshStats(mesh)[0]
         tic = clock()-tic
@@ -132,10 +136,7 @@ if __name__ == '__main__':
     plt.rc('legend', fontsize='x-large')
     styles = ('s', '^', 'x', 'o', 'h', '*', '+')
     for i in range(len(S)):
-        if mode == 'vscale':
-            plt.loglog(nEls[i], errors[i], label=str(S[i]), marker=styles[i])
-        else:
-            plt.semilogx(nEls[i], errors[i], label=str(S[i]), marker=styles[i])
+        plt.loglog(nEls[i], errors[i], label=str(S[i]), marker=styles[i])
     plt.title('Experiment: '+mode)
     plt.legend()
     plt.savefig('outdata/outputs/helmholtz_'+mode+'_errors.pdf', bbox_inches='tight')
