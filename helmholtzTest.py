@@ -67,6 +67,8 @@ def adaptiveTests(meshIterations=3, op=op):
         err = la.norm(u_h.dat.data - u.dat.data)
         for cnt in range(meshIterations):
             M = adap.computeSteadyMetric(u_h, nVerT=nVerT, op=op)
+            if op.gradate:
+                adap.metricGradation(M, op=op)
             mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
             f = inte.interp(mesh, f)[0]
             u_h, u, f = helmholtzSolve(mesh, 1, f)
@@ -81,14 +83,14 @@ def adaptiveTests(meshIterations=3, op=op):
     return errors, nEls, times
 
 # TODO: Run more tests:
-# TODO: * Comparison with isotropic case
+# TODO: * Comparison across error estimators
 
 # TODO: Further, create a wave equation test case based on this
 # TODO: * Test metric advection
 
 
 if __name__ == '__main__':
-    mode = input("Choose parameter to vary from {'meshIterations', 'hessMeth', 'ntype', 'vscale'}: ") \
+    mode = input("Choose parameter to vary from {'meshIterations', 'hessMeth', 'ntype', 'p', 'vscale', 'gradate'}: ")\
            or 'meshIterations'
 
     errors = []
@@ -121,6 +123,15 @@ if __name__ == '__main__':
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
+    elif mode == 'p':
+        S = (1, 2, 3)
+        for p in S:
+            print("\nTesting Lp metric normalisation with p = %d\n" % p)
+            op.p = p
+            err, nEle, tic = adaptiveTests(op=op)
+            errors.append(err)
+            nEls.append(nEle)
+            times.append(tic)
     elif mode == 'vscale':
         S = np.linspace(0.25, 1., 6)
         for vscale in S:
@@ -130,21 +141,26 @@ if __name__ == '__main__':
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
+    elif mode == 'gradate':
+        S = (True, False)
+        for gradate in S:
+            print("\nTesting metric gradation: ", gradate, "\n")
+            op.gradate = gradate
+            err, nEle, tic = adaptiveTests(op=op)
+            errors.append(err)
+            nEls.append(nEle)
+            times.append(tic)
 
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     plt.rc('legend', fontsize='x-large')
     styles = ('s', '^', 'x', 'o', 'h', '*', '+')
-    for i in range(len(S)):
-        plt.loglog(nEls[i], errors[i], label=str(S[i]), marker=styles[i])
-    plt.title('Experiment: '+mode)
-    plt.legend()
-    plt.savefig('outdata/outputs/helmholtz_'+mode+'_errors.pdf', bbox_inches='tight')
-    plt.show()
-    plt.clf()
-    for i in range(len(S)):
-        plt.loglog(nEls[i], times[i], label=str(S[i]), marker=styles[i])
-    plt.title('Experiment: '+mode)
-    plt.legend()
-    plt.savefig('outdata/outputs/helmholtz_'+mode+'_times.pdf', bbox_inches='tight')
-    plt.show()
+    outputs = {'errors': errors, 'times': times}
+    for output in outputs:
+        for i in range(len(S)):
+            plt.loglog(nEls[i], outputs[output][i], label=str(S[i]), marker=styles[i])
+        plt.title('Experiment: '+mode)
+        plt.legend()
+        plt.savefig('outdata/outputs/helmholtz_'+mode+'_'+output+'.pdf', bbox_inches='tight')
+        plt.show()
+        plt.clf()
