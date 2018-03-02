@@ -43,11 +43,11 @@ def constructHessian(f, op=opt.Options()):
     H = Function(V)
     tau = TestFunction(V)
     nhat = FacetNormal(mesh)  # Normal vector
-    if op.mtype == 'parts':
+    if op.hessMeth == 'parts':
         Lh = (inner(tau, H) + inner(div(tau), grad(f))) * dx
         Lh -= (tau[0, 1] * nhat[1] * f.dx(0) + tau[1, 0] * nhat[0] * f.dx(1)) * ds
         Lh -= (tau[0, 0] * nhat[1] * f.dx(0) + tau[1, 1] * nhat[0] * f.dx(1)) * ds  # Term not in Firedrake tutorial
-    else:
+    elif op.hessMeth == 'dL2':
         g = constructGradient(f)
         Lh = (inner(tau, H) + inner(div(tau), g)) * dx
         Lh -= (tau[0, 1] * nhat[1] * g[0] + tau[1, 0] * nhat[0] * g[1]) * ds
@@ -60,7 +60,7 @@ def constructHessian(f, op=opt.Options()):
     return H
 
 
-def computeSteadyMetric(f, H=None, nVerT=None, iError=1000., op=opt.Options()):
+def computeSteadyMetric(f, H=None, nVerT=None, errTarget=1e-3, op=opt.Options()):
     """
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``computeSteadyMetric``, from 
     ``adapt.py``, 2016.
@@ -68,7 +68,7 @@ def computeSteadyMetric(f, H=None, nVerT=None, iError=1000., op=opt.Options()):
     :arg f: P1 solution field.
     :arg H: reconstructed Hessian, usually chosen to be associated with ``sol``.
     :param nVerT: target number of vertices, in the case of Lp normalisation.
-    :param iError: inverse of the target error, in the case of manual normalisation.
+    :param errTarget: target error, in the case of manual normalisation.
     :param op: Options class object providing min/max cell size values.
     :return: steady metric associated with Hessian H.
     """
@@ -79,19 +79,19 @@ def computeSteadyMetric(f, H=None, nVerT=None, iError=1000., op=opt.Options()):
     if not nVerT:
         import utils.mesh as msh
 
-        nVerT = op.vscale * msh.meshStats(mesh)[0]
+        nVerT = op.vscale * msh.meshStats(mesh)[1]      # TODO: verify this is indeed vertices, not elements
 
     ia2 = 1. / pow(op.a, 2)         # Inverse square aspect ratio
     ihmin2 = 1. / pow(op.hmin, 2)   # Inverse square minimal side-length
     ihmax2 = 1. / pow(op.hmax, 2)   # Inverse square maximal side-length
     M = Function(V)
     if op.ntype == 'manual':
-        f_min = 1e-6  # Minimum tolerated value for the solution field
+        f_min = 1e-3  # Minimum tolerated value for the solution field
 
         for i in range(mesh.topology.num_vertices()):
 
             # Generate local Hessian
-            H_loc = H.dat.data[i] * iError / (max(np.sqrt(assemble(f * f * dx)), f_min))  # Avoid round-off error
+            H_loc = H.dat.data[i] / (errTarget * max(np.sqrt(assemble(f * f * dx)), f_min))  # Avoid round-off error
             mean_diag = 0.5 * (H_loc[0][1] + H_loc[1][0])
             H_loc[0][1] = mean_diag
             H_loc[1][0] = mean_diag

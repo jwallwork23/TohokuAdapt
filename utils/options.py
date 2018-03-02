@@ -7,7 +7,6 @@ from . import misc
 
 class Options:
     def __init__(self,
-                 coarseness=4,
                  family='dg-cg',
                  vscale=0.85,
                  hmin=500.,
@@ -44,7 +43,6 @@ class Options:
                  timestepper='CrankNicolson',
                  wd=False):
         """
-        :param coarseness: mesh coarseness to use, where 1 is x-fine and 5 is x-coarse.
         :param family: mixed function space family, from {'dg-dg', 'dg-cg'}.
         :param vscale: Scaling parameter for target number of vertices.
         :param hmin: Minimal tolerated element size (m).
@@ -81,12 +79,6 @@ class Options:
         :param timestepper: timestepping scheme.
         :param wd: toggle wetting and drying.
         """
-        # Initial mesh parameters
-        self.coarseness = coarseness
-        try:
-            assert coarseness in range(1, 9)
-        except:
-            raise ValueError('Please choose an integer between 0 and 8.')
 
         # Adaptivity parameters
         self.family = family
