@@ -53,6 +53,15 @@ for i in range(8):
         print("%d   %.4f" % (cnt+1, err))
     print("Timing: %.2fs" % (clock()-tic))
 
+# TODO: Run multiple tests:
+# TODO: * Methods of normalisation
+# TODO: * Methods of Hessian reconstruction
+# TODO: * Scaling parameters (i.e. nVerT)
+# TODO: * Comparison with isotropic case
+
+# TODO: Further, create a wave equation test case based on this
+# TODO: * Test metric advection
+
 # Fixed mesh runs
 print("\nFixed mesh runs\nRefinement   Degree    Error   Timing")
 for p in range(1, 4):
