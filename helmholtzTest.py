@@ -5,7 +5,11 @@ from time import clock
 
 import utils.adaptivity as adap
 import utils.mesh as msh
+import utils.options as opt
 
+
+op = opt.Options(hmin=1e-3,
+                 hmax=0.5)
 
 def helmholtzSolve(mesh_H, p, space="CG"):
     """
@@ -46,7 +50,7 @@ for i in range(8):
     err = la.norm(u_h.dat.data - u.dat.data)
     print("%d   %.4f" % (0, err))
     for cnt in range(3):
-        M = adap.computeSteadyMetric(u_h, nVerT=nVerT)
+        M = adap.computeSteadyMetric(u_h, nVerT=nVerT, op=op)
         mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
         u_h, u = helmholtzSolve(mesh, 1)
         err = la.norm(u_h.dat.data - u.dat.data)
@@ -54,6 +58,7 @@ for i in range(8):
     print("Timing: %.2fs" % (clock()-tic))
 
 # TODO: Run multiple tests:
+# TODO: * Number of adaption iterations
 # TODO: * Methods of normalisation
 # TODO: * Methods of Hessian reconstruction
 # TODO: * Scaling parameters (i.e. nVerT)
