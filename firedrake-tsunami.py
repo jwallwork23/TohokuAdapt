@@ -402,7 +402,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         msc.dis('Errors estimated. Run time: %.3fs' % errorTimer, op.printStats)
 
     if approach != 'fixedMesh':
-
         # Reset initial conditions
         if aposteriori:
             t = 0.
