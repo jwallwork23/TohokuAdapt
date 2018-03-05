@@ -69,6 +69,12 @@ def adaptive(mesh_HIterations=3, degree=1, approach='hessianBased', op=op):
         for cnt in range(mesh_HIterations):
             if approach == 'hessianBased':
                 M = adap.computeSteadyMetric(u_H, nVerT=nVerT, op=op)
+            elif approach == 'fluxJump':
+                v_DG0 = TestFunction(FunctionSpace(mesh_H, "DG", 0))
+                j_bdy = assemble(dot(v_DG0 * grad(u_H), FacetNormal(mesh_H)) * ds)
+                j_int = assemble(jump(v_DG0 * grad(u_H), n=FacetNormal(mesh_H)) * dS)
+                M = adap.isotropicMetric(assemble(v_DG0 * (j_bdy * j_bdy + j_int * j_int) * dx),
+                                         invert=False, nVerT=nVerT, op=op)
             elif approach in ('higherOrderResidual', 'higherOrderImplicit', 'higherOrderExplicit'):
                 x, y = SpatialCoordinate(mesh_H)
                 V_oi = FunctionSpace(mesh_H, "CG", degree+1)
@@ -145,7 +151,7 @@ def adaptive(mesh_HIterations=3, degree=1, approach='hessianBased', op=op):
 
 if __name__ == '__main__':
     mode = input("""Choose parameter to vary from 
-                        {'mesh_HIterations', 'hessMeth', 'ntype', 'p', 'vscale', 'gradate', 'approach'}: """)\
+                        {'meshIterations', 'hessMeth', 'ntype', 'p', 'vscale', 'gradate', 'approach'}: """)\
            or 'mesh_HIterations'
 
     errors = []
@@ -206,8 +212,12 @@ if __name__ == '__main__':
             nEls.append(nEle)
             times.append(tic)
     elif mode == 'approach':
-        S = ('hessianBased', 'higherOrderExplicit', 'refinedExplicit', 'higherOrderResidual', 'refinedResidual',
-             'higherOrderImplicit', 'refinedImplicit')
+        S = ('hessianBased',
+             'fluxJump',
+             'higherOrderResidual', 'refinedResidual',
+             'higherOrderImplicit', 'refinedImplicit',
+             'higherOrderExplicit', 'refinedExplicit',
+             )
         for approach in S:
             print("\nTesting use of error estimator %s\n" % approach)
             err, nEle, tic = adaptive(approach=approach, op=op)
@@ -218,7 +228,7 @@ if __name__ == '__main__':
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     plt.rc('legend', fontsize='x-large')
-    styles = ('s', '^', 'x', 'o', 'h', '*', '+')
+    styles = ('s', '^', 'x', 'o', 'h', '*', '+', '.')
     outputs = {'errors': errors, 'times': times}
     for output in outputs:
         for i in range(len(S)):
@@ -228,6 +238,8 @@ if __name__ == '__main__':
         plt.savefig('outdata/outputs/helmholtz_'+mode+'_'+output+'.pdf', bbox_inches='tight')
         plt.show()
         plt.clf()
+
+# TODO: cases of NO ENRICHMENT, fluxJump
 
 # TODO: Further, create a wave equation test case based on this
 # TODO: * Test metric advection
