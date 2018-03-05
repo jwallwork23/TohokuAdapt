@@ -52,10 +52,10 @@ def fixed():
             n = pow(2, i)
             mesh_H = UnitSquareMesh(n, n)
             u_H, u = helmholtzSolve(mesh_H, p)[:2]
-            err = la.norm(u_H.dat.data - u.dat.data)
+            err = errornorm(u, u_H)
             print("     %d          %d      %.4f    %.2fs" % (i, p, err, clock() - tic))
 
-def adaptive(mesh_HIterations=3, degree=1, approach='hessianBased', op=op):
+def adaptive(meshIterations=3, degree=1, approach='hessianBased', op=op):
     errors = []
     nEls = []
     times = []
@@ -65,10 +65,10 @@ def adaptive(mesh_HIterations=3, degree=1, approach='hessianBased', op=op):
         mesh_H = UnitSquareMesh(n, n)
         nVerT = op.vscale * msh.meshStats(mesh_H)[1]
         u_H, u, f = helmholtzSolve(mesh_H, degree)
-        err = la.norm(u_H.dat.data - u.dat.data)
-        for cnt in range(mesh_HIterations):
+        err = errornorm(u, u_H)
+        for cnt in range(meshIterations):
             if approach == 'hessianBased':
-                M = adap.computeSteadyMetric(u_H, nVerT=nVerT, op=op)
+                M = adap.computeSteadyMetric(u_H, op=op)
             elif approach == 'fluxJump':
                 v_DG0 = TestFunction(FunctionSpace(mesh_H, "DG", 0))
                 j_bdy = assemble(dot(v_DG0 * grad(u_H), FacetNormal(mesh_H)) * ds)
@@ -131,6 +131,18 @@ def adaptive(mesh_HIterations=3, degree=1, approach='hessianBased', op=op):
                     F_h = Be - L_h + Bu - I
                     solve(F_h == 0, e)
                     M = adap.isotropicMetric(inte.interp(mesh_H, e)[0], invert=False, nVerT=nVerT, op=op)
+            elif approach in ('residual', 'explicit'):
+                v_DG0 = TestFunction(FunctionSpace(mesh_H, "DG", 0))
+                R_H = assemble(v_DG0 * (- div(grad(u_H)) + u_H - f) * dx)
+                if approach == 'residual':
+                    M = adap.isotropicMetric(R_H, invert=False, nVerT=nVerT, op=op)
+                else:
+                    hk = CellSize(mesh_H)
+                    resTerm = assemble(v_DG0 * hk * hk * R_H * R_H * dx)
+                    j_bdy = assemble(dot(v_DG0 * grad(u_H), FacetNormal(mesh_H)) * ds)
+                    j_int = assemble(jump(v_DG0 * grad(u_H), n=FacetNormal(mesh_H)) * dS)
+                    jumpTerm = assemble(v_DG0 * hk * (j_bdy * j_bdy + j_int * j_int) * dx)
+                    M = adap.isotropicMetric(assemble(sqrt(resTerm + jumpTerm)), invert=False, nVerT=nVerT, op=op)
             else:
                 raise NotImplementedError
             if op.gradate:
@@ -152,13 +164,13 @@ def adaptive(mesh_HIterations=3, degree=1, approach='hessianBased', op=op):
 if __name__ == '__main__':
     mode = input("""Choose parameter to vary from 
                         {'meshIterations', 'hessMeth', 'ntype', 'p', 'vscale', 'gradate', 'approach'}: """)\
-           or 'mesh_HIterations'
+           or 'meshIterations'
 
     errors = []
     nEls = []
     times = []
 
-    if mode == 'mesh_HIterations':
+    if mode == 'meshIterations':
         S = range(1, 4)
         for i in S:
             print("\nTesting use of %d mesh_H iterations\n" % i)
@@ -212,13 +224,21 @@ if __name__ == '__main__':
             nEls.append(nEle)
             times.append(tic)
     elif mode == 'approach':
-        S = ('hessianBased',
-             'fluxJump',
-             'higherOrderResidual', 'refinedResidual',
-             'higherOrderImplicit', 'refinedImplicit',
-             'higherOrderExplicit', 'refinedExplicit',
-             )
-        for approach in S:
+        experiment = int(input("""Choose experiment from list:
+1: Residual approximations
+2: Implicit approximations
+3: Explicit approximations
+4: Higher order approximations
+5: Refined approximations\n"""))
+        S = ('hessianBased', 'fluxJump', 'residual', 'explicit',
+             'higherOrderResidual', 'higherOrderImplicit', 'higherOrderExplicit',
+             'refinedResidual', 'refinedImplicit', 'refinedExplicit')
+        E = {1: (S[0], S[2], S[4], S[7]),
+             2: (S[0], S[5], S[8]),
+             3: (S[0], S[3], S[6], S[9]),
+             4: (S[0], S[4], S[5], S[6]),
+             5: (S[0], S[7], S[8], S[9])}
+        for approach in E[experiment]:
             print("\nTesting use of error estimator %s\n" % approach)
             err, nEle, tic = adaptive(approach=approach, op=op)
             errors.append(err)
@@ -235,7 +255,11 @@ if __name__ == '__main__':
             plt.loglog(nEls[i], outputs[output][i], label=str(S[i]), marker=styles[i])
         plt.title('Experiment: '+mode)
         plt.legend()
-        plt.savefig('outdata/outputs/helmholtz_'+mode+'_'+output+'.pdf', bbox_inches='tight')
+        filename = 'outdata/outputs/helmholtz_'+mode+'_'+output
+        if mode == 'approach':
+            filename += '_experiment' + str(experiment)
+        filename += '.pdf'
+        plt.savefig(filename, bbox_inches='tight')
         plt.show()
         plt.clf()
 

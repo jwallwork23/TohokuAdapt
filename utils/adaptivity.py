@@ -6,6 +6,7 @@ from numpy import linalg as la
 from scipy import linalg as sla
 
 import utils.forms as form
+import utils.mesh as msh
 import utils.options as opt
 
 
@@ -77,8 +78,6 @@ def computeSteadyMetric(f, H=None, nVerT=None, errTarget=1e-3, op=opt.Options())
     V = H.function_space()
     mesh = V.mesh()
     if not nVerT:
-        import utils.mesh as msh
-
         nVerT = op.vscale * msh.meshStats(mesh)[1]      # TODO: verify this is indeed vertices, not elements
 
     ia2 = 1. / pow(op.a, 2)         # Inverse square aspect ratio
