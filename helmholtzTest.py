@@ -68,13 +68,13 @@ def adaptive(meshIterations=3, degree=1, approach='hessianBased', op=op):
         err = errornorm(u, u_H)
         for cnt in range(meshIterations):
             if approach == 'hessianBased':
-                M = adap.computeSteadyMetric(u_H, op=op)
+                M = adap.computeSteadyMetric(u_H, nVerT=nVerT, op=op)
             elif approach == 'fluxJump':
                 v_DG0 = TestFunction(FunctionSpace(mesh_H, "DG", 0))
                 j_bdy = assemble(dot(v_DG0 * grad(u_H), FacetNormal(mesh_H)) * ds)
                 j_int = assemble(jump(v_DG0 * grad(u_H), n=FacetNormal(mesh_H)) * dS)
-                M = adap.isotropicMetric(assemble(v_DG0 * (j_bdy * j_bdy + j_int * j_int) * dx),
-                                         invert=False, nVerT=nVerT, op=op)
+                M = adap.isotropicMetric(assemble(v_DG0 * (j_bdy * j_bdy + j_int * j_int) * dx), invert=False,
+                                         nVerT=nVerT, op=op)
             elif approach in ('higherOrderResidual', 'higherOrderImplicit', 'higherOrderExplicit'):
                 x, y = SpatialCoordinate(mesh_H)
                 V_oi = FunctionSpace(mesh_H, "CG", degree+1)
@@ -91,7 +91,7 @@ def adaptive(meshIterations=3, degree=1, approach='hessianBased', op=op):
                         j_bdy = assemble(dot(v_DG0 * grad(u_H_oi), FacetNormal(mesh_H)) * ds)
                         j_int = assemble(jump(v_DG0 * grad(u_H_oi), n=FacetNormal(mesh_H)) * dS)
                         jumpTerm = assemble(v_DG0 * hk * (j_bdy * j_bdy + j_int * j_int) * dx)
-                        M = adap.isotropicMetric(assemble(sqrt(resTerm + jumpTerm)), invert=False, nVerT=nVerT, op=op)
+                        M = adap.isotropicMetric(assemble(sqrt(resTerm + jumpTerm)), invert=False, op=op)
                 elif approach == 'higherOrderImplicit':
                     v_oi = TestFunction(V_oi)
                     e = Function(V_oi)
@@ -230,15 +230,16 @@ if __name__ == '__main__':
 3: Explicit approximations
 4: Higher order approximations
 5: Refined approximations\n"""))
-        S = ('hessianBased', 'fluxJump', 'residual', 'explicit',
+        A = ('hessianBased', 'fluxJump', 'residual', 'explicit',
              'higherOrderResidual', 'higherOrderImplicit', 'higherOrderExplicit',
              'refinedResidual', 'refinedImplicit', 'refinedExplicit')
-        E = {1: (S[0], S[2], S[4], S[7]),
-             2: (S[0], S[5], S[8]),
-             3: (S[0], S[3], S[6], S[9]),
-             4: (S[0], S[4], S[5], S[6]),
-             5: (S[0], S[7], S[8], S[9])}
-        for approach in E[experiment]:
+        E = {1: (A[0], A[2], A[4], A[7]),
+             2: (A[0], A[5], A[8]),
+             3: (A[0], A[3], A[6], A[9]),
+             4: (A[0], A[4], A[5], A[6]),
+             5: (A[0], A[7], A[8], A[9])}
+        S = E[experiment]
+        for approach in S:
             print("\nTesting use of error estimator %s\n" % approach)
             err, nEle, tic = adaptive(approach=approach, op=op)
             errors.append(err)
@@ -262,8 +263,6 @@ if __name__ == '__main__':
         plt.savefig(filename, bbox_inches='tight')
         plt.show()
         plt.clf()
-
-# TODO: cases of NO ENRICHMENT, fluxJump
 
 # TODO: Further, create a wave equation test case based on this
 # TODO: * Test metric advection

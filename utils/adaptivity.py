@@ -175,12 +175,12 @@ def isotropicMetric(f, bdy=False, invert=True, nVerT=None, op=opt.Options()):
     else:
         g.interpolate(f)
 
-    if nVerT:
-        # gmin = min(g.dat.data) if scalar else min(g.dat.data[:, 0]**2 + g.dat.data[:, 1]**2)  # Minimum value
-        gmin = 1e-6     # Minimum tolerated value
-        # gnorm = max(sqrt(assemble(inner(g, g)*dx)), gmin)   # L2 norm
-        gnorm = max(assemble(sqrt(inner(g, g))*dx), gmin)   # Equivalent to scaling by metric complexity
-        g.dat.data[:] = np.abs(g.dat.data) * nVerT / gnorm  # TODO: changes in 3D case
+    # Normalise error estimate
+    gnorm = max(assemble(sqrt(inner(g, g))*dx), 1e-6)   # Equivalent to scaling by (thresholded) metric complexity
+    if not nVerT:
+        nVerT = op.vscale * msh.meshStats(mesh)[1]
+    g.dat.data[:] = np.abs(g.dat.data) * nVerT / gnorm  # TODO: changes in 3D case
+
     for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(len(g.dat.data)):
         if scalar:
             if invert:
