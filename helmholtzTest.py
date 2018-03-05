@@ -1,7 +1,6 @@
 from firedrake import *
 
 import numpy as np
-import numpy.linalg as la
 from time import clock
 import matplotlib.pyplot as plt
 
@@ -55,11 +54,11 @@ def fixed():
             err = errornorm(u, u_H)
             print("     %d          %d      %.4f    %.2fs" % (i, p, err, clock() - tic))
 
-def adaptive(meshIterations=3, degree=1, approach='hessianBased', op=op):
+def adaptive(meshIterations=3, numMeshes=8, degree=1, approach='hessianBased', op=op):
     errors = []
     nEls = []
     times = []
-    for i in range(8):
+    for i in range(numMeshes):
         tic = clock()
         n = pow(2, i)
         mesh_H = UnitSquareMesh(n, n)
@@ -75,15 +74,19 @@ def adaptive(meshIterations=3, degree=1, approach='hessianBased', op=op):
                     j_int = assemble(jump(v_DG0 * grad(u_H), n=FacetNormal(mesh_H)) * dS)
                     M = adap.isotropicMetric(assemble(v_DG0 * (j_bdy * j_bdy + j_int * j_int) * dx), invert=False,
                                              nVerT=nVerT, op=op)
-                elif approach in ('higherOrderResidual', 'higherOrderImplicit', 'higherOrderExplicit'):
+                elif approach in ('higherOrderResidual', 'higherOrderImplicit', 'higherOrderExplicit',
+                                  'lowerOrderResidual', 'lowerOrderImplicit', 'lowerOrderExplicit'):
+                    deg = degree+1 if \
+                        approach in ('higherOrderResidual', 'higherOrderImplicit', 'higherOrderExplicit') else degree-1
                     x, y = SpatialCoordinate(mesh_H)
-                    V_oi = FunctionSpace(mesh_H, "CG", degree+1)
+                    V_oi = FunctionSpace(mesh_H, "CG", deg)
                     u_H_oi = Function(V_oi).interpolate(u_H)
                     f_oi = Function(V_oi).interpolate((1+8*pi*pi)*cos(2*pi*x)*cos(2*pi*y))
-                    if approach in ('higherOrderResidual', 'higherOrderExplicit'):
+                    if approach in ('higherOrderResidual', 'higherOrderExplicit',
+                                    'lowerOrderResidual', 'lowerOrderExplicit'):
                         v_DG0 = TestFunction(FunctionSpace(mesh_H, "DG", 0))
                         R_oi = assemble(v_DG0 * (- div(grad(u_H_oi)) + u_H_oi - f_oi) * dx)
-                        if approach == 'higherOrderResidual':
+                        if approach in ('higherOrderResidual', 'lowerOrderResidual'):
                             M = adap.isotropicMetric(R_oi, invert=False, nVerT=nVerT, op=op)
                         else:
                             hk = CellSize(mesh_H)
@@ -92,7 +95,7 @@ def adaptive(meshIterations=3, degree=1, approach='hessianBased', op=op):
                             j_int = assemble(jump(v_DG0 * grad(u_H_oi), n=FacetNormal(mesh_H)) * dS)
                             jumpTerm = assemble(v_DG0 * hk * (j_bdy * j_bdy + j_int * j_int) * dx)
                             M = adap.isotropicMetric(assemble(sqrt(resTerm + jumpTerm)), invert=False, op=op)
-                    elif approach == 'higherOrderImplicit':
+                    elif approach in ('higherOrderImplicit', 'lowerOrderImplicit'):
                         v_oi = TestFunction(V_oi)
                         e = Function(V_oi)
                         Be = (inner(grad(e), grad(v_oi)) + e * v_oi) * dx
@@ -163,7 +166,7 @@ def adaptive(meshIterations=3, degree=1, approach='hessianBased', op=op):
 
 if __name__ == '__main__':
     mode = input("""Choose parameter to vary from 
-                        {'meshIterations', 'hessMeth', 'ntype', 'p', 'vscale', 'gradate', 'approach'}: """)\
+                        {'meshIterations', 'hessMeth', 'ntype', 'p', 'vscale', 'gradate', 'approach', 'order'}: """)\
            or 'meshIterations'
 
     errors = []
@@ -247,7 +250,26 @@ if __name__ == '__main__':
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
-
+    elif mode == 'order':
+        numMeshes = 6
+        experiment = int(input("""Choose experiment from list:
+0: Residual approximations
+1: Implicit approximations
+2: Explicit approximations\n"""))
+        A = ('fixedMesh',
+             'lowerOrderResidual', 'residual', 'higherOrderResidual',
+             'lowerOrderImplicit', 'higherOrderImplicit',
+             'lowerOrderExplicit', 'explicit', 'higherOrderExplicit')
+        E = {0: (A[0], A[1], A[2], A[3]),
+             1: (A[0], A[4], A[5], A[6]),
+             2: (A[0], A[7], A[8])}
+        S = E[experiment]
+        for approach in S:
+            print("\nTesting use of error estimator %s\n" % approach)
+            err, nEle, tic = adaptive(approach=approach, degree=2, op=op)
+            errors.append(err)
+            nEls.append(nEle)
+            times.append(tic)
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     plt.rc('legend', fontsize='x-large')
@@ -256,10 +278,15 @@ if __name__ == '__main__':
     for output in outputs:
         for i in range(len(S)):
             plt.loglog(nEls[i], outputs[output][i], label=str(S[i]), marker=styles[i])
-        plt.title('Experiment: '+mode)
+        title = 'Experiment: '+mode
+        if mode in ('approach', 'order'):
+            title += ' ' + str(experiment)
+        plt.title(title)
         plt.legend()
+        plt.xlabel('#Elements')
+        plt.ylabel('CPU time' if output == 'times' else r'$\mathcal{L}_2$ error')
         filename = 'outdata/outputs/helmholtz_'+mode+'_'+output
-        if mode == 'approach':
+        if mode in ('approach', 'order'):
             filename += '_experiment' + str(experiment)
         filename += '.pdf'
         plt.savefig(filename, bbox_inches='tight')
