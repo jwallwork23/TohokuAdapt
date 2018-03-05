@@ -251,7 +251,6 @@ if __name__ == '__main__':
             nEls.append(nEle)
             times.append(tic)
     elif mode == 'order':
-        numMeshes = 6
         experiment = int(input("""Choose experiment from list:
 0: Residual approximations
 1: Implicit approximations
@@ -261,12 +260,12 @@ if __name__ == '__main__':
              'lowerOrderImplicit', 'higherOrderImplicit',
              'lowerOrderExplicit', 'explicit', 'higherOrderExplicit')
         E = {0: (A[0], A[1], A[2], A[3]),
-             1: (A[0], A[4], A[5], A[6]),
-             2: (A[0], A[7], A[8])}
+             1: (A[0], A[4], A[5]),
+             2: (A[0], A[6], A[7], A[8])}
         S = E[experiment]
         for approach in S:
             print("\nTesting use of error estimator %s\n" % approach)
-            err, nEle, tic = adaptive(approach=approach, degree=2, op=op)
+            err, nEle, tic = adaptive(approach=approach, numMeshes=6, degree=2, op=op)
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
