@@ -179,7 +179,7 @@ if __name__ == '__main__':
     nEls = []
     times = []
 
-    if mode == 'meshIterations':
+    if mode == 'meshIterations':    # Multiple mesh optimisation steps
         S = range(1, 4)
         for i in S:
             print("\nTesting %d mesh_H iterations\n" % i)
@@ -187,7 +187,7 @@ if __name__ == '__main__':
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
-    elif mode == 'redefine':
+    elif mode == 'redefine':        # Avoid interpolation error and costs
         S = (True, False)
         for tf in S:
             print("\nTesting with RHS redefinition: ", tf, "\n")
@@ -195,7 +195,7 @@ if __name__ == '__main__':
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
-    elif mode == 'hessMeth':
+    elif mode == 'hessMeth':        # Mode of Hessian recovery
         S = ('parts', 'dL2')
         for hessMeth in S:
             print("\nTesting %s Hessian reconstruction\n" % hessMeth)
@@ -204,7 +204,7 @@ if __name__ == '__main__':
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
-    elif mode == 'ntype':
+    elif mode == 'ntype':           # Mode of metric normalisation
         S = ('lp', 'manual')
         for ntype in S:
             print("\nTesting %s metric normalisation\n" % ntype)
@@ -213,7 +213,7 @@ if __name__ == '__main__':
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
-    elif mode == 'p':
+    elif mode == 'p':               # Type of Lp norm used in normalisation step
         S = (1, 2, 3)
         for p in S:
             print("\nTesting Lp metric normalisation with p = %d\n" % p)
@@ -222,7 +222,7 @@ if __name__ == '__main__':
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
-    elif mode == 'vscale':
+    elif mode == 'vscale':          # Scale target number of vertices
         S = np.linspace(0.25, 1., 6)
         for vscale in S:
             print("\nTesting metric rescaling by %.2f\n" % vscale)
@@ -231,7 +231,7 @@ if __name__ == '__main__':
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
-    elif mode == 'normType':
+    elif mode == 'normType':        # Quantify errors in different norms
         S = ('L2 fixedMesh', 'H1 fixedMesh', 'OF fixedMesh', 'L2 hessianBased', 'H1 hessianBased', 'OF hessianBased')
         for Si in S:
             normType, approach = Si.split()
@@ -240,7 +240,7 @@ if __name__ == '__main__':
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
-    elif mode == 'gradate':
+    elif mode == 'gradate':         # Smoothen mesh using gradation
         S = (True, False)
         for gradate in S:
             print("\nTesting metric gradation: ", gradate, "\n")
@@ -249,7 +249,7 @@ if __name__ == '__main__':
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
-    elif mode == 'approach':
+    elif mode == 'approach':        # Experiment with different error estimators
         experiment = int(input("""Choose experiment from list:
 0: All approximation approaches
 1: Residual approximations
@@ -273,7 +273,7 @@ if __name__ == '__main__':
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
-    elif mode == 'order':
+    elif mode == 'order':           # Approximate errors and residuals in lower, higher or the same space
         experiment = int(input("""Choose experiment from list:
 0: Residual approximations
 1: Implicit approximations
@@ -307,7 +307,7 @@ if __name__ == '__main__':
         plt.legend()
         plt.xlabel('#Elements')
         plt.ylabel('CPU time' if output == 'times' else r'$\mathcal{L}_2$ error')
-        filename = 'outdata/outputs/helmholtz_'+mode+'_'+output
+        filename = 'outdata/outputs/helmholtz/helmholtz_'+mode+'_'+output
         if mode in ('approach', 'order'):
             filename += '_experiment' + str(experiment)
         filename += '.pdf'

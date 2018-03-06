@@ -28,12 +28,6 @@ outputs/
 
 .README.md.swp
 
-# Old fixed mesh tsunami script
-fixedMesh.py
-
-# Old anisotropic mesh adaptive tsunami script
-simpleAdapt.py
-
 # Old adjoint based mesh adaptive tsunami script
 adjoint-based.py
 
