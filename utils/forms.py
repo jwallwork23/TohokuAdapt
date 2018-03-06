@@ -304,6 +304,11 @@ def indicator(V, mode='tohoku'):
         x2 = 3.5
         y1 = 0.1
         y2 = 0.9
+    elif mode == 'helmholtz':
+        x1 = 0.
+        x2 = 0.2
+        y1 = 0.4
+        y2 = 0.6
     else:
         raise NotImplementedError
     if smooth:

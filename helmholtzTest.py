@@ -14,7 +14,8 @@ import utils.options as opt
 op = opt.Options(hmin=1e-3,
                  hmax=0.5)
 
-def helmholtzSolve(mesh_H, p, f=None, space="CG"):
+
+def helmholtzSolve(mesh_H, p, f=None, space="CG", normType='L2'):
     """
     Solve Helmholtz' equation in CG2 space. By method of reconstructed solns exact soln is u=cos(2*pi*x)cos(2*pi*y).
     
@@ -22,6 +23,7 @@ def helmholtzSolve(mesh_H, p, f=None, space="CG"):
     :param p: degree of polynomials used.
     :param f: RHS function.
     :param space: type of test space considered.
+    :param normType: type of error norm considered. The 'OF' option measures error in objective computation.
     :return: approximation on ``mesh_H``, under ``space`` of order ``p``, along with exact solution.
     """
 
@@ -37,10 +39,16 @@ def helmholtzSolve(mesh_H, p, f=None, space="CG"):
     F = B - L
     solve(F == 0, u_H)
 
-    # Establish analytic solution
+    # Establish analytic solution and compute (relative) error
     u = Function(V).interpolate(cos(2*pi*x)*cos(2*pi*y))
+    if normType in ('L2', 'H1', 'Hdiv', 'Hcurl'):
+        err = errornorm(u, u_H, norm_type=normType) / norm(u, norm_type=normType)
+    elif normType == 'OF':
+        k = form.indicator(V, mode='helmholtz')
+        J = -0.0282                                 # Here exact OF value was computed in a fine, high degree space
+        err = np.abs(J - assemble(k * u_H * dx)) / np.abs(J)
 
-    return u_H, u, f
+    return u_H, u, f, err
 
 
 def fixed():
@@ -50,11 +58,10 @@ def fixed():
             tic = clock()
             n = pow(2, i)
             mesh_H = UnitSquareMesh(n, n)
-            u_H, u = helmholtzSolve(mesh_H, p)[:2]
-            err = errornorm(u, u_H)
+            u_H, u, f, err = helmholtzSolve(mesh_H, p, normType='OF')
             print("     %d          %d      %.4f    %.2fs" % (i, p, err, clock() - tic))
 
-def adaptive(meshIterations=3, numMeshes=8, degree=1, approach='hessianBased', op=op):
+def adaptive(meshIterations=3, numMeshes=8, degree=1, normType='OF', approach='hessianBased', op=op):
     errors = []
     nEls = []
     times = []
@@ -63,7 +70,7 @@ def adaptive(meshIterations=3, numMeshes=8, degree=1, approach='hessianBased', o
         n = pow(2, i)
         mesh_H = UnitSquareMesh(n, n)
         nVerT = op.vscale * msh.meshStats(mesh_H)[1]
-        u_H, u, f = helmholtzSolve(mesh_H, degree)
+        u_H, u, f, err = helmholtzSolve(mesh_H, degree, normType=normType)
         if approach != 'fixedMesh':
             for cnt in range(meshIterations):
                 if approach == 'hessianBased':
@@ -152,8 +159,7 @@ def adaptive(meshIterations=3, numMeshes=8, degree=1, approach='hessianBased', o
                     adap.metricGradation(M, op=op)
                 mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
                 f = inte.interp(mesh_H, f)[0]
-                u_H, u, f = helmholtzSolve(mesh_H, degree, f)
-        err = errornorm(u, u_H)
+                u_H, u, f, err = helmholtzSolve(mesh_H, degree, f, normType='OF')
         nEle = msh.meshStats(mesh_H)[0]
         tic = clock()-tic
         print("Initial mesh_H %d   Error: %.4f    #Elements: %d     Timing: %.2fs" % (i, err, nEle, tic))
@@ -165,10 +171,9 @@ def adaptive(meshIterations=3, numMeshes=8, degree=1, approach='hessianBased', o
 
 
 if __name__ == '__main__':
-    mode = input("""Choose parameter to vary from 
-                        {'meshIterations', 'hessMeth', 'ntype', 'p', 'vscale', 'gradate', 'approach', 'order'}: """)\
+    mode = input("""Choose parameter to vary from {'meshIterations', 'hessMeth', 'ntype', 'p', 'vscale', 'gradate', 
+                                                   'normType', 'approach', 'order'}: """)\
            or 'meshIterations'
-
     errors = []
     nEls = []
     times = []
@@ -176,7 +181,7 @@ if __name__ == '__main__':
     if mode == 'meshIterations':
         S = range(1, 4)
         for i in S:
-            print("\nTesting use of %d mesh_H iterations\n" % i)
+            print("\nTesting %d mesh_H iterations\n" % i)
             err, nEle, tic = adaptive(i, op=op)
             errors.append(err)
             nEls.append(nEle)
@@ -184,7 +189,7 @@ if __name__ == '__main__':
     elif mode == 'hessMeth':
         S = ('parts', 'dL2')
         for hessMeth in S:
-            print("\nTesting use of %s Hessian reconstruction\n" % hessMeth)
+            print("\nTesting %s Hessian reconstruction\n" % hessMeth)
             op.hessMeth = hessMeth
             err, nEle, tic = adaptive(op=op)
             errors.append(err)
@@ -193,7 +198,7 @@ if __name__ == '__main__':
     elif mode == 'ntype':
         S = ('lp', 'manual')
         for ntype in S:
-            print("\nTesting use of %s metric normalisation\n" % ntype)
+            print("\nTesting %s metric normalisation\n" % ntype)
             op.ntype = ntype
             err, nEle, tic = adaptive(op=op)
             errors.append(err)
@@ -214,6 +219,14 @@ if __name__ == '__main__':
             print("\nTesting metric rescaling by %.2f\n" % vscale)
             op.vscale = vscale
             err, nEle, tic = adaptive(op=op)
+            errors.append(err)
+            nEls.append(nEle)
+            times.append(tic)
+    elif mode == 'normType':
+        S = ('L2', 'H1', 'OF')
+        for normType in S:
+            print("\nTesting norm type %s\n" % normType)
+            err, nEle, tic = adaptive(normType=normType, op=op)
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
@@ -245,7 +258,7 @@ if __name__ == '__main__':
              5: (A[0], A[8], A[9], A[10])}
         S = E[experiment]
         for approach in S:
-            print("\nTesting use of error estimator %s\n" % approach)
+            print("\nTesting use of %s error estimation\n" % approach)
             err, nEle, tic = adaptive(approach=approach, op=op)
             errors.append(err)
             nEls.append(nEle)
@@ -264,7 +277,7 @@ if __name__ == '__main__':
              2: (A[0], A[6], A[7], A[8])}
         S = E[experiment]
         for approach in S:
-            print("\nTesting use of error estimator %s\n" % approach)
+            print("\nTesting use of %s error estimation\n" % approach)
             err, nEle, tic = adaptive(approach=approach, numMeshes=6, degree=2, op=op)
             errors.append(err)
             nEls.append(nEle)
