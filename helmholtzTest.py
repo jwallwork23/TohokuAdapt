@@ -45,8 +45,9 @@ def helmholtzSolve(mesh_H, p, f=None, space="CG", normType='L2'):
         err = errornorm(u, u_H, norm_type=normType) / norm(u, norm_type=normType)
     elif normType == 'OF':
         k = form.indicator(V, mode='helmholtz')
-        J = -0.0282                                 # Here exact OF value was computed in a fine, high degree space
+        J = -0.0285   # Given by OF evaluated on exact solution on a fine, high degree space
         err = np.abs(J - assemble(k * u_H * dx)) / np.abs(J)
+        # err = assemble(k * u * dx)
 
     return u_H, u, f, err
 
@@ -54,14 +55,14 @@ def helmholtzSolve(mesh_H, p, f=None, space="CG", normType='L2'):
 def fixed():
     print("\nFixed mesh_H runs\nRefinement   Degree    Error   Timing")
     for p in range(1, 4):
-        for i in range(8):
+        for i in range(10):
             tic = clock()
             n = pow(2, i)
             mesh_H = UnitSquareMesh(n, n)
             u_H, u, f, err = helmholtzSolve(mesh_H, p, normType='OF')
-            print("     %d          %d      %.4f    %.2fs" % (i, p, err, clock() - tic))
+            print("     %d          %d      %.8f    %.2fs" % (i, p, err, clock() - tic))
 
-def adaptive(meshIterations=3, numMeshes=8, degree=1, normType='OF', approach='hessianBased', op=op):
+def adaptive(meshIterations=3, numMeshes=8, degree=1, normType='OF', redefine=False, approach='hessianBased', op=op):
     errors = []
     nEls = []
     times = []
@@ -158,7 +159,7 @@ def adaptive(meshIterations=3, numMeshes=8, degree=1, normType='OF', approach='h
                 if op.gradate:
                     adap.metricGradation(M, op=op)
                 mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
-                f = inte.interp(mesh_H, f)[0]
+                f = None if redefine else inte.interp(mesh_H, f)[0]
                 u_H, u, f, err = helmholtzSolve(mesh_H, degree, f, normType=normType)
         nEle = msh.meshStats(mesh_H)[0]
         tic = clock()-tic
@@ -171,8 +172,8 @@ def adaptive(meshIterations=3, numMeshes=8, degree=1, normType='OF', approach='h
 
 
 if __name__ == '__main__':
-    mode = input("""Choose parameter to vary from {'meshIterations', 'hessMeth', 'ntype', 'p', 'vscale', 'gradate', 
-                                                   'normType', 'approach', 'order'}: """)\
+    mode = input("""Choose parameter to vary from {'meshIterations', 'redefine', 'hessMeth', 'ntype', 'p', 'vscale', 
+                                                   'gradate', 'normType', 'approach', 'order'}: """)\
            or 'meshIterations'
     errors = []
     nEls = []
@@ -183,6 +184,14 @@ if __name__ == '__main__':
         for i in S:
             print("\nTesting %d mesh_H iterations\n" % i)
             err, nEle, tic = adaptive(i, op=op)
+            errors.append(err)
+            nEls.append(nEle)
+            times.append(tic)
+    elif mode == 'redefine':
+        S = (True, False)
+        for tf in S:
+            print("\nTesting with RHS redefinition: ", tf, "\n")
+            err, nEle, tic = adaptive(redefine=tf, op=op)
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
@@ -223,10 +232,11 @@ if __name__ == '__main__':
             nEls.append(nEle)
             times.append(tic)
     elif mode == 'normType':
-        S = ('L2', 'OF')
-        for normType in S:
-            print("\nTesting norm type %s\n" % normType)
-            err, nEle, tic = adaptive(normType=normType, op=op)
+        S = ('L2 fixedMesh', 'H1 fixedMesh', 'OF fixedMesh', 'L2 hessianBased', 'H1 hessianBased', 'OF hessianBased')
+        for Si in S:
+            normType, approach = Si.split()
+            print("\nTesting norm type %s for %s\n" % (normType, approach))
+            err, nEle, tic = adaptive(approach=approach, normType=normType, op=op)
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
