@@ -159,7 +159,7 @@ def adaptive(meshIterations=3, numMeshes=8, degree=1, normType='OF', approach='h
                     adap.metricGradation(M, op=op)
                 mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
                 f = inte.interp(mesh_H, f)[0]
-                u_H, u, f, err = helmholtzSolve(mesh_H, degree, f, normType='OF')
+                u_H, u, f, err = helmholtzSolve(mesh_H, degree, f, normType=normType)
         nEle = msh.meshStats(mesh_H)[0]
         tic = clock()-tic
         print("Initial mesh_H %d   Error: %.4f    #Elements: %d     Timing: %.2fs" % (i, err, nEle, tic))
@@ -223,7 +223,7 @@ if __name__ == '__main__':
             nEls.append(nEle)
             times.append(tic)
     elif mode == 'normType':
-        S = ('L2', 'H1', 'OF')
+        S = ('L2', 'OF')
         for normType in S:
             print("\nTesting norm type %s\n" % normType)
             err, nEle, tic = adaptive(normType=normType, op=op)
