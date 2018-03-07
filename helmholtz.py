@@ -80,7 +80,7 @@ def adaptive(meshIterations=1, numMeshes=8, degree=1, normType='OF', redefine=Fa
 
         # Solve dual problem on initial mesh
         if approach in ('adjoint', 'DWR', 'DWF', 'refinedDWR', 'refinedDWE',
-                        'highOrderDWR', 'highOrderDWE', 'lowOrderDWR', 'lowOrderDWE'):
+                        'higherOrderDWR', 'higherOrderDWE', 'lowerOrderDWR', 'lowerOrderDWE'):
             l_H = helmholtzSolve(mesh_H, degree, adjoint=True, region=region)[0]
             l_H.rename('Adjoint')
             dualFile.write(l_H, time=float(i))
@@ -100,10 +100,12 @@ def adaptive(meshIterations=1, numMeshes=8, degree=1, normType='OF', redefine=Fa
                     j_int = assemble(jump(v_DG0 * grad(u_H), n=FacetNormal(mesh_H)) * dS)
                     M = adap.isotropicMetric(assemble(v_DG0 * (j_bdy * j_bdy + j_int * j_int) * dx), invert=False,
                                              nVerT=nVerT, op=op)
-                elif approach in ('higherOrderResidual', 'higherOrderImplicit', 'higherOrderExplicit', 'higherOrderDWR',
-                                  'lowerOrderResidual', 'lowerOrderImplicit', 'lowerOrderExplicit', 'lowerOrderDWR'):
+                elif approach in ('higherOrderResidual', 'higherOrderImplicit', 'higherOrderExplicit',
+                                  'higherOrderDWR', 'higherOrderDWE', 'lowerOrderResidual', 'lowerOrderImplicit',
+                                  'lowerOrderExplicit', 'lowerOrderDWR', 'lowerOrderDWE'):
                     deg = degree+1 if \
-                        approach in ('higherOrderResidual', 'higherOrderImplicit', 'higherOrderExplicit') else degree-1
+                        approach in ('higherOrderResidual', 'higherOrderImplicit', 'higherOrderExplicit',
+                                     'higherOrderDWR', 'higherOrderDWE') else degree-1
                     x, y = SpatialCoordinate(mesh_H)
                     V_oi = FunctionSpace(mesh_H, "CG", deg)
                     u_H_oi = Function(V_oi).interpolate(u_H)
@@ -121,7 +123,7 @@ def adaptive(meshIterations=1, numMeshes=8, degree=1, normType='OF', redefine=Fa
                             j_int = assemble(jump(v_DG0 * grad(u_H_oi), n=FacetNormal(mesh_H)) * dS)
                             jumpTerm = assemble(v_DG0 * hk * (j_bdy * j_bdy + j_int * j_int) * dx)
                             M = adap.isotropicMetric(assemble(sqrt(resTerm + jumpTerm)), invert=False, nVerT=nVerT, op=op)
-                    elif approach in ('higherOrderImplicit', 'lowerOrderImplicit'):
+                    elif approach in ('higherOrderImplicit', 'lowerOrderImplicit', 'lowerOrderDWE', 'higherOrderDWE'):
                         v_oi = TestFunction(V_oi)
                         e = Function(V_oi)
                         Be = (inner(grad(e), grad(v_oi)) + e * v_oi) * dx
@@ -130,9 +132,14 @@ def adaptive(meshIterations=1, numMeshes=8, degree=1, normType='OF', redefine=Fa
                         I = form.interelementTerm(v_oi * grad(u_H_oi), n=FacetNormal(mesh_H)) * dS
                         F_oi = Be - L_oi + Bu - I
                         solve(F_oi == 0, e)
-                        M = adap.isotropicMetric(e, invert=False, nVerT=nVerT, op=op)
+                        if approach in ('higherOrderImplicit', 'lowerOrderImplicit'):
+                            M = adap.isotropicMetric(e, invert=False, nVerT=nVerT, op=op)
+                        else:
+                            l_oi = Function(V_oi).interpolate(l_H)
+                            el = assemble(v_DG0 * e * l_oi * dx)
+                            M = adap.isotropicMetric(el, invert=False, nVerT=nVerT, op=op)
                     elif approach in ('lowerOrderDWR', 'higherOrderDWR'):
-                        l_oi = Function(V_oi).inteprolate(l_H)
+                        l_oi = Function(V_oi).interpolate(l_H)
                         Rl = assemble(v_DG0 * (- div(grad(u_H_oi)) + u_H_oi - f_oi) * l_oi * dx)
                         M = adap.isotropicMetric(Rl, invert=False, nVerT=nVerT, op=op)
                 elif approach in ('refinedResidual', 'refinedImplicit', 'refinedExplicit', 'refinedDWR', 'refinedDWE'):
@@ -310,15 +317,15 @@ if __name__ == '__main__':
 6: Adjoint approximations\n"""))
         A = ('fixedMesh', 'hessianBased', 'fluxJump', 'residual', 'explicit',
              'higherOrderResidual', 'higherOrderImplicit', 'higherOrderExplicit', 'higherOrderDWR', 'higherOrderDWE',
-             'refinedResidual', 'refinedImplicit', 'refinedExplicit', 'refinedDWR', 'refinedDWE'
+             'refinedResidual', 'refinedImplicit', 'refinedExplicit', 'refinedDWR', 'refinedDWE', 'DWF'
              )
         E = {0: (A[0], A[1], A[2], A[3], A[4], A[6]),
              1: (A[0], A[3], A[5], A[10]),
              2: (A[0], A[6], A[11]),
              3: (A[0], A[4], A[7], A[12]),
              4: (A[0], A[5], A[6], A[7]),
-             5: (A[0], A[10], A[11], A[12])
-             6: (A[0], A[8], A[9], A[13], A[14])}
+             5: (A[0], A[10], A[11], A[12]),
+             6: (A[0], A[8], A[9], A[13], A[14], A[15])}
         S = E[experiment]
         for approach in S:
             print("\nTesting use of %s error estimation\n" % approach)
@@ -338,8 +345,8 @@ if __name__ == '__main__':
              'lowerOrderDWR', 'DWR', 'higherOrderDWR',
              'lowerOrderDWE', 'lowerOrderDWE'
              )
-        E = {0: (A[0], A[1], A[2], A[3]),
-             1: (A[0], A[4], A[5]),
+        E = {0: (A[0], A[1], A[2], A[3], A[9], A[10], A[11]),
+             1: (A[0], A[4], A[5], A[12], A[13]),
              2: (A[0], A[6], A[7], A[8])}
         S = E[experiment]
         for approach in S:
