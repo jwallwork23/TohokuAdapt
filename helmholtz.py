@@ -74,6 +74,7 @@ def adaptive(meshIterations=1, numMeshes=8, degree=1, normType='OF', redefine=Fa
         tic = clock()
         n = pow(2, i)
         mesh_H = UnitSquareMesh(n, n)
+        outfile = File("plots/helmholtz/solution.pvd")
 
         # Solve dual problem on initial mesh
         if approach in ('DWR', 'DWF', 'refinedDWR', 'refinedDWE',
@@ -188,6 +189,8 @@ def adaptive(meshIterations=1, numMeshes=8, degree=1, normType='OF', redefine=Fa
                 mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
                 f = None if redefine else inte.interp(mesh_H, f)[0]
                 u_H, u, f, err = helmholtzSolve(mesh_H, degree, f, normType=normType)
+                u_H.rename('Numerical solution')
+        outfile.write(u_H, time=float(i))
         nEle = msh.meshStats(mesh_H)[0]
         tic = clock()-tic
         print("Initial mesh_H %d   Error: %.4f    #Elements: %d     Timing: %.2fs" % (i, err, nEle, tic))
