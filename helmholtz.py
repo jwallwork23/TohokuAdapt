@@ -66,7 +66,7 @@ def fixed():
             u_H, u, f, err = helmholtzSolve(mesh_H, p, normType='OF')
             print("     %d          %d      %.8f    %.2fs" % (i, p, err, clock() - tic))
 
-def adaptive(meshIterations=1, numMeshes=8, degree=1, normType='OF', redefine=False, approach='hessianBased', region=1,
+def adaptive(meshIterations=1, numMeshes=9, degree=1, normType='OF', redefine=False, approach='hessianBased', region=1,
              op=op):
     errors = []
     nEls = []
@@ -314,7 +314,8 @@ if __name__ == '__main__':
 3: Explicit approximations
 4: Higher order approximations
 5: Refined approximations
-6: Adjoint approximations\n"""))
+6: Adjoint approximations
+7: Main approaches\n"""))
         A = ('fixedMesh', 'hessianBased', 'fluxJump', 'residual', 'explicit',
              'higherOrderResidual', 'higherOrderImplicit', 'higherOrderExplicit', 'higherOrderDWR', 'higherOrderDWE',
              'refinedResidual', 'refinedImplicit', 'refinedExplicit', 'refinedDWR', 'refinedDWE', 'DWF'
@@ -325,7 +326,8 @@ if __name__ == '__main__':
              3: (A[0], A[4], A[7], A[12]),
              4: (A[0], A[5], A[6], A[7]),
              5: (A[0], A[10], A[11], A[12]),
-             6: (A[0], A[8], A[9], A[13], A[14], A[15])}
+             6: (A[0], A[8], A[9], A[13], A[14], A[15]),
+             7: (A[0], A[1], A[8], A[13], A[15])}
         S = E[experiment]
         for approach in S:
             print("\nTesting use of %s error estimation\n" % approach)
@@ -351,7 +353,7 @@ if __name__ == '__main__':
         S = E[experiment]
         for approach in S:
             print("\nTesting use of %s error estimation\n" % approach)
-            err, nEle, tic = adaptive(approach=approach, numMeshes=6, degree=2, op=op)
+            err, nEle, tic = adaptive(approach=approach, numMeshes=7, degree=2, op=op)
             errors.append(err)
             nEls.append(nEle)
             times.append(tic)
@@ -369,7 +371,7 @@ if __name__ == '__main__':
         plt.title(title)
         plt.legend()
         plt.xlabel('#Elements')
-        plt.ylabel('CPU time' if output == 'times' else r'$\mathcal{L}_2$ error')
+        plt.ylabel('CPU time' if output == 'times' else 'Error')
         filename = 'outdata/outputs/helmholtz/helmholtz_'+mode+'_'+output
         if mode in ('approach', 'order'):
             filename += '_experiment' + str(experiment)
