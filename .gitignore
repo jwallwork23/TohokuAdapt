@@ -28,9 +28,6 @@ outputs/
 
 .README.md.swp
 
-# Old adjoint based mesh adaptive tsunami script
-adjoint-based.py
-
 # Old test scripts
 test-shallow-water.py
 test-rossby-wave.py

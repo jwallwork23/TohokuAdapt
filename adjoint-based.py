@@ -13,6 +13,8 @@ import utils.options as opt
 import utils.storage as stor
 
 
+# TODO: ressuract this! Continuous adjoint vs. discrete adjoint in Thetis!
+
 # Define initial mesh and mesh statistics placeholders
 print('************** ADJOINT-BASED ADAPTIVE TSUNAMI SIMULATION **************\n')
 print('ADJOINT-GUIDED mesh adaptive solver initially defined on a mesh of')
