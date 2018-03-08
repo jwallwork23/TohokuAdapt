@@ -28,21 +28,15 @@ outputs/
 
 .README.md.swp
 
-# Old test scripts
-test-shallow-water.py
-test-rossby-wave.py
-
-# Timings and errors for simulations
-outdata/timings.txt
-outdata/errors.txt
+# Old test script
+shallow-water-test.py
 
 # Plot timeseries at a later time
 quickPlot.py
 
-# Thetis sanity checks and testing
-thetisTest.py
+# Testing
 wdTest.py
-
-# Pyadjoint testing
-pyadjoint-test.py
+rossby-test-thetis.py
+rossby-test-firedrake.py
+pyadjoint-test-thetis.py
 pyadjoint-test-firedrake.py

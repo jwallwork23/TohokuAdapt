@@ -66,7 +66,7 @@ def fixed():
             u_H, u, f, err = helmholtzSolve(mesh_H, p, normType='OF')
             print("     %d          %d      %.8f    %.2fs" % (i, p, err, clock() - tic))
 
-def adaptive(meshIterations=1, numMeshes=9, degree=1, normType='OF', redefine=False, approach='hessianBased', region=1,
+def adaptive(meshIterations=3, numMeshes=9, degree=1, normType='OF', redefine=False, approach='hessianBased', region=1,
              op=op):
     errors = []
     nEls = []
@@ -78,13 +78,6 @@ def adaptive(meshIterations=1, numMeshes=9, degree=1, normType='OF', redefine=Fa
         primalFile = File("plots/helmholtz/solution.pvd")
         dualFile = File("plots/helmholtz/adjoint.pvd")
 
-        # Solve dual problem on initial mesh
-        if approach in ('adjoint', 'DWR', 'DWF', 'refinedDWR', 'refinedDWE',
-                        'higherOrderDWR', 'higherOrderDWE', 'lowerOrderDWR', 'lowerOrderDWE'):
-            l_H = helmholtzSolve(mesh_H, degree, adjoint=True, region=region)[0]
-            l_H.rename('Adjoint')
-            dualFile.write(l_H, time=float(i))
-
         # Solve primal equation on initial mesh
         nVerT = op.vscale * msh.meshStats(mesh_H)[1]
         u_H, u, f, err = helmholtzSolve(mesh_H, degree, normType=normType, region=region)
@@ -92,6 +85,14 @@ def adaptive(meshIterations=1, numMeshes=9, degree=1, normType='OF', redefine=Fa
         # Solve primal equation adaptively
         if approach != 'fixedMesh':
             for cnt in range(meshIterations):
+
+                # Solve dual problem on initial mesh
+                if approach in ('adjoint', 'DWR', 'DWF', 'refinedDWR', 'refinedDWE',
+                                'higherOrderDWR', 'higherOrderDWE', 'lowerOrderDWR', 'lowerOrderDWE'):
+                    l_H = helmholtzSolve(mesh_H, degree, adjoint=True, region=region)[0]
+                    l_H.rename('Adjoint')
+                    dualFile.write(l_H, time=float(i))
+
                 if approach == 'hessianBased':
                     M = adap.computeSteadyMetric(u_H, nVerT=nVerT, op=op)
                 elif approach == 'fluxJump':
