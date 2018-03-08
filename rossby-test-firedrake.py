@@ -9,9 +9,9 @@ periodic = True
 op = opt.Options(family='dg-cg',
                  # timestepper='ImplicitEuler',
                  timestepper='CrankNicolson',
-                 dt=0.1,
+                 dt=0.01,   # TODO: adjust this to keep Courant number fixed
                  Tend=120.,
-                 ndump=12,
+                 ndump=120,
                  g=1.)
 Dt = Constant(op.dt)
 dirName = "plots/rossby-wave/"
@@ -19,7 +19,7 @@ forwardFile = File(dirName + "forwardRW.pvd")
 solFile = File(dirName + 'analytic.pvd')
 
 # Define Mesh
-n = 5           # Which gives dx ~ 0.283 > 0.1 = dt
+n = 6           # Which gives dx ~ 0.236 > 0.1 = dt
 lx = 48
 ly = 24
 mesh = PeriodicRectangleMesh(lx*n, ly*n, lx, ly, direction="x") if periodic else RectangleMesh(lx*n, ly*n, lx, ly)
@@ -61,6 +61,8 @@ while t < op.Tend:
         print('t = %.1fs' % t)
     t += op.dt
     cnt += 1
+
+# TODO: Check analytic solution is correctly implemented.
 
 # # Plot analytic solution
 # t = 0.

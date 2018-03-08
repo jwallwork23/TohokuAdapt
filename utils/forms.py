@@ -148,10 +148,12 @@ def adjointSW(l, l_, b, Dt, mode='shallow-water', switch=Constant(1.), op=opt.Op
     L = ((inner(lu_, w) + le_ * xi) / Dt - a2 * b * inner(grad(le_), w) + a2 * op.g * inner(lu_, grad(xi))) * dx
     L -= switch * iA * xi * dx
 
+    # TODO: boundary conditions?
+
     return B, L
 
 
-def weakResidualSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, allowNormalFlow=True, adjoint=False,
+def weakResidualSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, neumann=True, adjoint=False,
                    mode='shallow-water', switch=Constant(0.), op=opt.Options()):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
@@ -163,6 +165,7 @@ def weakResidualSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, allo
     :param nu: coefficient for stress term.
     :param coriolisFreq: Coriolis parameter for rotational equations.
     :param nonlinear: toggle nonlinear / linear equations.
+    :param neumann: impose Neumann BCs.
     :param op: parameter-holding class.
     :return: weak residual for shallow water equations at current timestep.
     """
@@ -170,7 +173,7 @@ def weakResidualSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, allo
         B, L = adjointSW(q, q_, b, Dt, mode=mode, switch=switch, op=op)
     else:
         B, L = formsSW(q, q_, b, Dt, nu=nu, coriolisFreq=coriolisFreq, nonlinear=nonlinear,
-                       allowNormalFlow=allowNormalFlow, op=op)
+                       neumann=neumann, op=op)
     return B - L
 
 
