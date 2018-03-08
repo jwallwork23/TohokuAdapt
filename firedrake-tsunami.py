@@ -188,7 +188,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     Jvals = [Jval]
 
     if getData:
-        # Define variational problem
+        # Define variational problem    # TODO: use LinearVariationalProblem, for which need TrialFunction(s)
         forwardProblem = NonlinearVariationalProblem(
             form.weakResidualSW(q, q_, b, Dt, coriolisFreq=f, neumann=True, op=op), q, bcs=bc)
         forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)

@@ -101,6 +101,8 @@ def formsSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, neumann=Tru
     B = (inner(u, w) + eta * xi) / Dt * dx  # LHS bilinear form
     L = (inner(u_, w) + eta_ * xi) / Dt * dx  # RHS linear functional
 
+    # TODO: Some amendments to be made in DG case.
+
     if V.sub(1).ufl_element().family() == 'Lagrange':
         B += a1 * g * inner(grad(eta), w) * dx
         L -= a2 * g * inner(grad(eta_), w) * dx

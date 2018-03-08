@@ -4,12 +4,21 @@ import utils.forms as form
 import utils.options as opt
 
 
+# Define Mesh
+n = 5
+lx = 48
+ly = 24
+mesh = PeriodicRectangleMesh(lx*n, ly*n, lx, ly, direction="x") if periodic else RectangleMesh(lx*n, ly*n, lx, ly)
+xy = Function(mesh.coordinates)
+xy.dat.data[:, :] -= [lx/2, ly/2]
+mesh.coordinates.assign(xy)
+
 # Set solver parameters and plot directories
 periodic = True
 op = opt.Options(family='dg-cg',
                  # timestepper='ImplicitEuler',
                  timestepper='CrankNicolson',
-                 dt=0.01,   # TODO: adjust this to keep Courant number fixed
+                 dt = 0.5 / n,              # Ensures Courant number 0.5
                  Tend=120.,
                  ndump=120,
                  g=1.)
@@ -17,15 +26,6 @@ Dt = Constant(op.dt)
 dirName = "plots/rossby-wave/"
 forwardFile = File(dirName + "forwardRW.pvd")
 solFile = File(dirName + 'analytic.pvd')
-
-# Define Mesh
-n = 6           # Which gives dx ~ 0.236 > 0.1 = dt
-lx = 48
-ly = 24
-mesh = PeriodicRectangleMesh(lx*n, ly*n, lx, ly, direction="x") if periodic else RectangleMesh(lx*n, ly*n, lx, ly)
-xy = Function(mesh.coordinates)
-xy.dat.data[:, :] -= [lx/2, ly/2]
-mesh.coordinates.assign(xy)
 
 # Define FunctionSpaces and physical fields
 V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
