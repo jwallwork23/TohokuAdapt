@@ -38,45 +38,33 @@ q_ = form.solutionHuang(V, t=0.)
 u_, eta_ = q_.split()
 u_.rename('Velocity')
 eta_.rename('Elevation')
-bc = DirichletBC(V.sub(0), [0, 0], [1, 2] if periodic else 'on_boundary')
+BCs = DirichletBC(V.sub(0), [0, 0], [1, 2] if periodic else 'on_boundary')
 
 # Define variational problem
-qt = TestFunction(V)
-(w, xi) = (as_vector((qt[0], qt[1])), qt[2])
 q = Function(V)
-u_, eta_ = split(q_)
-u, eta = split(q)
-a1, a2 = form.timestepCoeffs(op.timestepper)
-B = (inner(u, w) + eta * xi) / Dt * dx                    # LHS bilinear form
-L = (inner(u_, w) + eta_ * xi) / Dt * dx                  # RHS linear functional
-B += a1 * op.g * inner(grad(eta), w) * dx if op.space2 == "CG" else - (a1 * op.g * eta * div(w)) * dx
-L -= a2 * op.g * inner(grad(eta_), w) * dx if op.space2 == "CG" else - (a2 * op.g * eta_ * div(w)) * dx
-B -= a1 * inner(b * u, grad(xi)) * dx                      # No integration by parts
-L += a2 * inner(b * u_, grad(xi)) * dx                     #           "
-B += a1 * f * inner(as_vector((-u[1], u[0])), w) * dx     # Rotational terms
-L -= a2 * f * inner(as_vector((-u_[1], u_[0])), w) * dx   #           "
-F = B - L
-forwardProblem = NonlinearVariationalProblem(F, q, bcs=bc)
-forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=opt.Options().params)
-u_, eta_ = q_.split()
 u, eta = q.split()
+F = form.weakResidualSW(q, q_, b, Dt, coriolisFreq=f, nonlinear=True, neumann=True, op=op)
+# TODO: I think this extra BC needs removing.
+forwardProblem = NonlinearVariationalProblem(F, q, bcs=BCs)
+forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
 # Initialise counters and solve numerically
 t = 0.
 cnt = 0
 forwardFile.write(u_, eta_, time=t)
+print('Generating numerical solution')
 while t < op.Tend:
     forwardSolver.solve()
     q_.assign(q)
     if cnt % op.ndump == 0:
         forwardFile.write(u_, eta_, time=t)
-        print('t = %.2fs' % t)
+        print('t = %.1fs' % t)
     t += op.dt
     cnt += 1
 
 # # Plot analytic solution
 # t = 0.
-# print('Generating analytic solution')
+# print('Generating analytical solution')
 # while t < op.Tend:
 #     q = form.solutionHuang(V, t=t)
 #     u, eta = q.split()

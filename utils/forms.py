@@ -75,7 +75,7 @@ def strongResidualSW(q, q_, b, Dt, nu=0., rotational=False, nonlinear=False, op=
     return Au, Ae
 
 
-def formsSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, allowNormalFlow=True, op=opt.Options()):
+def formsSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, neumann=True, op=opt.Options()):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
 
@@ -86,6 +86,7 @@ def formsSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, allowNormal
     :param nu: coefficient for stress term.
     :param coriolisFreq: Coriolis parameter for rotational equations.
     :param nonlinear: toggle nonlinear / linear equations.
+    :param neumann: impose Neumann BCs.
     :param op: parameter holding class.
     :return: weak residual for shallow water equations at current timestep.
     """
@@ -106,12 +107,12 @@ def formsSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, allowNormal
     else:
         B -= a1 * g * eta * div(w) * dx
         L += a2 * g * eta_ * div(w) * dx
-    if allowNormalFlow:
-        B += a1 * div(b * u) * xi * dx
-        L -= a2 * div(b * u_) * xi * dx
-    else:
+    if neumann:
         B -= a1 * inner(b * u, grad(xi)) * dx
         L += a2 * inner(b * u_, grad(xi)) * dx
+    else:
+        B += a1 * div(b * u) * xi * dx
+        L -= a2 * div(b * u_) * xi * dx
     if nu != 0.:
         B -= a1 * nu * inner(grad(u) + transpose(grad(u)), grad(w)) * dx
         L += a2 * nu * inner(grad(u_) + transpose(grad(u_)), grad(w)) * dx
