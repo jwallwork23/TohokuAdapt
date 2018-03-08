@@ -94,8 +94,7 @@ cnt = 0
 
 if getData:
     # Define variational problem
-    psi = TestFunction(V_H)
-    F = form.weakResidualAD(phi_next, phi, psi, w, Dt, nu=nu)
+    F = form.weakResidualAD(phi_next, phi, w, Dt, nu=nu)
 
     print('\nStarting primal run (forwards in time) on a fixed mesh with %d elements' % nEle)
     finished = False
@@ -253,9 +252,8 @@ if approach in ('simpleAdapt', 'goalBased'):
             phi_next = Function(V_H)
 
             # Re-establish bilinear form and set boundary conditions
-            psi = TestFunction(V_H)
             w = Function(VectorFunctionSpace(mesh_H, "CG", 2), name='Wind field').interpolate(Expression([1, 0]))
-            F = form.weakResidualAD(phi_next, phi, psi, w, Dt, nu=nu)
+            F = form.weakResidualAD(phi_next, phi, w, Dt, nu=nu)
 
             if tAdapt:
                 dt = adap.adaptTimestepAD(w)

@@ -25,6 +25,9 @@ def timestepCoeffs(timestepper):
     return a1, a2
 
 
+# TODO: make this format more conventional and consider RK4 timestepping
+
+
 def timestepScheme(u, u_, timestepper):
     """
     :arg u: prognostic variable at current timestep. 
@@ -73,13 +76,12 @@ def strongResidualSW(q, q_, b, Dt, nu=0., rotational=False, nonlinear=False, op=
     return Au, Ae
 
 
-def formsSW(q, q_, qt, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, allowNormalFlow=True, op=opt.Options()):
+def formsSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, allowNormalFlow=True, op=opt.Options()):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
 
     :arg q: solution tuple for linear shallow water equations.
     :arg q_: solution tuple for linear shallow water equations at previous timestep.
-    :arg qt: test function tuple.
     :arg b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: coefficient for stress term.
@@ -91,6 +93,7 @@ def formsSW(q, q_, qt, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, allowNo
     V = q.function_space()
     (u, eta) = (as_vector((q[0], q[1])), q[2])
     (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
+    qt = TestFunction(V)
     (w, xi) = (as_vector((qt[0], qt[1])), qt[2])
     a1, a2 = timestepCoeffs(op.timestepper)
     g = op.g
@@ -123,13 +126,12 @@ def formsSW(q, q_, qt, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, allowNo
     return B, L
 
 
-def adjointSW(l, l_, lt, b, Dt, x1=2.5, x2=3.5, y1=0.1, y2=0.9, smooth=False, switch=Constant(1.), op=opt.Options()):
+def adjointSW(l, l_, b, Dt, mode='shallow-water', switch=Constant(1.), op=opt.Options()):
     """
     Semi-discrete (time-discretised) weak form adjoint shallow water equations with no normal flow boundary conditions.
 
     :arg l: solution tuple for adjoint linear shallow water equations.
     :arg l_: solution tuple for adjoint linear shallow water equations at previous timestep.
-    :arg lt: test function tuple.
     :arg b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param op: parameter-holding class.
@@ -137,9 +139,10 @@ def adjointSW(l, l_, lt, b, Dt, x1=2.5, x2=3.5, y1=0.1, y2=0.9, smooth=False, sw
     """
     (lu, le) = (as_vector((l[0], l[1])), l[2])
     (lu_, le_) = (as_vector((l_[0], l_[1])), l_[2])
+    lt = TestFunction(l.function_space())
     (w, xi) = (as_vector((lt[0], lt[1])), lt[2])
     a1, a2 = timestepCoeffs(op.timestepper)
-    iA = indicator(l.function_space().sub(1), x1=x1, x2=x2, y1=y1, y2=y2, smooth=smooth)
+    iA = indicator(l.function_space().sub(1), mode=mode)
 
     B = ((inner(lu, w) + le * xi) / Dt + a1 * b * inner(grad(le), w) - a1 * op.g * inner(lu, grad(xi))) * dx
     L = ((inner(lu_, w) + le_ * xi) / Dt - a2 * b * inner(grad(le_), w) + a2 * op.g * inner(lu_, grad(xi))) * dx
@@ -148,14 +151,13 @@ def adjointSW(l, l_, lt, b, Dt, x1=2.5, x2=3.5, y1=0.1, y2=0.9, smooth=False, sw
     return B, L
 
 
-def weakResidualSW(q, q_, qt, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, allowNormalFlow=True, adjoint=False,
-                   switch=Constant(0.), op=opt.Options()):
+def weakResidualSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, allowNormalFlow=True, adjoint=False,
+                   mode='shallow-water', switch=Constant(0.), op=opt.Options()):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
 
     :arg q: solution tuple for linear shallow water equations.
     :arg q_: solution tuple for linear shallow water equations at previous timestep.
-    :arg qt: test function tuple.
     :arg b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: coefficient for stress term.
@@ -165,9 +167,9 @@ def weakResidualSW(q, q_, qt, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, 
     :return: weak residual for shallow water equations at current timestep.
     """
     if adjoint:
-        B, L = adjointSW(q, q_, qt, b, Dt, x1=2.5, x2=3.5, y1=0.1, y2=0.9, smooth=False, switch=switch, op=op)
+        B, L = adjointSW(q, q_, b, Dt, mode=mode, switch=switch, op=op)
     else:
-        B, L = formsSW(q, q_, qt, b, Dt, nu=nu, coriolisFreq=coriolisFreq, nonlinear=nonlinear,
+        B, L = formsSW(q, q_, b, Dt, nu=nu, coriolisFreq=coriolisFreq, nonlinear=nonlinear,
                        allowNormalFlow=allowNormalFlow, op=op)
     return B - L
 
@@ -228,11 +230,10 @@ def strongResidualAD(c, c_, w, Dt, nu=1e-3, timestepper='CrankNicolson'):
     return (c - c_) / Dt + inner(w, grad(cm)) - Constant(nu) * div(grad(cm))
 
 
-def weakResidualAD(c, c_, ct, w, Dt, nu=1e-3, timestepper='CrankNicolson'):
+def weakResidualAD(c, c_, w, Dt, nu=1e-3, timestepper='CrankNicolson'):
     """
     :arg c: concentration solution at current timestep. 
     :arg c_: concentration at previous timestep.
-    :arg ct: test function.
     :arg w: wind field.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: diffusivity parameter.
@@ -240,39 +241,40 @@ def weakResidualAD(c, c_, ct, w, Dt, nu=1e-3, timestepper='CrankNicolson'):
     :return: weak residual for advection diffusion equation at current timestep.
     """
     cm = timestepScheme(c, c_, timestepper)
+    ct = TestFunction(c.function_space())
     return ((c - c_) * ct / Dt + inner(grad(cm), w * ct) + Constant(nu) * inner(grad(cm), grad(ct))) * dx
 
 
-def adjointAD(l, l_, lt, w, Dt,  timestepper='CrankNicolson', x1=2.75, x2=3.25, y1=0.25, y2=0.75):
+def adjointAD(l, l_, w, Dt,  timestepper='CrankNicolson', x1=2.75, x2=3.25, y1=0.25, y2=0.75):
     """
     :arg l: adjoint concentration solution at current timestep. 
     :arg l_: adjoint concentration at previous timestep.
-    :arg lt: test function.
     :arg w: wind field.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param timestepper: time integration scheme used.
     :return: weak residual for advection diffusion equation at current timestep.
     """
     lm = timestepScheme(l, l_, timestepper)
-    iA = indicator(l.function_space(), x1=x1, x2=x2, y1=y1, y2=y2, smooth=False)
+    lt = TestFunction(l.function_space())
+    iA = indicator(l.function_space(), mode='advection-diffusion')
     return ((l - l_) * lt / Dt + inner(grad(lm), w * lt) + iA * lt) * dx
 
 
 # TODO: not sure this is properly linearised
 
 
-def weakMetricAdvection(M, M_, Mt, w, Dt, timestepper='ImplicitEuler'):
+def weakMetricAdvection(M, M_, w, Dt, timestepper='ImplicitEuler'):
     """
     Advect a metric. Also works for vector fields.
 
     :arg M: metric at current timestep.
     :arg M_: metric at previous timestep.
-    :arg Mt: test function.
     :arg w: wind vector.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param timestepper: time integration scheme used.
     :return: weak residual for metric advection.
     """
+    Mt = TestFunction(M.function_space())
     Mm = timestepScheme(M, M_, timestepper)
     F = (inner(M - M_, Mt) / Dt + inner(dot(w, nabla_grad(Mm)), Mt)) * dx
     return F

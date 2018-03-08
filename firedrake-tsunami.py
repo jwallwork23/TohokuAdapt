@@ -172,9 +172,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     if getData:
         # Define variational problem
-        qt = TestFunction(V_H)
         forwardProblem = NonlinearVariationalProblem(
-            form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False, op=op), q)
+            form.weakResidualSW(q, q_, b, Dt, allowNormalFlow=False, op=op), q)
         forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
         if approach in ('implicit', 'DWE'):
@@ -476,9 +475,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     eta.rename("elev_2d")
 
                 # Re-establish variational form
-                qt = TestFunction(V_H)
                 adaptProblem = NonlinearVariationalProblem(
-                    form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False, op=op), q)
+                    form.weakResidualSW(q, q_, b, Dt, allowNormalFlow=False, op=op), q)
                 adaptSolver = NonlinearVariationalSolver(adaptProblem, solver_parameters=op.params)
                 if op.tAdapt:
                     dt = adap.adaptTimestepSW(mesh_H, b)
