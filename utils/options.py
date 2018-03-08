@@ -83,7 +83,7 @@ class Options:
         # Adaptivity parameters
         self.family = family
         try:
-            assert family in ('dg-dg', 'dg-cg')
+            assert family in ('dg-dg', 'dg-cg', 'cg-cg')
         except:
             raise ValueError('Mixed function space not recognised.')
         self.vscale = vscale
@@ -175,14 +175,12 @@ class Options:
                        'assembled_pc_type': 'lu',
                        'snes_lag_preconditioner': -1,
                        'snes_lag_preconditioner_persists': True}
-        self.degree1 = 1
-        self.degree2 = 1
-        self.space1 = 'DG'
-        if family == 'dg-cg':
-            self.degree2 += 1
-            self.space2 = 'CG'
-        else:
-            self.space2 = 'DG'
+
+        # Define FunctionSpaces
+        self.degree1 = 2 if family == 'cg-cg' else 1
+        self.degree2 = 2 if family == 'dg-cg' else 1
+        self.space1 = "CG" if family == 'cg-cg' else "DG"
+        self.space2 = "DG" if family == 'dg-dg' else "CG"
 
         # Gauge locations in latitude-longitude coordinates
         self.glatlon = {"P02": (38.5002, 142.5016), "P06": (38.6340, 142.5838), "801": (38.2, 141.7),
