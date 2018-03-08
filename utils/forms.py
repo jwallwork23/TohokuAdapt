@@ -75,7 +75,7 @@ def strongResidualSW(q, q_, b, Dt, nu=0., rotational=False, nonlinear=False, op=
     return Au, Ae
 
 
-def formsSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, neumann=True, op=opt.Options()):
+def formsSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, noslip=True, op=opt.Options()):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
 
@@ -86,7 +86,7 @@ def formsSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, neumann=Tru
     :param nu: coefficient for stress term.
     :param coriolisFreq: Coriolis parameter for rotational equations.
     :param nonlinear: toggle nonlinear / linear equations.
-    :param neumann: impose Neumann BCs.
+    :param noslip: impose Neumann BCs.
     :param op: parameter holding class.
     :return: weak residual for shallow water equations at current timestep.
     """
@@ -98,20 +98,16 @@ def formsSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, neumann=Tru
     a1, a2 = timestepCoeffs(op.timestepper)
     g = op.g
 
-    B = (inner(u, w) + eta * xi) / Dt * dx  # LHS bilinear form
-    L = (inner(u_, w) + eta_ * xi) / Dt * dx  # RHS linear functional
-
-    # TODO: Some amendments to be made in DG case.
-
-    if V.sub(1).ufl_element().family() == 'Lagrange':
-        B += a1 * g * inner(grad(eta), w) * dx
-        L -= a2 * g * inner(grad(eta_), w) * dx
-    else:
-        B -= a1 * g * eta * div(w) * dx
-        L += a2 * g * eta_ * div(w) * dx
-    if neumann:
+    B = (inner(u, w) + eta * xi) / Dt * dx + a1 * g * inner(grad(eta), w) * dx          # LHS bilinear form
+    L = (inner(u_, w) + eta_ * xi) / Dt * dx - a2 * g * inner(grad(eta_), w) * dx       # RHS linear functional
+    if noslip:
         B -= a1 * inner(b * u, grad(xi)) * dx
         L += a2 * inner(b * u_, grad(xi)) * dx
+        if V.sub(0).ufl_element().family() != 'Lagrange':
+            n = FacetNormal(V.mesh())
+            B += a1 * b * (dot(u('+'), n)('+') + dot(u('-'), n)('-')) * xi * dS
+            L -= a1 * b * (dot(u_('+'), n)('+') + dot(u_('-'), n)('-')) * xi * dS
+        # TODO: Test this
     else:
         B += a1 * div(b * u) * xi * dx
         L -= a2 * div(b * u_) * xi * dx
@@ -124,6 +120,7 @@ def formsSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, neumann=Tru
     if nonlinear:
         B += a1 * inner(dot(u, nabla_grad(u)), w) * dx
         L -= a2 * inner(dot(u_, nabla_grad(u_)), w) * dx
+        # TODO: bottom friction?
 
     return B, L
 
@@ -155,7 +152,7 @@ def adjointSW(l, l_, b, Dt, mode='shallow-water', switch=Constant(1.), op=opt.Op
     return B, L
 
 
-def weakResidualSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, neumann=True, adjoint=False,
+def weakResidualSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, noslip=True, adjoint=False,
                    mode='shallow-water', switch=Constant(0.), op=opt.Options()):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
@@ -167,7 +164,7 @@ def weakResidualSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, neum
     :param nu: coefficient for stress term.
     :param coriolisFreq: Coriolis parameter for rotational equations.
     :param nonlinear: toggle nonlinear / linear equations.
-    :param neumann: impose Neumann BCs.
+    :param noslip: impose Neumann BCs.
     :param op: parameter-holding class.
     :return: weak residual for shallow water equations at current timestep.
     """
@@ -175,7 +172,7 @@ def weakResidualSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, neum
         B, L = adjointSW(q, q_, b, Dt, mode=mode, switch=switch, op=op)
     else:
         B, L = formsSW(q, q_, b, Dt, nu=nu, coriolisFreq=coriolisFreq, nonlinear=nonlinear,
-                       neumann=neumann, op=op)
+                       noslip=noslip, op=op)
     return B - L
 
 

@@ -4,6 +4,8 @@ import utils.forms as form
 import utils.options as opt
 
 
+periodic = True
+
 # Define Mesh
 n = 5
 lx = 48
@@ -14,7 +16,6 @@ xy.dat.data[:, :] -= [lx/2, ly/2]
 mesh.coordinates.assign(xy)
 
 # Set solver parameters and plot directories
-periodic = True
 op = opt.Options(family='dg-cg',
                  # timestepper='ImplicitEuler',
                  timestepper='CrankNicolson',
@@ -43,8 +44,7 @@ BCs = DirichletBC(V.sub(0), [0, 0], [1, 2] if periodic else 'on_boundary')
 # Define variational problem
 q = Function(V)
 u, eta = q.split()
-F = form.weakResidualSW(q, q_, b, Dt, coriolisFreq=f, nonlinear=True, neumann=True, op=op)
-# TODO: I think this extra BC needs removing.
+F = form.weakResidualSW(q, q_, b, Dt, coriolisFreq=f, nonlinear=True, noslip=False, op=op)  # TODO: testing of BCs
 forwardProblem = NonlinearVariationalProblem(F, q, bcs=BCs)
 forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
