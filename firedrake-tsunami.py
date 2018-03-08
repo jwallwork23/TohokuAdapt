@@ -18,8 +18,6 @@ import utils.timeseries as tim
 now = datetime.datetime.now()
 date = str(now.day)+'-'+str(now.month)+'-'+str(now.year%2000)
 
-# TODO: combine rossby-wave test case into this script
-
 
 def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mode='tohoku', op=opt.Options()):
     """
@@ -40,6 +38,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         msc.dis('*********************** TOHOKU TSUNAMI SIMULATION *********************\n', op.printStats)
     elif mode == 'shallow-water':
         msc.dis('*********************** SHALLOW WATER TEST PROBLEM ********************\n', op.printStats)
+    elif mode == 'rossby-wave':
+        msc.dis('****************** EQUATORIAL ROSSBY WAVE TEST PROBLEM ****************\n', op.printStats)
     primalTimer = dualTimer = errorTimer = adaptTimer = False
     if approach in ('implicit', 'DWE'):
         op.orderChange = 1
@@ -57,19 +57,40 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     # Load Mesh(es)
     if mode == 'tohoku':
         mesh_H, eta0, b = msh.TohokuDomain(startRes)    # Computational mesh
+        dt = adap.adaptTimestepSW(mesh_H, b)
     elif mode == 'shallow-water':
         lx = 2 * np.pi
         n = pow(2, startRes)
         mesh_H = SquareMesh(n, n, lx, lx)  # Computational mesh
         x, y = SpatialCoordinate(mesh_H)
-        P1_2d = FunctionSpace(mesh_H, "CG", 1)
-        eta0 = Function(P1_2d).interpolate(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))), annotate=False)
-        b = Function(P1_2d).assign(0.1, annotate=False)
+        P1 = FunctionSpace(mesh_H, "CG", 1)
+        eta0 = Function(P1).interpolate(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))), annotate=False)
+        b = Function(P1).assign(0.1, annotate=False)
+        dt = 0.01
+    elif mode == 'rossby-wave':
+        n = 5
+        lx = 48
+        ly = 24
+        mesh_H = RectangleMesh(lx * n, ly * n, lx, ly)
+        xy = Function(mesh_H.coordinates)
+        xy.dat.data[:, :] -= [lx / 2, ly / 2]
+        mesh_H.coordinates.assign(xy)
+        P1 = FunctionSpace(mesh_H, "CG", 1)
+        b = Function(P1).assign(1.)
+        dt = 0.1
     else:
         raise NotImplementedError
 
     # Define initial FunctionSpace and variables of problem and apply initial conditions
     V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
+    if mode == 'rossby-wave':
+        q0 = form.solutionHuang(V_H, t=0.)
+        u0, eta0 = q0.split()
+        bc = DirichletBC(V_H.sub(0), [0, 0], 'on_boundary')
+        f = Function(P1).interpolate(SpatialCoordinate(mesh_H)[1])
+    else:
+        bc = []
+        f = None
     q_ = Function(V_H)
     u_, eta_ = q_.split()
     u_.interpolate(Expression([0, 0]))
@@ -92,7 +113,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         eh.rename("Fine elevation")
 
     # Specify physical and solver parameters
-    dt = adap.adaptTimestepSW(mesh_H, b) if mode == 'tohoku' else 0.01        # TODO: change this
     msc.dis('Using initial timestep = %4.3fs\n' % dt, op.printStats)
     Dt = Constant(dt)
     T = op.Tend
@@ -146,9 +166,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             e0, e1 = e.split()
             e0.rename("Implicit error 0")
             e1.rename("Implicit error 1")
-            et = TestFunction(V_oi)
-            (et0, et1) = (as_vector((et[0], et[1])), et[2])
-            normal = FacetNormal(mesh_H)
 
     # Initialise adaptivity placeholders and counters
     nEle, nVerT = msh.meshStats(mesh_H)
@@ -173,12 +190,15 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     if getData:
         # Define variational problem
         forwardProblem = NonlinearVariationalProblem(
-            form.weakResidualSW(q, q_, b, Dt, allowNormalFlow=False, op=op), q)
+            form.weakResidualSW(q, q_, b, Dt, coriolisFreq=f, allowNormalFlow=False, op=op), q, bcs=bc)
         forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
         if approach in ('implicit', 'DWE'):
-            B_, L = form.formsSW(q_oi, q_oi_, et, b, Dt, allowNormalFlow=False)
-            B = form.formsSW(e, e_, et, b, Dt, allowNormalFlow=False)[0]
+            et = TestFunction(V_oi)
+            (et0, et1) = (as_vector((et[0], et[1])), et[2])
+            normal = FacetNormal(mesh_H)
+            B_, L = form.formsSW(q_oi, q_oi_, b, Dt, coriolisFreq=f, allowNormalFlow=False)
+            B = form.formsSW(e, e_, b, Dt, allowNormalFlow=False)[0]
             I = form.interelementTerm(et1 * u_oi, n=normal) * dS
             errorProblem = NonlinearVariationalProblem(B - L + B_ - I, e)
             errorSolver = NonlinearVariationalSolver(errorProblem, solver_parameters=op.params)
@@ -468,7 +488,11 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     if mode == 'tohoku':
                         b = inte.interp(mesh_H, b)[0]
                     elif mode == 'shallow-water':
-                        b = Function(FunctionSpace(mesh_H, "CG", 1)).assign(0.1, annotate=False)
+                        b = Function(FunctionSpace(mesh_H, "CG", 1)).assign(0.1)
+                    elif mode == 'rossby-wave':
+                        P1 = FunctionSpace(mesh_H, "CG", 1)
+                        b = Function(P1).assign(1.)
+                        f = Function(P1).assign(SpatialCoordinate(mesh_H)[1])
                     q = Function(V_H)
                     u, eta = q.split()
                     u.rename("uv_2d")
@@ -476,7 +500,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
                 # Re-establish variational form
                 adaptProblem = NonlinearVariationalProblem(
-                    form.weakResidualSW(q, q_, b, Dt, allowNormalFlow=False, op=op), q)
+                    form.weakResidualSW(q, q_, b, Dt, coriolisFreq=f, allowNormalFlow=False, op=op), q)
                 adaptSolver = NonlinearVariationalSolver(adaptProblem, solver_parameters=op.params)
                 if op.tAdapt:
                     dt = adap.adaptTimestepSW(mesh_H, b)

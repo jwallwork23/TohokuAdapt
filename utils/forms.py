@@ -57,7 +57,6 @@ def strongResidualSW(q, q_, b, Dt, nu=0., rotational=False, nonlinear=False, op=
     # TODO: include optionality for BCs
     # TODO: implement Galerkin Least Squares (GLS) stabilisation
 
-
     (u, eta) = (as_vector((q[0], q[1])), q[2])
     (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
     um = timestepScheme(u, u_, op.timestepper)
@@ -197,7 +196,7 @@ def solutionHuang(V, t=0., B=0.395):
     :arg V: Mixed function space upon which to define solutions.
     :arg t: current time.
     :param B: Parameter controlling amplitude of soliton.
-    :return: Analytic solution for test problem of Huang.
+    :return: Analytic solution for rossby-wave test problem of Huang.
     """
     x, y = SpatialCoordinate(V.mesh())
     q = Function(V)
@@ -230,37 +229,25 @@ def strongResidualAD(c, c_, w, Dt, nu=1e-3, timestepper='CrankNicolson'):
     return (c - c_) / Dt + inner(w, grad(cm)) - Constant(nu) * div(grad(cm))
 
 
-def weakResidualAD(c, c_, w, Dt, nu=1e-3, timestepper='CrankNicolson'):
+def weakResidualAD(c, c_, w, Dt, nu=1e-3, adjoint=False, timestepper='CrankNicolson'):
     """
     :arg c: concentration solution at current timestep. 
     :arg c_: concentration at previous timestep.
     :arg w: wind field.
     :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: diffusivity parameter.
+    :param adjoint: toggle (continuous) adjoint equations.
     :param timestepper: time integration scheme used.
     :return: weak residual for advection diffusion equation at current timestep.
     """
     cm = timestepScheme(c, c_, timestepper)
     ct = TestFunction(c.function_space())
-    return ((c - c_) * ct / Dt + inner(grad(cm), w * ct) + Constant(nu) * inner(grad(cm), grad(ct))) * dx
-
-
-def adjointAD(l, l_, w, Dt,  timestepper='CrankNicolson', x1=2.75, x2=3.25, y1=0.25, y2=0.75):
-    """
-    :arg l: adjoint concentration solution at current timestep. 
-    :arg l_: adjoint concentration at previous timestep.
-    :arg w: wind field.
-    :param Dt: timestep expressed as a FiredrakeConstant.
-    :param timestepper: time integration scheme used.
-    :return: weak residual for advection diffusion equation at current timestep.
-    """
-    lm = timestepScheme(l, l_, timestepper)
-    lt = TestFunction(l.function_space())
-    iA = indicator(l.function_space(), mode='advection-diffusion')
-    return ((l - l_) * lt / Dt + inner(grad(lm), w * lt) + iA * lt) * dx
-
-
-# TODO: not sure this is properly linearised
+    F = ((c - c_) * ct / Dt + inner(grad(cm), w * ct)) * dx
+    if nu != 0.:
+        F += Constant(nu) * inner(grad(cm), grad(ct)) * dx
+    if adjoint:
+        F += indicator(c.function_space(), mode='advection-diffusion') * ct * dx
+    return F
 
 
 def weakMetricAdvection(M, M_, w, Dt, timestepper='ImplicitEuler'):
@@ -289,22 +276,7 @@ def indicator(V, mode='tohoku'):
     smooth = True if mode == 'tohoku' else False
 
     # Define extent of region A
-    if mode == 'tohoku':
-        x1 = 490e3
-        x2 = 640e3
-        y1 = 4160e3
-        y2 = 4360e3
-    elif mode == 'shallow-water':
-        x1 = 0.
-        x2 = 0.5 * np.pi
-        y1 = 0.5 * np.pi
-        y2 = 1.5 * np.pi
-    elif mode == 'advection-diffusion':
-        x1 = 2.5
-        x2 = 3.5
-        y1 = 0.1
-        y2 = 0.9
-    elif mode == 'helmholtz1':
+    if mode == 'helmholtz1':
         x1 = 0.
         x2 = 0.2
         y1 = 0.4
@@ -314,6 +286,26 @@ def indicator(V, mode='tohoku'):
         x2 = 0.3
         y1 = 0.1
         y2 = 0.3
+    elif mode == 'advection-diffusion':
+        x1 = 2.5
+        x2 = 3.5
+        y1 = 0.1
+        y2 = 0.9
+    elif mode == 'shallow-water':
+        x1 = 0.
+        x2 = 0.5 * np.pi
+        y1 = 0.5 * np.pi
+        y2 = 1.5 * np.pi
+    elif mode == 'rossby-wave':
+        x1 = 0.
+        x2 = 8.
+        y1 = 10.
+        y2 = 14.
+    elif mode == 'tohoku':
+        x1 = 490e3
+        x2 = 640e3
+        y1 = 4160e3
+        y2 = 4360e3
     else:
         raise NotImplementedError
     if smooth:
