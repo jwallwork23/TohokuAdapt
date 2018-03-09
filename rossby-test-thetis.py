@@ -4,7 +4,7 @@ import utils.forms as form
 
 
 # Set solver parameters
-periodic = True
+periodic = False
 dt = 0.1            # In Matt's parameters dt=0.1
 T = 120.
 ndump = 12

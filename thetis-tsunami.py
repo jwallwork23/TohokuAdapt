@@ -57,6 +57,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     # Load Mesh, initial condition and bathymetry
     if mode == 'tohoku':
         mesh_H, eta0, b = msh.TohokuDomain(startRes, wd=op.wd)
+        P1 = FunctionSpace(mesh_H, "CG", 1)
     elif mode == 'shallow-water':
         lx = 2 * np.pi
         n = pow(2, startRes)
@@ -65,7 +66,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         P1 = FunctionSpace(mesh_H, "CG", 1)
         eta0 = Function(P1).interpolate(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))))
         b = Function(P1).assign(0.1)
-    else:
+    elif mode == 'rossby-wave':
         n = pow(2, startRes)
         lx = 48
         ly = 24
@@ -88,7 +89,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         uv_2d, elev_2d = q.split()
         elev_2d.interpolate(eta0)
         BCs = {}
-    uv_2d.rename("uv_2d")
+    uv_2d.rename("uv_2d")       # TODO: this should be 'Velocity2d'
     elev_2d.rename("elev_2d")
     if approach in ('residual', 'implicit', 'DWR', 'DWE', 'explicit'):
         q_ = Function(V_H)
@@ -161,8 +162,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     # Get timestep
     solver_obj = solver2d.FlowSolver2d(mesh_H, b)
-    solver_obj.create_equations()
     if mode == 'tohoku':
+        solver_obj.create_equations()
         dt = min(np.abs(solver_obj.compute_time_step().dat.data))
     elif mode == 'shallow-water':
         dt = 0.025  # TODO: change this
@@ -171,7 +172,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     Dt = Constant(dt)
     iEnd = int(np.ceil(T / (dt * op.rm)))
     if op.gradate or op.wd:                 # Get initial boundary metric
-        P1 = FunctionSpace(mesh_H, "CG", 1)
         H0 = Function(P1).interpolate(CellSize(mesh_H))
     if op.wd:
         g = adap.constructGradient(elev_2d)
@@ -192,8 +192,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         # Get solver parameter values and construct solver
         options = solver_obj.options
         options.element_family = op.family
-        options.use_nonlinear_equations = True if op.wd else False           # TODO: convert to nonlinear everywhere
+        options.use_nonlinear_equations = True if op.wd or mode == 'rossby-wave' else False
         options.use_grad_depth_viscosity_term = False
+        if mode == 'rossby-wave':
+            options.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh_H)[1])
         options.simulation_export_time = dt * (op.rm-1) if aposteriori else dt * op.ndump
         options.simulation_end_time = T
         options.timestepper_type = op.timestepper
@@ -204,16 +206,16 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         options.use_wetting_and_drying = op.wd
         if op.wd:
             options.wetting_and_drying_alpha = alpha
-        if mode == 'rossby-wave':
-            options.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh_H)[1])
 
         # Output error data
         if approach == 'fixedMesh' and op.outputOF:
             if mode == 'tohoku':
                 cb = err.TohokuCallback(solver_obj)
             elif mode == 'shallow-water':
+                solver_obj.create_equations()
                 cb = err.ShallowWaterCallback(solver_obj)
             elif mode == 'rossby-wave':
+                solver_obj.create_equations()
                 cb = err.RossbyWaveCallback(solver_obj)
             cb.output_dir = dirName
             cb.append_to_log = True
@@ -221,7 +223,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             solver_obj.add_callback(cb, 'timestep')
 
         # Apply ICs and time integrate
-        solver_obj.assign_initial_conditions(elev=elev_2d if mode == 'rossby-wave' else eta0)
+        if mode == 'rossby-wave':
+            solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
+        else:
+            solver_obj.assign_initial_conditions(elev=eta0)
         solver_obj.bnd_functions['shallow_water'] = BCs
         if aposteriori and approach != 'DWF':
             if mode == 'tohoku':
@@ -454,7 +459,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             adapSolver = solver2d.FlowSolver2d(mesh_H, b)
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
-            adapOpt.use_nonlinear_equations = True if mode == 'rossby-wave' else False
+            adapOpt.use_nonlinear_equations = True if op.wd or mode == 'rossby-wave' else False
             adapOpt.use_grad_depth_viscosity_term = False
             adapOpt.simulation_export_time = dt * op.ndump
             startT = endT
@@ -476,7 +481,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                                        field_dict,
                                        field_metadata,
                                        export_type='hdf5')
-            adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)    # TODO: why is this here?
+            adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)    # TODO: why is this here, not later?
             adapSolver.i_export = int(cnt / op.ndump)
             adapSolver.iteration = cnt
             adapSolver.simulation_time = startT
@@ -541,11 +546,11 @@ if __name__ == '__main__':
                      gauges=False,
                      tAdapt=False,
                      # iso=False if approach in ('gradientBased', 'hessianBased') else True,
-                     iso=True,
-                     # iso=False,
+                     # iso=True,
+                     iso=False,
                      bootstrap=False,
                      printStats=True,
-                     outputOF=True,
+                     outputOF=False,
                      orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
                      # orderChange=0,
                      wd=False,
