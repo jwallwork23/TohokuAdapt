@@ -25,7 +25,7 @@ op = opt.Options(family='cg-cg',
                  g=1.)
 Dt = Constant(op.dt)
 dirName = "plots/rossby-wave/"
-forwardFile = File(dirName + "forwardRW.pvd")
+forwardFile = File(dirName+op.family+"/forwardRW.pvd")
 solFile = File(dirName + 'analytic.pvd')
 
 # Define FunctionSpaces and physical fields
@@ -39,7 +39,7 @@ q_ = form.solutionHuang(V, t=0.)
 u_, eta_ = q_.split()
 u_.rename('Velocity')
 eta_.rename('Elevation')
-BCs = DirichletBC(V.sub(0), [0, 0], [1, 2] if periodic else 'on_boundary')
+BCs = DirichletBC(V.sub(0), Constant([0, 0]), [1, 2] if periodic else 'on_boundary')
 
 # Define variational problem
 q = Function(V)

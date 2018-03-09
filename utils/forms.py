@@ -102,8 +102,7 @@ def formsSW(q, q_, b, Dt, nu=None, coriolisFreq=None, nonlinear=False, noslip=Tr
     if noslip:
         B -= a1 * inner(b * u, grad(xi)) * dx
         if V.sub(0).ufl_element().family() != 'Lagrange':
-            n = FacetNormal(V.mesh())
-            B += a1 * b * (dot(u('+'), n('+')) + dot(u('-'), n('-'))) * xi * dS
+            B += a1 * jump(b * u * xi, n=FacetNormal(V.mesh())) * dS
         # TODO: Test this
     else:
         B += a1 * div(b * u) * xi * dx
