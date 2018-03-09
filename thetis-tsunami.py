@@ -397,13 +397,12 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     loadVel.close()
 
             # Construct metric
-            P1 = FunctionSpace(mesh_H, "CG", 1)
             if aposteriori:
                 with DumbCheckpoint(dirName+'hdf5/'+approach+'Error'+msc.indexString(int(cnt/op.rm)), mode=FILE_READ) \
                         as loadErr:
                     loadErr.load(epsilon)
                     loadErr.close()
-                errEst = Function(P1).interpolate(inte.interp(mesh_H, epsilon)[0])
+                errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon)[0])
                 M = adap.isotropicMetric(errEst, op=op, invert=False, nVerT=nVerT)
             else:
                 if approach == 'norm':
@@ -445,6 +444,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             if not (((approach in ('fieldBased', 'gradientBased', 'hessianBased') and op.mtype != 'f')
                      or approach == 'fluxJump') and cnt == 0):
                 mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
+                P1 = FunctionSpace(mesh_H, "CG", 1)
                 elev_2d, uv_2d = inte.interp(mesh_H, elev_2d, uv_2d)
                 if mode == 'tohoku':
                     b = inte.interp(mesh_H, b)[0]
