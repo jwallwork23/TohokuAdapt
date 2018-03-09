@@ -25,7 +25,7 @@ def timestepCoeffs(timestepper):
     return a1, a2
 
 
-# TODO: make this format more conventional and consider RK4 timestepping
+# TODO: make this format more conventional and move into utils/timestepping
 
 
 def timestepScheme(u, u_, timestepper):
@@ -40,7 +40,7 @@ def timestepScheme(u, u_, timestepper):
     return a1 * u + a2 * u_
 
 
-def strongResidualSW(q, q_, b, Dt, nu=0., rotational=False, nonlinear=False, op=opt.Options()):
+def strongResidualSW(q, q_, b, Dt, nu=None, coriolisFreq=None, nonlinear=False, op=opt.Options()):
     """
     Construct the strong residual for the semi-discrete linear shallow water equations at the current timestep.
 
@@ -48,13 +48,12 @@ def strongResidualSW(q, q_, b, Dt, nu=0., rotational=False, nonlinear=False, op=
     :arg q_: solution tuple for linear shallow water equations at previous timestep.
     :arg b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
-    :param nu: coefficient for stress term.
-    :param rotational: toggle rotational / non-rotational equations.
+    :param nu: coefficient for stress term, expressed as a FiredrakeConstant.
+    :param coriolisFreq: Coriolis parameter for rotational equations.
     :param nonlinear: toggle nonlinear / linear equations.
     :param op: parameter holding class.
     :return: strong residual for shallow water equations at current timestep.
     """
-    # TODO: include optionality for BCs
     # TODO: implement Galerkin Least Squares (GLS) stabilisation
 
     (u, eta) = (as_vector((q[0], q[1])), q[2])
@@ -64,18 +63,17 @@ def strongResidualSW(q, q_, b, Dt, nu=0., rotational=False, nonlinear=False, op=
 
     Au = (u - u_) / Dt + op.g * grad(em)
     Ae = (eta - eta_) / Dt + div(b * um)
-    if nu != 0.:
+    if nu:
         Au += div(nu * (grad(um) + transpose(grad(um))))
     if rotational:
-        f = op.coriolis0 + op.coriolis1 * SpatialCoordinate(q.function_space().mesh())[1]
-        Au += f * as_vector((-u[1], u[0]))
+        Au += coriolisFreq * as_vector((-u[1], u[0]))
     if nonlinear:
         Au += dot(u, nabla_grad(u))
 
     return Au, Ae
 
 
-def formsSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, noslip=True, op=opt.Options()):
+def formsSW(q, q_, b, Dt, nu=None, coriolisFreq=None, nonlinear=False, noslip=True, op=opt.Options()):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
 
@@ -83,7 +81,7 @@ def formsSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, noslip=True
     :arg q_: solution tuple for linear shallow water equations at previous timestep.
     :arg b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
-    :param nu: coefficient for stress term.
+    :param nu: coefficient for stress term, expressed as a FiredrakeConstant.
     :param coriolisFreq: Coriolis parameter for rotational equations.
     :param nonlinear: toggle nonlinear / linear equations.
     :param noslip: impose Neumann BCs.
@@ -98,23 +96,21 @@ def formsSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, noslip=True
     a1, a2 = timestepCoeffs(op.timestepper)
     g = op.g
 
-    B = (inner(u, w) + eta * xi) / Dt * dx + a1 * g * inner(grad(eta), w) * dx          # LHS bilinear form
-    L = (inner(u_, w) + eta_ * xi) / Dt * dx - a2 * g * inner(grad(eta_), w) * dx       # RHS linear functional
+    B = (inner(q, qt)) / Dt * dx + a1 * g * inner(grad(eta), w) * dx          # LHS bilinear form
+    L = (inner(q_, qt)) / Dt * dx - a2 * g * inner(grad(eta_), w) * dx       # RHS linear functional
+    L -= a2 * div(b * u_) * xi * dx     # Note: Don't "apply BCs" to linear functional
     if noslip:
         B -= a1 * inner(b * u, grad(xi)) * dx
-        L += a2 * inner(b * u_, grad(xi)) * dx
         if V.sub(0).ufl_element().family() != 'Lagrange':
             n = FacetNormal(V.mesh())
-            B += a1 * b * (dot(u('+'), n)('+') + dot(u('-'), n)('-')) * xi * dS
-            L -= a1 * b * (dot(u_('+'), n)('+') + dot(u_('-'), n)('-')) * xi * dS
+            B += a1 * b * (dot(u('+'), n('+')) + dot(u('-'), n('-'))) * xi * dS
         # TODO: Test this
     else:
         B += a1 * div(b * u) * xi * dx
-        L -= a2 * div(b * u_) * xi * dx
-    if nu != 0.:
+    if nu:
         B -= a1 * nu * inner(grad(u) + transpose(grad(u)), grad(w)) * dx
         L += a2 * nu * inner(grad(u_) + transpose(grad(u_)), grad(w)) * dx
-    if coriolisFreq is not None:
+    if coriolisFreq:
         B += a1 * coriolisFreq * inner(as_vector((-u[1], u[0])), w) * dx
         L -= a2 * coriolisFreq * inner(as_vector((-u_[1], u_[0])), w) * dx
     if nonlinear:

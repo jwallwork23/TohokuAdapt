@@ -16,12 +16,12 @@ xy.dat.data[:, :] -= [lx/2, ly/2]
 mesh.coordinates.assign(xy)
 
 # Set solver parameters and plot directories
-op = opt.Options(family='dg-cg',
+op = opt.Options(family='cg-cg',
                  # timestepper='ImplicitEuler',
                  timestepper='CrankNicolson',
-                 dt = 0.5 / n,              # Ensures Courant number 0.5
+                 dt = 0.5/n,                # Ensures Courant number 0.5
                  Tend=120.,
-                 ndump=120,
+                 ndump=12,
                  g=1.)
 Dt = Constant(op.dt)
 dirName = "plots/rossby-wave/"
@@ -58,7 +58,7 @@ while t < op.Tend:
     q_.assign(q)
     if cnt % op.ndump == 0:
         forwardFile.write(u_, eta_, time=t)
-        print('t = %.1fs' % t)
+    print('t = %.1fs' % t)
     t += op.dt
     cnt += 1
 
