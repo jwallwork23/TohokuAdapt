@@ -190,15 +190,15 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     if getData:
         # Define variational problem    # TODO: use LinearVariationalProblem, for which need TrialFunction(s)
         forwardProblem = NonlinearVariationalProblem(
-            form.weakResidualSW(q, q_, b, Dt, coriolisFreq=f, noslip=True, op=op), q, bcs=bc)
+            form.weakResidualSW(q, q_, b, Dt, coriolisFreq=f, impermeable=True, op=op), q, bcs=bc)
         forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
         if approach in ('implicit', 'DWE'):
             et = TestFunction(V_oi)
             (et0, et1) = (as_vector((et[0], et[1])), et[2])
             normal = FacetNormal(mesh_H)
-            B_, L = form.formsSW(q_oi, q_oi_, b, Dt, coriolisFreq=f, noslip=True)
-            B = form.formsSW(e, e_, b, Dt, noslip=True)[0]
+            B_, L = form.formsSW(q_oi, q_oi_, b, Dt, coriolisFreq=f, impermeable=True)
+            B = form.formsSW(e, e_, b, Dt, impermeable=True)[0]
             I = form.interelementTerm(et1 * u_oi, n=normal) * dS
             errorProblem = NonlinearVariationalProblem(B - L + B_ - I, e)
             errorSolver = NonlinearVariationalSolver(errorProblem, solver_parameters=op.params)
@@ -500,7 +500,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
                 # Re-establish variational form
                 adaptProblem = NonlinearVariationalProblem(
-                    form.weakResidualSW(q, q_, b, Dt, coriolisFreq=f, noslip=True, op=op), q)
+                    form.weakResidualSW(q, q_, b, Dt, coriolisFreq=f, impermeable=True, op=op), q)
                 adaptSolver = NonlinearVariationalSolver(adaptProblem, solver_parameters=op.params)
                 if op.tAdapt:
                     dt = adap.adaptTimestepSW(mesh_H, b)

@@ -39,12 +39,12 @@ q_ = form.solutionHuang(V, t=0.)
 u_, eta_ = q_.split()
 u_.rename('Velocity')
 eta_.rename('Elevation')
-BCs = DirichletBC(V.sub(0), Constant([0, 0]), [1, 2] if periodic else 'on_boundary')
+BCs = DirichletBC(V.sub(0), Constant([0, 0]), [1, 2] if periodic else 'on_boundary')    # No-slip boundary conditions
 
 # Define variational problem
 q = Function(V)
 u, eta = q.split()
-F = form.weakResidualSW(q, q_, b, Dt, coriolisFreq=f, nonlinear=True, noslip=False, op=op)  # TODO: testing of BCs
+F = form.weakResidualSW(q, q_, b, Dt, coriolisFreq=f, nonlinear=True, impermeable=False, op=op)  # TODO: testing of BCs
 forwardProblem = NonlinearVariationalProblem(F, q, bcs=BCs)
 forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
@@ -64,14 +64,14 @@ while t < op.Tend:
 
 # TODO: Check analytic solution is correctly implemented.
 
-# # Plot analytic solution
-# t = 0.
-# print('Generating analytical solution')
-# while t < op.Tend:
-#     q = form.solutionHuang(V, t=t)
-#     u, eta = q.split()
-#     u.rename('Analytic fluid velocity')
-#     eta.rename('Analytic free surface')
-#     solFile.write(u, eta, time=t)
-#     print('t = %.1fs' % t)
-#     t += op.ndump * op.dt
+# Plot analytic solution
+t = 0.
+print('Generating analytical solution')
+while t < op.Tend:
+    q = form.solutionHuang(V, t=t)
+    u, eta = q.split()
+    u.rename('Analytic fluid velocity')
+    eta.rename('Analytic free surface')
+    solFile.write(u, eta, time=t)
+    print('t = %.1fs' % t)
+    t += op.ndump * op.dt

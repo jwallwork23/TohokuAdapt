@@ -73,7 +73,7 @@ def strongResidualSW(q, q_, b, Dt, nu=None, coriolisFreq=None, nonlinear=False, 
     return Au, Ae
 
 
-def formsSW(q, q_, b, Dt, nu=None, coriolisFreq=None, nonlinear=False, noslip=True, op=opt.Options()):
+def formsSW(q, q_, b, Dt, nu=None, coriolisFreq=None, nonlinear=False, impermeable=True, op=opt.Options()):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
 
@@ -84,7 +84,7 @@ def formsSW(q, q_, b, Dt, nu=None, coriolisFreq=None, nonlinear=False, noslip=Tr
     :param nu: coefficient for stress term, expressed as a FiredrakeConstant.
     :param coriolisFreq: Coriolis parameter for rotational equations.
     :param nonlinear: toggle nonlinear / linear equations.
-    :param noslip: impose Neumann BCs.
+    :param impermeable: impose Neumann BCs.
     :param op: parameter holding class.
     :return: weak residual for shallow water equations at current timestep.
     """
@@ -99,7 +99,7 @@ def formsSW(q, q_, b, Dt, nu=None, coriolisFreq=None, nonlinear=False, noslip=Tr
     B = (inner(q, qt)) / Dt * dx + a1 * g * inner(grad(eta), w) * dx          # LHS bilinear form
     L = (inner(q_, qt)) / Dt * dx - a2 * g * inner(grad(eta_), w) * dx       # RHS linear functional
     L -= a2 * div(b * u_) * xi * dx     # Note: Don't "apply BCs" to linear functional
-    if noslip:
+    if impermeable:
         B -= a1 * inner(b * u, grad(xi)) * dx
         if V.sub(0).ufl_element().family() != 'Lagrange':
             B += a1 * jump(b * u * xi, n=FacetNormal(V.mesh())) * dS
@@ -147,7 +147,7 @@ def adjointSW(l, l_, b, Dt, mode='shallow-water', switch=Constant(1.), op=opt.Op
     return B, L
 
 
-def weakResidualSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, noslip=True, adjoint=False,
+def weakResidualSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, impermeable=True, adjoint=False,
                    mode='shallow-water', switch=Constant(0.), op=opt.Options()):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
@@ -159,7 +159,7 @@ def weakResidualSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, nosl
     :param nu: coefficient for stress term.
     :param coriolisFreq: Coriolis parameter for rotational equations.
     :param nonlinear: toggle nonlinear / linear equations.
-    :param noslip: impose Neumann BCs.
+    :param impermeable: impose impermeable BCs.
     :param op: parameter-holding class.
     :return: weak residual for shallow water equations at current timestep.
     """
@@ -167,7 +167,7 @@ def weakResidualSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, nosl
         B, L = adjointSW(q, q_, b, Dt, mode=mode, switch=switch, op=op)
     else:
         B, L = formsSW(q, q_, b, Dt, nu=nu, coriolisFreq=coriolisFreq, nonlinear=nonlinear,
-                       noslip=noslip, op=op)
+                       impermeable=impermeable, op=op)
     return B - L
 
 
@@ -203,12 +203,13 @@ def solutionHuang(V, t=0., B=0.395):
     A = 0.771 * B * B
     W = FunctionSpace(V.mesh(), V.sub(0).ufl_element().family(), V.sub(0).ufl_element().degree())
     u0 = Function(W).interpolate(
-        A * (1 / (cosh(B * (x + B * B * t)) ** 2)) * 0.25 * (-9 + 6 * y * y) * exp(-0.5 * y * y))
+        A * (1 / (cosh(B * (x + 0.395 * B * B * t)) ** 2)) * 0.25 * (-9 + 6 * y * y) * exp(-0.5 * y * y))
     u1 = Function(W).interpolate(
-        -2 * B * tanh(B * (x + B * B * t)) * A * (1 / (cosh(B * (x + B * B * t)) ** 2)) * 2 * y * exp(-0.5 * y * y))
+        -2 * B * tanh(B * (x + 0.395 * B * B * t)) * A *
+        (1 / (cosh(B * (x + 0.395 * B * B * t)) ** 2)) * 2 * y * exp(-0.5 * y * y))
     u.dat.data[:,0] = u0.dat.data
     u.dat.data[:,1] = u1.dat.data
-    eta.interpolate(A*(1/(cosh(B*(x + B * B * t))**2))*0.25*(3+6*y*y)*exp(-0.5*y*y))
+    eta.interpolate(A*(1/(cosh(B*(x + 0.395 * B * B * t))**2))*0.25*(3+6*y*y)*exp(-0.5*y*y))
 
     return q
 
