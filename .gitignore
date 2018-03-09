@@ -36,6 +36,5 @@ quickPlot.py
 
 # Testing
 wdTest.py
-rossby-test-thetis.py
 pyadjoint-test-thetis.py
 pyadjoint-test-firedrake.py

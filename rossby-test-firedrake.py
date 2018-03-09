@@ -4,15 +4,15 @@ import utils.forms as form
 import utils.options as opt
 
 
-periodic = True
+periodic = False
 
 # Define Mesh
 n = 5
 lx = 48
 ly = 24
-mesh = PeriodicRectangleMesh(lx*n, ly*n, lx, ly, direction="x") if periodic else RectangleMesh(lx*n, ly*n, lx, ly)
+mesh = PeriodicRectangleMesh(lx*n, ly*n, lx, ly, direction="x") if periodic else RectangleMesh(3*lx*n, ly*n, 3*lx, ly)
 xy = Function(mesh.coordinates)
-xy.dat.data[:, :] -= [lx/2, ly/2]
+xy.dat.data[:, :] -= [lx/2, ly/2] if periodic else [3*lx/2, ly/2]
 mesh.coordinates.assign(xy)
 
 # Set solver parameters and plot directories
@@ -34,33 +34,33 @@ P1 = FunctionSpace(mesh, "CG", 1)
 b = Function(P1).assign(1.)
 f = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
 
-# # Assign initial and boundary conditions
-# q_ = form.solutionHuang(V, t=0.)
-# u_, eta_ = q_.split()
-# u_.rename('Velocity')
-# eta_.rename('Elevation')
-# BCs = DirichletBC(V.sub(0), Constant([0, 0]), [1, 2] if periodic else 'on_boundary')    # No-slip boundary conditions
-#
-# # Define variational problem
-# q = Function(V)
-# u, eta = q.split()
-# F = form.weakResidualSW(q, q_, b, Dt, coriolisFreq=f, nonlinear=True, impermeable=False, op=op)  # TODO: testing of BCs
-# forwardProblem = NonlinearVariationalProblem(F, q, bcs=BCs)
-# forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
-#
-# # Initialise counters and solve numerically
-# t = 0.
-# cnt = 0
-# forwardFile.write(u_, eta_, time=t)
-# print('Generating numerical solution')
-# while t < op.Tend:
-#     forwardSolver.solve()
-#     q_.assign(q)
-#     if cnt % op.ndump == 0:
-#         forwardFile.write(u_, eta_, time=t)
-#     print('t = %.1fs' % t)
-#     t += op.dt
-#     cnt += 1
+# Assign initial and boundary conditions
+q_ = form.solutionHuang(V, t=0.)
+u_, eta_ = q_.split()
+u_.rename('Velocity')
+eta_.rename('Elevation')
+BCs = DirichletBC(V.sub(0), Constant([0, 0]), [1, 2] if periodic else 'on_boundary')    # No-slip boundary conditions
+
+# Define variational problem
+q = Function(V)
+u, eta = q.split()
+F = form.weakResidualSW(q, q_, b, Dt, coriolisFreq=f, nonlinear=True, impermeable=False, op=op)  # TODO: testing of BCs
+forwardProblem = NonlinearVariationalProblem(F, q, bcs=BCs)
+forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
+
+# Initialise counters and solve numerically
+t = 0.
+cnt = 0
+forwardFile.write(u_, eta_, time=t)
+print('Generating numerical solution')
+while t < op.Tend:
+    forwardSolver.solve()
+    q_.assign(q)
+    if cnt % op.ndump == 0:
+        forwardFile.write(u_, eta_, time=t)
+    print('t = %.1fs' % t)
+    t += op.dt
+    cnt += 1
 
 # Plot analytic solution
 t = 0.
