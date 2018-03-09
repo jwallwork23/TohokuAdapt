@@ -209,14 +209,19 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
         # Output error data
         if approach == 'fixedMesh' and op.outputOF:
-            cb = err.TohokuCallback(solver_obj) if mode == 'tohoku' else err.ShallowWaterCallback(solver_obj)
+            if mode == 'tohoku':
+                cb = err.TohokuCallback(solver_obj)
+            elif mode == 'shallow-water':
+                cb = err.ShallowWaterCallback(solver_obj)
+            elif mode == 'rossby-wave':
+                cb = err.RossbyWaveCallback(solver_obj)
             cb.output_dir = dirName
             cb.append_to_log = True
             cb.export_to_hdf5 = False
             solver_obj.add_callback(cb, 'timestep')
 
         # Apply ICs and time integrate
-        solver_obj.assign_initial_conditions(elev=eta0)
+        solver_obj.assign_initial_conditions(elev=elev_2d if mode == 'rossby-wave' else eta0)
         solver_obj.bnd_functions['shallow_water'] = BCs
         if aposteriori and approach != 'DWF':
             if mode == 'tohoku':
@@ -225,10 +230,16 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     rm = 30                         # TODO: what can we do about this? Needs changing for adjoint
                     dt = options.timestep
                     options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
-            else:
+            elif mode == 'shallow-water':
                 def selector():
                     t = solver_obj.simulation_time
                     rm = 10                         # TODO: what can we do about this? Needs changing for adjoint
+                    dt = options.timestep
+                    options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
+            else:
+                def selector():
+                    t = solver_obj.simulation_time
+                    rm = 12                         # TODO: what can we do about this? Needs changing for adjoint
                     dt = options.timestep
                     options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
             solver_obj.iterate(export_func=selector)
@@ -433,7 +444,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 if mode == 'tohoku':
                     b = inte.interp(mesh_H, b)[0]
                 elif mode == 'shallow-water':
-                    b = Function(FunctionSpace(mesh_H, "CG", 1)).assign(0.1)
+                    b = Function(P1).assign(0.1)
+                else:
+                    b = Function(P1).assign(1.)
                 uv_2d.rename('uv_2d')
                 elev_2d.rename('elev_2d')
 
@@ -472,8 +485,13 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 e.set_next_export_ix(adapSolver.i_export)
 
             # Evaluate callbacks and iterate
-            if op.outputOF:     # TODO: implement for rossby-wave
-                cb = err.TohokuCallback(adapSolver) if mode == 'tohoku' else err.ShallowWaterCallback(adapSolver)
+            if op.outputOF:
+                if mode == 'tohoku':
+                    cb = err.TohokuCallback(adapSolver)
+                elif mode == 'shallow-water':
+                    cb = err.ShallowWaterCallback(adapSolver)
+                elif mode == 'rossby-wave':
+                    cb = err.RossbyWaveCallback(adapSolver)
                 cb.output_dir = dirName
                 cb.append_to_log = True
                 cb.export_to_hdf5 = False
@@ -513,7 +531,7 @@ if __name__ == '__main__':
 """Choose error estimator from {'norm', 'fieldBased', 'gradientBased', 'hessianBased', 
 'residual', 'explicit', 'fluxJump', 'implicit', 'DWF', 'DWR' or 'DWE'}: """))
     op = opt.Options(vscale=0.1 if approach in ('DWR', 'gradientBased') else 0.85,
-                     family='dg-dg',
+                     family='dg-cg',
                      rm=60 if useAdjoint else 30,
                      gradate=True if aposteriori else False,
                      advect=False,
@@ -536,10 +554,17 @@ if __name__ == '__main__':
     if mode == 'shallow-water':
         op.Tstart = 0.5
         op.Tend = 2.5
-        op.hmin = 5e-2
+        op.hmin = 1e-2
         op.hmax = 1.
         op.rm = 20 if useAdjoint else 10
         op.ndump = 10
+    elif mode == 'rossby-wave':
+        op.Tstart = 30.
+        op.Tend = 120.
+        op.hmin = 5e-1
+        op.hmax = 10.
+        op.rm = 24 if useAdjoint else 12
+        op.ndump = 12
 
     # Run simulation(s)
     s = '_BOOTSTRAP' if op.bootstrap else ''

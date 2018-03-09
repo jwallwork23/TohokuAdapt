@@ -106,6 +106,34 @@ class ShallowWaterCallback(IntegralCallback):
         super(ShallowWaterCallback, self).__init__(indicatorSW, solver_obj, **kwargs)
 
 
+class RossbyWaveCallback(IntegralCallback):
+    """Integrates objective functional."""
+    name = 'objective functional'
+
+    def __init__(self, solver_obj, **kwargs):
+        """
+        :arg solver_obj: Thetis solver object
+        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+        """
+
+        def indicatorRW():
+            """
+            :param solver_obj: FlowSolver2d object.
+            :return: objective functional value for callbacks.
+            """
+            elev_2d = solver_obj.fields.solution_2d.split()[1]
+            ks = forms.indicator(elev_2d.function_space(), mode='rossby-wave')
+            kt = Constant(0.)
+            if solver_obj.simulation_time > 30.:
+                kt.assign(
+                    1. if solver_obj.simulation_time >
+                          30. + 0.5 * solver_obj.options.timestep else 0.5)
+
+            return assemble(elev_2d * ks * kt * dx)
+
+        super(RossbyWaveCallback, self).__init__(indicatorRW, solver_obj, **kwargs)
+
+
 def getOF(dirName):
     """
     :arg dirName: directory in which log file is saved
