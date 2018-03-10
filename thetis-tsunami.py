@@ -156,6 +156,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     if mode == 'rossby-wave':
         mesh_h = adap.isoP2(mesh_H)
         V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
+        uv_2d, elev_2d = inte.mixedPairInterp(mesh_h, uv_2d, elev_2d)
+        peak_i = max(elev_2d.dat.data)
 
     # Initialise adaptivity placeholders and counters
     nEle, nVerT = msh.meshStats(mesh_H)
@@ -528,16 +530,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     else:
         av = nEle
 
+    # Measure error using metrics
     if mode == 'rossby-wave':
-        q_a = Function(V_h)
-        u_a, eta_a = q_a.split()
-        with DumbCheckpoint(dirName + 'hdf5/finalAnalytic', mode=FILE_READ) as loadAna:
-            loadAna.load(u_a)
-            loadAna.load(eta_a)
-            loadAna.close()
-        uv_2d, elev_2d = inte.mixedPairInterp(mesh_h, uv_2d, elev_2d)
-
-
+        peak_f = max(elev_2d.dat.data)
+        print('Discrepancy in peak soliton height: %.4f' % (peak_i - peak_f))
 
     # Print to screen timing analyses and plot timeseries
     if op.printStats:
@@ -587,7 +583,7 @@ if __name__ == '__main__':
         op.Tend = 120.
         op.hmin = 5e-3
         op.hmax = 10.
-        op.rm = 24 if useAdjoint else 12
+        op.rm = 30 if useAdjoint else 15
         op.ndump = 12
 
     # Run simulation(s)

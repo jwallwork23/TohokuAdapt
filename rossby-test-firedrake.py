@@ -74,7 +74,3 @@ while t < op.Tend + 0.5 * op.dt:
     print('t = %.1fs' % t)
     t += op.ndump * op.dt
 print('Final time: %.2fs' % t)
-with DumbCheckpoint(dirName + 'hdf5/finalAnaltic', mode=FILE_CREATE) as saveAna:
-    saveAna.store(u_a)
-    saveAna.store(eta_a)
-    saveAna.close()
