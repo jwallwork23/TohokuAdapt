@@ -154,10 +154,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     v = TestFunction(P0)
 
     if mode == 'rossby-wave':
-        mesh_h = adap.isoP2(mesh_H)
-        V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
-        uv_2d, elev_2d = inte.mixedPairInterp(mesh_h, uv_2d, elev_2d)
-        peak_i = max(elev_2d.dat.data)
+        peak_i = max(inte.interp(adap.isoP2(mesh_H), elev_2d)[0].dat.data)
+        print("Initial soliton peak: .3f" % peak_i)
 
     # Initialise adaptivity placeholders and counters
     nEle, nVerT = msh.meshStats(mesh_H)
@@ -250,7 +248,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             else:
                 def selector():
                     t = solver_obj.simulation_time
-                    rm = 12                         # TODO: what can we do about this? Needs changing for adjoint
+                    rm = 15                         # TODO: what can we do about this? Needs changing for adjoint
                     dt = options.timestep
                     options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
             solver_obj.iterate(export_func=selector)
@@ -532,8 +530,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     # Measure error using metrics
     if mode == 'rossby-wave':
-        peak_f = max(elev_2d.dat.data)
-        print('Discrepancy in peak soliton height: %.4f' % (peak_i - peak_f))
+        peak_f = max(inte.interp(adap.isoP2(mesh_H), elev_2d)[0].dat.data)
+        print("Final soliton peak: .3f" % peak_f)
+        print('Discrepancy in peak soliton height: %.3f' % (peak_i - peak_f))
 
     # Print to screen timing analyses and plot timeseries
     if op.printStats:
@@ -598,7 +597,6 @@ if __name__ == '__main__':
                   % (i, av, J_h, timing, var))
             textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, J_h, timing, var))
     else:
-        # for i in range(6):
         for i in range(1, 6):
             av, rel, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
             print('Run %d:  Mean element count %6d      Relative error %.4e         Timing %.1fs'
