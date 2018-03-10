@@ -66,10 +66,15 @@ while t < op.Tend:
 t = 0.
 print('Generating analytical solution')
 while t < op.Tend + 0.5 * op.dt:
-    q = form.solutionHuang(V, t=t)
-    u, eta = q.split()
-    u.rename('Analytic fluid velocity')
-    eta.rename('Analytic free surface')
-    solFile.write(u, eta, time=t)
+    q_a = form.solutionHuang(V, t=t)
+    u_a, eta_a = q.split()
+    u_a.rename('Analytic fluid velocity')
+    eta_a.rename('Analytic free surface')
+    solFile.write(u_a, eta_a, time=t)
     print('t = %.1fs' % t)
     t += op.ndump * op.dt
+print('Final time: %.2fs' % t)
+with DumbCheckpoint(dirName + 'hdf5/finalAnaltic', mode=FILE_CREATE) as saveAna:
+    saveAna.store(u_a)
+    saveAna.store(eta_a)
+    saveAna.close()

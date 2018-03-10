@@ -65,7 +65,7 @@ def strongResidualSW(q, q_, b, Dt, nu=None, coriolisFreq=None, nonlinear=False, 
     Ae = (eta - eta_) / Dt + div(b * um)
     if nu:
         Au += div(nu * (grad(um) + transpose(grad(um))))
-    if rotational:
+    if coriolisFreq:
         Au += coriolisFreq * as_vector((-u[1], u[0]))
     if nonlinear:
         Au += dot(u, nabla_grad(u))

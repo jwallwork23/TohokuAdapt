@@ -153,6 +153,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         epsilon = Function(P0, name="Error indicator")
     v = TestFunction(P0)
 
+    if mode == 'rossby-wave':
+        mesh_h = adap.isoP2(mesh_H)
+        V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
+
     # Initialise adaptivity placeholders and counters
     nEle, nVerT = msh.meshStats(mesh_H)
     nVerT *= op.vscale                      # Target #Vertices
@@ -374,8 +378,12 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     if approach != 'fixedMesh':
         if aposteriori:     # Reset initial conditions
-            uv_2d.interpolate(Expression([0, 0]))
-            elev_2d.interpolate(eta0)
+            if mode == 'rossby-wave':
+                q = form.solutionHuang(V_H, t=0.)
+                uv_2d, elev_2d = q.split()
+            else:
+                uv_2d.interpolate(Expression([0, 0]))
+                elev_2d.interpolate(eta0)
             epsilon = Function(P0, name="Error indicator")
         msc.dis('\nStarting adaptive mesh primal run (forwards in time)', op.printStats)
         adaptTimer = clock()
@@ -520,6 +528,17 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     else:
         av = nEle
 
+    if mode == 'rossby-wave':
+        q_a = Function(V_h)
+        u_a, eta_a = q_a.split()
+        with DumbCheckpoint(dirName + 'hdf5/finalAnalytic', mode=FILE_READ) as loadAna:
+            loadAna.load(u_a)
+            loadAna.load(eta_a)
+            loadAna.close()
+        uv_2d, elev_2d = inte.mixedPairInterp(mesh_h, uv_2d, elev_2d)
+
+
+
     # Print to screen timing analyses and plot timeseries
     if op.printStats:
         msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer)
@@ -559,14 +578,14 @@ if __name__ == '__main__':
     if mode == 'shallow-water':
         op.Tstart = 0.5
         op.Tend = 2.5
-        op.hmin = 1e-2
+        op.hmin = 1e-4
         op.hmax = 1.
         op.rm = 20 if useAdjoint else 10
         op.ndump = 10
     elif mode == 'rossby-wave':
         op.Tstart = 30.
         op.Tend = 120.
-        op.hmin = 5e-1
+        op.hmin = 5e-3
         op.hmax = 10.
         op.rm = 24 if useAdjoint else 12
         op.ndump = 12

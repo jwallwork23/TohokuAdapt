@@ -25,11 +25,11 @@ def cheatCodes(approach, default='DWR'):
         useAdjoint = approach in ('DWR', 'DWE', 'DWF')
         aposteriori = True
     elif approach in ('saved', 'regen'):
-        approach = input("""Choose error estimator from 
-    'residual', 'explicit', 'implicit', 'DWF', 'DWR' or 'DWE': """) or 'DWR'
-        getData = False
         getError = approach == 'regen'
-        useAdjoint = approach in ('DWF', 'DWR')
+        approach = input("""Choose error estimator from 'residual', 'explicit', 'implicit', 'DWF', 'DWR' or 'DWE': """)\
+                   or 'DWR'
+        getData = False
+        useAdjoint = approach in ('DWR', 'DWE', 'DWF')
         aposteriori = True
     else:
         approach = 'fixedMesh'

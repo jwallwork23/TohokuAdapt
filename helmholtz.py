@@ -383,3 +383,5 @@ if __name__ == '__main__':
 
 # TODO: Further, create a wave equation test case based on this
 # TODO: * Test metric advection
+
+# TODO: Even more basic test cases to check Hessian recovery does what it should. i.e. consider a C^2 function
