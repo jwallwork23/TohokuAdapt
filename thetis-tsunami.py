@@ -539,11 +539,14 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         peak_i, peak_fin = msc.getMax(elev_2d.dat.data)
         print("Initial soliton peak: %.4f" % peak_init)
         print("Final soliton peak: %.4f" % peak_fin)
-        print('Discrepancy in peak soliton height: %.4f' % np.abs(peak_init - peak_fin))
+        peakDiscrepancy = np.abs(peak_init - peak_fin)
+        print('Discrepancy in peak soliton height: %.4f' % peakDiscrepancy)
         dgCoords = Function(VectorFunctionSpace(mesh_H, op.space2, op.degree2)).interpolate(mesh_H.coordinates)
         distanceTravelled = np.abs(dgCoords.dat.data[peak_i][0])
         print('Distance travelled: %.4fm. (Should be 48m)' % distanceTravelled)
-        print('Average speed: %.4fms^{-1}. (Should be 0.4ms^{-1})' % (distanceTravelled / T))
+        avgSpeed = distanceTravelled / T
+        print('Average speed: %.4fms^{-1}. (Should be 0.4ms^{-1})' % avgSpeed)
+        msc.recordMetrics(peakDiscrepancy, distanceTravelled, avgSpeed, approach)
 
     # Print to screen timing analyses and plot timeseries
     if op.printStats:

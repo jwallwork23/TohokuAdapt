@@ -81,3 +81,16 @@ def getMax(array):
             i = j
     return i, m
 
+
+def recordMetrics(peakDiscrepancy, distanceTravelled, avgSpeed, approach):
+    """
+    :param peakDiscrepancy: difference in height between initial and final peaks.
+    :param distanceTravelled: distance travelled by soliton over time interval.
+    :param avgSpeed: average speed as calculated using speed = distance / time.
+    :param approach: mesh adaptive approach.
+    """
+    metricFile = open('outdata/outputs/rossby-wave/metrics_'+approach+'.txt', 'w+')
+    metricFile.write(peakDiscrepancy + ' ' + distanceTravelled + ' ' + avgSpeed)
+    metricFile.close()
+
+# TODO: plotting function for metrics
