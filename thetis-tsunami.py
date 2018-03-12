@@ -540,7 +540,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         print("Initial soliton peak: %.4f" % peak_init)
         print("Final soliton peak: %.4f" % peak_fin)
         print('Discrepancy in peak soliton height: %.4f' % np.abs(peak_init - peak_fin))
-        dgCoords = Function(V_H.sub(1)).interpolate(mesh_H.coordinates)
+        dgCoords = Function(VectorFunctionSpace(mesh_H, op.space2, op.degree2)).interpolate(mesh_H.coordinates)
         distanceTravelled = np.abs(dgCoords.dat.data[peak_i][0])
         print('Distance travelled: %.4fm. (Should be 48m)' % distanceTravelled)
         print('Average speed: %.4fms^{-1}. (Should be 0.4ms^{-1})' % (distanceTravelled / T))
@@ -590,7 +590,7 @@ if __name__ == '__main__':
         op.ndump = 10
     elif mode == 'rossby-wave':
         op.Tstart = 30.
-        op.Tend = 20.
+        op.Tend = 120.
         op.hmin = 5e-3
         op.hmax = 10.
         op.rm = 30 if useAdjoint else 15
