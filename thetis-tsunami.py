@@ -67,10 +67,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         eta0 = Function(P1).interpolate(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))))
         b = Function(P1).assign(0.1)
     elif mode == 'rossby-wave':
-        n = pow(2, startRes)
         lx = 48
         ly = 24
-        mesh_H = RectangleMesh(3 * lx * n, ly * n, 3 * lx, ly)
+        mesh_H = RectangleMesh(3 * lx * startRes, ly * startRes, 3 * lx, ly)
         xy = Function(mesh_H.coordinates)
         xy.dat.data[:, :] -= [3 * lx / 2, ly / 2]
         mesh_H.coordinates.assign(xy)
@@ -153,10 +152,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         epsilon = Function(P0, name="Error indicator")
     v = TestFunction(P0)
 
-    if mode == 'rossby-wave':
-        # peak_init = msc.getMax(inte.interp(adap.isoP2(mesh_H), elev_2d)[0].dat.data)[1]
-        peak_init = msc.getMax(elev_2d.dat.data)[1]
-
     # Initialise adaptivity placeholders and counters
     nEle, nVerT = msh.meshStats(mesh_H)
     nVerT *= op.vscale                      # Target #Vertices
@@ -166,13 +161,11 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     # Get timestep
     solver_obj = solver2d.FlowSolver2d(mesh_H, b)
-    if mode == 'tohoku':
-        solver_obj.create_equations()
-        dt = min(np.abs(solver_obj.compute_time_step().dat.data))
-    elif mode == 'shallow-water':
+    if mode == 'shallow-water':
         dt = 0.025  # TODO: change this
     else:
-        dt = 0.1    # TODO: change this
+        solver_obj.create_equations()
+        dt = min(np.abs(solver_obj.compute_time_step().dat.data))
     Dt = Constant(dt)
     iEnd = int(np.ceil(T / (dt * op.rm)))
     if op.gradate or op.wd:                 # Get initial boundary metric
@@ -248,7 +241,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             else:
                 def selector():
                     t = solver_obj.simulation_time
-                    rm = 15                         # TODO: what can we do about this? Needs changing for adjoint
+                    rm = 24                         # TODO: what can we do about this? Needs changing for adjoint
                     dt = options.timestep
                     options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
             solver_obj.iterate(export_func=selector)
@@ -520,8 +513,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             nEle = msh.meshStats(mesh_H)[0]
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
-            av = op.printToScreen(int(cnt/op.rm+1), clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, cnt*dt, dt)
             cnt += op.rm
+            av = op.printToScreen(int(cnt/op.rm+1), clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, cnt*dt, dt)
 
         adaptTimer = clock() - adaptTimer
         msc.dis('Adaptive primal run complete. Run time: %.3fs' % adaptTimer, op.printStats)
@@ -530,28 +523,26 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     if op.printStats:
         msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer)
 
-    # Measure error using metrics
+    # Measure error using metrics, using data from Huang et al.
     if mode == 'rossby-wave':
         index = int(cntT/op.ndump) if approach == 'fixedMesh' else int((cnt-op.rm) / op.ndump)
-        print(index)
         with DumbCheckpoint(dirName+'hdf5/Elevation2d_'+msc.indexString(index), mode=FILE_READ) as loadElev:
             loadElev.load(elev_2d, name='elev_2d')
             loadElev.close()
-        # peak_i, peak_fin = msc.getMax(inte.interp(adap.isoP2(mesh_H), elev_2d)[0].dat.data)
-        peak_i, peak_fin = msc.getMax(elev_2d.dat.data)
-        print("Initial soliton peak: %.4f" % peak_init)
-        print("Final soliton peak: %.4f" % peak_fin)
-        peakDiscrepancy = np.abs(peak_init - peak_fin)
-        print('Discrepancy in peak soliton height: %.4f' % peakDiscrepancy)
+        # peak_i, peak = msc.getMax(inte.interp(adap.isoP2(mesh_H), elev_2d)[0].dat.data)
+        peak_i, peak = msc.getMax(elev_2d.dat.data)
+        print("Final soliton peak: %.4f" % peak)
+        relativePeak = np.abs(peak/0.1567020)
+        print('Relative discrepancy in peak soliton height: %.4f' % relativePeak)
         dgCoords = Function(VectorFunctionSpace(mesh_H, op.space2, op.degree2)).interpolate(mesh_H.coordinates)
         distanceTravelled = np.abs(dgCoords.dat.data[peak_i][0])
         print('Distance travelled: %.4fm. (Should be 48m)' % distanceTravelled)
-        avgSpeed = distanceTravelled / T
-        print('Average speed: %.4fms^{-1}. (Should be 0.4ms^{-1})' % avgSpeed)
+        phaseSpd = distanceTravelled/47.18
+        print('Relative mean phase speed: %.4fms^{-1}' % phaseSpd)
 
     toc = clock() - tic
     if mode == 'rossby-wave':
-        return av, peakDiscrepancy, distanceTravelled, avgSpeed, toc
+        return av, relativePeak, distanceTravelled, phaseSpd, toc
     else:
         return av, np.abs(op.J(mode) - J_h)/np.abs(op.J(mode)), J_h, toc
 
@@ -564,7 +555,7 @@ if __name__ == '__main__':
 """Choose error estimator from {'norm', 'fieldBased', 'gradientBased', 'hessianBased', 
 'residual', 'explicit', 'fluxJump', 'implicit', 'DWF', 'DWR' or 'DWE'}: """))
     op = opt.Options(vscale=0.1 if approach in ('DWR', 'gradientBased') else 0.85,
-                     family='dg-cg',
+                     family='dg-dg',
                      rm=60 if useAdjoint else 30,
                      gradate=True if aposteriori else False,
                      advect=False,
@@ -596,7 +587,7 @@ if __name__ == '__main__':
         op.Tend = 120.
         op.hmin = 5e-3
         op.hmax = 10.
-        op.rm = 30 if useAdjoint else 15
+        op.rm = 48 if useAdjoint else 24
         op.ndump = 12
 
     # Run simulation(s)
@@ -613,11 +604,11 @@ if __name__ == '__main__':
     else:
         for i in range(1, 6):
             if mode == 'rossby-wave':
-                av, peakDiscrepancy, distanceTravelled, avgSpeed, timing = \
+                av, relativePeak, distanceTravelled, phaseSpd, timing = \
                     solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
-                print('Run %d:  <#Elements> %6d   Discrepancy: %.4fm  Distance: %.4fm  Speed: %.4fms^{-1}  Timing %.1fs'
-                      % (i, av, peakDiscrepancy, distanceTravelled, avgSpeed, timing))
-                textfile.write('%d, %.4f, %.4f, %.4f, %.1f\n' % (av, peakDiscrepancy, distanceTravelled, avgSpeed, timing))
+                print('Run %d:  <#Elements>: %6d   Discrepancy: %.4fm  Distance: %.4fm  Speed: %.4fms^{-1}  Timing %.1fs'
+                      % (i, av, relativePeak, distanceTravelled, phaseSpd, timing))
+                textfile.write('%d, %.4f, %.4f, %.4f, %.1f\n' % (av, relativePeak, distanceTravelled, phaseSpd, timing))
             else:
                 av, rel, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
                 print('Run %d:  Mean element count %6d      Relative error %.4e         Timing %.1fs'
