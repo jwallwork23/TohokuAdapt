@@ -531,18 +531,12 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             loadElev.close()
         # peak_i, peak = msc.getMax(inte.interp(adap.isoP2(mesh_H), elev_2d)[0].dat.data)
         peak_i, peak = msc.getMax(elev_2d.dat.data)
-        print("Final soliton peak: %.4f" % peak)
-        relativePeak = np.abs(peak/0.1567020)
-        print('Relative discrepancy in peak soliton height: %.4f' % relativePeak)
         dgCoords = Function(VectorFunctionSpace(mesh_H, op.space2, op.degree2)).interpolate(mesh_H.coordinates)
         distanceTravelled = np.abs(dgCoords.dat.data[peak_i][0])
-        print('Distance travelled: %.4fm. (Should be 48m)' % distanceTravelled)
-        phaseSpd = distanceTravelled/47.18
-        print('Relative mean phase speed: %.4fms^{-1}' % phaseSpd)
 
     toc = clock() - tic
     if mode == 'rossby-wave':
-        return av, relativePeak, distanceTravelled, phaseSpd, toc
+        return av, np.abs(peak/0.1567020), distanceTravelled, distanceTravelled/47.18, toc
     else:
         return av, np.abs(op.J(mode) - J_h)/np.abs(op.J(mode)), J_h, toc
 
@@ -565,7 +559,6 @@ if __name__ == '__main__':
                      gauges=False,
                      tAdapt=False,
                      # iso=False if approach in ('gradientBased', 'hessianBased') else True,
-                     # iso=True,
                      iso=False,
                      bootstrap=False,
                      printStats=True,
@@ -606,7 +599,7 @@ if __name__ == '__main__':
             if mode == 'rossby-wave':
                 av, relativePeak, distanceTravelled, phaseSpd, timing = \
                     solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
-                print('Run %d:  <#Elements>: %6d   Discrepancy: %.4fm  Distance: %.4fm  Speed: %.4fms^{-1}  Timing %.1fs'
+                print('Run %d:  <#Elements>: %6d   Height: %.4fm  Distance: %.4fm  Speed: %.4fms^{-1}  Timing %.1fs'
                       % (i, av, relativePeak, distanceTravelled, phaseSpd, timing))
                 textfile.write('%d, %.4f, %.4f, %.4f, %.1f\n' % (av, relativePeak, distanceTravelled, phaseSpd, timing))
             else:
