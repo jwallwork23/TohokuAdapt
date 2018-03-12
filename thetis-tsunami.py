@@ -83,6 +83,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         q = form.solutionHuang(V_H, t=0.)
         uv_2d, elev_2d = q.split()
         BCs = {1: {'uv': Constant(0.)}, 2: {'uv': Constant(0.)}, 3: {'uv': Constant(0.)}, 4: {'uv': Constant(0.)}}
+        f = Function(P1).interpolate(SpatialCoordinate(mesh_H)[1])
     else:
         q = Function(V_H)
         uv_2d, elev_2d = q.split()
@@ -165,9 +166,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         dt = 0.025  # TODO: change this
     else:
         solver_obj.create_equations()
-        dt = min(np.abs(solver_obj.compute_time_step().dat.data))
+        dt = np.round(min(np.abs(solver_obj.compute_time_step().dat.data)), 2)
     Dt = Constant(dt)
-    iEnd = int(np.ceil(T / (dt * op.rm)))
+    # iEnd = int(np.ceil(T / (dt * op.rm)))
+    iEnd = int(T / (dt * op.rm))            # It appears this format is better for CFL criterion derived timesteps
     if op.gradate or op.wd:                 # Get initial boundary metric
         H0 = Function(P1).interpolate(CellSize(mesh_H))
     if op.wd:
@@ -192,7 +194,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         options.use_nonlinear_equations = True if op.wd or mode == 'rossby-wave' else False
         options.use_grad_depth_viscosity_term = False
         if mode == 'rossby-wave':
-            options.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh_H)[1])
+            options.coriolis_frequency = f
         options.simulation_export_time = dt * (op.rm-1) if aposteriori else dt * op.ndump
         options.simulation_end_time = T
         options.timestepper_type = op.timestepper
@@ -244,7 +246,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     rm = 24                         # TODO: what can we do about this? Needs changing for adjoint
                     dt = options.timestep
                     options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
-            solver_obj.iterate(export_func=selector)
+            solver_obj.iterate(export_func=selector)    # TODO: This ^^^ doesn't always work
         else:
             solver_obj.iterate()
         if op.outputOF:
@@ -288,9 +290,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         errorTimer = clock()
 
         # Define implicit error problem     # TODO: use Thetis forms. Also put these in utils.forms
-        if approach in ('implicit', 'DWE'):
-            B_, L = form.formsSW(q_oi, q_oi_, et, b, Dt, allowNormalFlow=False)
-            B = form.formsSW(e, e_, et, b, Dt, allowNormalFlow=False)[0]
+        if approach in ('implicit', 'DWE'): # TODO: check nonlinear option out
+            B_, L = form.formsSW(q_oi, q_oi_, b, Dt, impermeable=False, coriolisFreq=f, nonlinear=True)
+            B = form.formsSW(e, e_, b, Dt, impermeable=False, coriolisFreq=f, nonlinear=True)[0]
             I = form.interelementTerm(et1 * uv_2d_oi, n=normal) * dS
             errorProblem = NonlinearVariationalProblem(B - L + B_ - I, e)
             errorSolver = NonlinearVariationalSolver(errorProblem, solver_parameters=op.params)
@@ -306,8 +308,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     loadElev.load(elev_2d)
                     loadElev.close()
             else:
-                i1 = 2*k
-                i2 = 0 if k == 0 else 2*k+1
+                i1 = 0 if k == 0 else 2*k-1
+                i2 = 2*k
                 with DumbCheckpoint(dirName+'hdf5/Velocity2d_'+msc.indexString(i1), mode=FILE_READ) as loadVel:
                     loadVel.load(uv_2d)
                     loadVel.close()
@@ -340,11 +342,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             # Approximate residuals
             if approach in ('explicit', 'residual', 'DWR'):
                 if op.orderChange:
-                    Au, Ae = form.strongResidualSW(q_oi, q_oi_, b, Dt, op=op)
-
-                    # TODO: Here and elsewhere, use something along the lines of:
-                    # TODO: eqns = ShallowWaterEquations(V_oi, b)
-                    # TODO: res = eqns.residual(label, q_oi, q_oi_, fields, fields_old, bnd_conditions)
+                    Au, Ae = form.strongResidualSW(q_oi, q_oi_, b, Dt, op=op) # TODO: Use Thetis forms here
                 else:
                     qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
                     Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt, op=op)
@@ -384,7 +382,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             epsilon = Function(P0, name="Error indicator")
         msc.dis('\nStarting adaptive mesh primal run (forwards in time)', op.printStats)
         adaptTimer = clock()
-        while cnt < np.ceil(T / dt):
+        # while cnt < np.ceil(T / dt):
+        while cnt < int(T / dt):        # It appears this format is better for CFL criterion derived timesteps
             stepTimer = clock()
 
             # Load variables from disk
