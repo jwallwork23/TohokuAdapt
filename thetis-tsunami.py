@@ -156,7 +156,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     if mode == 'rossby-wave':
         # peak_init = msc.getMax(inte.interp(adap.isoP2(mesh_H), elev_2d)[0].dat.data)[1]
         peak_init = msc.getMax(elev_2d.dat.data)[1]
-        print("Initial soliton peak: %.3f" % peak_init)
 
     # Initialise adaptivity placeholders and counters
     nEle, nVerT = msh.meshStats(mesh_H)
@@ -531,8 +530,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     # Measure error using metrics
     if mode == 'rossby-wave':
-        with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + msc.indexString(int(cnt / op.ndump)), mode=FILE_READ) \
-                as loadElev:
+        index = int(cntT/op.ndump) if approach == 'fixedMesh' else int((cnt-op.rm) / op.ndump)
+        print(index)
+        with DumbCheckpoint(dirName+'hdf5/Elevation2d_'+msc.indexString(index), mode=FILE_READ) as loadElev:
             loadElev.load(elev_2d, name='elev_2d')
             loadElev.close()
         # peak_i, peak_fin = msc.getMax(inte.interp(adap.isoP2(mesh_H), elev_2d)[0].dat.data)
@@ -540,7 +540,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         print("Initial soliton peak: %.4f" % peak_init)
         print("Final soliton peak: %.4f" % peak_fin)
         print('Discrepancy in peak soliton height: %.4f' % np.abs(peak_init - peak_fin))
-        distanceTravelled = np.abs(mesh_H.coordinates.dat.data[peak_i][0])
+        dgCoords = Function(V_H.sub(1)).interpolate(mesh_H.coordinates)
+        distanceTravelled = np.abs(dgCoords.dat.data[peak_i][0])
         print('Distance travelled: %.4fm. (Should be 48m)' % distanceTravelled)
         print('Average speed: %.4fms^{-1}. (Should be 0.4ms^{-1})' % (distanceTravelled / T))
 
@@ -589,7 +590,7 @@ if __name__ == '__main__':
         op.ndump = 10
     elif mode == 'rossby-wave':
         op.Tstart = 30.
-        op.Tend = 120.
+        op.Tend = 20.
         op.hmin = 5e-3
         op.hmax = 10.
         op.rm = 30 if useAdjoint else 15
