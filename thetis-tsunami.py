@@ -341,6 +341,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             if approach in ('explicit', 'residual', 'DWR'):
                 if op.orderChange:
                     Au, Ae = form.strongResidualSW(q_oi, q_oi_, b, Dt, op=op)
+
+                    # TODO: Here and elsewhere, use something along the lines of:
+                    # TODO: eqns = ShallowWaterEquations(V_oi, b)
+                    # TODO: res = eqns.residual(label, q_oi, q_oi_, fields, fields_old, bnd_conditions)
                 else:
                     qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
                     Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt, op=op)
@@ -599,12 +603,12 @@ if __name__ == '__main__':
             if mode == 'rossby-wave':
                 av, relativePeak, distanceTravelled, phaseSpd, timing = \
                     solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
-                print('Run %d:  <#Elements>: %6d   Height: %.4fm  Distance: %.4fm  Speed: %.4fms^{-1}  Timing %.1fs'
+                print('Run %d: <#Elements>: %6d  Height error: %.4f  Distance: %.4fm  Speed error: %.4fm  Timing %.1fs'
                       % (i, av, relativePeak, distanceTravelled, phaseSpd, timing))
                 textfile.write('%d, %.4f, %.4f, %.4f, %.1f\n' % (av, relativePeak, distanceTravelled, phaseSpd, timing))
             else:
                 av, rel, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
-                print('Run %d:  Mean element count %6d      Relative error %.4e         Timing %.1fs'
+                print('Run %d: Mean element count %6d Relative error %.4e Timing %.1fs'
                       % (i, av, rel, timing))
                 textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, timing, J_h))
     textfile.close()
