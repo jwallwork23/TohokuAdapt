@@ -66,3 +66,18 @@ def printTimings(primal, dual=False, error=False, adapt=False):
 def dis(string, printStats=True):
     if printStats:
         print(string)
+
+
+def getMax(array):
+    """
+    :param array: 1D array.
+    :return: index for maximum and its value. 
+    """
+    i = 0
+    m = 0
+    for j in range(len(array)):
+        if array[j] > m:
+            m = array[j]
+            i = j
+    return i, m
+
