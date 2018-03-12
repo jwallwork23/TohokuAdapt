@@ -527,6 +527,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         msc.dis('Adaptive primal run complete. Run time: %.3fs' % adaptTimer, op.printStats)
     else:
         av = nEle
+    if op.printStats:
+        msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer)
 
     # Measure error using metrics
     if mode == 'rossby-wave':
@@ -546,14 +548,12 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         print('Distance travelled: %.4fm. (Should be 48m)' % distanceTravelled)
         avgSpeed = distanceTravelled / T
         print('Average speed: %.4fms^{-1}. (Should be 0.4ms^{-1})' % avgSpeed)
-        msc.recordMetrics(peakDiscrepancy, distanceTravelled, avgSpeed, approach)
 
-    # Print to screen timing analyses and plot timeseries
-    if op.printStats:
-        msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer)
-    rel = np.abs(op.J(mode) - J_h)/np.abs(op.J(mode))
-
-    return av, rel, J_h, clock() - tic
+    toc = clock() - tic
+    if mode == 'rossby-wave':
+        return av, peakDiscrepancy, distanceTravelled, avgSpeed, toc
+    else:
+        return av, np.abs(op.J(mode) - J_h)/np.abs(op.J(mode)), J_h, toc
 
 
 if __name__ == '__main__':
@@ -612,8 +612,15 @@ if __name__ == '__main__':
             textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, J_h, timing, var))
     else:
         for i in range(1, 6):
-            av, rel, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
-            print('Run %d:  Mean element count %6d      Relative error %.4e         Timing %.1fs'
-                  % (i, av, rel, timing))
-            textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, timing, J_h))
+            if mode == 'rossby-wave':
+                av, peakDiscrepancy, distanceTravelled, avgSpeed, timing = \
+                    solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
+                print('Run %d:  <#Elements> %6d   Discrepancy: %.4fm  Distance: %.4fm  Speed: %.4fms^{-1}  Timing %.1fs'
+                      % (i, av, peakDiscrepancy, distanceTravelled, avgSpeed, timing))
+                textfile.write('%d, %.4f, %.4f, %.4f, %.1f\n' % (av, peakDiscrepancy, distanceTravelled, avgSpeed, timing))
+            else:
+                av, rel, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
+                print('Run %d:  Mean element count %6d      Relative error %.4e         Timing %.1fs'
+                      % (i, av, rel, timing))
+                textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, timing, J_h))
     textfile.close()
