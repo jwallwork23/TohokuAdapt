@@ -241,7 +241,7 @@ class Options:
         :arg dt: current timestep.
         :returns: mean element count.
         """
-        av = Sn / (mn+1)
+        av = Sn / mn
         if self.printStats:
             print("""\n************************** Adaption step %d ****************************
 Percent complete  : %4.1f%%    Elapsed time : %4.2fs (This step : %4.2fs)     

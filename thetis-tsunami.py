@@ -163,10 +163,21 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     # Get timestep
     solver_obj = solver2d.FlowSolver2d(mesh_H, b)
     if mode == 'shallow-water':
-        dt = 0.025  # TODO: change this
+        dt = 0.025                          # TODO: change this
     else:
         solver_obj.create_equations()
-        dt = np.round(min(np.abs(solver_obj.compute_time_step().dat.data)), 2)
+        dt = min(np.abs(solver_obj.compute_time_step().dat.data))
+        if mode == 'rossby-wave':   # Ensure simulation time is achieved exactly.
+            if dt > 0.5:
+                dt = 0.5
+            elif dt > 0.25:
+                dt = 0.25
+            elif dt > 0.2:
+                dt = 0.2
+            elif dt > 0.1:
+                dt = 0.1
+            elif dt > 0.05:
+                dt = 0.05
     Dt = Constant(dt)
     # iEnd = int(np.ceil(T / (dt * op.rm)))
     iEnd = int(T / (dt * op.rm))            # It appears this format is better for CFL criterion derived timesteps
@@ -179,7 +190,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         print('#### gradient = ', gs)
         ls = np.min([H0.dat.data[i] for i in DirichletBC(P1, 0, 'on_boundary').nodes])
         print('#### ls = ', ls)
-        alpha = Constant(gs * ls)       # TODO: how to set wetting-and-drying parameter?
+        alpha = Constant(gs * ls)           # TODO: how to set wetting-and-drying parameter?
         print('#### alpha = ', alpha.dat.data)
         # alpha = Constant(0.5)
         # exit(23)
