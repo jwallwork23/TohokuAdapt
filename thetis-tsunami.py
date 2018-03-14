@@ -1,6 +1,6 @@
 from thetis import *
 from thetis.field_defs import field_metadata
-# from firedrake_adjoint import *
+from firedrake_adjoint import *
 
 import numpy as np
 from time import clock
@@ -16,6 +16,8 @@ import utils.options as opt
 
 now = datetime.datetime.now()
 date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
+
+dt_meas = dt
 
 def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mode='tohoku', op=opt.Options()):
     """
@@ -129,12 +131,11 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             dual_u, dual_e = dual.split()
             dual_u.rename("Adjoint velocity")
             dual_e.rename("Adjoint elevation")
-            if mode == 'tohoku':
-                J = form.objectiveFunctionalSW(q, plot=True)    # TODO: this no longer exists in pyadjoint
-            elif mode == 'shallow-water':
-                J = form.objectiveFunctionalSW(q, Tstart=op.Tstart, x1=0., x2=0.5*np.pi, y1=0.5 * np.pi,y2=1.5 * np.pi,
-                                               smooth=False)
-        if approach in ('implicit', 'DWE'):
+            k = Function(V_H)
+            k0, k1 = k.split()
+            k1.assign(form.indicator(V_H.sub(1), mode=mode))
+            J = Functional(inner(q_, k) * dx * dt_meas)   # TODO: this no longer exists in pyadjoint
+
             e_ = Function(V_oi)
             e = Function(V_oi)
             e0, e1 = e.split()
