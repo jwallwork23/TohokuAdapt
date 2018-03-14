@@ -243,19 +243,22 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             if mode == 'tohoku':
                 def selector():
                     t = solver_obj.simulation_time
-                    rm = 30                         # TODO: what can we do about this? Needs changing for adjoint
+                    # rm = 30                         # TODO: what can we do about this? Needs changing for adjoint
+                    rm = 60
                     dt = options.timestep
                     options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
             elif mode == 'shallow-water':
                 def selector():
                     t = solver_obj.simulation_time
-                    rm = 10                         # TODO: what can we do about this? Needs changing for adjoint
+                    # rm = 10                         # TODO: what can we do about this? Needs changing for adjoint
+                    rm = 20
                     dt = options.timestep
                     options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
             else:
                 def selector():
                     t = solver_obj.simulation_time
-                    rm = 24                         # TODO: what can we do about this? Needs changing for adjoint
+                    # rm = 24                         # TODO: what can we do about this? Needs changing for adjoint
+                    rm = 48
                     dt = options.timestep
                     options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
             solver_obj.iterate(export_func=selector)    # TODO: This ^^^ doesn't always work
@@ -275,6 +278,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             msc.dis('\nStarting fixed mesh dual run (backwards in time)', op.printStats)
             dualTimer = clock()
             for (variable, solution) in compute_adjoint(J):
+                print(variable, solution)
                 if save:
                     # Load adjoint data and save to HDF5
                     dual.assign(variable, annotate=False)
@@ -369,9 +373,11 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                                                          b if (op.orderChange or mode != 'tohoku') else b_h, v,
                                                          maxBathy=True if mode == 'tohoku' else False)
 
-            # TODO: Load adjoint data from HDF5
-            # TODO: Form remaining error estimates
-            # TODO: maximise DWF over time window
+            if useAdjoint:
+                raise NotImplementedError
+                # TODO: Load adjoint data from HDF5
+                # TODO: Form remaining error estimates
+                # TODO: maximise DWF over time window
 
             # Store error estimates
             epsilon.rename("Error indicator")
@@ -577,7 +583,7 @@ if __name__ == '__main__':
                      iso=False,
                      bootstrap=False,
                      printStats=True,
-                     outputOF=False,
+                     outputOF=True,
                      orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
                      # orderChange=0,
                      wd=False,

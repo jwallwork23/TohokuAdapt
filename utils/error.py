@@ -1,6 +1,6 @@
 from thetis import *
 from thetis.callback import DiagnosticCallback
-# from firedrake_adjoint import adj_start_timestep, adj_inc_timestep
+from firedrake_adjoint import adj_start_timestep, adj_inc_timestep
 
 import numpy as np
 import cmath
@@ -32,17 +32,17 @@ class IntegralCallback(DiagnosticCallback):
         # Output OF value
         t = self.solver_obj.simulation_time
         dt = self.solver_obj.options.timestep
+        T = self.solver_obj.options.simulation_end_time
         value = self.scalar_callback() * dt
         if t > self.solver_obj.options.simulation_end_time - 0.5 * dt:
             value *= 0.5
         self.objective_value += value
 
-        # # Track adjoint data
-        # finished = True if t > self.solver_obj.options.simulation_end_time - 0.5 * dt else False
-        # if t < 0.5 * dt:
-        #     adj_start_timestep()
-        # else:
-        #     adj_inc_timestep(time=t, finished=finished)
+        # Track adjoint data
+        if t < 0.5 * dt:
+            adj_start_timestep()
+        else:
+            adj_inc_timestep(time=t, finished=True if t > T - 0.5 * dt else False)
 
         return value, self.objective_value
 
@@ -69,7 +69,7 @@ class TohokuCallback(IntegralCallback):
             elev_2d = solver_obj.fields.solution_2d.split()[1]
             ks = forms.indicator(elev_2d.function_space(), mode='tohoku')
             kt = Constant(0.)
-            if solver_obj.simulation_time > 300.:
+            if solver_obj.simulation_time > 300.:   # TODO: make this more general
                 kt.assign(1. if solver_obj.simulation_time >
                                 300. + 0.5 * solver_obj.options.timestep else 0.5)
 
@@ -96,7 +96,7 @@ class ShallowWaterCallback(IntegralCallback):
             elev_2d = solver_obj.fields.solution_2d.split()[1]
             ks = forms.indicator(elev_2d.function_space(), mode='shallow-water')
             kt = Constant(0.)
-            if solver_obj.simulation_time > 0.5:
+            if solver_obj.simulation_time > 0.5:    # TODO: make this more general
                 kt.assign(
                     1. if solver_obj.simulation_time >
                           0.5 + 0.5 * solver_obj.options.timestep else 0.5)
@@ -124,7 +124,7 @@ class RossbyWaveCallback(IntegralCallback):
             elev_2d = solver_obj.fields.solution_2d.split()[1]
             ks = forms.indicator(elev_2d.function_space(), mode='rossby-wave')
             kt = Constant(0.)
-            if solver_obj.simulation_time > 30.:
+            if solver_obj.simulation_time > 30.:    # TODO: make this more general
                 kt.assign(
                     1. if solver_obj.simulation_time >
                           30. + 0.5 * solver_obj.options.timestep else 0.5)
