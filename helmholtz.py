@@ -72,7 +72,6 @@ def adaptive(meshIterations=3, numMeshes=9, degree=1, normType='OF', redefine=Fa
     nEls = []
     times = []
     for i in range(numMeshes):
-        tic = clock()
         n = pow(2, i)
         mesh_H = UnitSquareMesh(n, n)
         primalFile = File("plots/helmholtz/solution.pvd")
@@ -80,6 +79,7 @@ def adaptive(meshIterations=3, numMeshes=9, degree=1, normType='OF', redefine=Fa
 
         # Solve primal equation on initial mesh
         nVerT = op.vscale * msh.meshStats(mesh_H)[1]
+        tic = clock()
         u_H, u, f, err = helmholtzSolve(mesh_H, degree, normType=normType, region=region)
 
         # Solve primal equation adaptively

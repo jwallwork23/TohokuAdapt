@@ -17,8 +17,6 @@ import utils.options as opt
 now = datetime.datetime.now()
 date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
-dt_meas = dt
-
 def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mode='tohoku', op=opt.Options()):
     """
     Run mesh adaptive simulations for the Tohoku problem.
@@ -33,7 +31,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     :param op: parameter values.
     :return: mean element count and relative error in objective functional value.
     """
-    tic = clock()
+    if useAdjoint:
+        dt_meas = dt
+
     if mode == 'tohoku':
         msc.dis('*********************** TOHOKU TSUNAMI SIMULATION *********************\n', op.printStats)
         assert (float(physical_constants['g_grav'].dat.data) == 9.81)
@@ -196,6 +196,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         # alpha = Constant(0.5)
         # exit(23)
 
+    tic = clock()
     if getData:
         msc.dis('Starting fixed mesh primal run (forwards in time)', op.printStats)
         primalTimer = clock()
