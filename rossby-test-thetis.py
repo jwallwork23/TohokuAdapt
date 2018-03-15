@@ -40,7 +40,7 @@ if not periodic:
 print('Generating numerical solution')
 solver_obj = solver2d.FlowSolver2d(mesh, b)
 options = solver_obj.options
-options.element_family = 'dg-cg'
+options.element_family = 'dg-dg'
 options.use_nonlinear_equations = True
 options.use_grad_depth_viscosity_term = False                   # In Matt's parameters viscosity=1e-6
 options.coriolis_frequency = f
@@ -56,18 +56,18 @@ solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
 solver_obj.bnd_functions['shallow_water'] = BCs
 solver_obj.iterate()
 
-# Check residual approximation works using Thetis forms
-indexStr = msc.indexString(int(T/(dt * ndump)))
-with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as loadVel:
-    loadVel.load(uv_2d)
-    loadVel.close()
-with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as loadElev:
-    loadElev.load(elev_2d)
-    loadElev.close()
-V_oi = VectorFunctionSpace(mesh, "DG", 2) * FunctionSpace(mesh, "DG", 2)
-q_oi = Function(V)
-uv_oi, elev_oi = q_oi.split()
-uv_oi.interpolate(uv_2d)
-elev_oi.interpolate(elev_2d)
-eqns = ShallowWaterEquations(V_oi, b)
-res = eqns.residual(label, q_oi, q_oi_, fields, fields_old, bnd_conditions)     # TODO: this won't work yet
+# # Check residual approximation works using Thetis forms
+# indexStr = msc.indexString(int(T/(dt * ndump)))
+# with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as loadVel:
+#     loadVel.load(uv_2d)
+#     loadVel.close()
+# with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as loadElev:
+#     loadElev.load(elev_2d)
+#     loadElev.close()
+# V_oi = VectorFunctionSpace(mesh, "DG", 2) * FunctionSpace(mesh, "DG", 2)
+# q_oi = Function(V)
+# uv_oi, elev_oi = q_oi.split()
+# uv_oi.interpolate(uv_2d)
+# elev_oi.interpolate(elev_2d)
+# eqns = ShallowWaterEquations(V_oi, b)
+# res = eqns.residual(label, q_oi, q_oi_, fields, fields_old, bnd_conditions)     # TODO: this won't work yet
