@@ -23,8 +23,8 @@ mesh.coordinates.assign(xy)
 # Define FunctionSpaces and  physical fields
 V = VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1)
 P1 = FunctionSpace(mesh, "CG", 1)
-# physical_constants['g_grav'] = Constant(1.)     # Gravitational acceleration    TODO: how to alter this properly?
-assert(float(physical_constants['g_grav'].dat.data) == 1.)
+physical_constants['g_grav'] = Constant(1.)     # Gravitational acceleration    TODO: how to alter this properly?
+# assert(float(physical_constants['g_grav'].dat.data) == 1.)
 b = Function(P1).assign(1.)
 f = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
 

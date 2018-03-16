@@ -570,7 +570,7 @@ if __name__ == '__main__':
     parser.add_argument("mode", help="Choose problem from {'tohoku', 'shallow-water', 'rossby-wave'}.")
     parser.add_argument("approach", help=
 """Choose error estimator from {'norm', 'fieldBased', 'gradientBased', 'hessianBased', 
-'residual', 'explicit', 'fluxJump', 'implicit', 'DWF', 'DWR' or 'DWE'}: """)
+'residual', 'explicit', 'fluxJump', 'implicit', 'DWF', 'DWR', 'DWE'}: """)
     args = parser.parse_args()
     print("Mode: ", args.mode)
     print("Approach: ", args.approach)

@@ -18,9 +18,9 @@ class Options:
                  iso=False,
                  advect=False,
                  gradate=False,
+                 nonlinear=False,
                  window=False,
                  tAdapt=False,
-                 bAdapt=False,
                  bootstrap=False,
                  outputOF=True,
                  printStats=True,
@@ -29,8 +29,6 @@ class Options:
                  beta=1.4,
                  gamma=1.,
                  g=9.81,
-                 coriolis0=0.,      # TODO: feasible dimensional value?
-                 coriolis1=1.,      # TODO: feasible dimensional value?
                  outputMetric=False,
                  plotpvd=True,
                  gauges=False,
@@ -54,8 +52,8 @@ class Options:
         :param iso: Toggle isotropic / anisotropic algorithm.
         :param advect: Toggle metric advection.
         :param gradate: Toggle metric gradation.
+        :param nonlinear: Toggle nonlinear / linear equations.
         :param window: generate error estimators over a time window of relevance.
-        :param bAdapt: adapt initial mesh to bathymetry profile.
         :param tAdapt: implement adaptive timestepping.
         :param bootstrap: implement mesh bootstrapping to establish initial mesh.
         :param outputOF: print objective functional value to screen.
@@ -65,8 +63,6 @@ class Options:
         :param beta: metric gradation scaling parameter.
         :param gamma: metric rescaling parameter.
         :param g: gravitational acceleration.
-        :param coriolis0: constant coefficient of beta-plane Coriolis term.
-        :param coriolis1: linear coefficient of beta-plane Coriolis term. 
         :param outputMetric: toggle saving metric to PVD.
         :param plotpvd: toggle saving solution fields to PVD.
         :param gauges: toggle saving of elevation to HDF5 for timeseries analysis. 
@@ -120,9 +116,9 @@ class Options:
         self.iso = iso
         self.advect = advect
         self.gradate = gradate
+        self.nonlinear = nonlinear
         self.window = window
         self.tAdapt = tAdapt
-        self.bAdapt = bAdapt
         self.bootstrap = bootstrap
         self.outputOF = outputOF
         self.printStats = printStats
@@ -131,7 +127,7 @@ class Options:
         self.plotpvd = plotpvd
         self.gauges = gauges
         self.wd = wd
-        assert(type(advect) == type(gradate) == type(window) == type(iso) == type(tAdapt) == type(bAdapt)
+        assert(type(advect) == type(gradate) == type(nonlinear) == type(window) == type(iso) == type(tAdapt)
                == type(bootstrap) == type(outputOF) == type(printStats) == type(capBathymetry) == type(outputMetric)
                == type(plotpvd) == type(gauges) == type(wd) == bool)
         self.hessMeth = hessMeth
