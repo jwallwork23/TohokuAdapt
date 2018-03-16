@@ -101,10 +101,14 @@ if __name__ == '__main__':
                      # wd=True if mode == 'tohoku' else False,
                      ndump=10)
 
-    for tf in (True, False):
-        op.nonlinear = tf
-        textfile = open('outdata/outputs/modelVerification/nonlinear=' + str(tf) + '/' + date + '.txt', 'w+')
-        for i in range(11):
-            J_h, timing = solverSW(i, op=op)
-            textfile.write('%d, %.4e, %.1f\n' % (i, J_h, timing))
-        textfile.close()
+    for i in (True, False):
+        for j in (True, False):
+            op.nonlinear = i
+            op.rotational = j
+            filename = 'outdata/outputs/modelVerification/nonlinear=' + str(i) + '_'
+            filename += 'rotational=' + str(j) + '_'
+            textfile = open(filename + date + '.txt', 'w+')
+            for k in range(11):
+                J_h, timing = solverSW(k, op=op)
+                textfile.write('%d, %.4e, %.1f\n' % (k, J_h, timing))
+            textfile.close()
