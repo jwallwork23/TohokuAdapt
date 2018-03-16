@@ -166,19 +166,29 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     if mode == 'shallow-water':
         dt = 0.025                          # TODO: change this
     else:
+        # Ensure simulation time is achieved exactly.
         solver_obj.create_equations()
         dt = min(np.abs(solver_obj.compute_time_step().dat.data))
-        if mode == 'rossby-wave':   # Ensure simulation time is achieved exactly.
-            if dt > 0.5:
-                dt = 0.5
-            elif dt > 0.25:
-                dt = 0.25
-            elif dt > 0.2:
-                dt = 0.2
-            elif dt > 0.1:
-                dt = 0.1
-            elif dt > 0.05:
-                dt = 0.05
+        if dt > 3.:
+            dt = 3.
+        elif dt > 2.5:
+            dt = 2.5
+        elif dt > 2.:
+            dt = 2.
+        elif dt > 1.5:
+            dt = 1.5
+        elif dt > 1.:
+            dt = 1.
+        elif dt > 0.5:
+            dt = 0.5
+        elif dt > 0.25:
+            dt = 0.25
+        elif dt > 0.2:
+            dt = 0.2
+        elif dt > 0.1:
+            dt = 0.1
+        elif dt > 0.05:
+            dt = 0.05
     Dt = Constant(dt)
     # iEnd = int(np.ceil(T / (dt * op.rm)))
     iEnd = int(T / (dt * op.rm))            # It appears this format is better for CFL criterion derived timesteps
@@ -204,7 +214,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         # Get solver parameter values and construct solver
         options = solver_obj.options
         options.element_family = op.family
-        options.use_nonlinear_equations = True if op.wd or mode == 'rossby-wave' else False
+        options.use_nonlinear_equations = True if op.nonlinear else False
         options.use_grad_depth_viscosity_term = False
         if mode == 'rossby-wave':
             options.coriolis_frequency = f
@@ -482,7 +492,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             adapSolver = solver2d.FlowSolver2d(mesh_H, b)
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
-            adapOpt.use_nonlinear_equations = True if op.wd or mode == 'rossby-wave' else False
+            adapOpt.use_nonlinear_equations = True if op.nonlinear else False
             adapOpt.use_grad_depth_viscosity_term = False
             adapOpt.simulation_export_time = dt * op.ndump
             startT = endT
@@ -612,6 +622,7 @@ if __name__ == '__main__':
         op.hmax = 10.
         op.rm = 48 if useAdjoint else 24
         op.ndump = 12
+        op.nonlinear = True
 
     # Run simulation(s)
     s = '_BOOTSTRAP' if op.bootstrap else ''
