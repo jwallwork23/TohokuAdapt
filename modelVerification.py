@@ -31,8 +31,6 @@ def solverSW(startRes, op=opt.Options()):
         Omega = 7.291e-5
         for i, v in zip(range(len(mesh_H.coordinates.dat.data)), mesh_H.coordinates.dat.data):
             f.dat.data[i] = 2 * Omega * np.sin(np.radians(conv.get_latitude(v[0], v[1], 54)))
-    else:
-        f.interpolate(Expression(0))
 
     # Get timestep, ensuring simulation time is achieved exactly
     solver_obj = solver2d.FlowSolver2d(mesh_H, b)
