@@ -94,7 +94,7 @@ if __name__ == '__main__':
                      # wd=True if mode == 'tohoku' else False,
                      ndump=10)
 
-    for i in (True, False):
+    for i in (False, True):
         for j in (True, False):
             op.nonlinear = i
             op.rotational = j
