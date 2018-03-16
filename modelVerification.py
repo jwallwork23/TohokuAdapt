@@ -97,7 +97,7 @@ if __name__ == '__main__':
 
     op = opt.Options(family='dg-dg',
                      wd=False,
-                     # wd=True if mode == 'tohoku' else False,
+                     # wd=True,
                      ndump=10)
 
     for i in (False, True):
@@ -108,6 +108,7 @@ if __name__ == '__main__':
             filename += 'rotational=' + str(j) + '_'
             textfile = open(filename + date + '.txt', 'w+')
             for k in range(11):
+                print("\nNONLINEAR = %s, ROTATIONAL = %s, RUN %d\n" % (i, j, k))
                 J_h, timing = solverSW(k, op=op)
                 textfile.write('%d, %.4e, %.1f\n' % (k, J_h, timing))
             textfile.close()
