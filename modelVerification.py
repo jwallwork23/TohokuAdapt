@@ -5,6 +5,7 @@ import numpy as np
 from time import clock
 import datetime
 
+import utils.conversion as conv
 import utils.error as err
 import utils.mesh as msh
 import utils.options as opt
@@ -18,10 +19,20 @@ def solverSW(startRes, op=opt.Options()):
 
     # Establish Mesh, initial FunctionSpace and variables of problem and apply initial conditions
     mesh_H, eta0, b = msh.TohokuDomain(startRes, wd=op.wd)
+    y = SpatialCoordinate(mesh_H)[1]
     V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
     q = Function(V_H)
     uv_2d, elev_2d = q.split()
     elev_2d.interpolate(eta0)
+
+    # Get Coriolis frequency
+    f = Function(FunctionSpace(mesh_H, 'CG', 1))
+    if op.rotational:
+        Omega = 7.291e-5
+        for i, v in zip(range(len(mesh_H.coordinates.dat.data)), mesh_H.coordinates.dat.data):
+            f.dat.data[i] = 2 * Omega * np.sin(np.radians(conv.get_latitude(v[0], v[1], 54)))
+    else:
+        f.interpolate(Expression(0))
 
     # Get timestep, ensuring simulation time is achieved exactly
     solver_obj = solver2d.FlowSolver2d(mesh_H, b)
@@ -55,9 +66,6 @@ def solverSW(startRes, op=opt.Options()):
     options.element_family = op.family
     options.use_nonlinear_equations = True if op.nonlinear else False
     options.use_grad_depth_viscosity_term = False
-    f = Function(FunctionSpace(mesh_H, 'CG', 1))
-    if op.rotational:
-        f.interpolate(SpatialCoordinate(mesh_H)[1])
     options.coriolis_frequency = f
     options.simulation_export_time = dt * op.ndump
     options.simulation_end_time = op.Tend
@@ -95,7 +103,7 @@ if __name__ == '__main__':
                      ndump=10)
 
     for i in (False, True):
-        for j in (True, False):
+        for j in (False, True):
             op.nonlinear = i
             op.rotational = j
             filename = 'outdata/outputs/modelVerification/nonlinear=' + str(i) + '_'
