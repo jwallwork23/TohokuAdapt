@@ -3,12 +3,14 @@ from firedrake_adjoint import *
 
 import numpy as np
 from time import clock
+import datetime
 
 import utils.error as err
 import utils.mesh as msh
 import utils.options as opt
 
-
+now = datetime.datetime.now()
+date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 assert (float(physical_constants['g_grav'].dat.data) == 9.81)
 
 def solverSW(startRes, op=opt.Options()):
@@ -53,6 +55,10 @@ def solverSW(startRes, op=opt.Options()):
     options.element_family = op.family
     options.use_nonlinear_equations = True if op.nonlinear else False
     options.use_grad_depth_viscosity_term = False
+    f = Function(FunctionSpace(mesh_H, 'CG', 1))
+    if op.rotational:
+        f.interpolate(SpatialCoordinate(mesh_H)[1])
+    options.coriolis_frequency = f
     options.simulation_export_time = dt * op.ndump
     options.simulation_end_time = op.Tend
     options.timestepper_type = op.timestepper
@@ -82,6 +88,7 @@ def solverSW(startRes, op=opt.Options()):
 
     return J_h, clock() - timer
 
+
 if __name__ == '__main__':
 
     op = opt.Options(family='dg-dg',
@@ -96,5 +103,8 @@ if __name__ == '__main__':
 
     for tf in (True, False):
         op.nonlinear = tf
+        textfile = open('outdata/outputs/modelVerification/nonlinear=' + str(tf) + '/' + date + '.txt', 'w+')
         for i in range(11):
             J_h, timing = solverSW(i, op=op)
+            textfile.write('%d, %.4e, %.1f\n' % (i, J_h, timing))
+        textfile.close()

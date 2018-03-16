@@ -19,6 +19,7 @@ class Options:
                  advect=False,
                  gradate=False,
                  nonlinear=False,
+                 rotational=False,
                  window=False,
                  tAdapt=False,
                  bootstrap=False,
@@ -53,6 +54,7 @@ class Options:
         :param advect: Toggle metric advection.
         :param gradate: Toggle metric gradation.
         :param nonlinear: Toggle nonlinear / linear equations.
+        :param rotational: Toggle rotational / non-rotational equations.
         :param window: generate error estimators over a time window of relevance.
         :param tAdapt: implement adaptive timestepping.
         :param bootstrap: implement mesh bootstrapping to establish initial mesh.
@@ -117,6 +119,7 @@ class Options:
         self.advect = advect
         self.gradate = gradate
         self.nonlinear = nonlinear
+        self.rotational = rotational
         self.window = window
         self.tAdapt = tAdapt
         self.bootstrap = bootstrap
@@ -127,9 +130,9 @@ class Options:
         self.plotpvd = plotpvd
         self.gauges = gauges
         self.wd = wd
-        assert(type(advect) == type(gradate) == type(nonlinear) == type(window) == type(iso) == type(tAdapt)
-               == type(bootstrap) == type(outputOF) == type(printStats) == type(capBathymetry) == type(outputMetric)
-               == type(plotpvd) == type(gauges) == type(wd) == bool)
+        assert(type(advect) == type(gradate) == type(nonlinear) == type(rotational) == type(window) == type(iso)
+               == type(tAdapt) == type(bootstrap) == type(outputOF) == type(printStats) == type(capBathymetry)
+               == type(outputMetric) == type(plotpvd) == type(gauges) == type(wd) == bool)
         self.hessMeth = hessMeth
         try:
             assert hessMeth in ('dL2', 'parts')
