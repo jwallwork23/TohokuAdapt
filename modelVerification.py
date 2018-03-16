@@ -14,7 +14,7 @@ date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 assert (float(physical_constants['g_grav'].dat.data) == 9.81)
 
 def solverSW(startRes, op=opt.Options()):
-    dirName = "plots/modelVerification"
+    dirName = "plots/modelVerification/"
 
     # Establish Mesh, initial FunctionSpace and variables of problem and apply initial conditions
     mesh_H, eta0, b = msh.TohokuDomain(startRes, wd=op.wd)
