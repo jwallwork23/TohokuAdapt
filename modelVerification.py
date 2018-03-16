@@ -71,20 +71,18 @@ def solverSW(startRes, op=opt.Options()):
     #     options.wetting_and_drying_alpha = alpha
 
     # Output error data
-    if op.outputOF:
-        cb = err.TohokuCallback(solver_obj)
-        cb.output_dir = dirName
-        cb.append_to_log = True
-        cb.export_to_hdf5 = False
-        solver_obj.add_callback(cb, 'timestep')
+    cb = err.TohokuCallback(solver_obj)
+    cb.output_dir = dirName
+    cb.append_to_log = True
+    cb.export_to_hdf5 = False
+    solver_obj.add_callback(cb, 'timestep')
 
     # Apply ICs and time integrate
     solver_obj.assign_initial_conditions(elev=eta0)
     timer = clock()
     solver_obj.iterate()
     timer = clock() - timer
-    if op.outputOF:
-        J_h = err.getOF(dirName)  # Evaluate objective functional
+    J_h = err.getOF(dirName)  # Evaluate objective functional
 
     return J_h, clock() - timer
 
@@ -92,11 +90,6 @@ def solverSW(startRes, op=opt.Options()):
 if __name__ == '__main__':
 
     op = opt.Options(family='dg-dg',
-                     outputMetric=False,
-                     plotpvd=True,
-                     gauges=False,
-                     printStats=True,
-                     outputOF=True,
                      wd=False,
                      # wd=True if mode == 'tohoku' else False,
                      ndump=10)
