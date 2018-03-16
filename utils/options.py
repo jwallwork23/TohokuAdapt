@@ -147,11 +147,8 @@ class Options:
 
         # Physical parameters
         self.g = g
-        self.coriolis0 = coriolis0
-        self.coriolis1 = coriolis1
         try:
             assert(g > 0)
-            assert(type(coriolis0) == type(coriolis1) == float)
         except:
             raise ValueError('Unphysical physical parameters!')
 
