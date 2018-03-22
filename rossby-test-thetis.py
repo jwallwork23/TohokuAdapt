@@ -43,6 +43,7 @@ options = solver_obj.options
 options.element_family = 'dg-dg'
 options.use_nonlinear_equations = True
 options.use_grad_depth_viscosity_term = False                   # In Matt's parameters viscosity=1e-6
+options.use_grad_div_viscosity_term = False
 options.coriolis_frequency = f
 File(dirName+'Coriolis.pvd').write(options.coriolis_frequency)  # Plot Coriolis frequency
 options.simulation_export_time = dt * ndump

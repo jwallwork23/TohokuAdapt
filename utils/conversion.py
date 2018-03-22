@@ -6,7 +6,10 @@ import numpy as np
 class OutOfRangeError(ValueError):
     pass
 
-__all__ = ['to_latlon', 'from_latlon', 'vectorlonlat2utm', 'get_latitude']
+__all__ = ["to_latlon", "from_latlon", "vectorlonlat2utm", "get_latitude", "latitude_to_zone_letter",
+           "latlon_to_zone_number", "zone_number_to_central_longitude", "vectorlonlat2tangentxy", "earth_radius",
+           "lonlat2tangentxy", "lonlat2tangent_pair", "vectorlonlat2utm", "mesh_converter", "xy2barycentric",
+           "rescaleMesh"]
 
 K0 = 0.9996
 

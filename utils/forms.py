@@ -40,7 +40,7 @@ def timestepScheme(u, u_, timestepper):
     return a1 * u + a2 * u_
 
 
-def strongResidualSW(q, q_, b, Dt, nu=None, coriolisFreq=None, nonlinear=False, op=opt.Options()):
+def strongResidualSW(q, q_, b, Dt, coriolisFreq=None, nonlinear=False, op=opt.Options()):
     """
     Construct the strong residual for the semi-discrete linear shallow water equations at the current timestep.
 
@@ -48,14 +48,11 @@ def strongResidualSW(q, q_, b, Dt, nu=None, coriolisFreq=None, nonlinear=False, 
     :arg q_: solution tuple for linear shallow water equations at previous timestep.
     :arg b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
-    :param nu: coefficient for stress term, expressed as a FiredrakeConstant.
     :param coriolisFreq: Coriolis parameter for rotational equations.
     :param nonlinear: toggle nonlinear / linear equations.
     :param op: parameter holding class.
     :return: strong residual for shallow water equations at current timestep.
     """
-    # TODO: implement Galerkin Least Squares (GLS) stabilisation
-
     (u, eta) = (as_vector((q[0], q[1])), q[2])
     (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
     um = timestepScheme(u, u_, op.timestepper)
@@ -63,8 +60,6 @@ def strongResidualSW(q, q_, b, Dt, nu=None, coriolisFreq=None, nonlinear=False, 
 
     Au = (u - u_) / Dt + op.g * grad(em)
     Ae = (eta - eta_) / Dt + div(b * um)
-    if nu:
-        Au += div(nu * (grad(um) + transpose(grad(um))))
     if coriolisFreq:
         Au += coriolisFreq * as_vector((-u[1], u[0]))
     if nonlinear:
@@ -73,7 +68,7 @@ def strongResidualSW(q, q_, b, Dt, nu=None, coriolisFreq=None, nonlinear=False, 
     return Au, Ae
 
 
-def formsSW(q, q_, b, Dt, nu=None, coriolisFreq=None, nonlinear=False, impermeable=True, op=opt.Options()):
+def formsSW(q, q_, b, Dt, coriolisFreq=None, nonlinear=False, impermeable=True, op=opt.Options()):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
 
@@ -81,7 +76,6 @@ def formsSW(q, q_, b, Dt, nu=None, coriolisFreq=None, nonlinear=False, impermeab
     :arg q_: solution tuple for linear shallow water equations at previous timestep.
     :arg b: bathymetry profile.
     :param Dt: timestep expressed as a FiredrakeConstant.
-    :param nu: coefficient for stress term, expressed as a FiredrakeConstant.
     :param coriolisFreq: Coriolis parameter for rotational equations.
     :param nonlinear: toggle nonlinear / linear equations.
     :param impermeable: impose Neumann BCs.
@@ -106,9 +100,6 @@ def formsSW(q, q_, b, Dt, nu=None, coriolisFreq=None, nonlinear=False, impermeab
         # TODO: Test this
     else:
         B += a1 * div(b * u) * xi * dx
-    if nu:
-        B -= a1 * nu * inner(grad(u) + transpose(grad(u)), grad(w)) * dx
-        L += a2 * nu * inner(grad(u_) + transpose(grad(u_)), grad(w)) * dx
     if coriolisFreq:
         B += a1 * coriolisFreq * inner(as_vector((-u[1], u[0])), w) * dx
         L -= a2 * coriolisFreq * inner(as_vector((-u_[1], u_[0])), w) * dx
@@ -147,7 +138,7 @@ def adjointSW(l, l_, b, Dt, mode='shallow-water', switch=Constant(1.), op=opt.Op
     return B, L
 
 
-def weakResidualSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, impermeable=True, adjoint=False,
+def weakResidualSW(q, q_, b, Dt, coriolisFreq=None, nonlinear=False, impermeable=True, adjoint=False,
                    mode='shallow-water', switch=Constant(0.), op=opt.Options()):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
@@ -166,7 +157,7 @@ def weakResidualSW(q, q_, b, Dt, nu=0., coriolisFreq=None, nonlinear=False, impe
     if adjoint:
         B, L = adjointSW(q, q_, b, Dt, mode=mode, switch=switch, op=op)
     else:
-        B, L = formsSW(q, q_, b, Dt, nu=nu, coriolisFreq=coriolisFreq, nonlinear=nonlinear,
+        B, L = formsSW(q, q_, b, Dt, coriolisFreq=coriolisFreq, nonlinear=nonlinear,
                        impermeable=impermeable, op=op)
     return B - L
 

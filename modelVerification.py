@@ -1,5 +1,5 @@
 from thetis import *
-from firedrake_adjoint import *
+# from firedrake_adjoint import *
 
 import numpy as np
 from time import clock
@@ -19,7 +19,6 @@ def solverSW(startRes, op=opt.Options()):
 
     # Establish Mesh, initial FunctionSpace and variables of problem and apply initial conditions
     mesh_H, eta0, b = msh.TohokuDomain(startRes, wd=op.wd)
-    y = SpatialCoordinate(mesh_H)[1]
     V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
     q = Function(V_H)
     uv_2d, elev_2d = q.split()
@@ -57,13 +56,12 @@ def solverSW(startRes, op=opt.Options()):
     elif dt > 0.05:
         dt = 0.05
 
-    # TODO: Consider w&d
-
     # Get solver parameter values and construct solver
     options = solver_obj.options
     options.element_family = op.family
     options.use_nonlinear_equations = True if op.nonlinear else False
     options.use_grad_depth_viscosity_term = False
+    options.use_grad_div_viscosity_term = False
     options.coriolis_frequency = f
     options.simulation_export_time = dt * op.ndump
     options.simulation_end_time = op.Tend
@@ -72,19 +70,34 @@ def solverSW(startRes, op=opt.Options()):
     options.output_directory = dirName
     options.export_diagnostics = True
     options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-    # options.use_wetting_and_drying = op.wd
+    # options.use_wetting_and_drying = op.wd        # TODO: Consider w&d
     # if op.wd:
     #     options.wetting_and_drying_alpha = alpha
 
-    # Output error data
-    cb = err.TohokuCallback(solver_obj)
-    cb.output_dir = dirName
-    cb.append_to_log = True
-    cb.export_to_hdf5 = False
-    solver_obj.add_callback(cb, 'timestep')
-
-    # Apply ICs and time integrate
+    # Apply ICs
     solver_obj.assign_initial_conditions(elev=eta0)
+
+    # Output objective functional computation error
+    cb1 = err.TohokuCallback(solver_obj)
+    cb1.output_dir = dirName
+    cb1.append_to_log = True
+    cb1.export_to_hdf5 = False
+    solver_obj.add_callback(cb1, 'timestep')
+
+    # Output gauge timeseries error
+    cb2 = err.P02Callback(solver_obj)
+    cb2.output_dir = dirName
+    cb2.append_to_log = True
+    cb2.export_to_hdf5 = False
+    solver_obj.add_callback(cb2, 'timestep')
+
+    # Output gauge timeseries error
+    cb3 = err.P06Callback(solver_obj)
+    cb3.output_dir = dirName
+    cb3.append_to_log = True
+    cb3.export_to_hdf5 = False
+    solver_obj.add_callback(cb3, 'timestep')
+
     timer = clock()
     solver_obj.iterate()
     timer = clock() - timer

@@ -3,11 +3,14 @@ from thetis.callback import DiagnosticCallback
 # from firedrake_adjoint import adj_start_timestep, adj_inc_timestep
 
 import numpy as np
-import cmath
 
 from . import forms
 from . import interpolation
 from . import options
+
+
+__all__ = ["IntegralCallback", "TohokuCallback", "ShallowWaterCallback", "RossbyWaveCallback", "getOF",
+           "explicitErrorEstimator", "DWR", "fluxJumpError", "basicErrorEstimator", "totalVariation"]
 
 
 class IntegralCallback(DiagnosticCallback):
@@ -32,7 +35,7 @@ class IntegralCallback(DiagnosticCallback):
         # Output OF value
         t = self.solver_obj.simulation_time
         dt = self.solver_obj.options.timestep
-        T = self.solver_obj.options.simulation_end_time
+        # T = self.solver_obj.options.simulation_end_time
         value = self.scalar_callback() * dt
         if t > self.solver_obj.options.simulation_end_time - 0.5 * dt:
             value *= 0.5
@@ -132,6 +135,77 @@ class RossbyWaveCallback(IntegralCallback):
             return assemble(elev_2d * ks * kt * dx)
 
         super(RossbyWaveCallback, self).__init__(indicatorRW, solver_obj, **kwargs)
+
+
+class GaugeCallback(DiagnosticCallback):
+    """Base class for callbacks that evaluate a scalar quantity at a gauge location."""
+    variable_names = ['current value', 'gauge value']
+
+    def __init__(self, scalar_callback, solver_obj, **kwargs):
+        """
+        Creates gauge callback object
+
+        :arg scalar_callback: Python function that takes the solver object as an argument and
+            returns a scalar quantity of interest
+        :arg solver_obj: Thetis solver object
+        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+        """
+        super(GaugeCallback, self).__init__(solver_obj, **kwargs)
+        self.scalar_callback = scalar_callback
+        self.init_value = self.scalar_callback()
+
+    def __call__(self):
+        self.gauge_value = self.scalar_callback() - self.init_value
+        return self.gauge_value, float(self.gauge_value)
+
+    def message_str(self, *args):
+        line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
+        return line
+
+
+class P02Callback(GaugeCallback):
+    """Evaluates at gauge P02."""
+    name = 'gauge P02'
+
+    def __init__(self, solver_obj, **kwargs):
+        """
+        :arg solver_obj: Thetis solver object
+        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+        """
+
+        def extractP02():
+            """
+            :param solver_obj: FlowSolver2d object.
+            :return: objective functional value for callbacks.
+            """
+            elev_2d = solver_obj.fields.solution_2d.split()[1]
+            loc = options.Options().gaugeCoord("P02")
+
+            return elev_2d.at(loc)
+
+        super(P02Callback, self).__init__(extractP02, solver_obj, **kwargs)
+
+
+class P06Callback(GaugeCallback):
+    """Evaluates at gauge P06."""
+    name = 'gauge P06'
+
+    def __init__(self, solver_obj, **kwargs):
+        """
+        :arg solver_obj: Thetis solver object
+        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+        """
+
+        def extractP06():
+            """
+            :param solver_obj: FlowSolver2d object.
+            :return: objective functional value for callbacks.
+            """
+            elev_2d = solver_obj.fields.solution_2d.split()[1]
+
+            return elev_2d.at(options.Options().gaugeCoord("P06"))
+
+        super(P06Callback, self).__init__(extractP06, solver_obj, **kwargs)
 
 
 def getOF(dirName):

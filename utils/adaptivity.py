@@ -9,6 +9,10 @@ import utils.forms as form
 import utils.mesh as msh
 import utils.options as opt
 
+__all__ = ["constructGradient", "constructHessian", "computeSteadyMetric", "isotropicMetric", "isoP2", "anisoRefine",
+           "metricGradation", "localMetricIntersection", "metricIntersection", "metricConvexCombination",
+           "symmetricProduct", "pointwiseMax", "metricComplexity", "advectMetric"]
+
 
 def constructGradient(f):
     """
@@ -521,30 +525,30 @@ def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEul
     return M_
 
 
-def adaptTimestepSW(mesh, b, sigma=0.9, g=9.81):
-    """
-    :arg mesh: Current (recently adapted) mesh.
-    :arg b: bathymetry profile.
-    :param sigma: scaling parameter in range (0,1).
-    :param g: gravitational acceleration.
-    :return: near-optimal numerically stable timestep.
-    """
-    h = Function(FunctionSpace(mesh, 'DG', 0)).interpolate(CellSize(mesh))
-    if isinstance(b, float):
-        return sigma * min(h.dat.data) / np.sqrt(g * b)
-    else:
-        return sigma * min(h.dat.data) / np.sqrt(g * max(b.dat.data))
-
-
-def adaptTimestepAD(w, sigma=0.9):
-    """
-    :arg w: wind-field used in advection-diffusion eqn.
-    :param sigma: scaling parameter in range (0,1).
-    :return: near-optimal numerically stable timestep.
-    """
-    mesh = w.function_space().mesh()
-    h = Function(FunctionSpace(mesh, 'DG', 0)).interpolate(CellSize(mesh))
-    return sigma * min(h.dat.data) / max(np.sqrt(pow(w.dat.data[:, 0], 2) + pow(w.dat.data[:, 1], 2)))
+# def adaptTimestepSW(mesh, b, sigma=0.9, g=9.81):
+#     """
+#     :arg mesh: Current (recently adapted) mesh.
+#     :arg b: bathymetry profile.
+#     :param sigma: scaling parameter in range (0,1).
+#     :param g: gravitational acceleration.
+#     :return: near-optimal numerically stable timestep.
+#     """
+#     h = Function(FunctionSpace(mesh, 'DG', 0)).interpolate(CellSize(mesh))
+#     if isinstance(b, float):
+#         return sigma * min(h.dat.data) / np.sqrt(g * b)
+#     else:
+#         return sigma * min(h.dat.data) / np.sqrt(g * max(b.dat.data))
+#
+#
+# def adaptTimestepAD(w, sigma=0.9):
+#     """
+#     :arg w: wind-field used in advection-diffusion eqn.
+#     :param sigma: scaling parameter in range (0,1).
+#     :return: near-optimal numerically stable timestep.
+#     """
+#     mesh = w.function_space().mesh()
+#     h = Function(FunctionSpace(mesh, 'DG', 0)).interpolate(CellSize(mesh))
+#     return sigma * min(h.dat.data) / max(np.sqrt(pow(w.dat.data[:, 0], 2) + pow(w.dat.data[:, 1], 2)))
 
 
 if __name__ == '__main__':

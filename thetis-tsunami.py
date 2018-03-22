@@ -216,6 +216,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         options.element_family = op.family
         options.use_nonlinear_equations = True if op.nonlinear else False
         options.use_grad_depth_viscosity_term = False
+        options.use_grad_div_viscosity_term = False
         if mode == 'rossby-wave':
             options.coriolis_frequency = f
         options.simulation_export_time = dt * (op.rm-1) if aposteriori else dt * op.ndump
@@ -494,6 +495,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = True if op.nonlinear else False
             adapOpt.use_grad_depth_viscosity_term = False
+            options.use_grad_div_viscosity_term = False
             adapOpt.simulation_export_time = dt * op.ndump
             startT = endT
             endT += dt * op.rm
@@ -571,6 +573,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         return av, np.abs(peak/0.1567020), distanceTravelled, distanceTravelled/47.18, toc
     else:
         return av, np.abs(op.J(mode) - J_h)/np.abs(op.J(mode)), J_h, toc
+
+    # TODO: also generate and output a timeseries plot for the integrand of the objective functional [Anca Belme paper]
 
 
 if __name__ == '__main__':
