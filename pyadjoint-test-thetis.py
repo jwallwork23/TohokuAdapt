@@ -1,55 +1,19 @@
 from thetis import *
 from thetis.field_defs import field_metadata
 from firedrake_adjoint import *
+from fenics_adjoint.solving import SolveBlock
 
 import numpy as np
 from time import clock
 import datetime
 
-import utils.adaptivity as adap
-import utils.error as err
 import utils.forms as form
-import utils.interpolation as inte
-import utils.mesh as msh
 import utils.misc as msc
 import utils.options as opt
 
 # Get date and parameters
 now = datetime.datetime.now()
 date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
-dt_meas = dt
-
-class AnnotationCallback(DiagnosticCallback):
-    """Base class for callbacks that annotate tape."""
-    variable_names = ['Annotation']
-
-    def __init__(self, solver_obj, **kwargs):
-        """
-        Creates error comparison check callback object
-
-        :arg solver_obj: Thetis solver object
-        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
-        """
-        super(AnnotationCallback, self).__init__(solver_obj, **kwargs)
-
-    def __call__(self):
-        # Track adjoint data
-        t = self.solver_obj.simulation_time
-        dt = self.solver_obj.options.timestep
-        T = self.solver_obj.options.simulation_end_time
-        finished = True if t > T + 0.5 * dt else False      # + 1 because callback happens after incrementation
-        if t < 1.5 * dt:                                    # + 1 because callback happens after incrementation
-            adj_start_timestep()
-            value = 'start'
-        else:
-            adj_inc_timestep(time=t, finished=finished)
-            value = 'end' if finished else 'middle'
-
-        return value, value
-
-    def message_str(self, *args):
-        line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
-        return line
 
 op = opt.Options(vscale=0.1,
                  family='dg-dg',
@@ -83,12 +47,22 @@ elev_2d.interpolate(eta0)
 uv_2d.rename("uv_2d")
 elev_2d.rename("elev_2d")
 
-# Set up adjoint problem
-J = Functional(elev_2d * form.indicator(V_H.sub(1), mode='shallow-water') * dx * dt_meas)
+# Set up adjoint variables
 dual = Function(V_H)
 dual_u, dual_e = dual.split()
 dual_u.rename("Adjoint velocity")
 dual_e.rename("Adjoint elevation")
+
+# Define indicator function
+k = Function(V_H)
+k0, k1 = k.split()
+iA = form.indicator(V_H.sub(1), mode='shallow-water')
+iA.rename("Region of interest")
+File(dirName+"indicator.pvd").write(iA)
+k1.assign(iA)
+J = assemble(inner(k, q) * dx)
+# Jfunc = assemble(inner(k, q_) * dx)
+# Jfuncs = [Jfunc]
 
 # Get solver parameter values and construct solver
 msc.dis('Starting fixed mesh primal run (forwards in time)', op.printStats)
@@ -114,45 +88,27 @@ options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
 # cb1.export_to_hdf5 = False
 # solver_obj.add_callback(cb1, 'timestep')
 
-# # Track adjoint data
-# cb2 = AnnotationCallback(solver_obj)
-# cb2.output_dir = dirName
-# cb2.append_to_log = False
-# cb2.append_to_hdf5 = False
-# cb2.export_to_hdf5 = False
-# solver_obj.add_callback(cb2, 'timestep')
-
 # Apply ICs and time integrate
 solver_obj.assign_initial_conditions(elev=eta0)
-def selector():
-    t = solver_obj.simulation_time
-    rm = 20
-    dt = options.timestep
-    options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
-solver_obj.iterate(export_func=selector)
+# def selector():
+#     t = solver_obj.simulation_time
+#     rm = 20
+#     dt = options.timestep
+#     options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
+# solver_obj.iterate(export_func=selector)
+solver_obj.iterate()
 
-msc.dis('\nStarting fixed mesh dual run (backwards in time)', op.printStats)
-cntT = int(np.ceil(T/dt))
-cnt = cntT
-save = True
-parameters["adjoint"]["stop_annotating"] = True  # Stop registering equations
+print('\nStarting fixed mesh dual run (backwards in time)')
 dualTimer = clock()
-for (variable, solution) in compute_adjoint(J):
-    print(variable, solution)
-    if save:
-        # Load adjoint data and save to HDF5
-        dual.assign(variable, annotate=False)
-        dual_u, dual_e = dual.split()
-        dual_u.rename('Adjoint velocity')
-        dual_e.rename('Adjoint elevation')
-        with DumbCheckpoint(dirName + 'hdf5/adjoint_' + msc.indexString(cnt), mode=FILE_CREATE) as saveAdj:
-            saveAdj.store(dual_u)
-            saveAdj.store(dual_e)
-            saveAdj.close()
-        msc.dis('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT * 100), op.printStats)
-        cnt -= 1
-        save = False
-    else:
-        save = True
-    if cnt == -1:
-        break
+dJdnu = compute_gradient(J, Control(b)) # TODO: Perhaps could make a different, more relevant calculation?
+tape = get_working_tape()
+solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
+
+t = op.Tend
+for i in range(len(solve_blocks)-1, -1, -1):
+    dual.assign(solve_blocks[i].adj_sol)
+    print('t = %.2fs' % t)
+    t -= dt
+
+dualTimer = clock() - dualTimer
+print('Adjoint run complete. Run time: %.3fs' % dualTimer)

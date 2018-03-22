@@ -8,8 +8,6 @@ from time import clock
 import utils.forms as form
 
 
-# dt_meas = dt
-
 # Establish filenames
 dirName = 'plots/pyadjoint_test/'
 forwardFile = File(dirName + "forward.pvd")
@@ -90,7 +88,6 @@ k1.assign(iA)
 print('Starting fixed mesh primal run (forwards in time)')
 primalTimer = clock()
 forwardFile.write(u, eta, time=t)
-# J = Functional(inner(q, k) * dx * dt_meas)
 Jfunc = assemble(inner(k, q_) * dx)
 Jfuncs = [Jfunc]
 while t < Tend + dt:
@@ -101,12 +98,6 @@ while t < Tend + dt:
     # Update OF
     Jfunc = assemble(inner(k, q_) * dx)
     Jfuncs.append(Jfunc)
-
-    # # Mark timesteps to be used in adjoint simulation
-    # if t == 0.:
-    #     adj_start_timestep()
-    # else:
-    #     adj_inc_timestep(time=t, finished= t >= Tend)
 
     if cnt % rm == 0:
         forwardFile.write(u, eta, time=t)
@@ -124,23 +115,8 @@ J = 0
 for i in range(1, len(Jfuncs)):
     J += 0.5*(Jfuncs[i-1] + Jfuncs[i])*dt
 
-# parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
 print('\nStarting fixed mesh dual run (backwards in time)')
 dualTimer = clock()
-# for (variable, solution) in compute_adjoint(J):
-#     if save:
-#         dual.assign(variable)
-#         if cnt % rm == 0:
-#             adjointFile.write(dual_u, dual_e, time=t)
-#             print('t = %.2fs' % t)
-#         cnt -= 1
-#         t -= dt
-#         save = False
-#     else:
-#         save = True
-#     if cnt == -1:
-#         break
-
 dJdnu = compute_gradient(J, Control(b)) # TODO: Perhaps could make a different, more relevant calculation?
 tape = get_working_tape()
 solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
@@ -156,4 +132,3 @@ for i in range(len(solve_blocks)-1, -1, -1):
 
 dualTimer = clock() - dualTimer
 print('Adjoint run complete. Run time: %.3fs' % dualTimer)
-cnt += 1
