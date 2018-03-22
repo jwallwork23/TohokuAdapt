@@ -66,6 +66,7 @@ B -= a1 * g * eta * div(w) * dx
 L += a2 * g * eta_ * div(w) * dx
 B -= a1 * inner(b * u, grad(xi)) * dx
 L += a2 * inner(b * u_, grad(xi)) * dx
+# B, L = form.formsSW(q, q_, b, Dt)
 forwardProblem = NonlinearVariationalProblem(B-L, q)
 forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters={'mat_type': 'matfree',
                                                                               'snes_type': 'ksponly',

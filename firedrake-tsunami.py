@@ -1,5 +1,7 @@
 from firedrake import *
 from firedrake_adjoint import *
+from fenics_adjoint.solving import SolveBlock
+
 
 import numpy as np
 from time import clock
@@ -53,6 +55,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     adaptiveFile = File(dirName + approach + ".pvd")
     if op.outputMetric:
         metricFile = File(dirName + "metric.pvd")
+    if useAdjoint:
+        adjointFile = File(dirName + "adjoint.pvd")
 
     # Load Mesh(es)
     if mode == 'tohoku':
@@ -93,7 +97,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         f = None
     q_ = Function(V_H)
     u_, eta_ = q_.split()
-    u_.interpolate(Expression([0, 0]))
     eta_.interpolate(eta0)
     q = Function(V_H)
     q.assign(q_)
@@ -182,10 +185,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     k0, k1 = k.split()
     k1.assign(form.indicator(V_H.sub(1), mode=mode))
     if useAdjoint:
-        Jfunc = Functional(switch * inner(k, q_) * dx)
+        Jfunc = assemble(switch * inner(k, q_) * dx)
         Jfuncs = [Jfunc]
-    Jval = assemble(switch * inner(k, q_) * dx)
-    Jvals = [Jval]
+    # Jval = assemble(switch * inner(k, q_) * dx)
+    # Jvals = [Jval]
 
     if getData:
         # Define variational problem    # TODO: use LinearVariationalProblem, for which need TrialFunction(s)
@@ -265,18 +268,18 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             if t >= op.Tstart:
                 switch.assign(1.)
             if useAdjoint:
-                Jfunc = Functional(switch * inner(k, q_) * dx)
+                Jfunc = assemble(switch * inner(k, q_) * dx)
                 Jfuncs.append(Jfunc)
-            if approach == 'fixedMesh':
-                Jval = assemble(switch * inner(k, q_) * dx)
-                Jvals.append(Jval)
+            # if approach == 'fixedMesh':
+            #     Jval = assemble(switch * inner(k, q_) * dx)
+            #     Jvals.append(Jval)
 
-            # Mark timesteps to be used in adjoint simulation
-            if useAdjoint:
-                if t == 0.:
-                    adj_start_timestep()
-                else:
-                    adj_inc_timestep(time=t, finished=t >= T)
+            # # Mark timesteps to be used in adjoint simulation
+            # if useAdjoint:
+            #     if t == 0.:
+            #         adj_start_timestep()
+            #     else:
+            #         adj_inc_timestep(time=t, finished=t >= T)
 
             if cnt % op.ndump == 0:
                 if op.plotpvd:
@@ -294,54 +297,66 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
         # Establish OF
         if useAdjoint:
-            J = Functional(Constant(0.) * inner(k, q_) * dx)
+            J = assemble(Constant(0.) * inner(k, q_) * dx)
             for i in range(1, len(Jfuncs)):
                 J += 0.5 * (Jfuncs[i - 1] + Jfuncs[i]) * dt
-        if op.outputOF and approach == 'fixedMesh':
-            J_h = 0
-            for i in range(1, len(Jvals)):
-                J_h += 0.5 * (Jvals[i - 1] + Jvals[i]) * dt
-            print('Estimated objective value J_h = ', J_h)
+        # if op.outputOF and approach == 'fixedMesh':
+        #     J_h = 0
+        #     for i in range(1, len(Jvals)):
+        #         J_h += 0.5 * (Jvals[i - 1] + Jvals[i]) * dt
+        #     print('Estimated objective value J_h = ', J_h)
 
         # Reset counter in explicit case
         if aposteriori and not useAdjoint:
             cnt = 0
 
         if useAdjoint:
-            parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
+            # parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
             msc.dis('\nStarting fixed mesh dual run (backwards in time)', op.printStats)
             dualTimer = clock()
-            for (variable, solution) in compute_adjoint(J):
-                if save:
-                    # Load adjoint data and save to HDF5
-                    indexStr = msc.indexString(cnt)
+            # for (variable, solution) in compute_adjoint(J):
+            #     if save:
+            #         # Load adjoint data and save to HDF5
+            #         indexStr = msc.indexString(cnt)
+            #
+            #         dual.assign(variable, annotate=False)
+            #         if op.window or ((op.orderChange or approach == 'DWF') and cnt % op.rm == 0):
+            #             dual_u, dual_e = dual.split()
+            #             dual_u.rename('Adjoint velocity')
+            #             dual_e.rename('Adjoint elevation')
+            #             with DumbCheckpoint(dirName + 'hdf5/adjoint_H_' + indexStr, mode=FILE_CREATE) as saveAdjH:
+            #                 saveAdjH.store(dual_u)
+            #                 saveAdjH.store(dual_e)
+            #                 saveAdjH.close()
+            #         elif (approach == 'DWR') and cnt % op.rm == 0:
+            #             dual_h = inte.mixedPairInterp(mesh_h, V_h, dual)[0]
+            #             dual_h_u, dual_h_e = dual_h.split()
+            #             dual_h_u.rename('Fine adjoint velocity')
+            #             dual_h_e.rename('Fine adjoint elevation')
+            #             with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_CREATE) as saveAdj:
+            #                 saveAdj.store(dual_h_u)
+            #                 saveAdj.store(dual_h_e)
+            #                 saveAdj.close()
+            #             if op.printStats:
+            #                 print('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT * 100))
+            #         cnt -= 1
+            #         save = False
+            #     else:
+            #         save = True
+            #     if cnt == -1:
+            #         break
+            dJdnu = compute_gradient(J, Control(b))  # TODO: Perhaps could make a different, more relevant calculation?
+            tape = get_working_tape()
+            solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
 
-                    dual.assign(variable, annotate=False)
-                    if op.window or ((op.orderChange or approach == 'DWF') and cnt % op.rm == 0):
-                        dual_u, dual_e = dual.split()
-                        dual_u.rename('Adjoint velocity')
-                        dual_e.rename('Adjoint elevation')
-                        with DumbCheckpoint(dirName + 'hdf5/adjoint_H_' + indexStr, mode=FILE_CREATE) as saveAdjH:
-                            saveAdjH.store(dual_u)
-                            saveAdjH.store(dual_e)
-                            saveAdjH.close()
-                    elif (approach == 'DWR') and cnt % op.rm == 0:
-                        dual_h = inte.mixedPairInterp(mesh_h, V_h, dual)[0]
-                        dual_h_u, dual_h_e = dual_h.split()
-                        dual_h_u.rename('Fine adjoint velocity')
-                        dual_h_e.rename('Fine adjoint elevation')
-                        with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_CREATE) as saveAdj:
-                            saveAdj.store(dual_h_u)
-                            saveAdj.store(dual_h_e)
-                            saveAdj.close()
-                        if op.printStats:
-                            print('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT * 100))
-                    cnt -= 1
-                    save = False
-                else:
-                    save = True
-                if cnt == -1:
-                    break
+            for i in range(len(solve_blocks) - 1, -1, -1):
+                dual.assign(solve_blocks[i].adj_sol)
+                if cnt % op.rm == 0:
+                    adjointFile.write(dual_u, dual_e, time=t)
+                    print('t = %.2fs' % t)
+                t -= dt
+
+
             dualTimer = clock() - dualTimer
             msc.dis('Adjoint run complete. Run time: %.3fs' % dualTimer, op.printStats)
             cnt += 1
