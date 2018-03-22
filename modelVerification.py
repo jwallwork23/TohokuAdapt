@@ -102,6 +102,7 @@ def solverSW(startRes, op=opt.Options()):
     solver_obj.iterate()
     timer = clock() - timer
     J_h = err.getOF(dirName)  # Evaluate objective functional
+    # TODO: also create a function to read gauge data from log
 
     return J_h, clock() - timer
 
