@@ -6,6 +6,7 @@ import numpy as np
 from time import clock
 import datetime
 
+import utils.error as err
 import utils.forms as form
 import utils.misc as msc
 import utils.options as opt
@@ -80,12 +81,14 @@ options.output_directory = dirName
 options.export_diagnostics = True
 options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
 
-# # Output OF values
-# cb1 = err.ShallowWaterCallback(solver_obj)
-# cb1.output_dir = dirName
-# cb1.append_to_log = True
-# cb1.export_to_hdf5 = False
-# solver_obj.add_callback(cb1, 'timestep')
+# Output OF values
+cb1 = err.ShallowWaterCallback(solver_obj)
+cb1.output_dir = dirName
+cb1.append_to_log = True
+cb1.export_to_hdf5 = False
+solver_obj.add_callback(cb1, 'timestep')
+
+# TODO: Callback for adding OF in pyadjoint sense?
 
 # Apply ICs and time integrate
 solver_obj.assign_initial_conditions(elev=eta0)
@@ -97,11 +100,13 @@ solver_obj.assign_initial_conditions(elev=eta0)
 # solver_obj.iterate(export_func=selector)
 solver_obj.iterate()
 
+print("Objective value = ", cb1.__call__()[1])
+
 print('\nStarting fixed mesh dual run (backwards in time)')
 dualTimer = clock()
 dJdb = compute_gradient(J, Control(b)) # TODO: Perhaps could make a different, more relevant calculation?
 tape = get_working_tape()
-# tape.visualise()
+tape.visualise()
 solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
 
 t = op.Tend

@@ -282,7 +282,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         else:
             solver_obj.iterate()
         if op.outputOF:
-            J_h = err.getOF(dirName)    # Evaluate objective functional
+            J_h = cb.__call__()[1]    # Evaluate objective functional
         primalTimer = clock() - primalTimer
         msc.dis('Primal run complete. Run time: %.3fs' % primalTimer, op.printStats)
 

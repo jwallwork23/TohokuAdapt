@@ -42,10 +42,10 @@ def forms(q, q_, Dt, b, op=opt.Options()):
     u, eta = split(q)
     u_, eta_ = split(q_)
     w, xi = TestFunctions(q.function_space())
-    g = 1.
+    g = op.g
     a1 = a2 = Constant(0.5)
-    B = (inner(u, w) + eta * xi) / Dt * dx  # LHS bilinear form
-    L = (inner(u_, w) + eta_ * xi) / Dt * dx  # RHS linear functional
+    B = (inner(u, w) + eta * xi) / Dt * dx      # LHS bilinear form
+    L = (inner(u_, w) + eta_ * xi) / Dt * dx    # RHS linear functional
     B -= a1 * g * eta * div(w) * dx
     L += a2 * g * eta_ * div(w) * dx
     # B += a1 * g * inner(grad(eta), w) * dx
@@ -105,7 +105,7 @@ u_, eta_ = split(q_)
 B, L = forms(q, q_, Dt, b)
 # B, L = formsSWcrankNicolson(q, q_, b, Dt)
 F = B - L
-forwardProblem = NonlinearVariationalProblem(F, q)
+forwardProblem = NonlinearVariationalProblem(F, q)  # TODO: use LinearVariationalProblem with a = lhs(F) and L = RHS(F)
 forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters={'mat_type': 'matfree',
                                                                               'snes_type': 'ksponly',
                                                                               'pc_type': 'python',

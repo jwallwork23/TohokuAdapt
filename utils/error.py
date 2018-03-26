@@ -208,23 +208,23 @@ class P06Callback(GaugeCallback):
         super(P06Callback, self).__init__(extractP06, solver_obj, **kwargs)
 
 
-def getOF(dirName):
-    """
-    :arg dirName: directory in which log file is saved
-    :return: final value of objective functional.
-    """
-    l = len([line for line in open(dirName + 'log', 'r')])
-    logfile = open(dirName + 'log', 'r')
-    i = 0
-    for line in logfile:
-        i += 1
-        if i == l-1:
-            text_ = line.split()
-        elif i == l:
-            text = line.split()
-            J_h = text[-1] if text[0] == 'objective' else text_[-1]
-
-    return float(J_h)
+# def getOF(dirName):
+#     """
+#     :arg dirName: directory in which log file is saved
+#     :return: final value of objective functional.
+#     """
+#     l = len([line for line in open(dirName + 'log', 'r')])
+#     logfile = open(dirName + 'log', 'r')
+#     i = 0
+#     for line in logfile:
+#         i += 1
+#         if i == l-1:
+#             text_ = line.split()
+#         elif i == l:
+#             text = line.split()
+#             J_h = text[-1] if text[0] == 'objective' else text_[-1]
+#
+#     return float(J_h)
 
 
 def explicitErrorEstimator(q, residual, b, v, maxBathy=False):

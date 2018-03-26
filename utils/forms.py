@@ -83,7 +83,7 @@ def formsSW(q, q_, b, Dt, coriolisFreq=None, nonlinear=False, impermeable=True, 
     :param op: parameter holding class.
     :return: weak residual for shallow water equations at current timestep.
     """
-    V = q.function_space()
+    V = q_.function_space()
     (u, eta) = (as_vector((q[0], q[1])), q[2])
     (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
     qt = TestFunction(V)
