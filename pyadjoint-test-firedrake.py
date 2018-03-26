@@ -42,7 +42,8 @@ def forms(q, q_, Dt, b, op=opt.Options()):
     u, eta = split(q)
     u_, eta_ = split(q_)
     w, xi = TestFunctions(q.function_space())
-    g = op.g
+    g = 1.
+    a1 = a2 = Constant(0.5)
     B = (inner(u, w) + eta * xi) / Dt * dx  # LHS bilinear form
     L = (inner(u_, w) + eta_ * xi) / Dt * dx  # RHS linear functional
     B -= a1 * g * eta * div(w) * dx
@@ -85,7 +86,6 @@ Dt = Constant(dt)
 Tstart = 0.5
 Tend = 2.5
 rm = 5
-a1 = a2 = 0.5   # For Crank-Nicolson timestepping
 g = 9.81
 iStart = int(Tstart / dt)
 iEnd = int(np.ceil(Tend / dt))

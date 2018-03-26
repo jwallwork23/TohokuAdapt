@@ -37,15 +37,19 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     if mode == 'tohoku':
         msc.dis('*********************** TOHOKU TSUNAMI SIMULATION *********************\n', op.printStats)
-        assert (float(physical_constants['g_grav'].dat.data) == 9.81)
+        g = 9.81
     elif mode == 'shallow-water':
         msc.dis('*********************** SHALLOW WATER TEST PROBLEM ********************\n', op.printStats)
-        assert (float(physical_constants['g_grav'].dat.data) == 9.81)
+        g = 9.81
     elif mode == 'rossby-wave':
         msc.dis('****************** EQUATORIAL ROSSBY WAVE TEST PROBLEM ****************\n', op.printStats)
-        assert (float(physical_constants['g_grav'].dat.data) == 1.)
+        g = 1.
     else:
         raise NotImplementedError
+    try:
+        assert (float(physical_constants['g_grav'].dat.data) == g)
+    except:
+        physical_constants['g_grav'].assign(g)
     primalTimer = dualTimer = errorTimer = adaptTimer = False
     if approach in ('implicit', 'DWE'):
         op.orderChange = 1
