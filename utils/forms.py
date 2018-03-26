@@ -64,6 +64,7 @@ def strongResidualSW(q, q_, b, Dt, coriolisFreq=None, nonlinear=False, op=opt.Op
         Au += coriolisFreq * as_vector((-u[1], u[0]))
     if nonlinear:
         Au += dot(u, nabla_grad(u))
+        Ae += div(em * um)
 
     return Au, Ae
 
@@ -90,8 +91,8 @@ def formsSW(q, q_, b, Dt, coriolisFreq=None, nonlinear=False, impermeable=True, 
     a1, a2 = timestepCoeffs(op.timestepper)
     g = op.g
 
-    B = (inner(q, qt)) / Dt * dx + a1 * g * inner(grad(eta), w) * dx          # LHS bilinear form
-    L = (inner(q_, qt)) / Dt * dx - a2 * g * inner(grad(eta_), w) * dx       # RHS linear functional
+    B = (inner(q, qt)) / Dt * dx + a1 * g * inner(grad(eta), w) * dx        # LHS bilinear form
+    L = (inner(q_, qt)) / Dt * dx - a2 * g * inner(grad(eta_), w) * dx      # RHS linear functional
     L -= a2 * div(b * u_) * xi * dx     # Note: Don't "apply BCs" to linear functional
     if impermeable:
         B -= a1 * inner(b * u, grad(xi)) * dx
@@ -104,9 +105,8 @@ def formsSW(q, q_, b, Dt, coriolisFreq=None, nonlinear=False, impermeable=True, 
         B += a1 * coriolisFreq * inner(as_vector((-u[1], u[0])), w) * dx
         L -= a2 * coriolisFreq * inner(as_vector((-u_[1], u_[0])), w) * dx
     if nonlinear:
-        B += a1 * inner(dot(u, nabla_grad(u)), w) * dx
-        L -= a2 * inner(dot(u_, nabla_grad(u_)), w) * dx
-        # TODO: bottom friction?
+        B += a1 * (inner(dot(u, nabla_grad(u)), w) + div(eta * u)) * dx
+        L -= a2 * (inner(dot(u_, nabla_grad(u_)), w)  + div(eta_ * u_)) * dx
 
     return B, L
 

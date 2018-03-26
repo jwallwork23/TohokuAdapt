@@ -1,6 +1,7 @@
 from thetis import *
 from thetis.field_defs import field_metadata
 from firedrake_adjoint import *
+from fenics_adjoint.solving import SolveBlock
 
 import numpy as np
 from time import clock
@@ -495,7 +496,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = True if op.nonlinear else False
             adapOpt.use_grad_depth_viscosity_term = False
-            options.use_grad_div_viscosity_term = False
+            adapOpt.use_grad_div_viscosity_term = False
             adapOpt.simulation_export_time = dt * op.ndump
             startT = endT
             endT += dt * op.rm

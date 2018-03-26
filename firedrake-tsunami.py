@@ -177,7 +177,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     Sn = nEle
     t = 0.
     cnt = 0
-    save = True
+    # save = True
 
     # Calculate OF value
     switch = Constant(0.)
@@ -345,17 +345,16 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             #         save = True
             #     if cnt == -1:
             #         break
-            dJdnu = compute_gradient(J, Control(b))  # TODO: Perhaps could make a different, more relevant calculation?
+            dJdb = compute_gradient(J, Control(b))  # TODO: Perhaps could make a different, more relevant calculation?
             tape = get_working_tape()
             solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
 
             for i in range(len(solve_blocks) - 1, -1, -1):
-                dual.assign(solve_blocks[i].adj_sol)
+                dual.assign(solve_blocks[i].adj_sol)        # TODO: in error estimation, can just extract later.
                 if cnt % op.rm == 0:
                     adjointFile.write(dual_u, dual_e, time=t)
                     print('t = %.2fs' % t)
                 t -= dt
-
 
             dualTimer = clock() - dualTimer
             msc.dis('Adjoint run complete. Run time: %.3fs' % dualTimer, op.printStats)
@@ -507,7 +506,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     elif mode == 'rossby-wave':
                         P1 = FunctionSpace(mesh_H, "CG", 1)
                         b = Function(P1).assign(1.)
-                        f = Function(P1).assign(SpatialCoordinate(mesh_H)[1])
+                        f = Function(P1).interpolate(SpatialCoordinate(mesh_H)[1])
                     q = Function(V_H)
                     u, eta = q.split()
                     u.rename("uv_2d")
@@ -531,11 +530,11 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             adaptSolver.solve()
             q_.assign(q)
 
-            # Calculate OF value
-            if t >= op.Tstart:
-                switch.assign(1.)
-            Jval = assemble(switch * inner(k, q_) * dx)
-            Jvals.append(Jval)
+            # # Calculate OF value
+            # if t >= op.Tstart:
+            #     switch.assign(1.)
+            # Jval = assemble(switch * inner(k, q_) * dx)
+            # Jvals.append(Jval)
 
             if cnt % op.ndump == 0:
                 adaptiveFile.write(u, eta, time=t)
@@ -548,8 +547,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
         # Establish OF
         J_h = 0
-        for i in range(1, len(Jvals)):
-            J_h += 0.5 * (Jvals[i - 1] + Jvals[i]) * dt
+        # for i in range(1, len(Jvals)):
+        #     J_h += 0.5 * (Jvals[i - 1] + Jvals[i]) * dt
         if op.outputOF:
             print('Estimated objective value J_h = ', J_h)
         rel = np.abs((op.J(mode) - J_h) / op.J(mode))
@@ -578,7 +577,7 @@ if __name__ == '__main__':
 """Choose error estimator from {'norm', 'fieldBased', 'gradientBased', 'hessianBased', 
 'residual', 'explicit', 'fluxJump', 'implicit', 'DWF', 'DWR' or 'DWE'}: """))
     op = opt.Options(vscale=0.1 if approach == 'DWR' else 0.85,
-                     family='dg-dg',
+                     family='cg-cg' if mode == 'rossby-wave' else 'dg-dg',
                      rm=60 if useAdjoint else 30,
                      gradate=True if useAdjoint else False,
                      advect=False,

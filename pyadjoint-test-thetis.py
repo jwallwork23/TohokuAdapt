@@ -1,5 +1,4 @@
 from thetis import *
-from thetis.field_defs import field_metadata
 from firedrake_adjoint import *
 from fenics_adjoint.solving import SolveBlock
 
@@ -37,7 +36,7 @@ mesh_H = SquareMesh(n, n, lx, lx)
 x, y = SpatialCoordinate(mesh_H)
 P1_2d = FunctionSpace(mesh_H, "CG", 1)
 eta0 = Function(P1_2d).interpolate(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))))
-b = Function(P1_2d).assign(0.1, annotate=False)
+b = Function(P1_2d).assign(0.1)
 
 # Define initial FunctionSpace and variables of problem and apply initial conditions
 V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
@@ -73,7 +72,7 @@ options.element_family = op.family
 options.use_nonlinear_equations = False
 options.use_grad_depth_viscosity_term = False
 options.use_grad_div_viscosity_term = False
-options.simulation_export_time = dt * (op.rm-1)
+options.simulation_export_time = dt * op.rm
 options.simulation_end_time = T
 options.timestepper_type = op.timestepper
 options.timestep = dt
@@ -100,15 +99,19 @@ solver_obj.iterate()
 
 print('\nStarting fixed mesh dual run (backwards in time)')
 dualTimer = clock()
-dJdnu = compute_gradient(J, Control(b)) # TODO: Perhaps could make a different, more relevant calculation?
+dJdb = compute_gradient(J, Control(b)) # TODO: Perhaps could make a different, more relevant calculation?
 tape = get_working_tape()
+# tape.visualise()
 solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
 
 t = op.Tend
+adjointFile = File(dirName + 'adjoint.pvd')
 for i in range(len(solve_blocks)-1, -1, -1):
     dual.assign(solve_blocks[i].adj_sol)
+    dual_u, dual_e = dual.split()
     print('t = %.2fs' % t)
+    adjointFile.write(dual_u, dual_e, time=t)
     t -= dt
-
 dualTimer = clock() - dualTimer
 print('Adjoint run complete. Run time: %.3fs' % dualTimer)
+File(dirName + 'gradient.pvd').write(dJdb)

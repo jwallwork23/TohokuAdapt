@@ -6,6 +6,52 @@ import numpy as np
 from time import clock
 
 import utils.forms as form
+import utils.options as opt
+
+
+def formsSWcrankNicolson(q, q_, b, Dt, coriolisFreq=None, nonlinear=False, impermeable=True):
+    V = q.function_space()
+    u, eta = split(q)
+    u_, eta_ = split(q_)
+    w, xi = TestFunctions(q.function_space())
+    a1 = Constant(0.5)
+    a2 = Constant(0.5)
+    g = 9.81
+
+    B = ((inner(u, w) + inner(eta, xi)) / Dt * dx + a1 * g * inner(grad(eta), w)) * dx          # LHS bilinear form
+    L = ((inner(u_, w) + inner(eta_, xi)) / Dt * dx - a2 * g * inner(grad(eta_), w)) * dx       # RHS linear functional
+    L -= a2 * div(b * u_) * xi * dx     # Note: Don't "apply BCs" to linear functional
+    if impermeable:
+        B -= a1 * inner(b * u, grad(xi)) * dx
+        if V.sub(0).ufl_element().family() != 'Lagrange':
+            B += a1 * jump(b * u * xi, n=FacetNormal(V.mesh())) * dS
+        # TODO: Test this
+    else:
+        B += a1 * div(b * u) * xi * dx
+    if coriolisFreq:
+        B += a1 * coriolisFreq * inner(as_vector((-u[1], u[0])), w) * dx
+        L -= a2 * coriolisFreq * inner(as_vector((-u_[1], u_[0])), w) * dx
+    if nonlinear:
+        B += a1 * inner(dot(u, nabla_grad(u)), w) * dx
+        L -= a2 * inner(dot(u_, nabla_grad(u_)), w) * dx
+
+    return B, L
+
+
+def forms(q, q_, Dt, b, op=opt.Options()):
+    u, eta = split(q)
+    u_, eta_ = split(q_)
+    w, xi = TestFunctions(q.function_space())
+    g = op.g
+    B = (inner(u, w) + eta * xi) / Dt * dx  # LHS bilinear form
+    L = (inner(u_, w) + eta_ * xi) / Dt * dx  # RHS linear functional
+    B -= a1 * g * eta * div(w) * dx
+    L += a2 * g * eta_ * div(w) * dx
+    # B += a1 * g * inner(grad(eta), w) * dx
+    # B -= a2 * g * inner(grad(eta_), w) * dx
+    B -= a1 * inner(b * u, grad(xi)) * dx
+    L += a2 * inner(b * u_, grad(xi)) * dx
+    return B, L
 
 
 # Establish filenames
@@ -52,22 +98,14 @@ dual_e.rename("Adjoint elevation")
 # Intialise counters
 t = 0.
 cnt = 0
-save = True
 
 # Define variational problem
 u, eta = split(q)
 u_, eta_ = split(q_)
-qt = TestFunction(V_H)
-(w, xi) = (as_vector((qt[0], qt[1])), qt[2])
-
-B = (inner(u, w) + eta * xi) / Dt * dx  # LHS bilinear form
-L = (inner(u_, w) + eta_ * xi) / Dt * dx  # RHS linear functional
-B -= a1 * g * eta * div(w) * dx
-L += a2 * g * eta_ * div(w) * dx
-B -= a1 * inner(b * u, grad(xi)) * dx
-L += a2 * inner(b * u_, grad(xi)) * dx
-# B, L = form.formsSW(q, q_, b, Dt)
-forwardProblem = NonlinearVariationalProblem(B-L, q)
+B, L = forms(q, q_, Dt, b)
+# B, L = formsSWcrankNicolson(q, q_, b, Dt)
+F = B - L
+forwardProblem = NonlinearVariationalProblem(F, q)
 forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters={'mat_type': 'matfree',
                                                                               'snes_type': 'ksponly',
                                                                               'pc_type': 'python',
@@ -118,8 +156,9 @@ for i in range(1, len(Jfuncs)):
 
 print('\nStarting fixed mesh dual run (backwards in time)')
 dualTimer = clock()
-dJdnu = compute_gradient(J, Control(b)) # TODO: Perhaps could make a different, more relevant calculation?
+dJdb = compute_gradient(J, Control(b)) # TODO: Perhaps could make a different, more relevant calculation?
 tape = get_working_tape()
+# tape.visualise()
 solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
 
 for i in range(len(solve_blocks)-1, -1, -1):
@@ -129,7 +168,6 @@ for i in range(len(solve_blocks)-1, -1, -1):
         print('t = %.2fs' % t)
     t -= dt
 
-# TODO: Now test this in Thetis!
-
 dualTimer = clock() - dualTimer
 print('Adjoint run complete. Run time: %.3fs' % dualTimer)
+File(dirName + 'gradient.pvd').write(dJdb)
