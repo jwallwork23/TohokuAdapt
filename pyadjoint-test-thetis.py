@@ -60,7 +60,7 @@ iA = form.indicator(V_H.sub(1), mode='shallow-water')
 iA.rename("Region of interest")
 File(dirName+"indicator.pvd").write(iA)
 k1.assign(iA)
-J = assemble(inner(k, q) * dx)
+# J = assemble(inner(k, q) * dx)
 # Jfunc = assemble(inner(k, q_) * dx)
 # Jfuncs = [Jfunc]
 
@@ -84,11 +84,16 @@ options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
 # Output OF values
 cb1 = err.ShallowWaterCallback(solver_obj)
 cb1.output_dir = dirName
-cb1.append_to_log = True
+cb1.append_to_log = False
 cb1.export_to_hdf5 = False
 solver_obj.add_callback(cb1, 'timestep')
 
-# TODO: Callback for adding OF in pyadjoint sense?
+# Get OF values
+cb2 = err.ObjectiveSWCallback(solver_obj)   # TODO: Callback for adding OF in pyadjoint sense?
+cb2.output_dir = dirName
+cb2.append_to_log = False
+cb2.export_to_hdf5 = False
+solver_obj.add_callback(cb2, 'timestep')
 
 # Apply ICs and time integrate
 solver_obj.assign_initial_conditions(elev=eta0)
@@ -100,7 +105,9 @@ solver_obj.assign_initial_conditions(elev=eta0)
 # solver_obj.iterate(export_func=selector)
 solver_obj.iterate()
 
-print("Objective value = ", cb1.__call__()[1])
+print("Objective value = %.4e" % (cb1.__call__()[1]))
+J = cb2.__call__()[1]
+print(J)
 
 print('\nStarting fixed mesh dual run (backwards in time)')
 dualTimer = clock()

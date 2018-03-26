@@ -208,23 +208,67 @@ class P06Callback(GaugeCallback):
         super(P06Callback, self).__init__(extractP06, solver_obj, **kwargs)
 
 
-# def getOF(dirName):
-#     """
-#     :arg dirName: directory in which log file is saved
-#     :return: final value of objective functional.
-#     """
-#     l = len([line for line in open(dirName + 'log', 'r')])
-#     logfile = open(dirName + 'log', 'r')
-#     i = 0
-#     for line in logfile:
-#         i += 1
-#         if i == l-1:
-#             text_ = line.split()
-#         elif i == l:
-#             text = line.split()
-#             J_h = text[-1] if text[0] == 'objective' else text_[-1]
-#
-#     return float(J_h)
+class ObjectiveCallback(DiagnosticCallback):
+    """Base class for callbacks that integrate a scalar quantity in time and space. Time integration is achieved
+    using the trapezium rule."""
+    variable_names = ['current functional', 'objective functional']
+
+    def __init__(self, scalar_callback, solver_obj, **kwargs):
+        """
+        Creates error comparison check callback object
+
+        :arg scalar_callback: Python function that takes the solver object as an argument and
+            returns a scalar quantity of interest
+        :arg solver_obj: Thetis solver object
+        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+        """
+        super(ObjectiveCallback, self).__init__(solver_obj, **kwargs)
+        self.scalar_callback = scalar_callback
+        self.objective_functional = [0.5 * scalar_callback() * solver_obj.options.timestep]
+
+    def __call__(self):
+        # Compute OF value
+        t = self.solver_obj.simulation_time
+        dt = self.solver_obj.options.timestep
+        value = self.scalar_callback() * dt
+        if t > self.solver_obj.options.simulation_end_time - 0.5 * dt:
+            value *= 0.5
+        self.objective_functional.append(value)
+
+        return value, self.objective_functional
+
+    def message_str(self, *args):
+        line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
+        return line
+
+
+class ObjectiveSWCallback(ObjectiveCallback):
+    """Integrates objective functional."""
+    name = 'objective functional'
+
+    def __init__(self, solver_obj, **kwargs):
+        """
+        :arg solver_obj: Thetis solver object
+        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+        """
+        from firedrake_adjoint import assemble
+
+        def objectiveSW():
+            """
+            :param solver_obj: FlowSolver2d object.
+            :return: objective functional value for callbacks.
+            """
+            elev_2d = solver_obj.fields.solution_2d.split()[1]
+            ks = forms.indicator(elev_2d.function_space(), mode='shallow-water')
+            kt = Constant(0.)
+            if solver_obj.simulation_time > 0.5:    # TODO: make this more general
+                kt.assign(
+                    1. if solver_obj.simulation_time >
+                          0.5 + 0.5 * solver_obj.options.timestep else 0.5)
+
+            return assemble(elev_2d * ks * kt * dx)
+
+        super(ObjectiveSWCallback, self).__init__(objectiveSW, solver_obj, **kwargs)
 
 
 def explicitErrorEstimator(q, residual, b, v, maxBathy=False):
