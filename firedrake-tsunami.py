@@ -570,12 +570,19 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
 
 if __name__ == '__main__':
+    import argparse
 
-    # Choose mode and set parameter values
-    mode = input("Choose problem: 'tohoku', 'shallow-water', 'rossby-wave': ")
-    approach, getData, getError, useAdjoint, aposteriori = msc.cheatCodes(input(
-"""Choose error estimator from {'norm', 'fieldBased', 'gradientBased', 'hessianBased', 
-'residual', 'explicit', 'fluxJump', 'implicit', 'DWF', 'DWR' or 'DWE'}: """))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("mode", help="Choose problem from {'tohoku', 'shallow-water', 'rossby-wave'}.")
+    parser.add_argument("approach", help=
+    """Choose error estimator from {'norm', 'fieldBased', 'gradientBased', 'hessianBased', 
+    'residual', 'explicit', 'fluxJump', 'implicit', 'DWF', 'DWR', 'DWE'}: """)
+    args = parser.parse_args()
+    print("Mode: ", args.mode)
+    print("Approach: ", args.approach)
+    mode = args.mode
+
+    approach, getData, getError, useAdjoint, aposteriori = msc.cheatCodes(args.approach)
     op = opt.Options(vscale=0.1 if approach == 'DWR' else 0.85,
                      family='cg-cg' if mode == 'rossby-wave' else 'dg-dg',
                      rm=60 if useAdjoint else 30,

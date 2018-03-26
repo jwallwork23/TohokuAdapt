@@ -246,7 +246,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 solver_obj.create_equations()
                 cb = err.RossbyWaveCallback(solver_obj)
             cb.output_dir = dirName
-            cb.append_to_log = True
+            cb.append_to_log = False
             cb.export_to_hdf5 = False
             solver_obj.add_callback(cb, 'timestep')
 
@@ -538,7 +538,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 elif mode == 'rossby-wave':
                     cb = err.RossbyWaveCallback(adapSolver)
                 cb.output_dir = dirName
-                cb.append_to_log = True
+                cb.append_to_log = False
                 cb.export_to_hdf5 = False
                 if cnt != 0:
                     cb.objective_functional = J_h
@@ -546,7 +546,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             solver_obj.bnd_functions['shallow_water'] = BCs
             adapSolver.iterate()
             if op.outputOF:
-                J_h = err.getOF(dirName)  # Evaluate objective functional
+                J_h = cb.__call__()[1]  # Evaluate objective functional
 
             # Get mesh stats
             nEle = msh.meshStats(mesh_H)[0]

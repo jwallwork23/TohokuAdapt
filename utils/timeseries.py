@@ -256,11 +256,12 @@ def errorVsElements(mode='tohoku', bootstrapping=False):
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     plt.rc('legend', fontsize='x-large')
-    labels = ("Fixed mesh", "Hessian based", "Explicit", "Flux jump", "Implicit", "Adjoint based",
-              "Goal based")
-    names = ("fixedMesh", "hessianBased", "explicit", "fluxJump", "implicit", "adjointBased", "goalBased")
-    styles = {labels[0]: 's', labels[1]: '^', labels[2]: 'x', labels[3]: 'o', labels[4]: '*', labels[5]: 'h',
-              labels[6]: 't'}
+    # labels = ("Fixed mesh", "Hessian based", "Explicit", "Flux jump", "Implicit", "Adjoint based", "Goal based")
+    labels = ("Fixed mesh", "Hessian based")
+    # names = ("fixedMesh", "hessianBased", "explicit", "fluxJump", "implicit", "adjointBased", "goalBased")
+    names = ("fixedMesh", "hessianBased")
+    # styles = {labels[0]: 's', labels[1]: '^', labels[2]: 'x', labels[3]: 'o', labels[4]: '*', labels[5]: 'h', labels[6]: 't'}
+    styles = {labels[0]: 's', labels[1]: '^'}
     err = {}
     nEls = {}
     tim = {}
