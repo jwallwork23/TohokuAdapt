@@ -101,6 +101,7 @@ for i in range(1, len(Jfuncs)):
     J += 0.5*(Jfuncs[i-1] + Jfuncs[i])*dt
 dJdb = compute_gradient(J, Control(b))      # Need compute gradient or tlm in order to extract adjoint solutions
 File('plots/pyadjointTest/gradient.pvd').write(dJdb)
+assert(dJdb.dat.norm > 1e-6)   # According to a standalone solver, this norm should be approximately 0.02
 
 
 from fenics_adjoint.solving import SolveBlock   # Need use Sebastian's `linear-solver` branch of pyadjoint

@@ -170,3 +170,4 @@ for i in range(len(solve_blocks)-1, -1, -1):
 dualTimer = clock() - dualTimer
 print('Adjoint run complete. Run time: %.3fs' % dualTimer)
 File(di + 'gradient.pvd').write(dJdb)
+print('Norm of gradient = %.3f' % dJdb.dat.norm)
