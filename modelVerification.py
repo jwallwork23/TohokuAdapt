@@ -65,11 +65,10 @@ def solverSW(startRes, op=opt.Options()):
     cb3 = err.P06Callback(solver_obj)           # Gauge timeseries error P06
     solver_obj.add_callback(cb3, 'timestep')
 
+    # Run simulation and extract values from Callbacks
     timer = clock()
     solver_obj.iterate()
     timer = clock() - timer
-
-    # Extract values from Callbacks
     J_h = cb1.__call__()[1]     # Evaluate objective functional
     gP02 = cb2.__call__()[1]
     gP06 = cb3.__call__()[1]
@@ -78,38 +77,40 @@ def solverSW(startRes, op=opt.Options()):
 
 
 if __name__ == '__main__':
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-r", help="Use rotational equations")
+    parser.add_argument("-l", help="Use linearised equations")
+    parser.add_argument("-w", help="Use wetting and drying")
+    args = parser.parse_args()
 
     op = opt.Options(family='dg-dg',
-                     wd=False,
-                     # wd=True,
+                     wd=True if args.w else False,
                      ndump=10)
+    op.nonlinear = False if args.l else True
+    op.rotational = True if args.r else False
+    filename = 'outdata/outputs/modelVerification/nonlinear=' + str(op.nonlinear) + '_'
+    filename += 'rotational=' + str(op.rotational) + '_' + date
+    errorfile = open(filename + '.txt', 'w+')
+    gaugeFileP02 = open(filename + 'P02.txt', 'w+')
+    gaugeFileP06 = open(filename + 'P06.txt', 'w+')
+    splineP02 = tim.extractSpline('P02')
+    splineP06 = tim.extractSpline('P06')
 
-    for i in (False, True):
-        for j in (False, True):
-            op.nonlinear = i
-            op.rotational = j
-            filename = 'outdata/outputs/modelVerification/nonlinear=' + str(i) + '_'
-            filename += 'rotational=' + str(j) + '_' + date
-            errorfile = open(filename + '.txt', 'w+')
-            gaugeFileP02 = open(filename + 'P02.txt', 'w+')
-            gaugeFileP06 = open(filename + 'P06.txt', 'w+')
-            splineP02 = tim.extractSpline('P02')
-            splineP06 = tim.extractSpline('P06')
-
-            # for k in range(11):
-            for k in range(1):
-                print("\nNONLINEAR = %s, ROTATIONAL = %s, RUN %d\n" % (i, j, k))
-                J_h, gP02, gP06, timing = solverSW(k, op=op)
-                gaugeFileP02.writelines(["%s," % val for val in gP02])
-                gaugeFileP06.writelines(["%s," % val for val in gP06])
-                times = np.linspace(0., 25., len(gP02))
-                errorsP02 = [gP02[i]-splineP02(times[i]) for i in range(len(gP02))]
-                errorsP06 = [gP06[i]-splineP06(times[i]) for i in range(len(gP06))]
-                exactP02 = err.totalVariation([splineP02(times[i]) for i in range(len(gP02))])
-                exactP06 = err.totalVariation([splineP06(times[i]) for i in range(len(gP06))])
-                totalVarP02 = err.totalVariation(errorsP02) / exactP02
-                totalVarP06 = err.totalVariation(errorsP06) / exactP06
-                errorfile.write('%d, %.4e, %.4e, %.4e, %.1f\n' % (k, J_h, totalVarP02, totalVarP06, timing))
-            errorfile.close()
-            gaugeFileP02.close()
-            gaugeFileP06.close()
+    for k in range(11):
+        print("\nNONLINEAR = %s, ROTATIONAL = %s, RUN %d\n" % (op.nonlinear, op.rotational, k))
+        J_h, gP02, gP06, timing = solverSW(k, op=op)
+        gaugeFileP02.writelines(["%s," % val for val in gP02])
+        gaugeFileP06.writelines(["%s," % val for val in gP06])
+        times = np.linspace(0., 25., len(gP02))
+        errorsP02 = [gP02[i]-splineP02(times[i]) for i in range(len(gP02))]
+        errorsP06 = [gP06[i]-splineP06(times[i]) for i in range(len(gP06))]
+        exactP02 = err.totalVariation([splineP02(times[i]) for i in range(len(gP02))])
+        exactP06 = err.totalVariation([splineP06(times[i]) for i in range(len(gP06))])
+        totalVarP02 = err.totalVariation(errorsP02) / exactP02
+        totalVarP06 = err.totalVariation(errorsP06) / exactP06
+        errorfile.write('%d, %.4e, %.4e, %.4e, %.1f\n' % (k, J_h, totalVarP02, totalVarP06, timing))
+    errorfile.close()
+    gaugeFileP02.close()
+    gaugeFileP06.close()
