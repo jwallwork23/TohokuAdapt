@@ -1,6 +1,6 @@
 from thetis import *
-# from firedrake_adjoint import *
 
+import matplotlib.pyplot as plt
 import numpy as np
 from time import clock
 import datetime
@@ -79,32 +79,26 @@ def solverSW(startRes, op=opt.Options()):
 
     # Output objective functional computation error
     cb1 = err.TohokuCallback(solver_obj)
-    cb1.output_dir = di
-    cb1.append_to_log = True
-    cb1.export_to_hdf5 = False
     solver_obj.add_callback(cb1, 'timestep')
 
     # Output gauge timeseries error
     cb2 = err.P02Callback(solver_obj)
-    cb2.output_dir = di
-    cb2.append_to_log = True
-    cb2.export_to_hdf5 = False
     solver_obj.add_callback(cb2, 'timestep')
 
     # Output gauge timeseries error
     cb3 = err.P06Callback(solver_obj)
-    cb3.output_dir = di
-    cb3.append_to_log = True
-    cb3.export_to_hdf5 = False
     solver_obj.add_callback(cb3, 'timestep')
 
     timer = clock()
     solver_obj.iterate()
     timer = clock() - timer
-    J_h = cb1.__call__()[1]  # Evaluate objective functional
-    # TODO: also create a function to read gauge data
 
-    return J_h, clock() - timer
+    # Extract values from Callbacks
+    J_h = cb1.__call__()[1]     # Evaluate objective functional
+    gP02 = cb2.__call__()[1]
+    gP06 = cb3.__call__()[1]
+
+    return J_h, gP02, gP06, clock() - timer
 
 
 if __name__ == '__main__':
@@ -121,8 +115,15 @@ if __name__ == '__main__':
             filename = 'outdata/outputs/modelVerification/nonlinear=' + str(i) + '_'
             filename += 'rotational=' + str(j) + '_'
             textfile = open(filename + date + '.txt', 'w+')
-            for k in range(11):
+            figP02 = plt.figure(1)
+            figP06 = plt.figure(2)
+            # for k in range(11):
+            for k in range(1):
                 print("\nNONLINEAR = %s, ROTATIONAL = %s, RUN %d\n" % (i, j, k))
-                J_h, timing = solverSW(k, op=op)
+                J_h, gP02, gP06, timing = solverSW(k, op=op)
                 textfile.write('%d, %.4e, %.1f\n' % (k, J_h, timing))
+                figP02.plot(gP02)
+                figP06.plot(gP06)
+            figP02.show()
+            figP06.show()
             textfile.close()

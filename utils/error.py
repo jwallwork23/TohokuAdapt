@@ -30,6 +30,8 @@ class IntegralCallback(DiagnosticCallback):
         super(IntegralCallback, self).__init__(solver_obj, **kwargs)
         self.scalar_callback = scalar_callback
         self.objective_value = 0.5 * scalar_callback() * solver_obj.options.timestep
+        self.append_to_hdf5 = False
+        self.append_to_log = False
 
     def __call__(self):
         # Output OF value
@@ -139,7 +141,7 @@ class RossbyWaveCallback(IntegralCallback):
 
 class GaugeCallback(DiagnosticCallback):
     """Base class for callbacks that evaluate a scalar quantity at a gauge location."""
-    variable_names = ['current value', 'gauge value']
+    variable_names = ['current value', 'gauge values']
 
     def __init__(self, scalar_callback, solver_obj, **kwargs):
         """
@@ -153,10 +155,14 @@ class GaugeCallback(DiagnosticCallback):
         super(GaugeCallback, self).__init__(solver_obj, **kwargs)
         self.scalar_callback = scalar_callback
         self.init_value = self.scalar_callback()
+        self.gauge_values = [self.init_value]
+        self.append_to_hdf5 = False
+        self.append_to_log = False
 
     def __call__(self):
-        self.gauge_value = self.scalar_callback() - self.init_value
-        return self.gauge_value, float(self.gauge_value)
+        value = self.scalar_callback()
+        self.gauge_values.append(value - self.init_value)
+        return value, self.gauge_values
 
     def message_str(self, *args):
         line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
@@ -179,9 +185,8 @@ class P02Callback(GaugeCallback):
             :return: objective functional value for callbacks.
             """
             elev_2d = solver_obj.fields.solution_2d.split()[1]
-            loc = options.Options().gaugeCoord("P02")
 
-            return elev_2d.at(loc)
+            return elev_2d.at(options.Options().gaugeCoord("P02"))
 
         super(P02Callback, self).__init__(extractP02, solver_obj, **kwargs)
 
@@ -225,6 +230,8 @@ class ObjectiveCallback(DiagnosticCallback):
         super(ObjectiveCallback, self).__init__(solver_obj, **kwargs)
         self.scalar_callback = scalar_callback
         self.objective_functional = [scalar_callback()]
+        self.append_to_hdf5 = False
+        self.append_to_log = False
 
     def __call__(self):
         # Compute OF value

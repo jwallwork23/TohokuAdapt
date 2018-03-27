@@ -47,12 +47,8 @@ solver_obj.assign_initial_conditions(elev=eta0)
 
 # Apply Callbacks and time integrate
 cb1 = err.ShallowWaterCallback(solver_obj)  # Compute objective value on current solution
-cb1.append_to_log = False
-cb1.export_to_hdf5 = False
 solver_obj.add_callback(cb1, 'timestep')
 cb2 = err.ObjectiveSWCallback(solver_obj)   # Extract objective functional at each timestep for use in pyadjoint
-cb2.append_to_log = False
-cb2.export_to_hdf5 = False
 solver_obj.add_callback(cb2, 'timestep')
 solver_obj.iterate()
 
