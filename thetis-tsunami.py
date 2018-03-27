@@ -570,10 +570,11 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", help="Choose problem from {'tohoku', 'shallow-water', 'rossby-wave'}.")
-    parser.add_argument("approach", help=
-"""Choose error estimator from {'norm', 'fieldBased', 'gradientBased', 'hessianBased', 
-'residual', 'explicit', 'fluxJump', 'implicit', 'DWF', 'DWR', 'DWE'}: """)
+    parser.add_argument("mode", help="Choose problem from {'tohoku', 'shallow-water', 'rossby-wave'}")
+    parser.add_argument("approach", help="Choose error estimator from {'norm', 'fieldBased', 'gradientBased', "
+                                         "'hessianBased', 'residual', 'explicit', 'fluxJump', 'implicit', 'DWF', "
+                                         "'DWR', 'DWE'}" )
+    parser.add_argument("-w", help="Use wetting and drying")
     args = parser.parse_args()
     print("Mode: ", args.mode)
     print("Approach: ", args.approach)
@@ -590,16 +591,12 @@ if __name__ == '__main__':
                      outputMetric=False,
                      plotpvd=True,
                      gauges=False,
-                     tAdapt=False,
-                     # iso=False if approach in ('gradientBased', 'hessianBased') else True,
-                     iso=False,
                      bootstrap=False,
                      printStats=True,
                      outputOF=True,
                      orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
                      # orderChange=0,
-                     wd=False,
-                     # wd=True if mode == 'tohoku' else False,
+                     wd=True if args.w else False,
                      ndump=10)
     if mode == 'shallow-water':
         op.Tstart = 0.5
