@@ -252,6 +252,19 @@ def readErrors(date, approach, mode='tohoku', bootstrapping=False):
     return nEls, err, tim
 
 
+def extractSpline(gauge):
+    measuredFile = open('outdata/timeseries/P02data_' + gauge + 'mins.txt', 'r')
+    x = []
+    y = []
+    for line in measuredFile:
+        xy = line.split()
+        x.append(float(xy[0]))
+        y.append(float(xy[1]))
+    spline = si.interp1d(x, y, kind=1)
+    measuredFile.close()
+    return spline
+
+
 def errorVsElements(mode='tohoku', bootstrapping=False):
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')

@@ -1,6 +1,5 @@
 from thetis import *
 
-import matplotlib.pyplot as plt
 import numpy as np
 from time import clock
 import datetime
@@ -9,10 +8,10 @@ import utils.conversion as conv
 import utils.error as err
 import utils.mesh as msh
 import utils.options as opt
+import utils.timeseries as tim
 
 now = datetime.datetime.now()
 date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
-assert (float(physical_constants['g_grav'].dat.data) == 9.81)
 
 def solverSW(startRes, op=opt.Options()):
     di = "plots/modelVerification/"
@@ -86,7 +85,7 @@ if __name__ == '__main__':
                      ndump=10)
 
     for i in (False, True):
-        for j in (True, False):
+        for j in (False, True):
             op.nonlinear = i
             op.rotational = j
             filename = 'outdata/outputs/modelVerification/nonlinear=' + str(i) + '_'
@@ -94,13 +93,16 @@ if __name__ == '__main__':
             errorfile = open(filename + '.txt', 'w+')
             gaugeFileP02 = open(filename + 'P02.txt', 'w+')
             gaugeFileP06 = open(filename + 'P06.txt', 'w+')
+            splineP02 = tim.extractSpline('P02')
+            splineP06 = tim.extractSpline('P06')
+
             for k in range(11):
                 print("\nNONLINEAR = %s, ROTATIONAL = %s, RUN %d\n" % (i, j, k))
                 J_h, gP02, gP06, timing = solverSW(k, op=op)
-                # TODO: Calculate error in gauge measurements based on empirical data
-                errorfile.write('%d, %.4e, %.1f\n' % (k, J_h, timing))
                 gaugeFileP02.writelines(["%s," % val for val in gP02])
                 gaugeFileP06.writelines(["%s," % val for val in gP06])
+                # TODO: Calculate TV norm error in gauge measurements based on empirical data
+                errorfile.write('%d, %.4e, %.1f\n' % (k, J_h, timing))
             errorfile.close()
             gaugeFileP02.close()
             gaugeFileP06.close()
