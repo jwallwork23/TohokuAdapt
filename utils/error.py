@@ -155,7 +155,7 @@ class GaugeCallback(DiagnosticCallback):
         super(GaugeCallback, self).__init__(solver_obj, **kwargs)
         self.scalar_callback = scalar_callback
         self.init_value = self.scalar_callback()
-        self.gauge_values = [self.init_value]
+        self.gauge_values = [0.]
         self.append_to_hdf5 = False
         self.append_to_log = False
 

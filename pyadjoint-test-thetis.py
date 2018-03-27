@@ -3,7 +3,7 @@ from firedrake_adjoint import *
 from fenics_adjoint.solving import SolveBlock   # Need use Sebastian's `linear-solver` branch of pyadjoint
 from firedrake import Expression                # Annotation of Expressions not currently supported in firedrake_adjoint
 
-import utils.error as err       # Contains callbacks for objective functional computation and recording to tape
+import utils.error as err       # Contains callbacks for recording objective functional to tape
 
 T = 2.5
 dt = 0.025
@@ -18,20 +18,17 @@ eta0 = Function(P1_2d).interpolate(1e-3 * exp(-(pow(x - pi, 2) + pow(y - pi, 2))
 b = Function(P1_2d).assign(0.1)
 V = VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1)
 
-# Set up adjoint variables
+# Set up adjoint variables and indicator function
 dual = Function(V)
 dual_u, dual_e = dual.split()
 dual_u.rename("Adjoint velocity")
 dual_e.rename("Adjoint elevation")
-
-# Define indicator function
 k = Function(V)
 k0, k1 = k.split()
 k1.interpolate(Expression('(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' % (0., pi/2, pi/2, 3*pi/2)))
 
 # Get solver parameter values and construct solver
 solver_obj = solver2d.FlowSolver2d(mesh, b)
-solver_obj.create_equations()
 options = solver_obj.options
 options.element_family = 'dg-dg'
 options.use_nonlinear_equations = False
@@ -44,25 +41,18 @@ options.timestep = dt
 options.output_directory = 'plots/pyadjointTest/'
 options.export_diagnostics = False
 solver_obj.assign_initial_conditions(elev=eta0)
-
-# Apply Callbacks and time integrate
-cb1 = err.ShallowWaterCallback(solver_obj)  # Compute objective value on current solution
-solver_obj.add_callback(cb1, 'timestep')
-cb2 = err.ObjectiveSWCallback(solver_obj)   # Extract objective functional at each timestep for use in pyadjoint
-solver_obj.add_callback(cb2, 'timestep')
+cb = err.ObjectiveSWCallback(solver_obj)    # Extract objective functional at each timestep for use in pyadjoint
+solver_obj.add_callback(cb, 'timestep')
 solver_obj.iterate()
 
-# Assemble objective functional and its value on the current forward solution
-print("Objective value = %.4e" % (cb1.__call__()[1]))
-Jfuncs = cb2.__call__()[1]
+# Assemble objective functional and extract adjoint variables
+Jfuncs = cb.__call__()[1]
 J = 0
 for i in range(1, len(Jfuncs)):
     J += 0.5*(Jfuncs[i-1] + Jfuncs[i])*dt
-
-# Extract adjoint variables
-dJdb = compute_gradient(J, Control(b))  # Need compute gradient or tlm in order to extract adjoint solutions
+dJdb = compute_gradient(J, Control(b))      # Need compute gradient or tlm in order to extract adjoint solutions
 tape = get_working_tape()
-tape.visualise()
+# tape.visualise()
 solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
 for i in range(len(solve_blocks)-1, -1, -1):
     dual.assign(solve_blocks[i].adj_sol)

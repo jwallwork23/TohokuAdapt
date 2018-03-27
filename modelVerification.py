@@ -29,7 +29,7 @@ def solverSW(startRes, op=opt.Options()):
     if op.rotational:
         Omega = 7.291e-5
         for i, v in zip(range(len(mesh_H.coordinates.dat.data)), mesh_H.coordinates.dat.data):
-            f.dat.data[i] = 2 * Omega * np.sin(np.radians(conv.get_latitude(v[0], v[1], 54)))
+            f.dat.data[i] = 2 * Omega * np.sin(np.radians(conv.get_latitude(v[0], v[1], 54, northern=True)))
 
     # Get timestep, ensuring simulation time is achieved exactly
     solver_obj = solver2d.FlowSolver2d(mesh_H, b)
@@ -86,20 +86,21 @@ if __name__ == '__main__':
                      ndump=10)
 
     for i in (False, True):
-        for j in (False, True):
+        for j in (True, False):
             op.nonlinear = i
             op.rotational = j
             filename = 'outdata/outputs/modelVerification/nonlinear=' + str(i) + '_'
-            filename += 'rotational=' + str(j) + '_'
-            textfile = open(filename + date + '.txt', 'w+')
-            fig, axs = plt.subplots(2, 1, figsize=(5, 5))
-            # for k in range(11):
-            for k in range(1):
+            filename += 'rotational=' + str(j) + '_' + date
+            errorfile = open(filename + '.txt', 'w+')
+            gaugeFileP02 = open(filename + 'P02.txt', 'w+')
+            gaugeFileP06 = open(filename + 'P06.txt', 'w+')
+            for k in range(11):
                 print("\nNONLINEAR = %s, ROTATIONAL = %s, RUN %d\n" % (i, j, k))
                 J_h, gP02, gP06, timing = solverSW(k, op=op)
                 # TODO: Calculate error in gauge measurements based on empirical data
-                textfile.write('%d, %.4e, %.1f\n' % (k, J_h, timing))
-                axs[0].plot(gP02)
-                axs[1].plot(gP06)
-            plt.show()
-            textfile.close()
+                errorfile.write('%d, %.4e, %.1f\n' % (k, J_h, timing))
+                gaugeFileP02.writelines(["%s," % val for val in gP02])
+                gaugeFileP06.writelines(["%s," % val for val in gP06])
+            errorfile.close()
+            gaugeFileP02.close()
+            gaugeFileP06.close()
