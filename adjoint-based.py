@@ -26,13 +26,13 @@ print('...... mesh loaded. Initial #Elements : %d. Initial #Vertices : %d.' % (n
 # Get default parameter values and check CFL criterion
 op = opt.Options(vscale=0.2, rm=60, ndump=1, outputHessian=True, mtype='b') # ndump=1 needed for explicit error estn
 nVerT = op.vscale * nVer                                                    # Target #Vertices
-dirName = 'plots/adjointBased/'
+di = 'plots/adjointBased/'
 basic = bool(input('Hit anything but enter to use basic error estimators, as in DL16: '))
 if not basic:
-    dirName += 'explicit/'
+    di += 'explicit/'
 iso = op.iso
 if iso:
-    dirName += 'isotropic/'
+    di += 'isotropic/'
 T = op.Tend
 dt = op.dt
 Dt = Constant(dt)
@@ -100,7 +100,7 @@ else:
             lam_.assign(lam)
         if meshn == 0:
             print('t = %1.1fs' % t)
-            with DumbCheckpoint(dirName + 'hdf5/adjoint_' + op.indexString(mn), mode=FILE_CREATE) as chk:
+            with DumbCheckpoint(di + 'hdf5/adjoint_' + op.indexString(mn), mode=FILE_CREATE) as chk:
                 chk.store(lu)
                 chk.store(le)
                 chk.close()
@@ -113,8 +113,8 @@ else:
 
 # Approximate isotropic metric at boundaries of initial mesh using circumradius
 h = Function(W0.sub(1)).interpolate(CellSize(mesh0))
-hfile = File(dirName + "hessian.pvd")
-sfile = File(dirName + "significance.pvd")
+hfile = File(di + "hessian.pvd")
+sfile = File(di + "significance.pvd")
 
 print('\nStarting mesh adaptive forward run...')
 tic1 = clock()
@@ -124,14 +124,14 @@ while mn < iEnd:
     i0 = max(mn, iStart)
     Wcomp = FunctionSpace(mesh, "CG", 1)                                # Computational space to match metric P1 space
     W = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
-    elev_2d, uv_2d = op.loadFromDisk(W, index, dirName, elev0=eta0)     # Enforce ICs / load variables from disk
+    elev_2d, uv_2d = op.loadFromDisk(W, index, di, elev0=eta0)     # Enforce ICs / load variables from disk
     if not basic:
         hk = Function(Wcomp).interpolate(CellSize(mesh))                # Current sizes of mesh elements
     if (not basic) and (mn != 0):
         print('#### Interpolating adjoint data...')
-        elev_2d_, uv_2d_ = op.loadFromDisk(W, index - 1, dirName, elev0=eta0)    # Load saved forward data
+        elev_2d_, uv_2d_ = op.loadFromDisk(W, index - 1, di, elev0=eta0)    # Load saved forward data
     for j in range(i0, iEnd):
-        le, lu = op.loadFromDisk(W0, j, dirName, adjoint=True)          # Load saved adjoint data
+        le, lu = op.loadFromDisk(W0, j, di, adjoint=True)          # Load saved adjoint data
         if mn != 0:
             print('    #### Step %d / %d' % (j + 1 - i0, iEnd - i0))
             lu, le = inte.interp(mesh, lu, le)                                      # Interpolate onto current mesh
@@ -176,7 +176,7 @@ while mn < iEnd:
     if (not iso and op.outputHessian):
         H.rename("Hessian")
         hfile.write(H, time=float(mn))
-    msh.saveMesh(mesh, dirName + 'hdf5/mesh_' + stor.indexString(index))  # Save mesh to disk for timeseries analysis
+    msh.saveMesh(mesh, di + 'hdf5/mesh_' + stor.indexString(index))  # Save mesh to disk for timeseries analysis
 
     # Establish Thetis flow solver object
     solver_obj = solver2d.FlowSolver2d(mesh, b)
@@ -188,11 +188,11 @@ while mn < iEnd:
     options.simulation_end_time = (mn + 1) * dt * rm
     options.timestepper_type = op.timestepper
     options.timestep = dt
-    options.output_directory = dirName
+    options.output_directory = di
     options.export_diagnostics = True
     options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
     field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
-    e = exporter.ExportManager(dirName + 'hdf5', ['elev_2d', 'uv_2d'], field_dict, field_metadata, export_type='hdf5')
+    e = exporter.ExportManager(di + 'hdf5', ['elev_2d', 'uv_2d'], field_dict, field_metadata, export_type='hdf5')
     solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
 
     # Timestepper bookkeeping for export time step

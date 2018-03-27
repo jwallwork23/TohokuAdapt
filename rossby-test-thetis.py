@@ -9,7 +9,7 @@ periodic = False
 dt = 0.1            # In Matt's parameters dt=0.1
 T = 120.
 ndump = 12
-dirName = 'plots/rossby-wave/'
+di = 'plots/rossby-wave/'
 
 # Define Mesh
 n = 1
@@ -47,24 +47,24 @@ options.use_nonlinear_equations = True
 options.use_grad_depth_viscosity_term = False                   # In Matt's parameters viscosity=1e-6
 options.use_grad_div_viscosity_term = False
 options.coriolis_frequency = f
-File(dirName+'Coriolis.pvd').write(options.coriolis_frequency)  # Plot Coriolis frequency
+File(di+'Coriolis.pvd').write(options.coriolis_frequency)  # Plot Coriolis frequency
 options.simulation_export_time = dt * ndump
 options.simulation_end_time = T
 options.timestepper_type = 'CrankNicolson'
 # solver_obj.create_equations()
 # options.timestep = min(np.abs(solver_obj.compute_time_step().dat.data))
 options.timestep = dt
-options.output_directory = dirName
+options.output_directory = di
 solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
 solver_obj.bnd_functions['shallow_water'] = BCs
 solver_obj.iterate()
 
 # # Check residual approximation works using Thetis forms
 # indexStr = msc.indexString(int(T/(dt * ndump)))
-# with DumbCheckpoint(dirName + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as loadVel:
+# with DumbCheckpoint(di + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as loadVel:
 #     loadVel.load(uv_2d)
 #     loadVel.close()
-# with DumbCheckpoint(dirName + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as loadElev:
+# with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as loadElev:
 #     loadElev.load(elev_2d)
 #     loadElev.close()
 # V_oi = VectorFunctionSpace(mesh, "DG", 2) * FunctionSpace(mesh, "DG", 2)

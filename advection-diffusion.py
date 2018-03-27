@@ -22,12 +22,12 @@ diffusion = True
 tAdapt = True
 
 # Establish filenames
-dirName = "plots/testSuite/"
-forwardFile = File(dirName + "forwardAD.pvd")
-residualFile = File(dirName + "residualAD.pvd")
-adjointFile = File(dirName + "adjointAD.pvd")
-errorFile = File(dirName + "errorIndicatorAD.pvd")
-adaptiveFile = File(dirName + "goalBasedAD.pvd") if useAdjoint else File(dirName + "simpleAdaptAD.pvd")
+di = "plots/testSuite/"
+forwardFile = File(di + "forwardAD.pvd")
+residualFile = File(di + "residualAD.pvd")
+adjointFile = File(di + "adjointAD.pvd")
+errorFile = File(di + "errorIndicatorAD.pvd")
+adaptiveFile = File(di + "goalBasedAD.pvd") if useAdjoint else File(di + "simpleAdaptAD.pvd")
 
 # Establish initial mesh resolution
 bootTimer = clock()
@@ -110,7 +110,7 @@ if getData:
             if cnt % rm == 0:
                 phi_next_h, phi_h, w_h = inte.interp(mesh_h, phi_next, phi, w)
                 rho.interpolate(form.strongResidualAD(phi_next_h, phi_h, w_h, Dt, nu=nu))
-                with DumbCheckpoint(dirName + 'hdf5/residual_AD' + msc.indexString(cnt), mode=FILE_CREATE) as saveRes:
+                with DumbCheckpoint(di + 'hdf5/residual_AD' + msc.indexString(cnt), mode=FILE_CREATE) as saveRes:
                     saveRes.store(rho)
                     saveRes.close()
                 if op.plotpvd:
@@ -156,7 +156,7 @@ if getData:
 
                 # Save adjoint data to HDF5
                 if cnt % rm == 0:
-                    with DumbCheckpoint(dirName+'hdf5/adjoint_AD'+msc.indexString(cnt), mode=FILE_CREATE) as saveAdj:
+                    with DumbCheckpoint(di+'hdf5/adjoint_AD'+msc.indexString(cnt), mode=FILE_CREATE) as saveAdj:
                         saveAdj.store(dual_h)
                         saveAdj.close()
                     print('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT * 100))
@@ -182,10 +182,10 @@ if getError:
         indexStr = msc.indexString(k)
 
         # Load residual and adjoint data from HDF5
-        with DumbCheckpoint(dirName + 'hdf5/residual_AD' + indexStr, mode=FILE_READ) as loadRes:
+        with DumbCheckpoint(di + 'hdf5/residual_AD' + indexStr, mode=FILE_READ) as loadRes:
             loadRes.load(rho)
             loadRes.close()
-        with DumbCheckpoint(dirName + 'hdf5/adjoint_AD' + indexStr, mode=FILE_READ) as loadAdj:
+        with DumbCheckpoint(di + 'hdf5/adjoint_AD' + indexStr, mode=FILE_READ) as loadAdj:
             loadAdj.load(dual_h)
             loadAdj.close()
 
@@ -196,7 +196,7 @@ if getError:
         # Loop over relevant time window
         if op.window:
             for i in range(0, cnt, rm):
-                with DumbCheckpoint(dirName + 'hdf5/adjoint_AD' + msc.indexString(i), mode=FILE_READ) as loadAdj:
+                with DumbCheckpoint(di + 'hdf5/adjoint_AD' + msc.indexString(i), mode=FILE_READ) as loadAdj:
                     loadAdj.load(dual_h)
                     loadAdj.close()
                 epsilon_ = err.DWR(rho, dual_h, v)
@@ -208,7 +208,7 @@ if getError:
         epsilon.rename("Error indicator")
 
         # Store error estimates
-        with DumbCheckpoint(dirName + 'hdf5/error_AD' + indexStr, mode=FILE_CREATE) as saveErr:
+        with DumbCheckpoint(di + 'hdf5/error_AD' + indexStr, mode=FILE_CREATE) as saveErr:
             saveErr.store(epsilon)
             saveErr.close()
         if op.plotpvd:
@@ -228,7 +228,7 @@ if approach in ('simpleAdapt', 'goalBased'):
             W = TensorFunctionSpace(mesh_H, "CG", 1)
             if useAdjoint:
                 # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
-                with DumbCheckpoint(dirName + 'hdf5/error_AD' + msc.indexString(cnt), mode=FILE_READ) as loadError:
+                with DumbCheckpoint(di + 'hdf5/error_AD' + msc.indexString(cnt), mode=FILE_READ) as loadError:
                     loadError.load(epsilon)
                     loadError.close()
                 errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon)[0])

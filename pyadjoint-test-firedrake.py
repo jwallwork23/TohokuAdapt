@@ -56,9 +56,9 @@ def forms(q, q_, Dt, b, op=opt.Options()):
 
 
 # Establish filenames
-dirName = 'plots/pyadjoint_test/'
-forwardFile = File(dirName + "forward.pvd")
-adjointFile = File(dirName + "adjoint.pvd")
+di = 'plots/pyadjoint_test/'
+forwardFile = File(di + "forward.pvd")
+adjointFile = File(di + "adjoint.pvd")
 
 # Load Mesh(es)
 lx = 2 * np.pi
@@ -85,7 +85,7 @@ dt = 0.05
 Dt = Constant(dt)
 Tstart = 0.5
 Tend = 2.5
-rm = 5
+ndump = 5
 g = 9.81
 iStart = int(Tstart / dt)
 iEnd = int(np.ceil(Tend / dt))
@@ -121,7 +121,7 @@ k = Function(V_H)
 k0, k1 = k.split()
 iA = form.indicator(V_H.sub(1), mode='shallow-water')
 iA.rename("Region of interest")
-File(dirName+"indicator.pvd").write(iA)
+File(di+"indicator.pvd").write(iA)
 k1.assign(iA)
 
 print('Starting fixed mesh primal run (forwards in time)')
@@ -138,7 +138,7 @@ while t < Tend + dt:
     Jfunc = assemble(inner(k, q_) * dx)
     Jfuncs.append(Jfunc)
 
-    if cnt % rm == 0:
+    if cnt % ndump == 0:
         forwardFile.write(u, eta, time=t)
         print('t = %.2fs' % t)
     t += dt
@@ -156,18 +156,17 @@ for i in range(1, len(Jfuncs)):
 
 print('\nStarting fixed mesh dual run (backwards in time)')
 dualTimer = clock()
-dJdb = compute_gradient(J, Control(b)) # TODO: Perhaps could make a different, more relevant calculation?
+dJdb = compute_gradient(J, Control(b))  # Need compute gradient or tlm in order to extract adjoint solutions
 tape = get_working_tape()
 # tape.visualise()
 solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
 
 for i in range(len(solve_blocks)-1, -1, -1):
     dual.assign(solve_blocks[i].adj_sol)
-    if cnt % rm == 0:
-        adjointFile.write(dual_u, dual_e, time=t)
-        print('t = %.2fs' % t)
-    t -= dt
+    if i % ndump == 0:
+        adjointFile.write(dual_u, dual_e, time=dt*i)
+        print('t = %.2fs' % (dt*i))
 
 dualTimer = clock() - dualTimer
 print('Adjoint run complete. Run time: %.3fs' % dualTimer)
-File(dirName + 'gradient.pvd').write(dJdb)
+File(di + 'gradient.pvd').write(dJdb)

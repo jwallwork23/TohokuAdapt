@@ -15,7 +15,7 @@ date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 assert (float(physical_constants['g_grav'].dat.data) == 9.81)
 
 def solverSW(startRes, op=opt.Options()):
-    dirName = "plots/modelVerification/"
+    di = "plots/modelVerification/"
 
     # Establish Mesh, initial FunctionSpace and variables of problem and apply initial conditions
     mesh_H, eta0, b = msh.TohokuDomain(startRes, wd=op.wd)
@@ -67,7 +67,7 @@ def solverSW(startRes, op=opt.Options()):
     options.simulation_end_time = op.Tend
     options.timestepper_type = op.timestepper
     options.timestep = dt
-    options.output_directory = dirName
+    options.output_directory = di
     options.export_diagnostics = True
     options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
     # options.use_wetting_and_drying = op.wd        # TODO: Consider w&d
@@ -79,21 +79,21 @@ def solverSW(startRes, op=opt.Options()):
 
     # Output objective functional computation error
     cb1 = err.TohokuCallback(solver_obj)
-    cb1.output_dir = dirName
+    cb1.output_dir = di
     cb1.append_to_log = True
     cb1.export_to_hdf5 = False
     solver_obj.add_callback(cb1, 'timestep')
 
     # Output gauge timeseries error
     cb2 = err.P02Callback(solver_obj)
-    cb2.output_dir = dirName
+    cb2.output_dir = di
     cb2.append_to_log = True
     cb2.export_to_hdf5 = False
     solver_obj.add_callback(cb2, 'timestep')
 
     # Output gauge timeseries error
     cb3 = err.P06Callback(solver_obj)
-    cb3.output_dir = dirName
+    cb3.output_dir = di
     cb3.append_to_log = True
     cb3.export_to_hdf5 = False
     solver_obj.add_callback(cb3, 'timestep')
@@ -101,8 +101,8 @@ def solverSW(startRes, op=opt.Options()):
     timer = clock()
     solver_obj.iterate()
     timer = clock() - timer
-    J_h = err.getOF(dirName)  # Evaluate objective functional
-    # TODO: also create a function to read gauge data from log
+    J_h = cb1.__call__()[1]  # Evaluate objective functional
+    # TODO: also create a function to read gauge data
 
     return J_h, clock() - timer
 

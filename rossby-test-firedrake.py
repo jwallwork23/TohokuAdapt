@@ -24,9 +24,9 @@ op = opt.Options(family='cg-cg',
                  ndump=12,
                  g=1.)
 Dt = Constant(op.dt)
-dirName = "plots/rossby-wave/"
-forwardFile = File(dirName+op.family+"/forwardRW.pvd")
-solFile = File(dirName + 'analytic.pvd')
+di = "plots/rossby-wave/"
+forwardFile = File(di+op.family+"/forwardRW.pvd")
+solFile = File(di + 'analytic.pvd')
 
 # Define FunctionSpaces and physical fields
 V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)

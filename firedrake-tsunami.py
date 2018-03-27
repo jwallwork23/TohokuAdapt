@@ -47,16 +47,16 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         op.orderChange = 1
 
     # Establish filenames
-    dirName = 'plots/' + mode + '/'
+    di = 'plots/' + mode + '/'
     if op.plotpvd:
-        forwardFile = File(dirName + "forward.pvd")
-        residualFile = File(dirName + "residual.pvd")
-        errorFile = File(dirName + "errorIndicator.pvd")
-    adaptiveFile = File(dirName + approach + ".pvd")
+        forwardFile = File(di + "forward.pvd")
+        residualFile = File(di + "residual.pvd")
+        errorFile = File(di + "errorIndicator.pvd")
+    adaptiveFile = File(di + approach + ".pvd")
     if op.outputMetric:
-        metricFile = File(dirName + "metric.pvd")
+        metricFile = File(di + "metric.pvd")
     if useAdjoint:
-        adjointFile = File(dirName + "adjoint.pvd")
+        adjointFile = File(di + "adjoint.pvd")
 
     # Load Mesh(es)
     if mode == 'tohoku':
@@ -227,11 +227,11 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 indexStr = msc.indexString(cnt)
                 if approach == 'implicit':
                     epsilon = assemble(v * sqrt(inner(e, e)) * dx)
-                    with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_CREATE) as saveErr:
+                    with DumbCheckpoint(di + 'hdf5/error_' + indexStr, mode=FILE_CREATE) as saveErr:
                         saveErr.store(epsilon)
                         saveErr.close()
                 elif approach == 'DWE':
-                    with DumbCheckpoint(dirName + 'hdf5/implicitError_' + indexStr, mode=FILE_CREATE) as saveIE:
+                    with DumbCheckpoint(di + 'hdf5/implicitError_' + indexStr, mode=FILE_CREATE) as saveIE:
                         saveIE.store(e0)
                         saveIE.store(e1)
                         saveIE.close()
@@ -251,14 +251,14 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     if approach in ('explicit', 'DWR'):
                         rho_u.interpolate(Au)
                         rho_e.interpolate(Ae)
-                        with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_CREATE) as saveRes:
+                        with DumbCheckpoint(di + 'hdf5/residual_' + indexStr, mode=FILE_CREATE) as saveRes:
                             saveRes.store(rho_u)
                             saveRes.store(rho_e)
                             saveRes.close()
                         if op.plotpvd:
                             residualFile.write(rho_u, rho_e, time=t)
                 if approach in ('DWF', 'explicit', 'fluxJump'):
-                    with DumbCheckpoint(dirName + 'hdf5/forward_' + indexStr, mode=FILE_CREATE) as saveFor:
+                    with DumbCheckpoint(di + 'hdf5/forward_' + indexStr, mode=FILE_CREATE) as saveFor:
                         saveFor.store(u)
                         saveFor.store(eta)
                         saveFor.close()
@@ -324,7 +324,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             #             dual_u, dual_e = dual.split()
             #             dual_u.rename('Adjoint velocity')
             #             dual_e.rename('Adjoint elevation')
-            #             with DumbCheckpoint(dirName + 'hdf5/adjoint_H_' + indexStr, mode=FILE_CREATE) as saveAdjH:
+            #             with DumbCheckpoint(di + 'hdf5/adjoint_H_' + indexStr, mode=FILE_CREATE) as saveAdjH:
             #                 saveAdjH.store(dual_u)
             #                 saveAdjH.store(dual_e)
             #                 saveAdjH.close()
@@ -333,7 +333,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             #             dual_h_u, dual_h_e = dual_h.split()
             #             dual_h_u.rename('Fine adjoint velocity')
             #             dual_h_e.rename('Fine adjoint elevation')
-            #             with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_CREATE) as saveAdj:
+            #             with DumbCheckpoint(di + 'hdf5/adjoint_' + indexStr, mode=FILE_CREATE) as saveAdj:
             #                 saveAdj.store(dual_h_u)
             #                 saveAdj.store(dual_h_e)
             #                 saveAdj.close()
@@ -371,12 +371,12 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             # Load forward / adjoint / residual data from HDF5
             if useAdjoint:
                 if (approach == 'DWR') and not op.orderChange:
-                    with DumbCheckpoint(dirName + 'hdf5/adjoint_' + indexStr, mode=FILE_READ) as loadAdj:
+                    with DumbCheckpoint(di + 'hdf5/adjoint_' + indexStr, mode=FILE_READ) as loadAdj:
                         loadAdj.load(dual_h_u)
                         loadAdj.load(dual_h_e)
                         loadAdj.close()
                 else:
-                    with DumbCheckpoint(dirName + 'hdf5/adjoint_H_' + indexStr, mode=FILE_READ) as loadAdjH:
+                    with DumbCheckpoint(di + 'hdf5/adjoint_H_' + indexStr, mode=FILE_READ) as loadAdjH:
                         loadAdjH.load(dual_u)
                         loadAdjH.load(dual_e)
                         loadAdjH.close()
@@ -384,7 +384,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                         dual_oi_u.interpolate(dual_u)
                         dual_oi_e.interpolate(dual_e)
             if (approach in ('explicit', 'DWF')):
-                with DumbCheckpoint(dirName + 'hdf5/forward_' + indexStr, mode=FILE_READ) as loadFor:
+                with DumbCheckpoint(di + 'hdf5/forward_' + indexStr, mode=FILE_READ) as loadFor:
                     loadFor.load(u)
                     loadFor.load(eta)
                     loadFor.close()
@@ -392,12 +392,12 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     u_oi.interpolate(u)
                     eta_oi.interpolate(eta)
             if (approach in ('explicit', 'DWR')):
-                with DumbCheckpoint(dirName + 'hdf5/residual_' + indexStr, mode=FILE_READ) as loadRes:
+                with DumbCheckpoint(di + 'hdf5/residual_' + indexStr, mode=FILE_READ) as loadRes:
                     loadRes.load(rho_u)
                     loadRes.load(rho_e)
                     loadRes.close()
             elif approach == 'DWE':
-                with DumbCheckpoint(dirName + 'hdf5/implicitError_' + indexStr, mode=FILE_READ) as loadIE:
+                with DumbCheckpoint(di + 'hdf5/implicitError_' + indexStr, mode=FILE_READ) as loadIE:
                     loadIE.load(e0)
                     loadIE.load(e1)
                     loadIE.close()
@@ -415,7 +415,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             # Loop over relevant time window
             if op.window:
                 for i in range(k, min(k+iEnd-iStart, iEnd)):
-                    with DumbCheckpoint(dirName + 'hdf5/adjoint_H_' + msc.indexString(i), mode=FILE_READ) as loadAdj:
+                    with DumbCheckpoint(di + 'hdf5/adjoint_H_' + msc.indexString(i), mode=FILE_READ) as loadAdj:
                         loadAdj.load(dual_u)
                         loadAdj.load(dual_e)
                         loadAdj.close()
@@ -426,7 +426,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             epsilon.rename("Error indicator")
 
             # Store error estimates
-            with DumbCheckpoint(dirName + 'hdf5/error_' + indexStr, mode=FILE_CREATE) as saveErr:
+            with DumbCheckpoint(di + 'hdf5/error_' + indexStr, mode=FILE_CREATE) as saveErr:
                 saveErr.store(epsilon)
                 saveErr.close()
             if op.plotpvd:
@@ -452,7 +452,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 # Construct metric
                 if aposteriori:
                     # Load error indicator data from HDF5 and interpolate onto a P1 space defined on current mesh
-                    with DumbCheckpoint(dirName + 'hdf5/error_' + msc.indexString(cnt), mode=FILE_READ) as loadError:
+                    with DumbCheckpoint(di + 'hdf5/error_' + msc.indexString(cnt), mode=FILE_READ) as loadError:
                         loadError.load(epsilon)
                         loadError.close()
                     errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon)[0])

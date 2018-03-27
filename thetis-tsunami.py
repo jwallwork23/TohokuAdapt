@@ -55,11 +55,11 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         op.orderChange = 1
 
     # Establish filenames
-    dirName = 'plots/'+mode+'/'
+    di = 'plots/'+mode+'/'
     if op.plotpvd:
-        residualFile = File(dirName + "residual.pvd")
-        implicitErrorFile = File(dirName + "implicitError.pvd")
-        errorFile = File(dirName + "errorIndicator.pvd")
+        residualFile = File(di + "residual.pvd")
+        implicitErrorFile = File(di + "implicitError.pvd")
+        errorFile = File(di + "errorIndicator.pvd")
 
     # Load Mesh, initial condition and bathymetry
     if mode == 'tohoku':
@@ -228,7 +228,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         options.simulation_end_time = T
         options.timestepper_type = op.timestepper
         options.timestep = dt
-        options.output_directory = dirName
+        options.output_directory = di
         options.export_diagnostics = True
         options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
         options.use_wetting_and_drying = op.wd
@@ -245,7 +245,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             elif mode == 'rossby-wave':
                 solver_obj.create_equations()
                 cb = err.RossbyWaveCallback(solver_obj)
-            cb.output_dir = dirName
+            cb.output_dir = di
             cb.append_to_log = False
             cb.export_to_hdf5 = False
             solver_obj.add_callback(cb, 'timestep')
@@ -302,7 +302,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     dual_u, dual_e = dual.split()
                     dual_u.rename('Adjoint velocity')
                     dual_e.rename('Adjoint elevation')
-                    with DumbCheckpoint(dirName + 'hdf5/adjoint_' + msc.indexString(cnt), mode=FILE_CREATE) as saveAdj:
+                    with DumbCheckpoint(di + 'hdf5/adjoint_' + msc.indexString(cnt), mode=FILE_CREATE) as saveAdj:
                         saveAdj.store(dual_u)
                         saveAdj.store(dual_e)
                         saveAdj.close()
@@ -334,27 +334,27 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             msc.dis('Generating error estimate %d / %d' % (k+1, iEnd), op.printStats)
 
             if approach == 'DWF':
-                with DumbCheckpoint(dirName+'hdf5/Velocity2d_'+msc.indexString(k), mode=FILE_READ) as loadVel:
+                with DumbCheckpoint(di+'hdf5/Velocity2d_'+msc.indexString(k), mode=FILE_READ) as loadVel:
                     loadVel.load(uv_2d)
                     loadVel.close()
-                with DumbCheckpoint(dirName+'hdf5/Elevation2d_'+msc.indexString(k), mode=FILE_READ) as loadElev:
+                with DumbCheckpoint(di+'hdf5/Elevation2d_'+msc.indexString(k), mode=FILE_READ) as loadElev:
                     loadElev.load(elev_2d)
                     loadElev.close()
             else:
                 i1 = 0 if k == 0 else 2*k-1
                 i2 = 2*k
-                with DumbCheckpoint(dirName+'hdf5/Velocity2d_'+msc.indexString(i1), mode=FILE_READ) as loadVel:
+                with DumbCheckpoint(di+'hdf5/Velocity2d_'+msc.indexString(i1), mode=FILE_READ) as loadVel:
                     loadVel.load(uv_2d)
                     loadVel.close()
-                with DumbCheckpoint(dirName+'hdf5/Elevation2d_'+msc.indexString(i1), mode=FILE_READ) as loadElev:
+                with DumbCheckpoint(di+'hdf5/Elevation2d_'+msc.indexString(i1), mode=FILE_READ) as loadElev:
                     loadElev.load(elev_2d)
                     loadElev.close()
                 uv_2d_.assign(uv_2d)
                 elev_2d_.assign(elev_2d)
-                with DumbCheckpoint(dirName+'hdf5/Velocity2d_'+msc.indexString(i2), mode=FILE_READ) as loadVel:
+                with DumbCheckpoint(di+'hdf5/Velocity2d_'+msc.indexString(i2), mode=FILE_READ) as loadVel:
                     loadVel.load(uv_2d)
                     loadVel.close()
-                with DumbCheckpoint(dirName+'hdf5/Elevation2d_'+msc.indexString(i2), mode=FILE_READ) as loadElev:
+                with DumbCheckpoint(di+'hdf5/Elevation2d_'+msc.indexString(i2), mode=FILE_READ) as loadElev:
                     loadElev.load(elev_2d)
                     loadElev.close()
 
@@ -398,7 +398,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
             # Store error estimates
             epsilon.rename("Error indicator")
-            with DumbCheckpoint(dirName+'hdf5/'+approach+'Error'+msc.indexString(k), mode=FILE_CREATE) as saveErr:
+            with DumbCheckpoint(di+'hdf5/'+approach+'Error'+msc.indexString(k), mode=FILE_CREATE) as saveErr:
                 saveErr.store(epsilon)
                 saveErr.close()
             if op.plotpvd:
@@ -426,18 +426,18 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
                 q = Function(V_H)
                 uv_2d, elev_2d = q.split()
-                with DumbCheckpoint(dirName+'hdf5/Elevation2d_'+msc.indexString(int(cnt/op.ndump)), mode=FILE_READ) \
+                with DumbCheckpoint(di+'hdf5/Elevation2d_'+msc.indexString(int(cnt/op.ndump)), mode=FILE_READ) \
                         as loadElev:
                     loadElev.load(elev_2d, name='elev_2d')
                     loadElev.close()
-                with DumbCheckpoint(dirName+'hdf5/Velocity2d_'+msc.indexString(int(cnt/op.ndump)), mode=FILE_READ) \
+                with DumbCheckpoint(di+'hdf5/Velocity2d_'+msc.indexString(int(cnt/op.ndump)), mode=FILE_READ) \
                         as loadVel:
                     loadVel.load(uv_2d, name='uv_2d')
                     loadVel.close()
 
             # Construct metric
             if aposteriori:
-                with DumbCheckpoint(dirName+'hdf5/'+approach+'Error'+msc.indexString(int(cnt/op.rm)), mode=FILE_READ) \
+                with DumbCheckpoint(di+'hdf5/'+approach+'Error'+msc.indexString(int(cnt/op.rm)), mode=FILE_READ) \
                         as loadErr:
                     loadErr.load(epsilon)
                     loadErr.close()
@@ -507,7 +507,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             adapOpt.simulation_end_time = endT
             adapOpt.timestepper_type = op.timestepper
             adapOpt.timestep = dt
-            adapOpt.output_directory = dirName
+            adapOpt.output_directory = di
             adapOpt.export_diagnostics = True
             adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
             adapOpt.use_wetting_and_drying = op.wd
@@ -516,7 +516,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             if mode == 'rossby-wave':
                 adapOpt.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh_H)[1])
             field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
-            e = exporter.ExportManager(dirName + 'hdf5',
+            e = exporter.ExportManager(di + 'hdf5',
                                        ['elev_2d', 'uv_2d'],
                                        field_dict,
                                        field_metadata,
@@ -537,7 +537,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     cb = err.ShallowWaterCallback(adapSolver)
                 elif mode == 'rossby-wave':
                     cb = err.RossbyWaveCallback(adapSolver)
-                cb.output_dir = dirName
+                cb.output_dir = di
                 cb.append_to_log = False
                 cb.export_to_hdf5 = False
                 if cnt != 0:
@@ -565,7 +565,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     # Measure error using metrics, using data from Huang et al.
     if mode == 'rossby-wave':
         index = int(cntT/op.ndump) if approach == 'fixedMesh' else int((cnt-op.rm) / op.ndump)
-        with DumbCheckpoint(dirName+'hdf5/Elevation2d_'+msc.indexString(index), mode=FILE_READ) as loadElev:
+        with DumbCheckpoint(di+'hdf5/Elevation2d_'+msc.indexString(index), mode=FILE_READ) as loadElev:
             loadElev.load(elev_2d, name='elev_2d')
             loadElev.close()
         # peak_i, peak = msc.getMax(inte.interp(adap.isoP2(mesh_H), elev_2d)[0].dat.data)
