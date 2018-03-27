@@ -105,8 +105,10 @@ if __name__ == '__main__':
                 times = np.linspace(0., 25., len(gP02))
                 errorsP02 = [gP02[i]-splineP02(times[i]) for i in range(len(gP02))]
                 errorsP06 = [gP06[i]-splineP06(times[i]) for i in range(len(gP06))]
-                totalVarP02 = err.totalVariation(errorsP02)
-                totalVarP06 = err.totalVariation(errorsP06)
+                exactP02 = err.totalVariation([splineP02(times[i]) for i in range(len(gP02))])
+                exactP06 = err.totalVariation([splineP06(times[i]) for i in range(len(gP06))])
+                totalVarP02 = err.totalVariation(errorsP02) / exactP02
+                totalVarP06 = err.totalVariation(errorsP06) / exactP06
                 errorfile.write('%d, %.4e, %.4e, %.4e, %.1f\n' % (k, J_h, totalVarP02, totalVarP06, timing))
             errorfile.close()
             gaugeFileP02.close()
