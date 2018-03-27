@@ -35,26 +35,10 @@ def solverSW(startRes, op=opt.Options()):
     solver_obj = solver2d.FlowSolver2d(mesh_H, b)
     solver_obj.create_equations()
     dt = min(np.abs(solver_obj.compute_time_step().dat.data))
-    if dt > 3.:
-        dt = 3.
-    elif dt > 2.5:
-        dt = 2.5
-    elif dt > 2.:
-        dt = 2.
-    elif dt > 1.5:
-        dt = 1.5
-    elif dt > 1.:
-        dt = 1.
-    elif dt > 0.5:
-        dt = 0.5
-    elif dt > 0.25:
-        dt = 0.25
-    elif dt > 0.2:
-        dt = 0.2
-    elif dt > 0.1:
-        dt = 0.1
-    elif dt > 0.05:
-        dt = 0.05
+    for i in (3., 2.5, 2., 1.5, 1., 0.5, 0.25, 0.2, 0.1, 0.05):
+        if dt > i:
+            dt = i
+            break
 
     # Get solver parameter values and construct solver
     options = solver_obj.options
@@ -68,25 +52,18 @@ def solverSW(startRes, op=opt.Options()):
     options.timestepper_type = op.timestepper
     options.timestep = dt
     options.output_directory = di
-    options.export_diagnostics = True
-    options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+    options.export_diagnostics = False
     # options.use_wetting_and_drying = op.wd        # TODO: Consider w&d
     # if op.wd:
     #     options.wetting_and_drying_alpha = alpha
 
-    # Apply ICs
+    # Apply ICs and establish Callbacks
     solver_obj.assign_initial_conditions(elev=eta0)
-
-    # Output objective functional computation error
-    cb1 = err.TohokuCallback(solver_obj)
+    cb1 = err.TohokuCallback(solver_obj)        # Objective functional computation error
     solver_obj.add_callback(cb1, 'timestep')
-
-    # Output gauge timeseries error
-    cb2 = err.P02Callback(solver_obj)
+    cb2 = err.P02Callback(solver_obj)           # Gauge timeseries error P02
     solver_obj.add_callback(cb2, 'timestep')
-
-    # Output gauge timeseries error
-    cb3 = err.P06Callback(solver_obj)
+    cb3 = err.P06Callback(solver_obj)           # Gauge timeseries error P06
     solver_obj.add_callback(cb3, 'timestep')
 
     timer = clock()
@@ -98,7 +75,7 @@ def solverSW(startRes, op=opt.Options()):
     gP02 = cb2.__call__()[1]
     gP06 = cb3.__call__()[1]
 
-    return J_h, gP02, gP06, clock() - timer
+    return J_h, gP02, gP06, timer
 
 
 if __name__ == '__main__':
@@ -115,15 +92,14 @@ if __name__ == '__main__':
             filename = 'outdata/outputs/modelVerification/nonlinear=' + str(i) + '_'
             filename += 'rotational=' + str(j) + '_'
             textfile = open(filename + date + '.txt', 'w+')
-            figP02 = plt.figure(1)
-            figP06 = plt.figure(2)
+            fig, axs = plt.subplots(2, 1, figsize=(5, 5))
             # for k in range(11):
             for k in range(1):
                 print("\nNONLINEAR = %s, ROTATIONAL = %s, RUN %d\n" % (i, j, k))
                 J_h, gP02, gP06, timing = solverSW(k, op=op)
+                # TODO: Calculate error in gauge measurements based on empirical data
                 textfile.write('%d, %.4e, %.1f\n' % (k, J_h, timing))
-                figP02.plot(gP02)
-                figP06.plot(gP06)
-            figP02.show()
-            figP06.show()
+                axs[0].plot(gP02)
+                axs[1].plot(gP06)
+            plt.show()
             textfile.close()

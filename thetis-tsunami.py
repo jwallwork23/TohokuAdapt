@@ -174,26 +174,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         # Ensure simulation time is achieved exactly.
         solver_obj.create_equations()
         dt = min(np.abs(solver_obj.compute_time_step().dat.data))
-        if dt > 3.:
-            dt = 3.
-        elif dt > 2.5:
-            dt = 2.5
-        elif dt > 2.:
-            dt = 2.
-        elif dt > 1.5:
-            dt = 1.5
-        elif dt > 1.:
-            dt = 1.
-        elif dt > 0.5:
-            dt = 0.5
-        elif dt > 0.25:
-            dt = 0.25
-        elif dt > 0.2:
-            dt = 0.2
-        elif dt > 0.1:
-            dt = 0.1
-        elif dt > 0.05:
-            dt = 0.05
+        for i in (3., 2.5, 2., 1.5, 1., 0.5, 0.25, 0.2, 0.1, 0.05):
+            if dt > i:
+                dt = i
+                break
     Dt = Constant(dt)
     # iEnd = int(np.ceil(T / (dt * op.rm)))
     iEnd = int(T / (dt * op.rm))            # It appears this format is better for CFL criterion derived timesteps
