@@ -1,11 +1,9 @@
 from thetis import *
 from firedrake_adjoint import *
-from fenics_adjoint.solving import SolveBlock   # Need use Sebastian's `linear-solver` branch of pyadjoint
-from firedrake import Expression                # Annotation of Expressions not currently supported in firedrake_adjoint
-
+from firedrake import Expression        # Annotation of Expressions not currently supported in firedrake_adjoint
 
 class ObjectiveCallback(DiagnosticCallback):
-    """Base class for callbacks that form objective functionals.."""
+    """Base class for callbacks that form objective functionals."""
     variable_names = ['current functional', 'objective functional']
 
     def __init__(self, scalar_callback, solver_obj, **kwargs):
@@ -36,14 +34,13 @@ class ObjectiveCallback(DiagnosticCallback):
 
 class ObjectiveSWCallback(ObjectiveCallback):
     """Integrates objective functional in shallow water case."""
-    name = 'objective functional'
+    name = 'SW objective functional'
 
     def __init__(self, solver_obj, **kwargs):
         """
         :arg solver_obj: Thetis solver object
         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
         """
-        from firedrake_adjoint import assemble
 
         def objectiveSW():
             """
@@ -51,22 +48,17 @@ class ObjectiveSWCallback(ObjectiveCallback):
             :return: objective functional value for callbacks.
             """
             elev_2d = solver_obj.fields.solution_2d.split()[1]
-            ks = Function(elev_2d.function_space())
+            ks = Function(elev_2d.function_space()) # Spatial integral is over [0, pi/2] x [pi/2, 3pi/2]
             ks.interpolate(Expression('(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' %
                                       (0., pi / 2, pi / 2, 3 * pi / 2)))
             kt = Constant(0.)
-            if solver_obj.simulation_time > 0.5:
+            if solver_obj.simulation_time > 0.5:    # Time integral is over [0.5, 2.5]
                 kt.assign(1. if solver_obj.simulation_time > 0.5 + 0.5 * solver_obj.options.timestep else 0.5)
 
             return assemble(elev_2d * ks * kt * dx)
 
         super(ObjectiveSWCallback, self).__init__(objectiveSW, solver_obj, **kwargs)
 
-
-T = 2.5
-dt = 0.025
-ndump = 10
-adjointFile = File('plots/pyadjointTest/adjoint.pvd')
 
 # Establish Mesh, initial condition and bathymetry
 mesh = SquareMesh(16, 16, 2 * pi, 2 * pi)
@@ -82,6 +74,8 @@ dual_u.rename("Adjoint velocity")
 dual_e.rename("Adjoint elevation")
 
 # Get solver parameter values and construct solver
+dt = 0.025
+ndump = 10
 solver_obj = solver2d.FlowSolver2d(mesh, b)
 options = solver_obj.options
 options.element_family = 'dg-dg'
@@ -89,7 +83,7 @@ options.use_nonlinear_equations = False
 options.use_grad_depth_viscosity_term = False
 options.use_grad_div_viscosity_term = False
 options.simulation_export_time = dt * ndump
-options.simulation_end_time = T
+options.simulation_end_time = 2.5
 options.timestepper_type = 'CrankNicolson'
 options.timestep = dt
 options.output_directory = 'plots/pyadjointTest/'
@@ -106,8 +100,16 @@ J = 0
 for i in range(1, len(Jfuncs)):
     J += 0.5*(Jfuncs[i-1] + Jfuncs[i])*dt
 dJdb = compute_gradient(J, Control(b))      # Need compute gradient or tlm in order to extract adjoint solutions
+File('plots/pyadjointTest/gradient.pvd').write(dJdb)
+
+
+from fenics_adjoint.solving import SolveBlock   # Need use Sebastian's `linear-solver` branch of pyadjoint
+
 tape = get_working_tape()
+# tape.visualise()
+
 solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
+adjointFile = File('plots/pyadjointTest/adjoint.pvd')
 for i in range(len(solve_blocks)-1, -1, -1):
     dual.assign(solve_blocks[i].adj_sol)
     dual_u, dual_e = dual.split()

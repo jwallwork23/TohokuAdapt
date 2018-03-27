@@ -162,7 +162,7 @@ tape = get_working_tape()
 solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
 
 for i in range(len(solve_blocks)-1, -1, -1):
-    dual.assign(solve_blocks[i].adj_sol)
+    dual.assign(solve_blocks[i].adj_sol)        # TODO: adj_sols currently have None type
     if i % ndump == 0:
         adjointFile.write(dual_u, dual_e, time=dt*i)
         print('t = %.2fs' % (dt*i))
