@@ -253,7 +253,7 @@ def readErrors(date, approach, mode='tohoku', bootstrapping=False):
 
 
 def extractSpline(gauge):
-    measuredFile = open('outdata/timeseries/P02data_' + gauge + 'mins.txt', 'r')
+    measuredFile = open('outdata/timeseries/'+gauge+'data_25mins.txt', 'r')
     x = []
     y = []
     for line in measuredFile:

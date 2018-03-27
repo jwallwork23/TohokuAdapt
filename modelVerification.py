@@ -96,13 +96,18 @@ if __name__ == '__main__':
             splineP02 = tim.extractSpline('P02')
             splineP06 = tim.extractSpline('P06')
 
-            for k in range(11):
+            # for k in range(11):
+            for k in range(1):
                 print("\nNONLINEAR = %s, ROTATIONAL = %s, RUN %d\n" % (i, j, k))
                 J_h, gP02, gP06, timing = solverSW(k, op=op)
                 gaugeFileP02.writelines(["%s," % val for val in gP02])
                 gaugeFileP06.writelines(["%s," % val for val in gP06])
-                # TODO: Calculate TV norm error in gauge measurements based on empirical data
-                errorfile.write('%d, %.4e, %.1f\n' % (k, J_h, timing))
+                times = np.linspace(0., 25., len(gP02))
+                errorsP02 = [gP02[i]-splineP02(times[i]) for i in range(len(gP02))]
+                errorsP06 = [gP06[i]-splineP06(times[i]) for i in range(len(gP06))]
+                totalVarP02 = err.totalVariation(errorsP02)
+                totalVarP06 = err.totalVariation(errorsP06)
+                errorfile.write('%d, %.4e, %.4e, %.4e, %.1f\n' % (k, J_h, totalVarP02, totalVarP06, timing))
             errorfile.close()
             gaugeFileP02.close()
             gaugeFileP06.close()
