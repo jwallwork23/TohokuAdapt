@@ -224,15 +224,11 @@ class ObjectiveCallback(DiagnosticCallback):
         """
         super(ObjectiveCallback, self).__init__(solver_obj, **kwargs)
         self.scalar_callback = scalar_callback
-        self.objective_functional = [0.5 * scalar_callback() * solver_obj.options.timestep]
+        self.objective_functional = [scalar_callback()]
 
     def __call__(self):
         # Compute OF value
-        t = self.solver_obj.simulation_time
-        dt = self.solver_obj.options.timestep
-        value = self.scalar_callback() * dt
-        if t > self.solver_obj.options.simulation_end_time - 0.5 * dt:
-            value *= 0.5
+        value = self.scalar_callback()
         self.objective_functional.append(value)
 
         return value, self.objective_functional
@@ -259,12 +255,11 @@ class ObjectiveSWCallback(ObjectiveCallback):
             :return: objective functional value for callbacks.
             """
             elev_2d = solver_obj.fields.solution_2d.split()[1]
+            print(elev_2d)
             ks = forms.indicator(elev_2d.function_space(), mode='shallow-water')
             kt = Constant(0.)
             if solver_obj.simulation_time > 0.5:    # TODO: make this more general
-                kt.assign(
-                    1. if solver_obj.simulation_time >
-                          0.5 + 0.5 * solver_obj.options.timestep else 0.5)
+                kt.assign(1. if solver_obj.simulation_time > 0.5 + 0.5 * solver_obj.options.timestep else 0.5)
 
             return assemble(elev_2d * ks * kt * dx)
 
