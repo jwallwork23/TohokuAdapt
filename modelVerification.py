@@ -84,7 +84,6 @@ if __name__ == '__main__':
     parser.add_argument("-l", help="Use linearised equations")
     parser.add_argument("-w", help="Use wetting and drying")
     args = parser.parse_args()
-
     op = opt.Options(family='dg-dg',
                      wd=True if args.w else False,
                      ndump=10)
@@ -99,7 +98,7 @@ if __name__ == '__main__':
     splineP06 = tim.extractSpline('P06')
 
     for k in range(11):
-        print("\nNONLINEAR = %s, ROTATIONAL = %s, RUN %d\n" % (op.nonlinear, op.rotational, k))
+        print("\nRun %d: Nonlinear = %s, Rotational = %s\n" % (k, op.nonlinear, op.rotational))
         J_h, gP02, gP06, timing = solverSW(k, op=op)
         gaugeFileP02.writelines(["%s," % val for val in gP02])
         gaugeFileP06.writelines(["%s," % val for val in gP06])
@@ -111,6 +110,7 @@ if __name__ == '__main__':
         totalVarP02 = err.totalVariation(errorsP02) / exactP02
         totalVarP06 = err.totalVariation(errorsP06) / exactP06
         errorfile.write('%d, %.4e, %.4e, %.4e, %.1f\n' % (k, J_h, totalVarP02, totalVarP06, timing))
+        print("\nTotal variation... P02: %.3f, P06: %.3f\n" % (totalVarP02, totalVarP06))
     errorfile.close()
     gaugeFileP02.close()
     gaugeFileP06.close()
