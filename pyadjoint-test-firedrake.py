@@ -127,16 +127,15 @@ k1.assign(iA)
 print('Starting fixed mesh primal run (forwards in time)')
 primalTimer = clock()
 forwardFile.write(u, eta, time=t)
-Jfunc = assemble(inner(k, q_) * dx)
-Jfuncs = [Jfunc]
+# J = assemble(inner(k, q_) * dx)
+Jfuncs = [assemble(inner(k, q_) * dx)]
 while t < Tend + dt:
     # Solve problem and update solution
     forwardSolver.solve()
     q_.assign(q)
 
     # Update OF
-    Jfunc = assemble(inner(k, q_) * dx)
-    Jfuncs.append(Jfunc)
+    Jfuncs.append(assemble(inner(k, q_) * dx))
 
     if cnt % ndump == 0:
         forwardFile.write(u, eta, time=t)
@@ -157,17 +156,18 @@ for i in range(1, len(Jfuncs)):
 print('\nStarting fixed mesh dual run (backwards in time)')
 dualTimer = clock()
 dJdb = compute_gradient(J, Control(b))  # Need compute gradient or tlm in order to extract adjoint solutions
+File(di + 'gradient.pvd').write(dJdb)
+print('Norm of gradient = %.3f' % dJdb.dat.norm)
+
 tape = get_working_tape()
 # tape.visualise()
 solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
 
 for i in range(len(solve_blocks)-1, -1, -1):
-    dual.assign(solve_blocks[i].adj_sol)        # TODO: adj_sols currently have None type
+    dual.assign(solve_blocks[i].adj_sol)
     if i % ndump == 0:
         adjointFile.write(dual_u, dual_e, time=dt*i)
         print('t = %.2fs' % (dt*i))
 
 dualTimer = clock() - dualTimer
 print('Adjoint run complete. Run time: %.3fs' % dualTimer)
-File(di + 'gradient.pvd').write(dJdb)
-print('Norm of gradient = %.3f' % dJdb.dat.norm)
