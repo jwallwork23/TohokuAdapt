@@ -557,6 +557,7 @@ if __name__ == '__main__':
                                          "'hessianBased', 'residual', 'explicit', 'fluxJump', 'implicit', 'DWF', "
                                          "'DWR', 'DWE'}" )
     parser.add_argument("-w", help="Use wetting and drying")
+    parser.add_argument("-b", help="Use bootstrapping")
     args = parser.parse_args()
     print("Mode: ", args.mode)
     print("Approach: ", args.approach)
@@ -575,8 +576,8 @@ if __name__ == '__main__':
                      outputMetric=False,
                      plotpvd=True,
                      gauges=False,
-                     bootstrap=False,
-                     printStats=True,
+                     bootstrap=True if args.b else False,
+                     printStats=False,
                      outputOF=True,
                      orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
                      # orderChange=0,
@@ -591,7 +592,8 @@ if __name__ == '__main__':
     s = '_BOOTSTRAP' if op.bootstrap else ''
     textfile = open('outdata/outputs/'+mode+'/'+approach+date+s+'.txt', 'w+')
     if op.bootstrap:
-        for i in range(11):
+        # for i in range(11):
+        for i in range(8):
             av, rel, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
             var = np.abs(J_h - J_h_) if i > 0 else 0.
             J_h_ = J_h
@@ -599,8 +601,7 @@ if __name__ == '__main__':
                   % (i, av, J_h, timing, var))
             textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, J_h, timing, var))
     else:
-        # for i in range(1, 6):
-        for i in range(1):
+        for i in range(6):
             if mode == 'rossby-wave':
                 av, relativePeak, distanceTravelled, phaseSpd, timing = \
                     solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
