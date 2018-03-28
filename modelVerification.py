@@ -96,7 +96,7 @@ if __name__ == '__main__':
     splineP02 = tim.extractSpline('P02')
     splineP06 = tim.extractSpline('P06')
 
-    for k in range(11):
+    for k in range(10):     # TODO: Could turn it up to 11...
         print("\nStarting run %d... Nonlinear = %s, Rotational = %s\n" % (k, op.nonlinear, op.rotational))
         J_h, gP02, gP06, timing = solverSW(k, op=op)
         gaugeFileP02.writelines(["%s," % val for val in gP02])

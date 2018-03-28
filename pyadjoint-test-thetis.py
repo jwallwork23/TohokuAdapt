@@ -3,14 +3,11 @@ from firedrake_adjoint import *
 from fenics_adjoint.solving import SolveBlock   # Need use Sebastian's `linear-solver` branch of pyadjoint
 
 import utils.error as err
+import utils.mesh as msh
 
 
 # Establish Mesh, initial condition and bathymetry
-mesh = SquareMesh(16, 16, 2 * pi, 2 * pi)
-x, y = SpatialCoordinate(mesh)
-P1_2d = FunctionSpace(mesh, "CG", 1)
-eta0 = Function(P1_2d).interpolate(1e-3 * exp(-(pow(x - pi, 2) + pow(y - pi, 2))))
-b = Function(P1_2d).assign(0.1)
+mesh, eta0, b = msh.domainSW(4)[:3]
 
 # Establish adjoint variables and indicator function
 V = VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1)

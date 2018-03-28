@@ -7,6 +7,7 @@ from . import misc
 
 class Options:
     def __init__(self,
+                 mode='tohoku',
                  family='dg-cg',
                  vscale=0.85,
                  hmin=500.,
@@ -42,6 +43,7 @@ class Options:
                  timestepper='CrankNicolson',
                  wd=False):
         """
+        :param mode: problem considered.
         :param family: mixed function space family, from {'dg-dg', 'dg-cg'}.
         :param vscale: Scaling parameter for target number of vertices.
         :param hmin: Minimal tolerated element size (m).
@@ -77,6 +79,11 @@ class Options:
         :param timestepper: timestepping scheme.
         :param wd: toggle wetting and drying.
         """
+        self.mode = mode
+        try:
+            assert mode in ('tohoku', 'shallow-water', 'rossby-wave')
+        except:
+            raise ValueError('Test problem not recognised.')
 
         # Adaptivity parameters
         self.family = family
@@ -171,6 +178,23 @@ class Options:
                        'assembled_pc_type': 'lu',
                        'snes_lag_preconditioner': -1,
                        'snes_lag_preconditioner_persists': True}
+
+        # Override default parameter choices for SW and RW cases:
+        if self.mode == 'shallow-water':
+            self.Tstart = 0.5
+            self.Tend = 2.5
+            self.hmin = 1e-4
+            self.hmax = 1.
+            self.rm = 10
+            self.ndump = 10
+        elif self.mode == 'rossby-wave':
+            self.Tstart = 30.
+            self.Tend = 120.
+            self.hmin = 5e-3
+            self.hmax = 10.
+            self.rm = 24
+            self.ndump = 12
+            self.nonlinear = True
 
         # Define FunctionSpaces
         self.degree1 = 2 if family == 'cg-cg' else 1

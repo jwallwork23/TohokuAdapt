@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class MeshSetup:
     def __init__(self, level, wd=False):
 
@@ -126,9 +127,11 @@ if __name__ == '__main__':
         ms.convertMesh()
 else:
     from firedrake import *
+    from firedrake_adjoint import *
 
     import scipy.interpolate as si
     from scipy.io.netcdf import NetCDFFile
+
     from . import conversion
     from . import forms
     from . import options

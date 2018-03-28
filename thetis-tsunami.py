@@ -2,7 +2,6 @@ from thetis import *
 from thetis.field_defs import field_metadata
 from firedrake_adjoint import *
 from fenics_adjoint.solving import SolveBlock
-from firedrake import Expression
 
 import numpy as np
 from time import clock
@@ -66,12 +65,17 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         mesh_H, eta0, b, BCs = msh.TohokuDomain(startRes, wd=op.wd)
     elif mode == 'shallow-water':
         mesh_H, eta0, b, BCs = msh.domainSW(startRes)
-    elif mode == 'rossby-wave':
+    else:
         mesh_H, u0, eta0, b, BCs, f = msh.domainRW(startRes, op=op)
     T = op.Tend
 
     # Define initial FunctionSpace and variables of problem and apply initial conditions
     V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
+    q = Function(V_H)
+    uv_2d, elev_2d = q.split()  # Needed to load data into
+    uv_2d.rename("Velocity2d")
+    elev_2d.rename("Elevation2d")
+    P1 = FunctionSpace(mesh_H, "CG", 1)
     if approach in ('residual', 'implicit', 'DWR', 'DWE', 'explicit'):
         q_ = Function(V_H)
         uv_2d_, elev_2d_ = q_.split()
@@ -372,13 +376,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         msc.dis('Errors estimated. Run time: %.3fs' % errorTimer, op.printStats)
 
     if approach != 'fixedMesh':
-        if aposteriori:     # Reset initial conditions
-            if mode == 'rossby-wave':
-                q = form.solutionHuang(V_H, t=0.)
-                uv_2d, elev_2d = q.split()
-            else:
-                uv_2d.interpolate(Expression([0, 0]))
-                elev_2d.interpolate(eta0)
+        q = Function(V_H)
+        uv_2d, elev_2d = q.split()
+        elev_2d.interpolate(eta0)
+        if aposteriori:
             epsilon = Function(P0, name="Error indicator")
         msc.dis('\nStarting adaptive mesh primal run (forwards in time)', op.printStats)
         adaptTimer = clock()
@@ -561,7 +562,8 @@ if __name__ == '__main__':
 
     # Choose mode and set parameter values
     approach, getData, getError, useAdjoint, aposteriori = msc.cheatCodes(args.approach)
-    op = opt.Options(vscale=0.1 if approach in ('DWR', 'gradientBased') else 0.85,
+    op = opt.Options(mode=mode,
+                     vscale=0.1 if approach in ('DWR', 'gradientBased') else 0.85,
                      family='dg-dg',
                      rm=60 if useAdjoint else 30,
                      gradate=True if aposteriori else False,
@@ -578,20 +580,9 @@ if __name__ == '__main__':
                      wd=True if args.w else False,
                      ndump=10)
     if mode == 'shallow-water':
-        op.Tstart = 0.5
-        op.Tend = 2.5
-        op.hmin = 1e-4
-        op.hmax = 1.
         op.rm = 20 if useAdjoint else 10
-        op.ndump = 10
     elif mode == 'rossby-wave':
-        op.Tstart = 30.
-        op.Tend = 120.
-        op.hmin = 5e-3
-        op.hmax = 10.
         op.rm = 48 if useAdjoint else 24
-        op.ndump = 12
-        op.nonlinear = True
 
     # Run simulation(s)
     s = '_BOOTSTRAP' if op.bootstrap else ''
