@@ -109,7 +109,8 @@ if __name__ == '__main__':
         totalVarP02 = err.totalVariation(errorsP02) / exactP02
         totalVarP06 = err.totalVariation(errorsP06) / exactP06
         errorfile.write('%d, %.4e, %.4e, %.4e, %.1f\n' % (k, J_h, totalVarP02, totalVarP06, timing))
-        print("\nTotal variation... P02: %.3f, P06: %.3f\n" % (totalVarP02, totalVarP06))
+        print("\nRun %d... J_h: %.4e TV P02: %.3f, TV P06: %.3f, time: %.1f\n"
+              % (k, J_h, totalVarP02, totalVarP06, timing))
     errorfile.close()
     gaugeFileP02.close()
     gaugeFileP06.close()
