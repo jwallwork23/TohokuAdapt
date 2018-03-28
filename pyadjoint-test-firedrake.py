@@ -63,18 +63,18 @@ adjointFile = File(di + "adjoint.pvd")
 # Load Mesh(es)
 lx = 2 * np.pi
 n = pow(2, 4)
-mesh_H = SquareMesh(n, n, lx, lx)  # Computational mesh
-x, y = SpatialCoordinate(mesh_H)
-P1_2d = FunctionSpace(mesh_H, "CG", 1)
+mesh = SquareMesh(n, n, lx, lx)  # Computational mesh
+x, y = SpatialCoordinate(mesh)
+P1_2d = FunctionSpace(mesh, "CG", 1)
 eta0 = Function(P1_2d).interpolate(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))))
 b = Function(P1_2d).assign(0.1, annotate=False)
 
 # Define initial FunctionSpace and variables of problem and apply initial conditions
-V_H = VectorFunctionSpace(mesh_H, "DG", 1) * FunctionSpace(mesh_H, "CG", 2)
-q_ = Function(V_H)
+V = VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "CG", 2)
+q_ = Function(V)
 u_, eta_ = q_.split()
 eta_.interpolate(eta0)
-q = Function(V_H)
+q = Function(V)
 q.assign(q_)
 u, eta = q.split()
 u.rename("uv_2d")
@@ -90,7 +90,7 @@ g = 9.81
 iStart = int(Tstart / dt)
 iEnd = int(np.ceil(Tend / dt))
 
-dual = Function(V_H)
+dual = Function(V)
 dual_u, dual_e = dual.split()
 dual_u.rename("Adjoint velocity")
 dual_e.rename("Adjoint elevation")
@@ -117,25 +117,27 @@ u, eta = q.split()
 u_, eta_ = q_.split()
 
 # Define indicator function
-k = Function(V_H)
-k0, k1 = k.split()
-iA = form.indicator(V_H.sub(1), mode='shallow-water')
+ks = Function(V)
+k0, k1 = ks.split()
+iA = form.indicator(V.sub(1), mode='shallow-water')
 iA.rename("Region of interest")
 File(di+"indicator.pvd").write(iA)
 k1.assign(iA)
+kt = Constant(0.)
 
 print('Starting fixed mesh primal run (forwards in time)')
 primalTimer = clock()
 forwardFile.write(u, eta, time=t)
-# J = assemble(inner(k, q_) * dx)
-Jfuncs = [assemble(inner(k, q_) * dx)]
+Jfuncs = [assemble(kt * inner(ks, q_) * dx)]
 while t < Tend + dt:
     # Solve problem and update solution
     forwardSolver.solve()
     q_.assign(q)
 
-    # Update OF
-    Jfuncs.append(assemble(inner(k, q_) * dx))
+    # Update objective functional
+    if t > Tstart:
+        kt.assign(1. if t > Tstart + 0.5 * dt else 0.5)
+    Jfuncs.append(assemble(kt * inner(ks, q_) * dx))
 
     if cnt % ndump == 0:
         forwardFile.write(u, eta, time=t)
@@ -152,22 +154,23 @@ print('Primal run complete. Run time: %.3fs' % primalTimer)
 J = 0
 for i in range(1, len(Jfuncs)):
     J += 0.5*(Jfuncs[i-1] + Jfuncs[i])*dt
+# J = assemble(inner(ks, q) * dx)
 
-print('\nStarting fixed mesh dual run (backwards in time)')
 dualTimer = clock()
 dJdb = compute_gradient(J, Control(b))  # Need compute gradient or tlm in order to extract adjoint solutions
 File(di + 'gradient.pvd').write(dJdb)
-print('Norm of gradient = %.3f' % dJdb.dat.norm)
+print('Norm of gradient = %e' % dJdb.dat.norm)
 
-tape = get_working_tape()
-# tape.visualise()
-solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
-
-for i in range(len(solve_blocks)-1, -1, -1):
-    dual.assign(solve_blocks[i].adj_sol)
-    if i % ndump == 0:
-        adjointFile.write(dual_u, dual_e, time=dt*i)
-        print('t = %.2fs' % (dt*i))
-
-dualTimer = clock() - dualTimer
-print('Adjoint run complete. Run time: %.3fs' % dualTimer)
+# print('\nStarting fixed mesh dual run (backwards in time)')
+# tape = get_working_tape()
+# # tape.visualise()
+# solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
+#
+# for i in range(len(solve_blocks)-1, -1, -1):
+#     dual.assign(solve_blocks[i].adj_sol)
+#     if i % ndump == 0:
+#         adjointFile.write(dual_u, dual_e, time=dt*i)
+#         print('t = %.2fs' % (dt*i))
+#
+# dualTimer = clock() - dualTimer
+# print('Adjoint run complete. Run time: %.3fs' % dualTimer)

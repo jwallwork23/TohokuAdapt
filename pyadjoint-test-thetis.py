@@ -68,7 +68,8 @@ eta0 = Function(P1_2d).interpolate(1e-3 * exp(-(pow(x - pi, 2) + pow(y - pi, 2))
 b = Function(P1_2d).assign(0.1)
 
 # Establish adjoint variables and indicator function
-dual = Function(VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1))
+V = VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1)
+dual = Function(V)
 dual_u, dual_e = dual.split()
 dual_u.rename("Adjoint velocity")
 dual_e.rename("Adjoint elevation")
@@ -90,19 +91,27 @@ options.output_directory = 'plots/pyadjointTest/'
 options.export_diagnostics = False
 solver_obj.create_equations()
 solver_obj.assign_initial_conditions(elev=eta0)
-# J = assemble(solver_obj.fields.solution_2d.split()[1] * dx)
-cb = ObjectiveSWCallback(solver_obj)        # Extract objective functional at each timestep for use in pyadjoint
-solver_obj.add_callback(cb, 'timestep')
+# cb = ObjectiveSWCallback(solver_obj)        # Extract objective functional at each timestep for use in pyadjoint
+# solver_obj.add_callback(cb, 'timestep')
 solver_obj.iterate()
 
-# Assemble objective functional and compute gradient
-Jfuncs = cb.__call__()[1]
-J = 0
-for i in range(1, len(Jfuncs)):
-    J += 0.5*(Jfuncs[i-1] + Jfuncs[i])*dt
+# # Assemble objective functional and compute gradient
+# Jfuncs = cb.__call__()[1]
+# J = 0
+# for i in range(1, len(Jfuncs)):
+#     J += 0.5*(Jfuncs[i-1] + Jfuncs[i])*dt
+
+# Define indicator function
+ks = Function(V)
+k0, k1 = ks.split()
+k1.interpolate(Expression('(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' %
+                                      (0., pi / 2, pi / 2, 3 * pi / 2)))
+J = assemble(inner(ks, solver_obj.fields.solution_2d) * dx)
+
 dJdb = compute_gradient(J, Control(b))
 File('plots/pyadjointTest/gradient.pvd').write(dJdb)
-assert(dJdb.dat.norm > 1e-6)   # According to a standalone solver, this norm should be approximately 0.02
+print("Norm of gradient = %e" % dJdb.dat.norm)
+assert(dJdb.dat.norm > 1e-6)   # According to a standalone solver, this norm should be approximately 0.026
 
 
 from fenics_adjoint.solving import SolveBlock   # Need use Sebastian's `linear-solver` branch of pyadjoint
@@ -113,7 +122,7 @@ tape = get_working_tape()
 solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
 adjointFile = File('plots/pyadjointTest/adjoint.pvd')
 for i in range(len(solve_blocks)-1, -1, -1):
-    dual.assign(solve_blocks[i].adj_sol)        # TODO: adj_sols currently have None type
+    dual.assign(solve_blocks[i].adj_sol)
     dual_u, dual_e = dual.split()
     if i % ndump == 0:
         adjointFile.write(dual_u, dual_e, time=dt*i)

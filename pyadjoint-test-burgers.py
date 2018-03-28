@@ -34,15 +34,13 @@ k = indicator(Vs)
 
 t = 0.0
 end = 0.1
-Jtemp = assemble(k*inner(u,u)*dx)
-Jlist = [Jtemp]
+Jlist = [assemble(k*inner(u,u)*dx)]
 while (t <= end):
     solve(F == 0, u_next, bc)
     u.assign(u_next)
     t += float(dt)
 
-    Jtemp = assemble(k*inner(u, u)*dx)
-    Jlist.append(Jtemp)
+    Jlist.append(assemble(k*inner(u,u)*dx))
 
     print("t = ", np.round(t, 3))
     forwardFile.write(u)
@@ -51,9 +49,12 @@ t -= float(dt)
 J = 0
 for i in range(1, len(Jlist)):
     J += 0.5*(Jlist[i-1] + Jlist[i])*float(dt)
+# J = assemble(inner(u,u)*dx)
 
 dual = Function(V, name="Adjoint")
 dJdu, dJdnu = compute_gradient(J, [control, Control(nu)])
+File("plots/pyadjoint_test/gradient.pvd").write(dJdu)
+print("Norm of gradient wrt nu = ", float(dJdnu.dat.norm))
 adjointFile = File("plots/pyadjoint_test/adjoint.pvd")
 
 tape = get_working_tape()
@@ -65,6 +66,3 @@ for i in range(len(solve_blocks)-1, -1, -1):
     adjointFile.write(dual, time=t)
     print("t = ", np.round(t, 3))
     t -= float(dt)
-
-File("plots/pyadjoint_test/gradient.pvd").write(dJdu)
-print("Gradient = ", float(dJdnu.dat.data))
