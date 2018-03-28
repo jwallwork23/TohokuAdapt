@@ -34,7 +34,6 @@ options.timestepper_type = 'CrankNicolson'
 options.timestep = dt
 options.output_directory = 'plots/pyadjointTest/'
 options.export_diagnostics = False
-solver_obj.create_equations()
 solver_obj.assign_initial_conditions(elev=eta0)
 cb = err.ObjectiveSWCallback(solver_obj)        # Extract objective functional at each timestep for use in pyadjoint
 solver_obj.add_callback(cb, 'timestep')

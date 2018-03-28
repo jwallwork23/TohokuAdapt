@@ -2,6 +2,7 @@ from thetis import *
 from thetis.field_defs import field_metadata
 from firedrake_adjoint import *
 from fenics_adjoint.solving import SolveBlock
+from firedrake import Expression
 
 import numpy as np
 from time import clock
@@ -134,9 +135,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             dual_u, dual_e = dual.split()
             dual_u.rename("Adjoint velocity")
             dual_e.rename("Adjoint elevation")
-            k = Function(V_H)
-            k0, k1 = k.split()
-            k1.assign(form.indicator(V_H.sub(1), mode=mode))
         if approach in ('Implicit', 'DWE'):
             e_ = Function(V_oi)
             e = Function(V_oi)
@@ -187,7 +185,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         print('#### gradient = ', gs)
         ls = np.min([H0.dat.data[i] for i in DirichletBC(P1, 0, 'on_boundary').nodes])
         print('#### ls = ', ls)
-        alpha = Constant(gs * ls)           # TODO: how to set wetting-and-drying parameter?
+        alpha = Constant(gs * ls)           # TODO: How to set wetting-and-drying parameter?
         print('#### alpha = ', alpha.dat.data)
         # alpha = Constant(0.5)
         # exit(23)
@@ -216,25 +214,21 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         options.use_wetting_and_drying = op.wd
         if op.wd:
             options.wetting_and_drying_alpha = alpha
+        if mode == 'rossby-wave':
+            solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
+        else:
+            solver_obj.assign_initial_conditions(elev=elev_2d)
         if mode == 'tohoku':
             cb1 = err.TohokuCallback(solver_obj)
             cb2 = err.ObjectiveTohokuCallback(solver_obj)
         elif mode == 'shallow-water':
-            solver_obj.create_equations()
             cb1 = err.ShallowWaterCallback(solver_obj)
             cb2 = err.ObjectiveSWCallback(solver_obj)
-        elif mode == 'rossby-wave':
-            solver_obj.create_equations()
+        else:
             cb1 = err.RossbyWaveCallback(solver_obj)
             cb2 = err.ObjectiveRWCallback(solver_obj)
         solver_obj.add_callback(cb1, 'timestep')
         solver_obj.add_callback(cb2, 'timestep')
-
-        # Apply ICs and time integrate
-        if mode == 'rossby-wave':
-            solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
-        else:
-            solver_obj.assign_initial_conditions(elev=eta0)
         solver_obj.bnd_functions['shallow_water'] = BCs
         if aposteriori and approach != 'DWF':
             if mode == 'tohoku':
@@ -279,7 +273,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 J += 0.5 * (Jfuncs[i - 1] + Jfuncs[i]) * dt
 
             # Compute gradient
-            dJdb = compute_gradient(J, Control(b))
+            dJdb = compute_gradient(J, Control(b))      # TODO: Rewrite pyadjooint coode to avoid computing this
             File(di + 'gradient.pvd').write(dJdb)
             print("Norm of gradient = %e" % dJdb.dat.norm)
 
@@ -288,24 +282,20 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             # tape.visualise()
             solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
             N = len(solve_blocks)
-            for i in range(N-1, -1, -op.rm):
-                try:
-                    dual.assign(solve_blocks[i].adj_sol)
-                    dual_u, dual_e = dual.split()
-                    dual_u.rename('Adjoint velocity')
-                    dual_e.rename('Adjoint elevation')
-                    with DumbCheckpoint(di + 'hdf5/adjoint_' + msc.indexString(i), mode=FILE_CREATE) as saveAdj:
-                        saveAdj.store(dual_u)
-                        saveAdj.store(dual_e)
-                        saveAdj.close()
-                except:
-                    print('Block %d appears to have Nonetype' % (N-i))
-                if i % op.ndump == 0:
-                    if op.plotpvd:
-                        adjointFile.write(dual_u, dual_e, time=dt * i)
-                    if op.printStats:
-                        print('t = %.2fs' % (dt * i))
-                        print('Adjoint simulation %.2f%% complete' % ((N - i) / N * 100))
+            r = N % op.rm   # Number of extra tape annotations in setup
+            for i in range(N-1, r-2, -op.rm):
+                dual.assign(solve_blocks[i].adj_sol)
+                dual_u, dual_e = dual.split()
+                dual_u.rename('Adjoint velocity')
+                dual_e.rename('Adjoint elevation')
+                with DumbCheckpoint(di+'hdf5/adjoint_'+msc.indexString(int((i-r+1)/op.rm)), mode=FILE_CREATE) as saveAdj:
+                    saveAdj.store(dual_u)
+                    saveAdj.store(dual_e)
+                    saveAdj.close()
+                if op.plotpvd:
+                    adjointFile.write(dual_u, dual_e, time=dt * (i-r+1))
+                if op.printStats:
+                    print('Adjoint simulation %.2f%% complete' % ((N - i + r - 1) / N * 100))
             dualTimer = clock() - dualTimer
             msc.dis('Dual run complete. Run time: %.3fs' % dualTimer, op.printStats)
     cnt = 0
@@ -640,7 +630,8 @@ if __name__ == '__main__':
                   % (i, av, J_h, timing, var))
             textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, J_h, timing, var))
     else:
-        for i in range(1, 6):
+        # for i in range(1, 6):
+        for i in range(4, 5):
             if mode == 'rossby-wave':
                 av, relativePeak, distanceTravelled, phaseSpd, timing = \
                     solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
