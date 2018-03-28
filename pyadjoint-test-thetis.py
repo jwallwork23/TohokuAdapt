@@ -47,15 +47,15 @@ class ObjectiveSWCallback(ObjectiveCallback):
             :param solver_obj: FlowSolver2d object.
             :return: objective functional value for callbacks.
             """
-            elev_2d = solver_obj.fields.solution_2d.split()[1]
-            ks = Function(elev_2d.function_space()) # Spatial integral is over [0, pi/2] x [pi/2, 3pi/2]
-            ks.interpolate(Expression('(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' %
+            ks = Function(solver_obj.fields.solution_2d.function_space())
+            k0, k1 = ks.split()                     # Spatial integral is over [0, pi/2] x [pi/2, 3pi/2]
+            k1.interpolate(Expression('(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' %
                                       (0., pi / 2, pi / 2, 3 * pi / 2)))
             kt = Constant(0.)
             if solver_obj.simulation_time > 0.5:    # Time integral is over [0.5, 2.5]
                 kt.assign(1. if solver_obj.simulation_time > 0.5 + 0.5 * solver_obj.options.timestep else 0.5)
 
-            return assemble(elev_2d * ks * kt * dx)
+            return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
 
         super(ObjectiveSWCallback, self).__init__(objectiveSW, solver_obj, **kwargs)
 
@@ -91,23 +91,22 @@ options.output_directory = 'plots/pyadjointTest/'
 options.export_diagnostics = False
 solver_obj.create_equations()
 solver_obj.assign_initial_conditions(elev=eta0)
-# cb = ObjectiveSWCallback(solver_obj)        # Extract objective functional at each timestep for use in pyadjoint
-# solver_obj.add_callback(cb, 'timestep')
+cb = ObjectiveSWCallback(solver_obj)        # Extract objective functional at each timestep for use in pyadjoint
+solver_obj.add_callback(cb, 'timestep')
 solver_obj.iterate()
 
-# # Assemble objective functional and compute gradient
-# Jfuncs = cb.__call__()[1]
-# J = 0
-# for i in range(1, len(Jfuncs)):
-#     J += 0.5*(Jfuncs[i-1] + Jfuncs[i])*dt
+# Assemble objective functional
+Jfuncs = cb.__call__()[1]
+J = 0
+for i in range(1, len(Jfuncs)):
+    J += 0.5*(Jfuncs[i-1] + Jfuncs[i])*dt
+# ks = Function(V)
+# k0, k1 = ks.split()
+# k1.interpolate(Expression('(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' %
+#                                       (0., pi / 2, pi / 2, 3 * pi / 2)))
+# J = assemble(inner(ks, solver_obj.fields.solution_2d) * dx)
 
-# Define indicator function
-ks = Function(V)
-k0, k1 = ks.split()
-k1.interpolate(Expression('(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' %
-                                      (0., pi / 2, pi / 2, 3 * pi / 2)))
-J = assemble(inner(ks, solver_obj.fields.solution_2d) * dx)
-
+# Compute gradient
 dJdb = compute_gradient(J, Control(b))
 File('plots/pyadjointTest/gradient.pvd').write(dJdb)
 print("Norm of gradient = %e" % dJdb.dat.norm)
@@ -122,8 +121,11 @@ tape = get_working_tape()
 solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
 adjointFile = File('plots/pyadjointTest/adjoint.pvd')
 for i in range(len(solve_blocks)-1, -1, -1):
-    dual.assign(solve_blocks[i].adj_sol)
-    dual_u, dual_e = dual.split()
+    try:
+        dual.assign(solve_blocks[i].adj_sol)
+        dual_u, dual_e = dual.split()
+    except:
+        print('Block appears to have Nonetype',)
     if i % ndump == 0:
         adjointFile.write(dual_u, dual_e, time=dt*i)
         print('t = %.2fs' % (dt*i))
