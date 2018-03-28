@@ -1,6 +1,7 @@
 from thetis import *
 from thetis.field_defs import field_metadata
 from firedrake_adjoint import *
+import pyadjoint
 from fenics_adjoint.solving import SolveBlock
 
 import numpy as np
@@ -70,7 +71,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     T = op.Tend
 
     # Define initial FunctionSpace and variables of problem and apply initial conditions
-    V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
+    V_H = op.mixedSpace(mesh_H)
     q = Function(V_H)
     uv_2d, elev_2d = q.split()  # Needed to load data into
     uv_2d.rename("uv_2d")
@@ -376,151 +377,152 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         msc.dis('Errors estimated. Run time: %.3fs' % errorTimer, op.printStats)
 
     if approach != 'fixedMesh':
-        q = Function(V_H)
-        uv_2d, elev_2d = q.split()
-        elev_2d.interpolate(eta0)
-        if aposteriori:
-            epsilon = Function(P0, name="Error indicator")
-        msc.dis('\nStarting adaptive mesh primal run (forwards in time)', op.printStats)
-        adaptTimer = clock()
-        # while cnt < np.ceil(T / dt):
-        while cnt < int(T / dt):        # It appears this format is better for CFL criterion derived timesteps
-            stepTimer = clock()
-
-            # Load variables from disk
-            if cnt != 0:
-                V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
-                q = Function(V_H)
-                uv_2d, elev_2d = q.split()
-                with DumbCheckpoint(di+'hdf5/Elevation2d_'+msc.indexString(int(cnt/op.ndump)), mode=FILE_READ) \
-                        as loadElev:
-                    loadElev.load(elev_2d, name='elev_2d')
-                    loadElev.close()
-                with DumbCheckpoint(di+'hdf5/Velocity2d_'+msc.indexString(int(cnt/op.ndump)), mode=FILE_READ) \
-                        as loadVel:
-                    loadVel.load(uv_2d, name='uv_2d')
-                    loadVel.close()
-
-            # Construct metric
+        with pyadjoint.stop_annotating():
+            q = Function(V_H)
+            uv_2d, elev_2d = q.split()
+            elev_2d.interpolate(eta0)
             if aposteriori:
-                with DumbCheckpoint(di+'hdf5/'+approach+'Error'+msc.indexString(int(cnt/op.rm)), mode=FILE_READ) \
-                        as loadErr:
-                    loadErr.load(epsilon)
-                    loadErr.close()
-                errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon)[0])
-                M = adap.isotropicMetric(errEst, op=op, invert=False, nVerT=nVerT)
-            else:
-                if approach == 'norm':
-                    v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
-                    epsilon = assemble(v * inner(q, q) * dx)
-                    M = adap.isotropicMetric(epsilon, invert=False, nVerT=nVerT, op=op)
-                elif approach =='fluxJump' and cnt != 0:
-                    v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
-                    epsilon = err.fluxJumpError(q, v)
-                    M = adap.isotropicMetric(epsilon, invert=False, nVerT=nVerT, op=op)
-                else:
-                    if op.mtype != 's':
-                        if approach == 'fieldBased':
-                            M = adap.isotropicMetric(elev_2d, invert=False, nVerT=nVerT, op=op)
-                        elif approach == 'gradientBased':
-                            g = adap.constructGradient(elev_2d)
-                            M = adap.isotropicMetric(g, invert=False, nVerT=nVerT, op=op)
-                        elif approach == 'hessianBased':
-                            M = adap.computeSteadyMetric(elev_2d, nVerT=nVerT, op=op)
-                    if cnt != 0:    # Can't adapt to zero velocity
-                        if op.mtype != 'f':
-                            spd = Function(FunctionSpace(mesh_H, "DG", 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
-                            if approach == 'fieldBased':
-                                M2 = adap.isotropicMetric(spd, invert=False, nVerT=nVerT, op=op)
-                            elif approach == 'gradientBased':
-                                g = adap.constructGradient(spd)
-                                M2 = adap.isotropicMetric(g, invert=False, nVerT=nVerT, op=op)
-                            elif approach == 'hessianBased':
-                                M2 = adap.computeSteadyMetric(spd, nVerT=nVerT, op=op)
-                            M = adap.metricIntersection(M, M2) if op.mtype == 'b' else M2
-            if op.gradate:
-                M_ = adap.isotropicMetric(inte.interp(mesh_H, H0)[0], bdy=True, op=op)  # Initial boundary metric
-                M = adap.metricIntersection(M, M_, bdy=True)
-                adap.metricGradation(M, op=op)
-            if op.plotpvd:
-                File('plots/'+mode+'/mesh.pvd').write(mesh_H.coordinates, time=float(cnt))
+                epsilon = Function(P0, name="Error indicator")
+            msc.dis('\nStarting adaptive mesh primal run (forwards in time)', op.printStats)
+            adaptTimer = clock()
+            # while cnt < np.ceil(T / dt):
+            while cnt < int(T / dt):        # It appears this format is better for CFL criterion derived timesteps
+                stepTimer = clock()
 
-            # Adapt mesh and interpolate variables
-            if not (((approach in ('fieldBased', 'gradientBased', 'hessianBased') and op.mtype != 'f')
-                     or approach == 'fluxJump') and cnt == 0):
-                mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
-                P1 = FunctionSpace(mesh_H, "CG", 1)
-                elev_2d, uv_2d = inte.interp(mesh_H, elev_2d, uv_2d)
-                if mode == 'tohoku':
-                    b = inte.interp(mesh_H, b)[0]
-                elif mode == 'shallow-water':
-                    b = Function(P1).assign(0.1)
-                else:
-                    b = Function(P1).assign(1.)
-                uv_2d.rename('uv_2d')
-                elev_2d.rename('elev_2d')
-
-            # Solver object and equations
-            adapSolver = solver2d.FlowSolver2d(mesh_H, b)
-            adapOpt = adapSolver.options
-            adapOpt.element_family = op.family
-            adapOpt.use_nonlinear_equations = True if op.nonlinear else False
-            adapOpt.use_grad_depth_viscosity_term = False
-            adapOpt.use_grad_div_viscosity_term = False
-            adapOpt.simulation_export_time = dt * op.ndump
-            startT = endT
-            endT += dt * op.rm
-            adapOpt.simulation_end_time = endT
-            adapOpt.timestepper_type = op.timestepper
-            adapOpt.timestep = dt
-            adapOpt.output_directory = di
-            adapOpt.log_output = op.printStats
-            adapOpt.export_diagnostics = True
-            adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-            adapOpt.use_wetting_and_drying = op.wd
-            if op.wd:
-                adapOpt.wetting_and_drying_alpha = alpha
-            if mode == 'rossby-wave':
-                adapOpt.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh_H)[1])
-            field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
-            e = exporter.ExportManager(di + 'hdf5',
-                                       ['elev_2d', 'uv_2d'],
-                                       field_dict,
-                                       field_metadata,
-                                       export_type='hdf5')
-            adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
-            adapSolver.i_export = int(cnt / op.ndump)
-            adapSolver.iteration = cnt
-            adapSolver.simulation_time = startT
-            adapSolver.next_export_t = startT + adapOpt.simulation_export_time  # For next export
-            for e in adapSolver.exporters.values():
-                e.set_next_export_ix(adapSolver.i_export)
-
-            # Evaluate callbacks and iterate
-            if op.outputOF:
-                if mode == 'tohoku':
-                    cb1 = err.TohokuCallback(adapSolver)
-                elif mode == 'shallow-water':
-                    cb1 = err.ShallowWaterCallback(adapSolver)
-                elif mode == 'rossby-wave':
-                    cb1 = err.RossbyWaveCallback(adapSolver)
+                # Load variables from disk
                 if cnt != 0:
-                    cb1.objective_functional = J_h
-                adapSolver.add_callback(cb1, 'timestep')
-            solver_obj.bnd_functions['shallow_water'] = BCs
-            adapSolver.iterate()
-            if op.outputOF:
-                J_h = cb1.__call__()[1]  # Evaluate objective functional
+                    V_H = op.mixedSpace(mesh_H)
+                    q = Function(V_H)
+                    uv_2d, elev_2d = q.split()
+                    with DumbCheckpoint(di+'hdf5/Elevation2d_'+msc.indexString(int(cnt/op.ndump)), mode=FILE_READ) \
+                            as loadElev:
+                        loadElev.load(elev_2d, name='elev_2d')
+                        loadElev.close()
+                    with DumbCheckpoint(di+'hdf5/Velocity2d_'+msc.indexString(int(cnt/op.ndump)), mode=FILE_READ) \
+                            as loadVel:
+                        loadVel.load(uv_2d, name='uv_2d')
+                        loadVel.close()
 
-            # Get mesh stats
-            nEle = msh.meshStats(mesh_H)[0]
-            mM = [min(nEle, mM[0]), max(nEle, mM[1])]
-            Sn += nEle
-            cnt += op.rm
-            av = op.printToScreen(int(cnt/op.rm+1), clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, cnt*dt, dt)
+                # Construct metric
+                if aposteriori:
+                    with DumbCheckpoint(di+'hdf5/'+approach+'Error'+msc.indexString(int(cnt/op.rm)), mode=FILE_READ) \
+                            as loadErr:
+                        loadErr.load(epsilon)
+                        loadErr.close()
+                    errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon)[0])
+                    M = adap.isotropicMetric(errEst, op=op, invert=False, nVerT=nVerT)
+                else:
+                    if approach == 'norm':
+                        v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
+                        epsilon = assemble(v * inner(q, q) * dx)
+                        M = adap.isotropicMetric(epsilon, invert=False, nVerT=nVerT, op=op)
+                    elif approach =='fluxJump' and cnt != 0:
+                        v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
+                        epsilon = err.fluxJumpError(q, v)
+                        M = adap.isotropicMetric(epsilon, invert=False, nVerT=nVerT, op=op)
+                    else:
+                        if op.mtype != 's':
+                            if approach == 'fieldBased':
+                                M = adap.isotropicMetric(elev_2d, invert=False, nVerT=nVerT, op=op)
+                            elif approach == 'gradientBased':
+                                g = adap.constructGradient(elev_2d)
+                                M = adap.isotropicMetric(g, invert=False, nVerT=nVerT, op=op)
+                            elif approach == 'hessianBased':
+                                M = adap.computeSteadyMetric(elev_2d, nVerT=nVerT, op=op)
+                        if cnt != 0:    # Can't adapt to zero velocity
+                            if op.mtype != 'f':
+                                spd = Function(FunctionSpace(mesh_H, "DG", 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
+                                if approach == 'fieldBased':
+                                    M2 = adap.isotropicMetric(spd, invert=False, nVerT=nVerT, op=op)
+                                elif approach == 'gradientBased':
+                                    g = adap.constructGradient(spd)
+                                    M2 = adap.isotropicMetric(g, invert=False, nVerT=nVerT, op=op)
+                                elif approach == 'hessianBased':
+                                    M2 = adap.computeSteadyMetric(spd, nVerT=nVerT, op=op)
+                                M = adap.metricIntersection(M, M2) if op.mtype == 'b' else M2
+                if op.gradate:
+                    M_ = adap.isotropicMetric(inte.interp(mesh_H, H0)[0], bdy=True, op=op)  # Initial boundary metric
+                    M = adap.metricIntersection(M, M_, bdy=True)
+                    adap.metricGradation(M, op=op)
+                if op.plotpvd:
+                    File('plots/'+mode+'/mesh.pvd').write(mesh_H.coordinates, time=float(cnt))
 
-        adaptTimer = clock() - adaptTimer
-        msc.dis('Adaptive primal run complete. Run time: %.3fs' % adaptTimer, op.printStats)
+                # Adapt mesh and interpolate variables
+                if not (((approach in ('fieldBased', 'gradientBased', 'hessianBased') and op.mtype != 'f')
+                         or approach == 'fluxJump') and cnt == 0):
+                    mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
+                    P1 = FunctionSpace(mesh_H, "CG", 1)
+                    elev_2d, uv_2d = inte.interp(mesh_H, elev_2d, uv_2d)
+                    if mode == 'tohoku':
+                        b = inte.interp(mesh_H, b)[0]
+                    elif mode == 'shallow-water':
+                        b = Function(P1).assign(0.1)
+                    else:
+                        b = Function(P1).assign(1.)
+                    uv_2d.rename('uv_2d')
+                    elev_2d.rename('elev_2d')
+
+                # Solver object and equations
+                adapSolver = solver2d.FlowSolver2d(mesh_H, b)
+                adapOpt = adapSolver.options
+                adapOpt.element_family = op.family
+                adapOpt.use_nonlinear_equations = True if op.nonlinear else False
+                adapOpt.use_grad_depth_viscosity_term = False
+                adapOpt.use_grad_div_viscosity_term = False
+                adapOpt.simulation_export_time = dt * op.ndump
+                startT = endT
+                endT += dt * op.rm
+                adapOpt.simulation_end_time = endT
+                adapOpt.timestepper_type = op.timestepper
+                adapOpt.timestep = dt
+                adapOpt.output_directory = di
+                adapOpt.log_output = op.printStats
+                adapOpt.export_diagnostics = True
+                adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+                adapOpt.use_wetting_and_drying = op.wd
+                if op.wd:
+                    adapOpt.wetting_and_drying_alpha = alpha
+                if mode == 'rossby-wave':
+                    adapOpt.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh_H)[1])
+                field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
+                e = exporter.ExportManager(di + 'hdf5',
+                                           ['elev_2d', 'uv_2d'],
+                                           field_dict,
+                                           field_metadata,
+                                           export_type='hdf5')
+                adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
+                adapSolver.i_export = int(cnt / op.ndump)
+                adapSolver.iteration = cnt
+                adapSolver.simulation_time = startT
+                adapSolver.next_export_t = startT + adapOpt.simulation_export_time  # For next export
+                for e in adapSolver.exporters.values():
+                    e.set_next_export_ix(adapSolver.i_export)
+
+                # Evaluate callbacks and iterate
+                if op.outputOF:
+                    if mode == 'tohoku':
+                        cb1 = err.TohokuCallback(adapSolver)
+                    elif mode == 'shallow-water':
+                        cb1 = err.ShallowWaterCallback(adapSolver)
+                    elif mode == 'rossby-wave':
+                        cb1 = err.RossbyWaveCallback(adapSolver)
+                    if cnt != 0:
+                        cb1.objective_functional = J_h
+                    adapSolver.add_callback(cb1, 'timestep')
+                solver_obj.bnd_functions['shallow_water'] = BCs
+                adapSolver.iterate()
+                if op.outputOF:
+                    J_h = cb1.__call__()[1]  # Evaluate objective functional
+
+                # Get mesh stats
+                nEle = msh.meshStats(mesh_H)[0]
+                mM = [min(nEle, mM[0]), max(nEle, mM[1])]
+                Sn += nEle
+                cnt += op.rm
+                av = op.printToScreen(int(cnt/op.rm+1), clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, cnt*dt, dt)
+
+            adaptTimer = clock() - adaptTimer
+            msc.dis('Adaptive primal run complete. Run time: %.3fs' % adaptTimer, op.printStats)
     else:
         av = nEle
     if op.printStats:

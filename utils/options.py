@@ -249,6 +249,9 @@ class Options:
             if input('Hit enter if happy to proceed.'):
                 exit(23)
 
+    def mixedSpace(self, mesh):
+        return VectorFunctionSpace(mesh, self.space1, self.degree1) * FunctionSpace(mesh, self.space2, self.degree2)
+
     def printToScreen(self, mn, outerTime, innerTime, nEle, Sn, mM, t, dt):
         """
         :arg mn: mesh number.
