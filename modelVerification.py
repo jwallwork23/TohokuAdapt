@@ -17,7 +17,7 @@ def solverSW(startRes, op=opt.Options()):
     di = "plots/modelVerification/"
 
     # Establish Mesh, initial FunctionSpace and variables of problem and apply initial conditions
-    mesh_H, eta0, b = msh.TohokuDomain(startRes, wd=op.wd)
+    mesh_H, eta0, b = msh.TohokuDomain(startRes, wd=op.wd)[:3]
     V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
     q = Function(V_H)
     uv_2d, elev_2d = q.split()

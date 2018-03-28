@@ -185,7 +185,7 @@ def TohokuDomain(level=0, mesh=None, output=False, wd=False):
 
     # Post-process the bathymetry to have a minimum depth of 30m and if no wetting-and-drying
     if not wd:
-        b.assign(conditional(lt(30, b), b, 30))
+        b.assign(conditional(lt(30, b), b, 30), annotate=False)
     if output:
         File('plots/initialisation/surf.pvd').write(eta0)
         File('plots/initialisation/bathymetry.pvd').write(b)

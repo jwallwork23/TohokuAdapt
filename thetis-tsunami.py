@@ -73,8 +73,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
     q = Function(V_H)
     uv_2d, elev_2d = q.split()  # Needed to load data into
-    uv_2d.rename("Velocity2d")
-    elev_2d.rename("Elevation2d")
+    uv_2d.rename("uv_2d")
+    elev_2d.rename("elev_2d")
     P1 = FunctionSpace(mesh_H, "CG", 1)
     if approach in ('residual', 'implicit', 'DWR', 'DWE', 'explicit'):
         q_ = Function(V_H)
