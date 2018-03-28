@@ -258,7 +258,7 @@ class ObjectiveTohokuCallback(ObjectiveCallback):
             V = solver_obj.fields.solution_2d.function_space()
             ks = Function(V)
             k0, k1 = ks.split()
-            k1.assign(forms.indicator(V, mode='tohoku'))
+            k1.assign(forms.indicator(V.sub(1), mode='tohoku'))
             kt = Constant(0.)
             if solver_obj.simulation_time > 300.:    # TODO: make more general
                 kt.assign(1. if solver_obj.simulation_time > 300. + 0.5 * solver_obj.options.timestep else 0.5)

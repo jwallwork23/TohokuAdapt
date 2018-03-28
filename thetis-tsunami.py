@@ -600,7 +600,7 @@ if __name__ == '__main__':
             textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, J_h, timing, var))
     else:
         # for i in range(1, 6):
-        for i in range(4, 5):
+        for i in range(1):
             if mode == 'rossby-wave':
                 av, relativePeak, distanceTravelled, phaseSpd, timing = \
                     solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)

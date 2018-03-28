@@ -37,3 +37,8 @@ quickPlot.py
 # Testing
 wdTest.py
 heat_eqn.py
+pyadjoint-test-firedrake.py
+pyadjoint-test-burgers.py
+pyadjoint-test-thetis.py
+rossby-test-thetis.py
+rossby-test-firedrake.py
