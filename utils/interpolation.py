@@ -3,6 +3,9 @@ from firedrake import *
 from . import conversion
 
 
+__all__ = ["interp", "mixedPairInterp"]
+
+
 def interp(mesh, *fields):
     """
     Transfer solution fields from the old mesh to the new mesh. Based around the function ``transfer_solution`` by

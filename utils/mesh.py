@@ -1,6 +1,9 @@
 import numpy as np
 
 
+__all__ = ["MeshSetup", "TohokuDomain", "domainSW", "domainRW", "meshStats"]
+
+
 class MeshSetup:
     def __init__(self, level, wd=False):
 

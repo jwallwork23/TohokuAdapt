@@ -565,7 +565,8 @@ if __name__ == '__main__':
     # Choose mode and set parameter values
     approach, getData, getError, useAdjoint, aposteriori = msc.cheatCodes(args.approach)
     op = opt.Options(mode=mode,
-                     vscale=0.1 if approach in ('DWR', 'gradientBased') else 0.85,
+                     # vscale=0.1 if approach in ('DWR', 'gradientBased') else 0.85,
+                     vscale=0.85,
                      family='dg-dg',
                      rm=60 if useAdjoint else 30,
                      gradate=True if aposteriori else False,

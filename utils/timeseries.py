@@ -1,5 +1,4 @@
 from firedrake import *
-from firedrake.petsc import PETSc
 
 import numpy as np
 import scipy.interpolate as si
@@ -9,16 +8,8 @@ from . import misc
 from . import options as opt
 
 
-def loadMesh(filename):
-    """
-    :arg filename: mesh filename to load from, including directory location.
-    :return: Mesh, as loaded from HDF5.
-    """
-    filename += '.h5'
-    # print("### loadMesh DEBUG: attempting to load " + filename)
-    plex = PETSc.DMPlex().create()
-    plex.createFromFile(filename)
-    return Mesh(plex)
+__all__ = ["gaugeTimeseries", "extractTimeseries", "saveTimeseries", "plotGauges", "readErrors", "extractSpline",
+           "errorVsElements"]
 
 
 def gaugeTimeseries(gauge, dirName, iEnd, op=opt.Options(), output=False, name='test', adaptive=True):

@@ -2,45 +2,15 @@ from firedrake import *
 
 import numpy as np
 
-import utils.options as opt
+from . import options
+from . import timestepping
 
 
-def timestepCoeffs(timestepper):
-    """
-    :arg timestepper: scheme of choice.
-    :return: coefficients for use in scheme.
-    """
-    if timestepper == 'ExplicitEuler':
-        a1 = Constant(0.)
-        a2 = Constant(1.)
-    elif timestepper == 'ImplicitEuler':
-        a1 = Constant(1.)
-        a2 = Constant(0.)
-    elif timestepper == 'CrankNicolson':
-        a1 = Constant(0.5)
-        a2 = Constant(0.5)
-    else:
-        raise NotImplementedError("Timestepping scheme %s not yet considered." % timestepper)
-
-    return a1, a2
+__all__ = ["strongResidualSW", "formsSW", "adjointSW", "weakResidualSW", "interelementTerm", "solutionHuang",
+           "strongResidualAD", "weakResidualAD", "weakMetricAdvection", "indicator"]
 
 
-# TODO: make this format more conventional and move into utils/timestepping
-
-
-def timestepScheme(u, u_, timestepper):
-    """
-    :arg u: prognostic variable at current timestep. 
-    :arg u_: prognostic variable at previous timestep. 
-    :arg timestepper: scheme of choice.
-    :return: expression for prognostic variable to be used in scheme.
-    """
-    a1, a2 = timestepCoeffs(timestepper)
-
-    return a1 * u + a2 * u_
-
-
-def strongResidualSW(q, q_, b, Dt, coriolisFreq=None, nonlinear=False, op=opt.Options()):
+def strongResidualSW(q, q_, b, Dt, coriolisFreq=None, nonlinear=False, op=options.Options()):
     """
     Construct the strong residual for the semi-discrete linear shallow water equations at the current timestep.
 
@@ -55,8 +25,8 @@ def strongResidualSW(q, q_, b, Dt, coriolisFreq=None, nonlinear=False, op=opt.Op
     """
     (u, eta) = (as_vector((q[0], q[1])), q[2])
     (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
-    um = timestepScheme(u, u_, op.timestepper)
-    em = timestepScheme(eta, eta_, op.timestepper)
+    um = timestepping.timestepScheme(u, u_, op.timestepper)
+    em = timestepping.timestepScheme(eta, eta_, op.timestepper)
 
     Au = (u - u_) / Dt + op.g * grad(em)
     Ae = (eta - eta_) / Dt + div(b * um)
@@ -69,7 +39,7 @@ def strongResidualSW(q, q_, b, Dt, coriolisFreq=None, nonlinear=False, op=opt.Op
     return Au, Ae
 
 
-def formsSW(q, q_, b, Dt, coriolisFreq=None, nonlinear=False, impermeable=True, op=opt.Options()):
+def formsSW(q, q_, b, Dt, coriolisFreq=None, nonlinear=False, impermeable=True, op=options.Options()):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
 
@@ -88,7 +58,7 @@ def formsSW(q, q_, b, Dt, coriolisFreq=None, nonlinear=False, impermeable=True, 
     (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
     qt = TestFunction(V)
     (w, xi) = (as_vector((qt[0], qt[1])), qt[2])
-    a1, a2 = timestepCoeffs(op.timestepper)
+    a1, a2 = timestepping.timestepCoeffs(op.timestepper)
     g = op.g
 
     B = (inner(q, qt)) / Dt * dx + a1 * g * inner(grad(eta), w) * dx        # LHS bilinear form
@@ -111,7 +81,7 @@ def formsSW(q, q_, b, Dt, coriolisFreq=None, nonlinear=False, impermeable=True, 
     return B, L
 
 
-def adjointSW(l, l_, b, Dt, mode='shallow-water', switch=Constant(1.), op=opt.Options()):
+def adjointSW(l, l_, b, Dt, mode='shallow-water', switch=Constant(1.), op=options.Options()):
     """
     Semi-discrete (time-discretised) weak form adjoint shallow water equations with no normal flow boundary conditions.
 
@@ -126,7 +96,7 @@ def adjointSW(l, l_, b, Dt, mode='shallow-water', switch=Constant(1.), op=opt.Op
     (lu_, le_) = (as_vector((l_[0], l_[1])), l_[2])
     lt = TestFunction(l.function_space())
     (w, xi) = (as_vector((lt[0], lt[1])), lt[2])
-    a1, a2 = timestepCoeffs(op.timestepper)
+    a1, a2 = timestepping.timestepCoeffs(op.timestepper)
     iA = indicator(l.function_space().sub(1), mode=mode)
 
     B = ((inner(lu, w) + le * xi) / Dt + a1 * b * inner(grad(le), w) - a1 * op.g * inner(lu, grad(xi))) * dx
@@ -139,7 +109,7 @@ def adjointSW(l, l_, b, Dt, mode='shallow-water', switch=Constant(1.), op=opt.Op
 
 
 def weakResidualSW(q, q_, b, Dt, coriolisFreq=None, nonlinear=False, impermeable=True, adjoint=False,
-                   mode='shallow-water', switch=Constant(0.), op=opt.Options()):
+                   mode='shallow-water', switch=Constant(0.), op=options.Options()):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
 
@@ -220,7 +190,7 @@ def strongResidualAD(c, c_, w, Dt, nu=1e-3, timestepper='CrankNicolson'):
     :param timestepper: time integration scheme used.
     :return: weak residual for advection diffusion equation at current timestep.
     """
-    cm = timestepScheme(c, c_, timestepper)
+    cm = timestepping.timestepScheme(c, c_, timestepper)
     return (c - c_) / Dt + inner(w, grad(cm)) - Constant(nu) * div(grad(cm))
 
 
@@ -235,7 +205,7 @@ def weakResidualAD(c, c_, w, Dt, nu=1e-3, adjoint=False, timestepper='CrankNicol
     :param timestepper: time integration scheme used.
     :return: weak residual for advection diffusion equation at current timestep.
     """
-    cm = timestepScheme(c, c_, timestepper)
+    cm = timestepping.timestepScheme(c, c_, timestepper)
     ct = TestFunction(c.function_space())
     F = ((c - c_) * ct / Dt + inner(grad(cm), w * ct)) * dx
     if nu != 0.:
@@ -257,7 +227,7 @@ def weakMetricAdvection(M, M_, w, Dt, timestepper='ImplicitEuler'):
     :return: weak residual for metric advection.
     """
     Mt = TestFunction(M.function_space())
-    Mm = timestepScheme(M, M_, timestepper)
+    Mm = timestepping.timestepScheme(M, M_, timestepper)
     F = (inner(M - M_, Mt) / Dt + inner(dot(w, nabla_grad(Mm)), Mt)) * dx
     return F
 

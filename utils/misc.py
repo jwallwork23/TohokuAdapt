@@ -1,3 +1,6 @@
+__all__ = ["indexString", "cheatCodes", "printTimings", "dis", "getMax"]
+
+
 def indexString(index):
     """
     :arg index: integer form of index.

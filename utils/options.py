@@ -3,7 +3,10 @@ from firedrake import *
 import numpy as np
 
 from . import conversion
-from . import misc
+
+
+__all__ = ["Options"]
+
 
 class Options:
     def __init__(self,
@@ -15,7 +18,7 @@ class Options:
                  a=100,
                  ntype='lp',
                  p=2,
-                 mtype='s',         # Best approach for tsunami modelling
+                 mtype='s',                 # Best approach for tsunami modelling
                  iso=False,
                  advect=False,
                  gradate=False,

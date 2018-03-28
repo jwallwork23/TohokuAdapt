@@ -1,6 +1,41 @@
 from firedrake import *
 
 
+__all__ = ["timestepCoeffs", "timestepScheme", "setupSSPRK", "incrementSSPRK"]
+
+
+def timestepCoeffs(timestepper):    # TODO: make this format more conventional
+    """
+    :arg timestepper: scheme of choice.
+    :return: coefficients for use in scheme.
+    """
+    if timestepper == 'ExplicitEuler':
+        a1 = Constant(0.)
+        a2 = Constant(1.)
+    elif timestepper == 'ImplicitEuler':
+        a1 = Constant(1.)
+        a2 = Constant(0.)
+    elif timestepper == 'CrankNicolson':
+        a1 = Constant(0.5)
+        a2 = Constant(0.5)
+    else:
+        raise NotImplementedError("Timestepping scheme %s not yet considered." % timestepper)
+
+    return a1, a2
+
+
+def timestepScheme(u, u_, timestepper):
+    """
+    :arg u: prognostic variable at current timestep. 
+    :arg u_: prognostic variable at previous timestep. 
+    :arg timestepper: scheme of choice.
+    :return: expression for prognostic variable to be used in scheme.
+    """
+    a1, a2 = timestepCoeffs(timestepper)
+
+    return a1 * u + a2 * u_
+
+
 def setupSSPRK(B, L1, q):
     """
     Three-stage Strong-Stablility-Preserving Runge-Kutta timestepping, using code documented in 
