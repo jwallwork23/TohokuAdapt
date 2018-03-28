@@ -46,12 +46,11 @@ def solverSW(startRes, op=opt.Options()):
     options.use_grad_depth_viscosity_term = False
     options.use_grad_div_viscosity_term = False
     options.coriolis_frequency = f
-    options.simulation_export_time = dt * op.ndump
+    options.simulation_export_time = 100.
     options.simulation_end_time = op.Tend
     options.timestepper_type = op.timestepper
     options.timestep = dt
-    options.output_directory = di
-    options.export_diagnostics = False
+    options.no_exports = True
     # options.use_wetting_and_drying = op.wd        # TODO: Consider w&d
     # if op.wd:
     #     options.wetting_and_drying_alpha = alpha
