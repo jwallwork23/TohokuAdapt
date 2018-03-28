@@ -126,16 +126,18 @@ if __name__ == '__main__':
         ms.convertMesh()
 else:
     from firedrake import *
-    from firedrake.petsc import PETSc
 
     import scipy.interpolate as si
     from scipy.io.netcdf import NetCDFFile
     from . import conversion
+    from . import forms
+    from . import options
 
 
 def TohokuDomain(level=0, mesh=None, output=False, wd=False):
     """
-    Load the mesh, initial condition and bathymetry profile for the 2D ocean domain of the Tohoku tsunami problem.
+    Load the mesh, initial condition, bathymetry profile and boudnary conditions for the 2D ocean domain of the Tohoku 
+    tsunami problem.
     
     :arg level: refinement level, where 0 is coarsest.
     :param mesh: user specified mesh, if already generated.
@@ -185,7 +187,47 @@ def TohokuDomain(level=0, mesh=None, output=False, wd=False):
         File('plots/initialisation/surf.pvd').write(eta0)
         File('plots/initialisation/bathymetry.pvd').write(b)
 
-    return mesh, eta0, b
+    return mesh, eta0, b, {}
+
+
+def domainSW(level=4):
+    """
+    Load the mesh, initial condition, bathymetry profile and boundary conditions for the shallow water test problem.
+
+    :arg level: refinement level, where 0 is coarsest. 
+    """
+    n = pow(2, level)
+    lx = 2*pi
+    mesh = SquareMesh(n, n, lx, lx)
+    P1 = FunctionSpace(mesh, "CG", 1)
+    x, y = SpatialCoordinate(mesh)
+    eta0 = Function(P1).interpolate(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))))
+    b = Function(P1).assign(0.1)
+    return mesh, eta0, b, {}
+
+
+def domainRW(level=1, op=options.Options()):
+    """
+    Load the mesh, initial condition, bathymetry profile and boundary conditions for the equatorial Rossby wave test 
+    problem.
+
+    :arg level: refinement level, where 1 is coarsest.
+    :param op: options class object containing parameters.
+    """
+    lx = 48
+    ly = 24
+    mesh = RectangleMesh(3 * lx * level, ly * level, 3 * lx, ly)
+    xy = Function(mesh.coordinates)
+    xy.dat.data[:, :] -= [3 * lx / 2, ly / 2]
+    mesh.coordinates.assign(xy)
+    P1 = FunctionSpace(mesh, "CG", 1)
+    b = Function(P1).assign(1.)
+    q = forms.solutionHuang(
+        VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2), t=0.)
+    u0, eta0 = q.split()
+    BCs = {1: {'uv': Constant(0.)}, 2: {'uv': Constant(0.)}, 3: {'uv': Constant(0.)}, 4: {'uv': Constant(0.)}}
+    f = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
+    return mesh, u0, eta0, b, BCs, f
 
 
 def meshStats(mesh):
@@ -197,22 +239,3 @@ def meshStats(mesh):
     cStart, cEnd = plex.getHeightStratum(0)
     vStart, vEnd = plex.getDepthStratum(0)
     return cEnd - cStart, vEnd - vStart
-
-
-def saveMesh(mesh, filename):
-    """
-    :arg mesh: Mesh to be saved to HDF5.
-    :arg filename: filename to be given, including directory location.
-    """
-    viewer = PETSc.Viewer().createHDF5(filename + '.h5', 'w')
-    viewer(mesh._plex)
-
-
-# def loadMesh(filename):
-#     """
-#     :arg filename: mesh filename to load from, including directory location.
-#     :return: Mesh, as loaded from HDF5.
-#     """
-#     plex = PETSc.DMPlex().create()
-#     plex.createFromFile(filename + '.h5')
-#     return Mesh(plex)

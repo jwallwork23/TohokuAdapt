@@ -19,6 +19,7 @@ import utils.options as opt
 now = datetime.datetime.now()
 date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
+
 def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mode='tohoku', op=opt.Options()):
     """
     Run mesh adaptive simulations for the Tohoku problem.
@@ -62,41 +63,15 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     # Load Mesh, initial condition and bathymetry
     if mode == 'tohoku':
-        mesh_H, eta0, b = msh.TohokuDomain(startRes, wd=op.wd)
-        P1 = FunctionSpace(mesh_H, "CG", 1)
+        mesh_H, eta0, b, BCs = msh.TohokuDomain(startRes, wd=op.wd)
     elif mode == 'shallow-water':
-        lx = 2 * np.pi
-        n = pow(2, startRes)
-        mesh_H = SquareMesh(n, n, lx, lx)
-        x, y = SpatialCoordinate(mesh_H)
-        P1 = FunctionSpace(mesh_H, "CG", 1)
-        eta0 = Function(P1).interpolate(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))))
-        b = Function(P1).assign(0.1)
+        mesh_H, eta0, b, BCs = msh.domainSW(startRes)
     elif mode == 'rossby-wave':
-        lx = 48
-        ly = 24
-        mesh_H = RectangleMesh(3 * lx * startRes, ly * startRes, 3 * lx, ly)
-        xy = Function(mesh_H.coordinates)
-        xy.dat.data[:, :] -= [3 * lx / 2, ly / 2]
-        mesh_H.coordinates.assign(xy)
-        P1 = FunctionSpace(mesh_H, "CG", 1)
-        b = Function(P1).assign(1.)
+        mesh_H, u0, eta0, b, BCs, f = msh.domainRW(startRes, op=op)
     T = op.Tend
 
     # Define initial FunctionSpace and variables of problem and apply initial conditions
     V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
-    if mode == 'rossby-wave':
-        q = form.solutionHuang(V_H, t=0.)
-        uv_2d, elev_2d = q.split()
-        BCs = {1: {'uv': Constant(0.)}, 2: {'uv': Constant(0.)}, 3: {'uv': Constant(0.)}, 4: {'uv': Constant(0.)}}
-        f = Function(P1).interpolate(SpatialCoordinate(mesh_H)[1])
-    else:
-        q = Function(V_H)
-        uv_2d, elev_2d = q.split()
-        elev_2d.interpolate(eta0)
-        BCs = {}
-    uv_2d.rename("uv_2d")       # TODO: this should be 'Velocity2d'
-    elev_2d.rename("elev_2d")
     if approach in ('residual', 'implicit', 'DWR', 'DWE', 'explicit'):
         q_ = Function(V_H)
         uv_2d_, elev_2d_ = q_.split()
@@ -215,9 +190,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         if op.wd:
             options.wetting_and_drying_alpha = alpha
         if mode == 'rossby-wave':
-            solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
+            solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         else:
-            solver_obj.assign_initial_conditions(elev=elev_2d)
+            solver_obj.assign_initial_conditions(elev=eta0)
         if mode == 'tohoku':
             cb1 = err.TohokuCallback(solver_obj)
             cb2 = err.ObjectiveTohokuCallback(solver_obj)
