@@ -32,9 +32,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     :param op: parameter values.
     :return: mean element count and relative error in objective functional value.
     """
-    if useAdjoint:
-        dt_meas = dt
-
     if mode == 'tohoku':
         msc.dis('*********************** TOHOKU TSUNAMI SIMULATION *********************\n', op.printStats)
         g = 9.81
@@ -60,6 +57,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         residualFile = File(di + "residual.pvd")
         implicitErrorFile = File(di + "implicitError.pvd")
         errorFile = File(di + "errorIndicator.pvd")
+        adjointFile = File(di + "adjoint.pvd")
 
     # Load Mesh, initial condition and bathymetry
     if mode == 'tohoku':
@@ -139,8 +137,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             k = Function(V_H)
             k0, k1 = k.split()
             k1.assign(form.indicator(V_H.sub(1), mode=mode))
-            J = Functional(inner(q_, k) * dx * dt_meas)   # TODO: this no longer exists in pyadjoint
-
+        if approach in ('Implicit', 'DWE'):
             e_ = Function(V_oi)
             e = Function(V_oi)
             e0, e1 = e.split()
@@ -214,25 +211,24 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         options.timestep = dt
         options.output_directory = di
         options.export_diagnostics = True
+        options.log_output = op.printStats
         options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
         options.use_wetting_and_drying = op.wd
         if op.wd:
             options.wetting_and_drying_alpha = alpha
-
-        # Output error data
-        if approach == 'fixedMesh' and op.outputOF:
-            if mode == 'tohoku':
-                cb = err.TohokuCallback(solver_obj)
-            elif mode == 'shallow-water':
-                solver_obj.create_equations()
-                cb = err.ShallowWaterCallback(solver_obj)
-            elif mode == 'rossby-wave':
-                solver_obj.create_equations()
-                cb = err.RossbyWaveCallback(solver_obj)
-            cb.output_dir = di
-            cb.append_to_log = False
-            cb.export_to_hdf5 = False
-            solver_obj.add_callback(cb, 'timestep')
+        if mode == 'tohoku':
+            cb1 = err.TohokuCallback(solver_obj)
+            cb2 = err.ObjectiveTohokuCallback(solver_obj)
+        elif mode == 'shallow-water':
+            solver_obj.create_equations()
+            cb1 = err.ShallowWaterCallback(solver_obj)
+            cb2 = err.ObjectiveSWCallback(solver_obj)
+        elif mode == 'rossby-wave':
+            solver_obj.create_equations()
+            cb1 = err.RossbyWaveCallback(solver_obj)
+            cb2 = err.ObjectiveRWCallback(solver_obj)
+        solver_obj.add_callback(cb1, 'timestep')
+        solver_obj.add_callback(cb2, 'timestep')
 
         # Apply ICs and time integrate
         if mode == 'rossby-wave':
@@ -266,37 +262,50 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         else:
             solver_obj.iterate()
         if op.outputOF:
-            J_h = cb.__call__()[1]    # Evaluate objective functional
+            J_h = cb1.__call__()[1]    # Evaluate objective functional
         primalTimer = clock() - primalTimer
         msc.dis('Primal run complete. Run time: %.3fs' % primalTimer, op.printStats)
 
         # Reset counters
         cntT = int(np.ceil(T/dt))
-        cnt = 0 if aposteriori and not useAdjoint else cntT
         if useAdjoint:
-            save = True
-            parameters["adjoint"]["stop_annotating"] = True  # Stop registering equations
-            msc.dis('\nStarting fixed mesh dual run (backwards in time)', op.printStats)
+            msc.dis('\nGenerating dual solutions...', op.printStats)
             dualTimer = clock()
-            for (variable, solution) in compute_adjoint(J):
-                print(variable, solution)
-                if save:
-                    # Load adjoint data and save to HDF5
-                    dual.assign(variable, annotate=False)
+
+            # Assemble objective functional
+            Jfuncs = cb2.__call__()[1]
+            J = 0
+            for i in range(1, len(Jfuncs)):
+                J += 0.5 * (Jfuncs[i - 1] + Jfuncs[i]) * dt
+
+            # Compute gradient
+            dJdb = compute_gradient(J, Control(b))
+            File(di + 'gradient.pvd').write(dJdb)
+            print("Norm of gradient = %e" % dJdb.dat.norm)
+
+            # Extract adjoint solutions
+            tape = get_working_tape()
+            # tape.visualise()
+            solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
+            N = len(solve_blocks)
+            for i in range(N-1, -1, -op.rm):
+                try:
+                    dual.assign(solve_blocks[i].adj_sol)
                     dual_u, dual_e = dual.split()
                     dual_u.rename('Adjoint velocity')
                     dual_e.rename('Adjoint elevation')
-                    with DumbCheckpoint(di + 'hdf5/adjoint_' + msc.indexString(cnt), mode=FILE_CREATE) as saveAdj:
+                    with DumbCheckpoint(di + 'hdf5/adjoint_' + msc.indexString(i), mode=FILE_CREATE) as saveAdj:
                         saveAdj.store(dual_u)
                         saveAdj.store(dual_e)
                         saveAdj.close()
-                    msc.dis('Adjoint simulation %.2f%% complete' % ((cntT - cnt) / cntT * 100), op.printStats)
-                    cnt -= 1
-                    save = False
-                else:
-                    save = True
-                if cnt == -1:
-                    break
+                except:
+                    print('Block %d appears to have Nonetype' % (N-i))
+                if i % op.ndump == 0:
+                    if op.plotpvd:
+                        adjointFile.write(dual_u, dual_e, time=dt * i)
+                    if op.printStats:
+                        print('t = %.2fs' % (dt * i))
+                        print('Adjoint simulation %.2f%% complete' % ((N - i) / N * 100))
             dualTimer = clock() - dualTimer
             msc.dis('Dual run complete. Run time: %.3fs' % dualTimer, op.printStats)
     cnt = 0
@@ -306,8 +315,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         msc.dis('\nStarting error estimate generation', op.printStats)
         errorTimer = clock()
 
-        # Define implicit error problem     # TODO: use Thetis forms. Also put these in utils.forms
-        if approach in ('implicit', 'DWE'): # TODO: check nonlinear option out
+        # Define implicit error problem
+        if approach in ('implicit', 'DWE'): # TODO: Check out situation with nonlinear option
             B_, L = form.formsSW(q_oi, q_oi_, b, Dt, impermeable=False, coriolisFreq=f, nonlinear=True)
             B = form.formsSW(e, e_, b, Dt, impermeable=False, coriolisFreq=f, nonlinear=True)[0]
             I = form.interelementTerm(et1 * uv_2d_oi, n=normal) * dS
@@ -359,10 +368,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             # Approximate residuals
             if approach in ('explicit', 'residual', 'DWR'):
                 if op.orderChange:
-                    Au, Ae = form.strongResidualSW(q_oi, q_oi_, b, Dt, op=op) # TODO: Use Thetis forms here
+                    Au, Ae = form.strongResidualSW(q_oi, q_oi_, b, Dt, coriolisFreq=None, nonlinear=False, op=op)
                 else:
                     qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
-                    Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt, op=op)
+                    Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt, coriolisFreq=None, nonlinear=False, op=op)
                 rho_u.interpolate(Au)
                 rho_e.interpolate(Ae)
                 if op.plotpvd:
@@ -375,10 +384,17 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                                                          maxBathy=True if mode == 'tohoku' else False)
 
             if useAdjoint:
-                raise NotImplementedError
-                # TODO: Load adjoint data from HDF5
-                # TODO: Form remaining error estimates
-                # TODO: maximise DWF over time window
+                with DumbCheckpoint(di+'hdf5/adjoint_'+msc.indexString(k), mode=FILE_READ) as loadAdj:
+                    loadAdj.load(dual_u)
+                    loadAdj.load(dual_e)
+                    loadAdj.close()
+                if approach == 'DWR':   # TODO: Also consider higher order / refined duals
+                    epsilon = assemble(v * inner(rho, dual) * dx)
+                elif approach == 'DWE':
+                    epsilon = assemble(v* inner(e, dual) * dx)
+                elif approach == 'DWF':
+                    raise NotImplementedError
+                    # TODO: maximise DWF over time window
 
             # Store error estimates
             epsilon.rename("Error indicator")
@@ -492,6 +508,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             adapOpt.timestepper_type = op.timestepper
             adapOpt.timestep = dt
             adapOpt.output_directory = di
+            adapOpt.log_output = op.printStats
             adapOpt.export_diagnostics = True
             adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
             adapOpt.use_wetting_and_drying = op.wd
@@ -505,7 +522,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                                        field_dict,
                                        field_metadata,
                                        export_type='hdf5')
-            adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)    # TODO: why is this here, not later?
+            adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
             adapSolver.i_export = int(cnt / op.ndump)
             adapSolver.iteration = cnt
             adapSolver.simulation_time = startT
@@ -516,21 +533,18 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             # Evaluate callbacks and iterate
             if op.outputOF:
                 if mode == 'tohoku':
-                    cb = err.TohokuCallback(adapSolver)
+                    cb1 = err.TohokuCallback(adapSolver)
                 elif mode == 'shallow-water':
-                    cb = err.ShallowWaterCallback(adapSolver)
+                    cb1 = err.ShallowWaterCallback(adapSolver)
                 elif mode == 'rossby-wave':
-                    cb = err.RossbyWaveCallback(adapSolver)
-                cb.output_dir = di
-                cb.append_to_log = False
-                cb.export_to_hdf5 = False
+                    cb1 = err.RossbyWaveCallback(adapSolver)
                 if cnt != 0:
-                    cb.objective_functional = J_h
-                adapSolver.add_callback(cb, 'timestep')
+                    cb1.objective_functional = J_h
+                adapSolver.add_callback(cb1, 'timestep')
             solver_obj.bnd_functions['shallow_water'] = BCs
             adapSolver.iterate()
             if op.outputOF:
-                J_h = cb.__call__()[1]  # Evaluate objective functional
+                J_h = cb1.__call__()[1]  # Evaluate objective functional
 
             # Get mesh stats
             nEle = msh.meshStats(mesh_H)[0]
@@ -563,7 +577,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     else:
         return av, np.abs(op.J(mode) - J_h)/np.abs(op.J(mode)), J_h, toc
 
-    # TODO: also generate and output a timeseries plot for the integrand of the objective functional [Anca Belme paper]
+    # TODO: Also generate and output a timeseries plot for the integrand of the objective functional [Anca Belme paper]
 
 
 if __name__ == '__main__':

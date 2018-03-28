@@ -1,63 +1,8 @@
 from thetis import *
 from firedrake_adjoint import *
-from firedrake import Expression        # Annotation of Expressions not currently supported in firedrake_adjoint
+from fenics_adjoint.solving import SolveBlock   # Need use Sebastian's `linear-solver` branch of pyadjoint
 
-class ObjectiveCallback(DiagnosticCallback):
-    """Base class for callbacks that form objective functionals."""
-    variable_names = ['current functional', 'objective functional']
-
-    def __init__(self, scalar_callback, solver_obj, **kwargs):
-        """
-        Creates error comparison check callback object
-
-        :arg scalar_callback: Python function that takes the solver object as an argument and
-            returns a scalar quantity of interest
-        :arg solver_obj: Thetis solver object
-        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
-        """
-        super(ObjectiveCallback, self).__init__(solver_obj, **kwargs)
-        self.scalar_callback = scalar_callback
-        self.objective_functional = [scalar_callback()]
-        self.append_to_hdf5 = False
-        self.append_to_log = False
-
-    def __call__(self):
-        value = self.scalar_callback()
-        self.objective_functional.append(value)
-
-        return value, self.objective_functional
-
-    def message_str(self, *args):
-        line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
-        return line
-
-
-class ObjectiveSWCallback(ObjectiveCallback):
-    """Integrates objective functional in shallow water case."""
-    name = 'SW objective functional'
-
-    def __init__(self, solver_obj, **kwargs):
-        """
-        :arg solver_obj: Thetis solver object
-        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
-        """
-
-        def objectiveSW():
-            """
-            :param solver_obj: FlowSolver2d object.
-            :return: objective functional value for callbacks.
-            """
-            ks = Function(solver_obj.fields.solution_2d.function_space())
-            k0, k1 = ks.split()                     # Spatial integral is over [0, pi/2] x [pi/2, 3pi/2]
-            k1.interpolate(Expression('(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' %
-                                      (0., pi / 2, pi / 2, 3 * pi / 2)))
-            kt = Constant(0.)
-            if solver_obj.simulation_time > 0.5:    # Time integral is over [0.5, 2.5]
-                kt.assign(1. if solver_obj.simulation_time > 0.5 + 0.5 * solver_obj.options.timestep else 0.5)
-
-            return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
-
-        super(ObjectiveSWCallback, self).__init__(objectiveSW, solver_obj, **kwargs)
+import utils.error as err
 
 
 # Establish Mesh, initial condition and bathymetry
@@ -91,7 +36,7 @@ options.output_directory = 'plots/pyadjointTest/'
 options.export_diagnostics = False
 solver_obj.create_equations()
 solver_obj.assign_initial_conditions(elev=eta0)
-cb = ObjectiveSWCallback(solver_obj)        # Extract objective functional at each timestep for use in pyadjoint
+cb = err.ObjectiveSWCallback(solver_obj)        # Extract objective functional at each timestep for use in pyadjoint
 solver_obj.add_callback(cb, 'timestep')
 solver_obj.iterate()
 
@@ -100,24 +45,15 @@ Jfuncs = cb.__call__()[1]
 J = 0
 for i in range(1, len(Jfuncs)):
     J += 0.5*(Jfuncs[i-1] + Jfuncs[i])*dt
-# ks = Function(V)
-# k0, k1 = ks.split()
-# k1.interpolate(Expression('(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' %
-#                                       (0., pi / 2, pi / 2, 3 * pi / 2)))
-# J = assemble(inner(ks, solver_obj.fields.solution_2d) * dx)
 
 # Compute gradient
 dJdb = compute_gradient(J, Control(b))
 File('plots/pyadjointTest/gradient.pvd').write(dJdb)
 print("Norm of gradient = %e" % dJdb.dat.norm)
-assert(dJdb.dat.norm > 1e-6)   # According to a standalone solver, this norm should be approximately 0.026
 
-
-from fenics_adjoint.solving import SolveBlock   # Need use Sebastian's `linear-solver` branch of pyadjoint
-
+# Extract adjoint solutions
 tape = get_working_tape()
 # tape.visualise()
-
 solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
 adjointFile = File('plots/pyadjointTest/adjoint.pvd')
 for i in range(len(solve_blocks)-1, -1, -1):
