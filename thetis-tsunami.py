@@ -574,9 +574,9 @@ if __name__ == "__main__":
                  orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
                  # orderChange=0,
                  wd=True if args.w else False,
-                 ndump=10)
+                 ndump=50)
     if mode == 'shallow-water':
-        op.rm = 20 if useAdjoint else 10
+        op.rm = 10 if useAdjoint else 5
     elif mode == 'rossby-wave':
         op.rm = 48 if useAdjoint else 24
 
