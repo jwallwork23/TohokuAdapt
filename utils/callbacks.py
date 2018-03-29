@@ -64,9 +64,9 @@ class TohokuCallback(IntegralCallback):
             elev_2d = solver_obj.fields.solution_2d.split()[1]
             ks = forms.indicator(elev_2d.function_space(), mode='tohoku')
             kt = Constant(0.)
-            if solver_obj.simulation_time > 300.:   # TODO: make this more general
-                kt.assign(1. if solver_obj.simulation_time >
-                                300. + 0.5 * solver_obj.options.timestep else 0.5)
+            Tstart = solver_obj.options.period_of_interest_start
+            if solver_obj.simulation_time > Tstart:
+                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * solver_obj.options.timestep else 0.5)
 
             return assemble(elev_2d * ks * kt * dx)
 
@@ -92,10 +92,9 @@ class ShallowWaterCallback(IntegralCallback):
             elev_2d = solver_obj.fields.solution_2d.split()[1]
             ks = forms.indicator(elev_2d.function_space(), mode='shallow-water')
             kt = Constant(0.)
-            if solver_obj.simulation_time > 0.5:    # TODO: make this more general
-                kt.assign(
-                    1. if solver_obj.simulation_time >
-                          0.5 + 0.5 * solver_obj.options.timestep else 0.5)
+            Tstart = solver_obj.options.period_of_interest_start
+            if solver_obj.simulation_time > Tstart:
+                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * solver_obj.options.timestep else 0.5)
 
             return assemble(elev_2d * ks * kt * dx)
 
@@ -121,10 +120,9 @@ class RossbyWaveCallback(IntegralCallback):
             elev_2d = solver_obj.fields.solution_2d.split()[1]
             ks = forms.indicator(elev_2d.function_space(), mode='rossby-wave')
             kt = Constant(0.)
-            if solver_obj.simulation_time > 30.:    # TODO: make this more general
-                kt.assign(
-                    1. if solver_obj.simulation_time >
-                          30. + 0.5 * solver_obj.options.timestep else 0.5)
+            Tstart = solver_obj.options.period_of_interest_start
+            if solver_obj.simulation_time > Tstart:
+                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * solver_obj.options.timestep else 0.5)
 
             return assemble(elev_2d * ks * kt * dx)
 
@@ -257,8 +255,9 @@ class ObjectiveTohokuCallback(ObjectiveCallback):
             k0, k1 = ks.split()
             k1.assign(forms.indicator(V.sub(1), mode='tohoku'))
             kt = Constant(0.)
-            if solver_obj.simulation_time > 300.:
-                kt.assign(1. if solver_obj.simulation_time > 300. + 0.5 * solver_obj.options.timestep else 0.5)
+            Tstart = solver_obj.options.period_of_interest_start
+            if solver_obj.simulation_time > Tstart:
+                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * solver_obj.options.timestep else 0.5)
 
             return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
 
@@ -286,8 +285,9 @@ class ObjectiveSWCallback(ObjectiveCallback):
             k0, k1 = ks.split()
             k1.assign(forms.indicator(V.sub(1), mode='shallow-water'))
             kt = Constant(0.)
-            if solver_obj.simulation_time > 0.5:    # TODO: make more general
-                kt.assign(1. if solver_obj.simulation_time > 0.5 + 0.5 * solver_obj.options.timestep else 0.5)
+            Tstart = solver_obj.options.period_of_interest_start
+            if solver_obj.simulation_time > Tstart:
+                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * solver_obj.options.timestep else 0.5)
 
             return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
 
@@ -315,8 +315,9 @@ class ObjectiveRWCallback(ObjectiveCallback):
             k0, k1 = ks.split()
             k1.assign(forms.indicator(V.sub(1), mode='rossby-wave'))
             kt = Constant(0.)
-            if solver_obj.simulation_time > 30.:    # TODO: make more general
-                kt.assign(1. if solver_obj.simulation_time > 30. + 0.5 * solver_obj.options.timestep else 0.5)
+            Tstart = solver_obj.options.period_of_interest_start
+            if solver_obj.simulation_time > Tstart:
+                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * solver_obj.options.timestep else 0.5)
 
             return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
 

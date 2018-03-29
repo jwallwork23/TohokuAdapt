@@ -186,8 +186,11 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             options.coriolis_frequency = f
         options.simulation_export_time = dt * (op.rm-1) if aposteriori else dt * op.ndump
         options.simulation_end_time = T
+        options.period_of_interest_start = op.Tstart
+        options.period_of_interest_end = T
         options.timestepper_type = op.timestepper
         options.timestep = dt
+        options.timesteps_per_remesh = op.rm
         options.output_directory = di
         options.export_diagnostics = True
         options.log_output = op.printStats
@@ -215,22 +218,19 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             if mode == 'tohoku':
                 def selector():
                     t = solver_obj.simulation_time
-                    # rm = 30                         # TODO: what can we do about this? Needs changing for adjoint
-                    rm = 60
+                    rm = options.timesteps_per_remesh
                     dt = options.timestep
                     options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
             elif mode == 'shallow-water':
                 def selector():
                     t = solver_obj.simulation_time
-                    # rm = 10                         # TODO: what can we do about this? Needs changing for adjoint
-                    rm = 20
+                    rm = options.timesteps_per_remesh
                     dt = options.timestep
                     options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
             else:
                 def selector():
                     t = solver_obj.simulation_time
-                    # rm = 24                         # TODO: what can we do about this? Needs changing for adjoint
-                    rm = 48
+                    rm = options.timesteps_per_remesh
                     dt = options.timestep
                     options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
             solver_obj.iterate(export_func=selector)    # TODO: This ^^^ doesn't always work
@@ -254,7 +254,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 J += 0.5 * (Jfuncs[i - 1] + Jfuncs[i]) * dt
 
             # Compute gradient
-            dJdb = compute_gradient(J, Control(b))      # TODO: Rewrite pyadjooint coode to avoid computing this
+            dJdb = compute_gradient(J, Control(b))      # TODO: Rewrite pyadjoint code to avoid computing this
             File(di + 'gradient.pvd').write(dJdb)
             print("Norm of gradient = %e" % dJdb.dat.norm)
 
@@ -474,6 +474,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 startT = endT
                 endT += dt * op.rm
                 adapOpt.simulation_end_time = endT
+                adapOpt.period_of_interest_start = op.Tstart
+                adapOpt.period_of_interest_end = T
                 adapOpt.timestepper_type = op.timestepper
                 adapOpt.timestep = dt
                 adapOpt.output_directory = di
@@ -508,7 +510,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     elif mode == 'rossby-wave':
                         cb1 = cb.RossbyWaveCallback(adapSolver)
                     if cnt != 0:
-                        cb1.objective_functional = J_h
+                        cb1.objective_value = J_h
                     adapSolver.add_callback(cb1, 'timestep')
                 solver_obj.bnd_functions['shallow_water'] = BCs
                 adapSolver.iterate()
@@ -593,8 +595,8 @@ if __name__ == '__main__':
     s = '_BOOTSTRAP' if op.bootstrap else ''
     textfile = open('outdata/outputs/'+mode+'/'+approach+date+s+'.txt', 'w+')
     if op.bootstrap:
-        # for i in range(11):
-        for i in range(8):
+        for i in range(11):
+        # for i in range(8):
             av, rel, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
             var = np.abs(J_h - J_h_) if i > 0 else 0.
             J_h_ = J_h
