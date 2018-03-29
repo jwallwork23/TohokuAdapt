@@ -2,8 +2,6 @@ from firedrake import *
 from firedrake_adjoint import *
 from firedrake import Expression
 
-import numpy as np
-
 from .options import Options
 from .timestepping import timestepScheme, timestepCoeffs
 
@@ -104,7 +102,7 @@ def adjointSW(l, l_, b, Dt, mode='shallow-water', switch=Constant(1.), op=Option
     L = ((inner(lu_, w) + le_ * xi) / Dt - a2 * b * inner(grad(le_), w) + a2 * op.g * inner(lu_, grad(xi))) * dx
     L -= switch * iA * xi * dx
 
-    # TODO: boundary conditions?
+    # TODO: Boundary conditions?
 
     return B, L
 
@@ -210,45 +208,27 @@ def indicator(V, mode='tohoku'):
 
     # Define extent of region A
     if mode == 'helmholtz1':
-        x1 = 0.
-        x2 = 0.2
-        y1 = 0.4
-        y2 = 0.6
+        xy = [0., 0.2, 0.4, 0.6]
     elif mode == 'helmholtz2':
-        x1 = 0.1
-        x2 = 0.3
-        y1 = 0.1
-        y2 = 0.3
+        xy = [0.1, 0.3, 0.1, 0.3]
     elif mode == 'advection-diffusion':
-        x1 = 2.5
-        x2 = 3.5
-        y1 = 0.1
-        y2 = 0.9
+        xy = [2.5, 3.5, 0.1, 0.9]
     elif mode == 'shallow-water':
-        x1 = 0.
-        x2 = 0.5 * np.pi
-        y1 = 0.5 * np.pi
-        y2 = 1.5 * np.pi
+        xy = [0., 0.5 * pi, 0.5 * pi, 1.5 * pi]
     elif mode == 'rossby-wave':
-        x1 = 0.
-        x2 = 8.
-        y1 = 10.
-        y2 = 14.
+        xy = [0., 8., 10., 14.]
     elif mode == 'tohoku':
-        x1 = 490e3
-        x2 = 640e3
-        y1 = 4160e3
-        y2 = 4360e3
+        xy = [490e3, 640e3, 4160e3, 4360e3]
     else:
         raise NotImplementedError
     if smooth:
-        xd = (x2 - x1) / 2
-        yd = (y2 - y1) / 2
+        xd = (xy[1] - xy[0]) / 2
+        yd = (xy[3] - xy[2]) / 2
         ind = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? ' \
               'exp(1. / (pow(x[0] - %f, 2) - pow(%f, 2))) * exp(1. / (pow(x[1] - %f, 2) - pow(%f, 2))) : 0.' \
-              % (x1, x2, y1, y2, x1 + xd, xd, y1 + yd, yd)
+              % (xy[0], xy[1], xy[2], xy[3], xy[0] + xd, xd, xy[2] + yd, yd)
     else:
-        ind = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' % (x1, x2, y1, y2)
+        ind = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' % (xy[0], xy[1], xy[2], xy[3])
     iA = Function(V, name="Region of interest").interpolate(Expression(ind))
     if plot:
         File("plots/adjointBased/kernel.pvd").write(iA)

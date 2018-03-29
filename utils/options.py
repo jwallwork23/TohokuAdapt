@@ -27,7 +27,6 @@ class Options:
                  window=False,
                  tAdapt=False,
                  bootstrap=False,
-                 outputOF=True,
                  printStats=True,
                  capBathymetry=True,        # TODO: change this under W&D
                  hessMeth='dL2',
@@ -63,7 +62,6 @@ class Options:
         :param window: generate error estimators over a time window of relevance.
         :param tAdapt: implement adaptive timestepping.
         :param bootstrap: implement mesh bootstrapping to establish initial mesh.
-        :param outputOF: print objective functional value to screen.
         :param printStats: print to screen during simulation.
         :param capBathymetry: under no wetting-and-drying.
         :param hessMeth: Method of Hessian reconstruction: 'dL2' or 'parts'.
@@ -133,7 +131,6 @@ class Options:
         self.window = window
         self.tAdapt = tAdapt
         self.bootstrap = bootstrap
-        self.outputOF = outputOF
         self.printStats = printStats
         self.capBathymetry = capBathymetry
         self.outputMetric = outputMetric
@@ -141,8 +138,8 @@ class Options:
         self.gauges = gauges
         self.wd = wd
         assert(type(advect) == type(gradate) == type(nonlinear) == type(rotational) == type(window) == type(iso)
-               == type(tAdapt) == type(bootstrap) == type(outputOF) == type(printStats) == type(capBathymetry)
-               == type(outputMetric) == type(plotpvd) == type(gauges) == type(wd) == bool)
+               == type(tAdapt) == type(bootstrap) == type(printStats) == type(capBathymetry) == type(outputMetric)
+               == type(plotpvd) == type(gauges) == type(wd) == bool)
         self.hessMeth = hessMeth
         try:
             assert hessMeth in ('dL2', 'parts')
@@ -210,13 +207,11 @@ class Options:
                         "802": (39.3, 142.1), "803": (38.9, 141.8), "804": (39.7, 142.2), "806": (37.0, 141.2)}
 
         # Plotting dictionaries
-        labels = ('Coarse mesh', 'Medium mesh', 'Fine mesh', 'Hessian based', 'Explicit', 'Adjoint based', 'Goal based')
-        self.labels = labels
-        self.styles = {labels[0]: 's', labels[1]: '^', labels[2]: 'x', labels[3]: 'o', labels[4]: 'h', labels[5]: '*',
-                       labels[6]: '+'}
-        self.stamps = {labels[0]: 'fixedMesh', labels[1]: 'fixedMesh', labels[2]: 'fixedMesh', labels[3]: 'hessianBased',
-                       labels[4]: 'explicit', labels[5]: 'adjointBased', labels[6]: 'goalBased'}
-        # TODO: needs updating
+        self.labels = ("Fixed mesh", "Hessian based", "Explicit", "Implicit", "Adjoint based", "Goal based")
+        self.styles = {self.labels[0]: 's', self.labels[1]: '^', self.labels[2]: 'x', self.labels[3]: 'o',
+                       self.labels[4]: '*', self.labels[5]: 'h'}
+        self.stamps = {self.labels[0]: 'fixedMesh', self.labels[1]: 'hessianBased', self.labels[2]: 'explicit',
+                       self.labels[3]: 'implicit', self.labels[4]: 'DWF', self.labels[5]: 'DWR'}
 
 
     def J(self, mode):
@@ -224,10 +219,9 @@ class Options:
         :param mode: test problem choice.
         :return: 'exact' objective functional value, converged to 3 s.f.
         """
-        dat = {'tohoku': 1.2185e+13,            # On mesh of 196,560 elements   TODO: need verify on refined hierarchy
-               'shallow-water': 1.0647e-03,     # On mesh of 524,288 elements
-               }
-        # TODO: other test cases
+        dat = {'tohoku': 1.2185e+13,            # On mesh of 196,560 elements     TODO: Verify this
+               'shallow-water': 1.0647e-03,     # On mesh of 524,288 elements     TODO: Verify this
+               }                                                                # TODO: rossby-wave test case
         if mode in dat.keys():
             return dat[mode]
         else:

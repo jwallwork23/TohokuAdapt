@@ -288,9 +288,6 @@ def continuousAdjointSW(n, op=Options(Tstart=0.5, Tend=2.5, family='dg-cg')):
         slowdown = 1./slowdown
     print('Cts case: Adjoint run %.3fx %s than forward run.' % (slowdown, 'slower' if slow else 'faster'))
 
-    # adj_html("outdata/visualisations/forward.html", "forward")
-    # adj_html("outdata/visualisations/adjoint.html", "adjoint")
-
     return primalTimer, dualTimer, meshStats(mesh)[0]
 
 

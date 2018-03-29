@@ -12,7 +12,7 @@ from .options import Options
 
 __all__ = ["constructGradient", "constructHessian", "computeSteadyMetric", "isotropicMetric", "isoP2", "anisoRefine",
            "metricGradation", "localMetricIntersection", "metricIntersection", "metricConvexCombination",
-           "symmetricProduct", "pointwiseMax", "metricComplexity", "advectMetric", "adaptTimestepSW", "adaptTimestepAD"]
+           "symmetricProduct", "pointwiseMax", "metricComplexity", "advectMetric", "__main__"]
 
 
 def constructGradient(f):
@@ -213,7 +213,7 @@ def isoP2(mesh):
     return MeshHierarchy(mesh, 1).__getitem__(1)
 
 
-def anisoRefine(M, direction=0):
+def anisoRefine(M, direction=0):    # TODO: Test this
     """
     Approximately half element size in x- or y-direction by scaling corresponding eigenvalue.
        
@@ -230,8 +230,6 @@ def anisoRefine(M, direction=0):
         M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
         M.dat.data[i][1, 1] = lam[0] * v1[1] * v1[1] + lam[1] * v2[1] * v2[1]
     return M
-
-# TODO: test this
 
 
 def metricGradation(M, op=Options()):
@@ -255,8 +253,7 @@ def metricGradation(M, op=Options()):
 
     # Establish arrays for storage and a list of tags for vertices
     v12 = np.zeros(2)
-    v21 = np.zeros(2)
-    # TODO: work only with the upper triangular part for speed
+    v21 = np.zeros(2)   # TODO: Work only with the upper triangular part for speed
     verTag = np.zeros(numVer) + 1
     correction = True
     i = 0
@@ -427,6 +424,7 @@ def isotropicAdvection(M_, h_, w, Dt, n=1, timestepper='ImplicitEuler'):
     :param n: number of timesteps to advect over.
     :param timestepper: time integration scheme used.
     """
+    # TODO: More rigourous analysis of what `metric advection` is and how it is best implemented
 
     # Set up variational problem
     V = M_.function_space()
@@ -443,8 +441,6 @@ def isotropicAdvection(M_, h_, w, Dt, n=1, timestepper='ImplicitEuler'):
 
     return M_
 
-
-# TODO: more rigourous analysis of what `metric advection` is and how it is best implemented
 
 def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEuler', fieldToAdvect='M'):
     """
@@ -484,9 +480,7 @@ def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEul
             if outfile != None:
                 Mfile.write(M_, time=i)
 
-    elif fieldToAdvect == 'li':
-
-        # TODO: fix this approach
+    elif fieldToAdvect == 'li':     # TODO: Fix this approach
 
         # Define trial and test functions
         W = VectorFunctionSpace(mesh, 'CG', 1)
@@ -520,39 +514,12 @@ def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEul
                 Mfile.write(M_, time=i)
 
     else:
-        raise NotImplementedError
-        # TODO: investigate and implement other methods. Check BCs work.
+        raise NotImplementedError   # TODO: investigate and implement other methods. Check BCs work.
 
     return M_
 
 
-def adaptTimestepSW(mesh, b, sigma=0.9, g=9.81):
-    """
-    :arg mesh: Current (recently adapted) mesh.
-    :arg b: bathymetry profile.
-    :param sigma: scaling parameter in range (0,1).
-    :param g: gravitational acceleration.
-    :return: near-optimal numerically stable timestep.
-    """
-    h = Function(FunctionSpace(mesh, 'DG', 0)).interpolate(CellSize(mesh))
-    if isinstance(b, float):
-        return sigma * min(h.dat.data) / np.sqrt(g * b)
-    else:
-        return sigma * min(h.dat.data) / np.sqrt(g * max(b.dat.data))
-
-
-def adaptTimestepAD(w, sigma=0.9):
-    """
-    :arg w: wind-field used in advection-diffusion eqn.
-    :param sigma: scaling parameter in range (0,1).
-    :return: near-optimal numerically stable timestep.
-    """
-    mesh = w.function_space().mesh()
-    h = Function(FunctionSpace(mesh, 'DG', 0)).interpolate(CellSize(mesh))
-    return sigma * min(h.dat.data) / max(np.sqrt(pow(w.dat.data[:, 0], 2) + pow(w.dat.data[:, 1], 2)))
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     mesh = RectangleMesh(64, 16, 4, 1)
     V = TensorFunctionSpace(mesh, "CG", 1)
@@ -560,4 +527,4 @@ if __name__ == '__main__':
     w = Function(VectorFunctionSpace(mesh, "CG", 1)).interpolate(Expression([1, 0]))
     advectMetric(M, w, 0.05, 20, outfile='plots/tests/utils/meshAdvect.pvd')
 
-    # TODO: test other functionalities
+    # TODO: Do proper testing of all functionalities and produce plots

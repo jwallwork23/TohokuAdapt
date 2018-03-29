@@ -43,7 +43,7 @@ def interp(mesh, *fields):
             raise NotImplementedError('Interpolation not currently supported on requested field type.')
         try:
             f_new.dat.data[:] = f.at(coords)
-        # Establish which vertices fall outside the domain
+        # Establish which vertices fall outside the domain  # TODO: Figure out how to do this in a less hacky way
         except PointNotInDomainError:
             for x in range(len(coords)):
                 try:

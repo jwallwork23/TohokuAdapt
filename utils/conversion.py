@@ -8,7 +8,7 @@ class OutOfRangeError(ValueError):
 
 __all__ = ["to_latlon", "from_latlon", "vectorlonlat2utm", "get_latitude", "latitude_to_zone_letter",
            "latlon_to_zone_number", "zone_number_to_central_longitude", "vectorlonlat2tangentxy", "earth_radius",
-           "lonlat2tangentxy", "lonlat2tangent_pair", "vectorlonlat2utm", "mesh_converter", "xy2barycentric",
+           "lonlat2tangentxy", "vectorlonlat2utm", "latlonMesh2tangentPlane", "xy2barycentric",
            "rescaleMesh"]
 
 K0 = 0.9996
@@ -282,21 +282,6 @@ def lonlat2tangentxy(latitude, longitude, latitude0, longitude0):
     return x, y
 
 
-def lonlat2tangent_pair(latitude, longitude, latitude0, longitude0):
-    """
-    Project latitude-longitude coordinates onto a tangent plane at (lon0, lat0), in metric Cartesian coordinates (x,y),
-    with output given as a pair.
-
-    :arg latitude: latitudinal coordinate for projection.
-    :arg longitude: longitudinal coordinate for projection.
-    :param latitude0: latitudinal tangent coordinate. 
-    :param longitude0: longitudinal tangent coordinate.
-    :return: Cartesian coordinates on tangent plane.
-    """
-    x, y = lonlat2tangentxy(latitude, longitude, latitude0, longitude0)
-    return [x, y]
-
-
 def vectorlonlat2tangentxy(latitude, longitude, latitude0, longitude0):
     """
     Project a vector of latitude-longitude coordinates onto a tangent plane at (lon0, lat0), in metric Cartesian 
@@ -316,7 +301,7 @@ def vectorlonlat2tangentxy(latitude, longitude, latitude0, longitude0):
     return x, y
 
 
-def mesh_converter(meshfile, latitude0, longitude0):
+def latlonMesh2tangentPlane(meshfile, latitude0, longitude0):
     """
     Project a mesh file from latitude-longitude coordinates onto a tangent plane at (lon0, lat0), in metric Cartesian 
     coordinates (x,y).
@@ -336,10 +321,10 @@ def mesh_converter(meshfile, latitude0, longitude0):
         i += 1
         if i == 5:
             mode += 1
-        if mode == 1:  # Read number
-            n = int(line)  # Number of nodes
+        if mode == 1:                       # Read number
+            n = int(line)                   # Number of nodes
             mode += 1
-        elif mode == 2:  # Edit nodes
+        elif mode == 2:                     # Edit nodes
             xy = line.split()
             xy[1], xy[2] = lonlat2tangentxy(float(xy[2]), float(xy[1]), latitude0, longitude0)
             xy[1] = str(xy[1])
@@ -348,8 +333,8 @@ def mesh_converter(meshfile, latitude0, longitude0):
             line += '\n'
             cnt += 1
             if cnt == n:
-                assert int(xy[0]) == n  # Check all nodes have been covered
-                mode += 1  # The end of the nodes has been reached
+                assert int(xy[0]) == n      # Check all nodes have been covered
+                mode += 1                   # The end of the nodes has been reached
         mesh2.write(line)
     mesh1.close()
     mesh2.close()

@@ -83,6 +83,3 @@ def getMax(array):
             m = array[j]
             i = j
     return i, m
-
-
-# TODO: plotting function for metrics

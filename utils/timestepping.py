@@ -4,7 +4,7 @@ from firedrake import *
 __all__ = ["timestepCoeffs", "timestepScheme", "setupSSPRK", "incrementSSPRK"]
 
 
-def timestepCoeffs(timestepper):    # TODO: make this format more conventional
+def timestepCoeffs(timestepper):    # TODO: Make this format more conventional / delete it eventually
     """
     :arg timestepper: scheme of choice.
     :return: coefficients for use in scheme.

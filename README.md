@@ -11,6 +11,7 @@ As part of my PhD research, that work is integrated into the coastal, estuarine 
 adaptivity:
     * Hessians and metrics are approximated using ``adaptivity``.
     * Bootstrapping for a near-optimal initial mesh is achieved using ``bootstrapping``.
+    * Callbacks for assembling objective functionals and extracting timeseries are provided in ``callbacks``.
     * Coordinate transformations are achieved using ``conversion``.
     * (Local) error indicators are computed using ``error``.
     * Strong and weak forms of PDEs are available in ``forms``.

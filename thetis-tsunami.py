@@ -236,8 +236,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             solver_obj.iterate(export_func=selector)    # TODO: This ^^^ doesn't always work
         else:
             solver_obj.iterate()
-        if op.outputOF:
-            J_h = cb1.__call__()[1]    # Evaluate objective functional
+        J_h = cb1.__call__()[1]    # Evaluate objective functional
         primalTimer = clock() - primalTimer
         msc.dis('Primal run complete. Run time: %.3fs' % primalTimer, op.printStats)
 
@@ -502,20 +501,18 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     e.set_next_export_ix(adapSolver.i_export)
 
                 # Evaluate callbacks and iterate
-                if op.outputOF:
-                    if mode == 'tohoku':
-                        cb1 = cb.TohokuCallback(adapSolver)
-                    elif mode == 'shallow-water':
-                        cb1 = cb.ShallowWaterCallback(adapSolver)
-                    elif mode == 'rossby-wave':
-                        cb1 = cb.RossbyWaveCallback(adapSolver)
-                    if cnt != 0:
-                        cb1.objective_value = J_h
-                    adapSolver.add_callback(cb1, 'timestep')
+                if mode == 'tohoku':
+                    cb1 = cb.TohokuCallback(adapSolver)
+                elif mode == 'shallow-water':
+                    cb1 = cb.ShallowWaterCallback(adapSolver)
+                elif mode == 'rossby-wave':
+                    cb1 = cb.RossbyWaveCallback(adapSolver)
+                if cnt != 0:
+                    cb1.objective_value = J_h
+                adapSolver.add_callback(cb1, 'timestep')
                 solver_obj.bnd_functions['shallow_water'] = BCs
                 adapSolver.iterate()
-                if op.outputOF:
-                    J_h = cb1.__call__()[1]  # Evaluate objective functional
+                J_h = cb1.__call__()[1]  # Evaluate objective functional
 
                 # Get mesh stats
                 nEle = msh.meshStats(mesh_H)[0]
@@ -532,7 +529,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer)
 
     # Measure error using metrics, using data from Huang et al.
-    if mode == 'rossby-wave':
+    if mode == 'rossby-wave':   # TODO: Plot / interpret these results
         index = int(cntT/op.ndump) if approach == 'fixedMesh' else int((cnt-op.rm) / op.ndump)
         with DumbCheckpoint(di+'hdf5/Elevation2d_'+msc.indexString(index), mode=FILE_READ) as loadElev:
             loadElev.load(elev_2d, name='elev_2d')
@@ -551,7 +548,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     # TODO: Also generate and output a timeseries plot for the integrand of the objective functional [Anca Belme paper]
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -574,14 +571,12 @@ if __name__ == '__main__':
                      family='dg-dg',
                      rm=60 if useAdjoint else 30,
                      gradate=True if aposteriori else False,
-                     advect=False,
-                     window=True if approach == 'DWF' else False,
+                     window=True if approach == 'DWF' else False,   # TODO
                      outputMetric=False,
                      plotpvd=True,
-                     gauges=False,
+                     gauges=False,  # TODO: Include callbacks for Tohoku case
                      bootstrap=True if args.b else False,
                      printStats=False,
-                     outputOF=True,
                      orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
                      # orderChange=0,
                      wd=True if args.w else False,
@@ -592,8 +587,10 @@ if __name__ == '__main__':
         op.rm = 48 if useAdjoint else 24
 
     # Run simulation(s)
-    s = '_BOOTSTRAP' if op.bootstrap else ''
-    textfile = open('outdata/outputs/'+mode+'/'+approach+date+s+'.txt', 'w+')
+    filename = 'outdata/outputs/'+mode+'/'+approach+date
+    if op.bootstrap:
+        filename += '_BOOTSTRAP'
+    textfile = open(filename +'.txt', 'w+')
     if op.bootstrap:
         # for i in range(11):
         for i in range(8):   # TODO: Can't currently do multiple adjoint runs

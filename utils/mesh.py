@@ -1,7 +1,7 @@
 import numpy as np
 
 
-__all__ = ["MeshSetup", "TohokuDomain", "domainSW", "domainRW", "meshStats"]
+__all__ = ["MeshSetup", "TohokuDomain", "domainSW", "domainRW", "meshStats", "__main__"]
 
 
 class MeshSetup:
@@ -110,7 +110,7 @@ class MeshSetup:
         TohokuMesh.writeShapefile(self.dirName + self.meshName + '.shp')
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import qmesh
 
     generateAll = bool(input("Press 0 to generate a single mesh or 1 to generate all meshes in the hierarchy. "))

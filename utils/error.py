@@ -31,7 +31,7 @@ def explicitErrorEstimator(q, residual, b, v, maxBathy=False):
         assemble(v * h * h * sum([inner(residual.split()[k], residual.split()[k]) for k in range(m)]) * dx)
 
     # Compute boundary residual term on fine mesh
-    qh = mixedPairInterp(mesh, V, q)[0]       # TODO: not needed if changing order
+    qh = mixedPairInterp(mesh, V, q)[0]       # TODO: Not needed if changing order
     uh, etah = qh.split()
 
     j0 = assemble(dot(v * grad(uh[0]), n) * ds)
