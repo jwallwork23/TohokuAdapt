@@ -32,7 +32,7 @@ The following meshing strategies are implemented:
     * explicit and implicit a posteriori error estimators based on shallow water residuals;
     * a 'domain of dependence' type estimator as used in Davis and LeVeque 2016;
     * goal-oriented mesh adaptivity, weighting error estimates by adjoint solution data.
-* Other ``helmholtz`` and ``advection-diffusion`` test problems, defined on rectangular model domains.
+* Additional ``advection-diffusion`` test problem, defined on a rectangular model domain.
 
 For feedback, comments and questions, please email j.wallwork16@imperial.ac.uk.
 

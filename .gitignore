@@ -33,6 +33,7 @@ shallow-water-test.py
 # Testing
 wdTest.py
 heat_eqn.py
+helmholtz.py
 pyadjoint-test-firedrake.py
 pyadjoint-test-burgers.py
 pyadjoint-test-thetis.py
