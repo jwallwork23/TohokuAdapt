@@ -135,9 +135,9 @@ else:
     import scipy.interpolate as si
     from scipy.io.netcdf import NetCDFFile
 
-    from . import conversion
-    from . import forms
-    from . import options
+    from .conversion import vectorlonlat2utm
+    from .forms import solutionHuang
+    from .options import Options
 
 
 def TohokuDomain(level=0, mesh=None, output=False, wd=False):
@@ -165,7 +165,7 @@ def TohokuDomain(level=0, mesh=None, output=False, wd=False):
     nc1 = NetCDFFile('resources/initialisation/surf.nc', mmap=False)
     lon1 = nc1.variables['x'][:]
     lat1 = nc1.variables['y'][:]
-    x1, y1 = conversion.vectorlonlat2utm(lat1, lon1, force_zone_number=54)      # Our mesh mainly resides in UTM zone 54
+    x1, y1 = vectorlonlat2utm(lat1, lon1, force_zone_number=54)      # Our mesh mainly resides in UTM zone 54
     elev1 = nc1.variables['z'][:, :]
     interpolatorSurf = si.RectBivariateSpline(y1, x1, elev1)
     eta0vec = eta0.dat.data
@@ -175,7 +175,7 @@ def TohokuDomain(level=0, mesh=None, output=False, wd=False):
     nc2 = NetCDFFile('resources/bathymetry/tohoku.nc', mmap=False)
     lon2 = nc2.variables['lon'][:]
     lat2 = nc2.variables['lat'][:-1]
-    x2, y2 = conversion.vectorlonlat2utm(lat2, lon2, force_zone_number=54)
+    x2, y2 = vectorlonlat2utm(lat2, lon2, force_zone_number=54)
     elev2 = nc2.variables['elevation'][:-1, :]
     interpolatorBath = si.RectBivariateSpline(y2, x2, elev2)
     b_vec = b.dat.data
@@ -212,7 +212,7 @@ def domainSW(level=4):
     return mesh, eta0, b, {}
 
 
-def domainRW(level=1, op=options.Options()):
+def domainRW(level=1, op=Options()):
     """
     Load the mesh, initial condition, bathymetry profile and boundary conditions for the equatorial Rossby wave test 
     problem.
@@ -228,8 +228,7 @@ def domainRW(level=1, op=options.Options()):
     mesh.coordinates.assign(xy)
     P1 = FunctionSpace(mesh, "CG", 1)
     b = Function(P1).assign(1.)
-    q = forms.solutionHuang(
-        VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2), t=0.)
+    q = solutionHuang(VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2))
     u0, eta0 = q.split()
     BCs = {1: {'uv': Constant(0.)}, 2: {'uv': Constant(0.)}, 3: {'uv': Constant(0.)}, 4: {'uv': Constant(0.)}}
     f = Function(P1).interpolate(SpatialCoordinate(mesh)[1])

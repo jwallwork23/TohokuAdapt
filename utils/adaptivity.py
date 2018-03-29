@@ -5,9 +5,10 @@ import numpy
 from numpy import linalg as la
 from scipy import linalg as sla
 
-import utils.forms as form
-import utils.mesh as msh
-import utils.options as opt
+from .forms import weakResidualAD, weakMetricAdvection
+from .mesh import meshStats
+from .options import Options
+
 
 __all__ = ["constructGradient", "constructHessian", "computeSteadyMetric", "isotropicMetric", "isoP2", "anisoRefine",
            "metricGradation", "localMetricIntersection", "metricIntersection", "metricConvexCombination",
@@ -33,7 +34,7 @@ def constructGradient(f):
     return g
 
 
-def constructHessian(f, op=opt.Options()):
+def constructHessian(f, op=Options()):
     """
     Reconstructs the hessian of a scalar solution field with respect to the current mesh. The code for the integration 
     by parts reconstruction approach is based on the Monge-Amp\`ere tutorial provided in the Firedrake website 
@@ -65,7 +66,7 @@ def constructHessian(f, op=opt.Options()):
     return H
 
 
-def computeSteadyMetric(f, H=None, nVerT=None, errTarget=1e-3, op=opt.Options()):
+def computeSteadyMetric(f, H=None, nVerT=None, errTarget=1e-3, op=Options()):
     """
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``computeSteadyMetric``, from 
     ``adapt.py``, 2016.
@@ -82,7 +83,7 @@ def computeSteadyMetric(f, H=None, nVerT=None, errTarget=1e-3, op=opt.Options())
     V = H.function_space()
     mesh = V.mesh()
     if not nVerT:
-        nVerT = op.vscale * msh.meshStats(mesh)[1]      # TODO: verify this is indeed vertices, not elements
+        nVerT = op.vscale * meshStats(mesh)[1]      # TODO: verify this is indeed vertices, not elements
 
     ia2 = 1. / pow(op.a, 2)         # Inverse square aspect ratio
     ihmin2 = 1. / pow(op.hmin, 2)   # Inverse square minimal side-length
@@ -156,7 +157,7 @@ def computeSteadyMetric(f, H=None, nVerT=None, errTarget=1e-3, op=opt.Options())
     return M
 
 
-def isotropicMetric(f, bdy=False, invert=True, nVerT=None, op=opt.Options()):
+def isotropicMetric(f, bdy=False, invert=True, nVerT=None, op=Options()):
     """
     :arg f: function to adapt to.
     :param bdy: toggle boundary metric.
@@ -182,7 +183,7 @@ def isotropicMetric(f, bdy=False, invert=True, nVerT=None, op=opt.Options()):
     # Normalise error estimate
     gnorm = max(assemble(sqrt(inner(g, g))*dx), 1e-6)   # Equivalent to scaling by (thresholded) metric complexity
     if not nVerT:
-        nVerT = op.vscale * msh.meshStats(mesh)[1]
+        nVerT = op.vscale * meshStats(mesh)[1]
     g.dat.data[:] = np.abs(g.dat.data) * nVerT / gnorm  # TODO: changes in 3D case
 
     for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(len(g.dat.data)):
@@ -233,7 +234,7 @@ def anisoRefine(M, direction=0):
 # TODO: test this
 
 
-def metricGradation(M, op=opt.Options()):
+def metricGradation(M, op=Options()):
     """
     Perform anisotropic metric gradation in the method described in Alauzet 2010, using linear interpolation. Python
     code based on Nicolas Barral's function ``DMPlexMetricGradation2d_Internal`` in ``plex-metGradation.c``, 2017.
@@ -432,7 +433,7 @@ def isotropicAdvection(M_, h_, w, Dt, n=1, timestepper='ImplicitEuler'):
     W = h_.function_space()
     h = Function(W)
     ht = TestFunction(W)
-    F = form.weakResidualAD(h, h_, ht, w, Dt, nu=0., timestepper=timestepper)
+    F = weakResidualAD(h, h_, ht, w, Dt, nu=0., timestepper=timestepper)
 
     # Time integrate
     for i in range(1, n + 1):
@@ -472,7 +473,7 @@ def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEul
         Mt = TestFunction(V)
 
         # Set up tensor advection FEM problem
-        F = form.weakMetricAdvection(M, M_, Mt, w, Dt, timestepper=timestepper)
+        F = weakMetricAdvection(M, M_, Mt, w, Dt, timestepper=timestepper)
         prob = NonlinearVariationalProblem(F, M)
         solv = NonlinearVariationalSolver(prob, bc=bc)
 
@@ -502,7 +503,7 @@ def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEul
                 b.dat.data[i] = l_.dat.data[i]
 
         # Set up vector advection FEM problem
-        F = form.weakMetricAdvection(l, l_, lt, w, Dt, timestepper=timestepper)
+        F = weakMetricAdvection(l, l_, lt, w, Dt, timestepper=timestepper)
         prob = NonlinearVariationalProblem(F, l)
         solv = NonlinearVariationalSolver(prob, bc=DirichletBC(W, b, 'on_boundary'))
 

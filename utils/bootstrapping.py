@@ -4,20 +4,20 @@ from thetis import *
 import numpy as np
 from time import clock
 
-import utils.adaptivity as adap
-import utils.forms as form
-import utils.mesh as msh
-import utils.options as opt
+from .adaptivity import isoP2
+from .forms import indicator, weakResidualAD, weakResidualSW, adjointAD
+from .mesh import meshStats, TohokuDomain
+from .options import Options
 
 
 __all__ = ["solverAD", "solverSW", "solverFiredrake", "bootstrap", "continuousAdjointAD", "continuousAdjointSW"]
 
 
-def solverAD(n, op=opt.Options(Tend=2.4)):
+def solverAD(n, op=Options(Tend=2.4)):
 
     # Define Mesh and FunctionSpace
     mesh = RectangleMesh(4 * n, n, 4, 1)  # Computational mesh
-    nEle = msh.meshStats(mesh)[0]
+    nEle = meshStats(mesh)[0]
     x, y = SpatialCoordinate(mesh)
     V = FunctionSpace(mesh, "CG", 2)
 
@@ -34,8 +34,8 @@ def solverAD(n, op=opt.Options(Tend=2.4)):
 
     # Define variational problem and OF
     ct = TestFunction(V)
-    F = form.weakResidualAD(c, c_, ct, w, Dt, nu=1e-3)
-    iA = form.indicator(V)
+    F = weakResidualAD(c, c_, ct, w, Dt, nu=1e-3)
+    iA = indicator(V)
 
     J_trap = assemble(c_ * iA * dx)
     t = 0.
@@ -55,12 +55,12 @@ def solverAD(n, op=opt.Options(Tend=2.4)):
     return J_trap * dt, nEle
 
 
-def solverSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg',)):
+def solverSW(n, op=Options(Tstart=0.5, Tend=2.5, family='dg-cg',)):
 
     # Define Mesh and FunctionSpace
     lx = 2 * np.pi
     mesh = SquareMesh(2*n, 2*n, lx, lx)
-    nEle = msh.meshStats(mesh)[0]
+    nEle = meshStats(mesh)[0]
     x, y = SpatialCoordinate(mesh)
     V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
 
@@ -82,9 +82,9 @@ def solverSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg',)):
 
     # Define variational problem and OF
     qt = TestFunction(V)
-    forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
+    forwardProblem = NonlinearVariationalProblem(weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
     forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
-    iA = form.indicator(V.sub(1), x1=0., x2=0.5*np.pi, y1=0.5*np.pi, y2=1.5*np.pi, smooth=False)
+    iA = indicator(V.sub(1), x1=0., x2=0.5*np.pi, y1=0.5*np.pi, y2=1.5*np.pi, smooth=False)
 
     started = False
     t = 0.
@@ -108,14 +108,14 @@ def solverSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg',)):
     return J_trap * dt, nEle
 
 
-def solverFiredrake(nEle, isoP2=0, op=opt.Options()):
+def solverFiredrake(nEle, iso=0, op=Options()):
 
     # Define Mesh and FunctionSpace
-    mesh = msh.TohokuDomain(nEle)[0]
-    if bool(isoP2):
-        for i in range(int(isoP2)):
-            mesh = adap.isoP2(mesh)
-    eta0, b = msh.TohokuDomain(mesh=mesh)[1:]
+    mesh = TohokuDomain(nEle)[0]
+    if bool(iso):
+        for i in range(int(iso)):
+            mesh = isoP2(mesh)
+    eta0, b = TohokuDomain(mesh=mesh)[1:]
     V = VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2)
 
     # Specify solver parameters
@@ -135,9 +135,9 @@ def solverFiredrake(nEle, isoP2=0, op=opt.Options()):
 
     # Define variational problem and OF
     qt = TestFunction(V)
-    forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
+    forwardProblem = NonlinearVariationalProblem(weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
     forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
-    iA = form.indicator(V.sub(1), x1=490e3, x2=640e3, y1=4160e3, y2=4360e3, smooth=True)
+    iA = indicator(V.sub(1), x1=490e3, x2=640e3, y1=4160e3, y2=4360e3, smooth=True)
 
     started = False
     t = 0.
@@ -161,7 +161,7 @@ def solverFiredrake(nEle, isoP2=0, op=opt.Options()):
     return J_trap * dt
 
 
-def bootstrap(problem='advection-diffusion', maxIter=12, tol=1e-3, slowTol=10., op=opt.Options()):
+def bootstrap(problem='advection-diffusion', maxIter=12, tol=1e-3, slowTol=10., op=Options()):
     Js = []         # Container for objective functional values
     ts = []         # Timing values
     nEls = []       # Container for element counts
@@ -183,7 +183,7 @@ def bootstrap(problem='advection-diffusion', maxIter=12, tol=1e-3, slowTol=10., 
             J = solverFiredrake(nEle)
         elif problem == 'isoP2-firedrake-tsunami':
             nEle = op.meshes[0] * pow(4, i)
-            J = solverFiredrake(op.meshes[0], isoP2=i)
+            J = solverFiredrake(op.meshes[0], iso=i)
         elif problem == 'thetis-tsunami':
             nEle = op.meshes[i]
             J = solverFiredrake(nEle)
@@ -225,7 +225,7 @@ def bootstrap(problem='advection-diffusion', maxIter=12, tol=1e-3, slowTol=10., 
         return pow(2, iOpt), Js, nEls, ts
 
 
-def continuousAdjointSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg')):
+def continuousAdjointSW(n, op=Options(Tstart=0.5, Tend=2.5, family='dg-cg')):
 
     # Define Mesh and FunctionSpace
     lx = 2 * np.pi
@@ -254,12 +254,12 @@ def continuousAdjointSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg'))
 
     # Define forward problem
     qt = TestFunction(V)
-    forwardProblem = NonlinearVariationalProblem(form.weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
+    forwardProblem = NonlinearVariationalProblem(weakResidualSW(q, q_, qt, b, Dt, allowNormalFlow=False), q)
     forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
 
     # Define adjoint problem
     switch = Constant(1.)
-    adjointProblem = NonlinearVariationalProblem(form.weakResidualSW(l, l_, qt, b, Dt, allowNormalFlow=False,
+    adjointProblem = NonlinearVariationalProblem(weakResidualSW(l, l_, qt, b, Dt, allowNormalFlow=False,
                                                                      adjoint=True, switch=switch), l)
     adjointSolver = NonlinearVariationalSolver(adjointProblem, solver_parameters=op.params)
 
@@ -291,10 +291,10 @@ def continuousAdjointSW(n, op=opt.Options(Tstart=0.5, Tend=2.5, family='dg-cg'))
     # adj_html("outdata/visualisations/forward.html", "forward")
     # adj_html("outdata/visualisations/adjoint.html", "adjoint")
 
-    return primalTimer, dualTimer, msh.meshStats(mesh)[0]
+    return primalTimer, dualTimer, meshStats(mesh)[0]
 
 
-def continuousAdjointAD(n, op=opt.Options(Tend=2.4)):
+def continuousAdjointAD(n, op=Options(Tend=2.4)):
 
     # Define Mesh and FunctionSpace
     mesh = RectangleMesh(4 * n, n, 4, 1)  # Computational mesh
@@ -316,8 +316,8 @@ def continuousAdjointAD(n, op=opt.Options(Tend=2.4)):
 
     # Define forward and adjoint problems
     ct = TestFunction(V)
-    F = form.weakResidualAD(c, c_, ct, w, Dt, nu=1e-3)
-    A = form.adjointAD(l, l_, ct, w, Dt)
+    F = weakResidualAD(c, c_, ct, w, Dt, nu=1e-3)
+    A = adjointAD(l, l_, ct, w, Dt)
 
     t = 0.
     cnt = 0
@@ -342,4 +342,4 @@ def continuousAdjointAD(n, op=opt.Options(Tend=2.4)):
         slowdown = 1. / slowdown
     print('Cts case: Adjoint run %.3fx %s than forward run.' % (slowdown, 'slower' if slow else 'faster'))
 
-    return primalTimer, dualTimer, msh.meshStats(mesh)[0]
+    return primalTimer, dualTimer, meshStats(mesh)[0]

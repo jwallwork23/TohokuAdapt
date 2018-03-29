@@ -1,15 +1,14 @@
-from thetis import *
+from thetis_adjoint import *
 from thetis.callback import DiagnosticCallback
 
-from . import forms
-from . import options
+from .forms import indicator
 
 
-__all__ = ["IntegralCallback", "TohokuCallback", "ShallowWaterCallback", "RossbyWaveCallback",
+__all__ = ["FunctionalCallback", "TohokuCallback", "ShallowWaterCallback", "RossbyWaveCallback",
            "GaugeCallback", "P02Callback", "P06Callback", "ObjectiveCallback", "ObjectiveSWCallback"]
 
 
-class IntegralCallback(DiagnosticCallback):
+class FunctionalCallback(DiagnosticCallback):
     """Base class for callbacks that integrate a scalar quantity in time and space. Time integration is achieved
     using the trapezium rule."""
     variable_names = ['current integral', 'objective value']
@@ -23,18 +22,16 @@ class IntegralCallback(DiagnosticCallback):
         :arg solver_obj: Thetis solver object
         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
         """
-        super(IntegralCallback, self).__init__(solver_obj, **kwargs)
+        super(FunctionalCallback, self).__init__(solver_obj, **kwargs)
         self.scalar_callback = scalar_callback
         self.objective_value = 0.5 * scalar_callback() * solver_obj.options.timestep
         self.append_to_hdf5 = False
         self.append_to_log = False
 
     def __call__(self):
-        # Output OF value
-        t = self.solver_obj.simulation_time
         dt = self.solver_obj.options.timestep
         value = self.scalar_callback() * dt
-        if t > self.solver_obj.options.simulation_end_time - 0.5 * dt:
+        if self.solver_obj.simulation_time > self.solver_obj.options.simulation_end_time - 0.5 * dt:
             value *= 0.5
         self.objective_value += value
 
@@ -45,7 +42,7 @@ class IntegralCallback(DiagnosticCallback):
         return line
 
 
-class TohokuCallback(IntegralCallback):
+class TohokuCallback(FunctionalCallback):
     """Integrates objective functional."""
     name = 'objective functional'
 
@@ -62,18 +59,19 @@ class TohokuCallback(IntegralCallback):
             :return: objective functional value for callbacks.
             """
             elev_2d = solver_obj.fields.solution_2d.split()[1]
-            ks = forms.indicator(elev_2d.function_space(), mode='tohoku')
+            ks = indicator(elev_2d.function_space(), mode='tohoku')
             kt = Constant(0.)
+            dt = solver_obj.options.timestep
             Tstart = solver_obj.options.period_of_interest_start
-            if solver_obj.simulation_time > Tstart:
-                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * solver_obj.options.timestep else 0.5)
+            if solver_obj.simulation_time > Tstart - 0.5 * dt:
+                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * dt else 0.5)
 
             return assemble(elev_2d * ks * kt * dx)
 
         super(TohokuCallback, self).__init__(indicatorTohoku, solver_obj, **kwargs)
 
 
-class ShallowWaterCallback(IntegralCallback):
+class ShallowWaterCallback(FunctionalCallback):
     """Integrates objective functional."""
     name = 'objective functional'
 
@@ -90,18 +88,19 @@ class ShallowWaterCallback(IntegralCallback):
             :return: objective functional value for callbacks.
             """
             elev_2d = solver_obj.fields.solution_2d.split()[1]
-            ks = forms.indicator(elev_2d.function_space(), mode='shallow-water')
+            ks = indicator(elev_2d.function_space(), mode='shallow-water')
             kt = Constant(0.)
+            dt = solver_obj.options.timestep
             Tstart = solver_obj.options.period_of_interest_start
-            if solver_obj.simulation_time > Tstart:
-                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * solver_obj.options.timestep else 0.5)
+            if solver_obj.simulation_time > Tstart - 0.5 * dt:
+                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * dt else 0.5)
 
             return assemble(elev_2d * ks * kt * dx)
 
         super(ShallowWaterCallback, self).__init__(indicatorSW, solver_obj, **kwargs)
 
 
-class RossbyWaveCallback(IntegralCallback):
+class RossbyWaveCallback(FunctionalCallback):
     """Integrates objective functional."""
     name = 'objective functional'
 
@@ -118,11 +117,12 @@ class RossbyWaveCallback(IntegralCallback):
             :return: objective functional value for callbacks.
             """
             elev_2d = solver_obj.fields.solution_2d.split()[1]
-            ks = forms.indicator(elev_2d.function_space(), mode='rossby-wave')
+            ks = indicator(elev_2d.function_space(), mode='rossby-wave')
             kt = Constant(0.)
+            dt = solver_obj.options.timestep
             Tstart = solver_obj.options.period_of_interest_start
-            if solver_obj.simulation_time > Tstart:
-                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * solver_obj.options.timestep else 0.5)
+            if solver_obj.simulation_time > Tstart - 0.5 * dt:
+                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * dt else 0.5)
 
             return assemble(elev_2d * ks * kt * dx)
 
@@ -253,11 +253,12 @@ class ObjectiveTohokuCallback(ObjectiveCallback):
             V = solver_obj.fields.solution_2d.function_space()
             ks = Function(V)
             k0, k1 = ks.split()
-            k1.assign(forms.indicator(V.sub(1), mode='tohoku'))
+            k1.assign(indicator(V.sub(1), mode='tohoku'))
             kt = Constant(0.)
+            dt = solver_obj.options.timestep
             Tstart = solver_obj.options.period_of_interest_start
-            if solver_obj.simulation_time > Tstart:
-                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * solver_obj.options.timestep else 0.5)
+            if solver_obj.simulation_time > Tstart - 0.5 * dt:
+                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * dt else 0.5)
 
             return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
 
@@ -283,11 +284,12 @@ class ObjectiveSWCallback(ObjectiveCallback):
             V = solver_obj.fields.solution_2d.function_space()
             ks = Function(V)
             k0, k1 = ks.split()
-            k1.assign(forms.indicator(V.sub(1), mode='shallow-water'))
+            k1.assign(indicator(V.sub(1), mode='shallow-water'))
             kt = Constant(0.)
+            dt = solver_obj.options.timestep
             Tstart = solver_obj.options.period_of_interest_start
-            if solver_obj.simulation_time > Tstart:
-                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * solver_obj.options.timestep else 0.5)
+            if solver_obj.simulation_time > Tstart - 0.5 * dt:
+                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * dt else 0.5)
 
             return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
 
@@ -313,11 +315,12 @@ class ObjectiveRWCallback(ObjectiveCallback):
             V = solver_obj.fields.solution_2d.function_space()
             ks = Function(V)
             k0, k1 = ks.split()
-            k1.assign(forms.indicator(V.sub(1), mode='rossby-wave'))
+            k1.assign(indicator(V.sub(1), mode='rossby-wave'))
             kt = Constant(0.)
+            dt = solver_obj.options.timestep
             Tstart = solver_obj.options.period_of_interest_start
-            if solver_obj.simulation_time > Tstart:
-                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * solver_obj.options.timestep else 0.5)
+            if solver_obj.simulation_time > Tstart - 0.5 * dt:
+                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * dt else 0.5)
 
             return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
 

@@ -20,7 +20,6 @@ resources/meshes/
 resources/GMT/
 utils/.idea/
 outdata/
-outputs/
 
 
 ## Files to be ignored:
@@ -30,9 +29,6 @@ outputs/
 
 # Old test script
 shallow-water-test.py
-
-# Plot timeseries at a later time
-quickPlot.py
 
 # Testing
 wdTest.py

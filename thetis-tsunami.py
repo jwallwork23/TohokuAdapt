@@ -1,4 +1,4 @@
-from thetis import *
+from thetis_adjoint import *
 from thetis.field_defs import field_metadata
 from firedrake_adjoint import *
 import pyadjoint
@@ -595,8 +595,8 @@ if __name__ == '__main__':
     s = '_BOOTSTRAP' if op.bootstrap else ''
     textfile = open('outdata/outputs/'+mode+'/'+approach+date+s+'.txt', 'w+')
     if op.bootstrap:
-        for i in range(11):
-        # for i in range(8):
+        # for i in range(11):
+        for i in range(8):   # TODO: Can't currently do multiple adjoint runs
             av, rel, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
             var = np.abs(J_h - J_h_) if i > 0 else 0.
             J_h_ = J_h

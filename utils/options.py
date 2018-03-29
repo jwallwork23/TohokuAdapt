@@ -2,7 +2,7 @@ from firedrake import *
 
 import numpy as np
 
-from . import conversion
+from .conversion import from_latlon
 
 
 __all__ = ["Options"]
@@ -239,7 +239,7 @@ class Options:
         :param gauge: Tide / pressure gauge name, from {P02, P06, 801, 802, 803, 804, 806}.
         :return: UTM coordinate for chosen gauge.
         """
-        E, N, zn, zl = conversion.from_latlon(self.glatlon[gauge][0], self.glatlon[gauge][1], force_zone_number=54)
+        E, N, zn, zl = from_latlon(self.glatlon[gauge][0], self.glatlon[gauge][1], force_zone_number=54)
         return E, N
 
     def checkCFL(self, b):
