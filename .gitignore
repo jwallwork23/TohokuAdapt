@@ -34,6 +34,7 @@ shallow-water-test.py
 wdTest.py
 heat_eqn.py
 helmholtz.py
+advection-diffusion.py
 pyadjoint-test-firedrake.py
 pyadjoint-test-burgers.py
 pyadjoint-test-thetis.py

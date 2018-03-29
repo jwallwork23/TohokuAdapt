@@ -144,16 +144,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     # Get timestep
     solver_obj = solver2d.FlowSolver2d(mesh_H, b)
-    if mode == 'shallow-water':
-        dt = 0.025                          # TODO: change this
-    else:
-        # Ensure simulation time is achieved exactly.
-        solver_obj.create_equations()
-        dt = min(np.abs(solver_obj.compute_time_step().dat.data))
-        for i in (3., 2.5, 2., 1.5, 1., 0.5, 0.25, 0.2, 0.1, 0.05):
-            if dt > i:
-                dt = i
-                break
+    dt = 0.05                               # For consistency
     Dt = Constant(dt)
     # iEnd = int(np.ceil(T / (dt * op.rm)))
     iEnd = int(T / (dt * op.rm))            # It appears this format is better for CFL criterion derived timesteps

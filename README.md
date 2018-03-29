@@ -10,7 +10,6 @@ As part of my PhD research, that work is integrated into the coastal, estuarine 
 * A ``utils`` directory, containing the necessary functions for implementation of isotropic and anisotropic mesh
 adaptivity:
     * Hessians and metrics are approximated using ``adaptivity``.
-    * Bootstrapping for a near-optimal initial mesh is achieved using ``bootstrapping``.
     * Callbacks for assembling objective functionals and extracting timeseries are provided in ``callbacks``.
     * Coordinate transformations are achieved using ``conversion``.
     * (Local) error indicators are computed using ``error``.
@@ -32,7 +31,6 @@ The following meshing strategies are implemented:
     * explicit and implicit a posteriori error estimators based on shallow water residuals;
     * a 'domain of dependence' type estimator as used in Davis and LeVeque 2016;
     * goal-oriented mesh adaptivity, weighting error estimates by adjoint solution data.
-* Additional ``advection-diffusion`` test problem, defined on a rectangular model domain.
 
 For feedback, comments and questions, please email j.wallwork16@imperial.ac.uk.
 
