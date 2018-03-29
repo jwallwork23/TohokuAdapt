@@ -1,4 +1,6 @@
 from firedrake import *
+from firedrake_adjoint import *
+from firedrake import Expression
 
 import numpy as np
 
@@ -68,7 +70,6 @@ def formsSW(q, q_, b, Dt, coriolisFreq=None, nonlinear=False, impermeable=True, 
         B -= a1 * inner(b * u, grad(xi)) * dx
         if V.sub(0).ufl_element().family() != 'Lagrange':
             B += a1 * jump(b * u * xi, n=FacetNormal(V.mesh())) * dS
-        # TODO: Test this
     else:
         B += a1 * div(b * u) * xi * dx
     if coriolisFreq:
@@ -132,9 +133,6 @@ def weakResidualSW(q, q_, b, Dt, coriolisFreq=None, nonlinear=False, impermeable
     return B - L
 
 
-# TODO: Conisder 2D linear dispersive SWEs as in Saito '10a
-
-
 def interelementTerm(v, n=None):
     """
     :arg v: Function to be averaged over element boundaries.
@@ -148,36 +146,6 @@ def interelementTerm(v, n=None):
         return 0.5 * (v('+') * n('+') - v('-') * n('-'))
     else:
         return 0.5 * (dot(v('+'), n('+')) - dot(v('-'), n('-')))
-
-
-def solutionHuang(V, t=0., B=0.395):
-    """
-    :arg V: Mixed function space upon which to define solutions.
-    :arg t: current time.
-    :param B: Parameter controlling amplitude of soliton.
-    :return: Analytic solution for rossby-wave test problem of Huang.
-    """
-    x, y = SpatialCoordinate(V.mesh())
-    q = Function(V)
-    u, eta = q.split()
-
-    A = 0.771 * B * B
-    W = FunctionSpace(V.mesh(), V.sub(0).ufl_element().family(), V.sub(0).ufl_element().degree())
-    u0 = Function(W).interpolate(
-        A * (1 / (cosh(B * (x + 0.4 * t)) ** 2))
-        * 0.25 * (-9 + 6 * y * y)
-        * exp(-0.5 * y * y))
-    u1 = Function(W).interpolate(
-        -2 * B * tanh(B * (x + 0.4 * t)) *
-        A * (1 / (cosh(B * (x + 0.4 * t)) ** 2))
-        * 2 * y * exp(-0.5 * y * y))
-    u.dat.data[:,0] = u0.dat.data
-    u.dat.data[:,1] = u1.dat.data
-    eta.interpolate(A * (1 / (cosh(B * (x + 0.4 * t)) ** 2))
-                    * 0.25 * (3 + 6 * y * y)
-                    * exp(-0.5 * y * y))
-
-    return q
 
 
 def strongResidualAD(c, c_, w, Dt, nu=1e-3, timestepper='CrankNicolson'):
@@ -286,3 +254,33 @@ def indicator(V, mode='tohoku'):
         File("plots/adjointBased/kernel.pvd").write(iA)
 
     return iA
+
+
+def solutionHuang(V, t=0., B=0.395):
+    """
+    :arg V: Mixed function space upon which to define solutions.
+    :arg t: current time.
+    :param B: Parameter controlling amplitude of soliton.
+    :return: Analytic solution for rossby-wave test problem of Huang.
+    """
+    x, y = SpatialCoordinate(V.mesh())
+    q = Function(V)
+    u, eta = q.split()
+
+    A = 0.771 * B * B
+    W = FunctionSpace(V.mesh(), V.sub(0).ufl_element().family(), V.sub(0).ufl_element().degree())
+    u0 = Function(W).interpolate(
+        A * (1 / (cosh(B * (x + 0.4 * t)) ** 2))
+        * 0.25 * (-9 + 6 * y * y)
+        * exp(-0.5 * y * y))
+    u1 = Function(W).interpolate(
+        -2 * B * tanh(B * (x + 0.4 * t)) *
+        A * (1 / (cosh(B * (x + 0.4 * t)) ** 2))
+        * 2 * y * exp(-0.5 * y * y))
+    u.dat.data[:,0] = u0.dat.data
+    u.dat.data[:,1] = u1.dat.data
+    eta.interpolate(A * (1 / (cosh(B * (x + 0.4 * t)) ** 2))
+                    * 0.25 * (3 + 6 * y * y)
+                    * exp(-0.5 * y * y))
+
+    return q

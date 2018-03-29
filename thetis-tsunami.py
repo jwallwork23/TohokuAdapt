@@ -9,6 +9,7 @@ from time import clock
 import datetime
 
 import utils.adaptivity as adap
+import utils.callbacks as cb
 import utils.error as err
 import utils.forms as form
 import utils.interpolation as inte
@@ -199,14 +200,14 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         else:
             solver_obj.assign_initial_conditions(elev=eta0)
         if mode == 'tohoku':
-            cb1 = err.TohokuCallback(solver_obj)
-            cb2 = err.ObjectiveTohokuCallback(solver_obj)
+            cb1 = cb.TohokuCallback(solver_obj)
+            cb2 = cb.ObjectiveTohokuCallback(solver_obj)
         elif mode == 'shallow-water':
-            cb1 = err.ShallowWaterCallback(solver_obj)
-            cb2 = err.ObjectiveSWCallback(solver_obj)
+            cb1 = cb.ShallowWaterCallback(solver_obj)
+            cb2 = cb.ObjectiveSWCallback(solver_obj)
         else:
-            cb1 = err.RossbyWaveCallback(solver_obj)
-            cb2 = err.ObjectiveRWCallback(solver_obj)
+            cb1 = cb.RossbyWaveCallback(solver_obj)
+            cb2 = cb.ObjectiveRWCallback(solver_obj)
         solver_obj.add_callback(cb1, 'timestep')
         solver_obj.add_callback(cb2, 'timestep')
         solver_obj.bnd_functions['shallow_water'] = BCs
@@ -501,11 +502,11 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 # Evaluate callbacks and iterate
                 if op.outputOF:
                     if mode == 'tohoku':
-                        cb1 = err.TohokuCallback(adapSolver)
+                        cb1 = cb.TohokuCallback(adapSolver)
                     elif mode == 'shallow-water':
-                        cb1 = err.ShallowWaterCallback(adapSolver)
+                        cb1 = cb.ShallowWaterCallback(adapSolver)
                     elif mode == 'rossby-wave':
-                        cb1 = err.RossbyWaveCallback(adapSolver)
+                        cb1 = cb.RossbyWaveCallback(adapSolver)
                     if cnt != 0:
                         cb1.objective_functional = J_h
                     adapSolver.add_callback(cb1, 'timestep')
@@ -601,7 +602,7 @@ if __name__ == '__main__':
                   % (i, av, J_h, timing, var))
             textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, J_h, timing, var))
     else:
-        for i in range(6):
+        for i in range(1, 6):
             if mode == 'rossby-wave':
                 av, relativePeak, distanceTravelled, phaseSpd, timing = \
                     solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
