@@ -1,4 +1,4 @@
-from firedrake import *
+from thetis import *
 
 from .conversion import OutOfRangeError
 

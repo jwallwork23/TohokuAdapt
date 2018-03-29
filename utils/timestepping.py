@@ -1,4 +1,4 @@
-from firedrake import *
+from thetis import *
 
 
 __all__ = ["timestepCoeffs", "timestepScheme", "setupSSPRK", "incrementSSPRK"]

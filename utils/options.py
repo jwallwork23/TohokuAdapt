@@ -1,4 +1,4 @@
-from firedrake import *
+from thetis import *
 
 import numpy as np
 

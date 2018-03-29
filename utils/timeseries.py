@@ -1,4 +1,4 @@
-from firedrake import *
+from thetis import *
 
 import scipy.interpolate as si
 import matplotlib.pyplot as plt

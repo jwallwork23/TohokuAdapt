@@ -66,11 +66,6 @@ def printTimings(primal, dual=False, error=False, adapt=False):
     print("Total         %5.3fs\n" % (primal + float(dual) + float(error) + float(adapt)))
 
 
-def dis(string, printStats=True):
-    if printStats:
-        print(string)
-
-
 def getMax(array):
     """
     :param array: 1D array.

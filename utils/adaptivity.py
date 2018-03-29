@@ -1,16 +1,16 @@
-from firedrake import *
+from thetis import *
 
 import numpy as np
 import numpy
 from numpy import linalg as la
 from scipy import linalg as sla
 
-from .forms import weakResidualAD, weakMetricAdvection
+from .forms import weakMetricAdvection
 from .mesh import meshStats
 from .options import Options
 
 
-__all__ = ["constructGradient", "constructHessian", "computeSteadyMetric", "isotropicMetric", "isoP2", "anisoRefine",
+__all__ = ["constructGradient", "constructHessian", "steadyMetric", "isotropicMetric", "isoP2", "anisoRefine",
            "metricGradation", "localMetricIntersection", "metricIntersection", "metricConvexCombination",
            "symmetricProduct", "pointwiseMax", "metricComplexity", "advectMetric", "__main__"]
 
@@ -66,9 +66,9 @@ def constructHessian(f, op=Options()):
     return H
 
 
-def computeSteadyMetric(f, H=None, nVerT=None, errTarget=1e-3, op=Options()):
+def steadyMetric(f, H=None, nVerT=None, errTarget=1e-3, op=Options()):
     """
-    Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``computeSteadyMetric``, from 
+    Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``steadyMetric``, from 
     ``adapt.py``, 2016.
 
     :arg f: P1 solution field.

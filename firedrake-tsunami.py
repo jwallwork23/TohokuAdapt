@@ -36,12 +36,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     :return: mean element count and relative error in objective functional value.
     """
     tic = clock()
-    if mode == 'tohoku':
-        msc.dis('*********************** TOHOKU TSUNAMI SIMULATION *********************\n', op.printStats)
-    elif mode == 'shallow-water':
-        msc.dis('*********************** SHALLOW WATER TEST PROBLEM ********************\n', op.printStats)
-    elif mode == 'rossby-wave':
-        msc.dis('****************** EQUATORIAL ROSSBY WAVE TEST PROBLEM ****************\n', op.printStats)
+    try:
+        assert(mode in ('tohoku', 'shallow-water', 'rossby-wave'))
+    except:
+        raise NotImplementedError
     primalTimer = dualTimer = errorTimer = adaptTimer = False
     if approach in ('implicit', 'DWE'):
         op.orderChange = 1
@@ -86,7 +84,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         raise NotImplementedError
 
     # Define initial FunctionSpace and variables of problem and apply initial conditions
-    V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
+    V_H = op.mixedSpace(mesh_H)
     if mode == 'rossby-wave':
         q0 = form.solutionHuang(V_H, t=0.)
         u0, eta0 = q0.split()
@@ -107,7 +105,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     # Establish finer mesh (h < H) upon which to approximate error
     if op.orderChange == 0:
         mesh_h = adap.isoP2(mesh_H)
-        V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
+        V_h = op.mixedSpace(mesh_h)
         if mode == 'tohoku':
             b_h = msh.TohokuDomain(mesh=mesh_h)[2]
         qh = Function(V_h)
@@ -116,7 +114,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         eh.rename("Fine elevation")
 
     # Specify physical and solver parameters
-    msc.dis('Using initial timestep = %4.3fs\n' % dt, op.printStats)
+    if op.printStats:
+        print('Using initial timestep = %4.3fs\n' % dt)
     Dt = Constant(dt)
     T = op.Tend
     iStart = int(op.Tstart / dt)
@@ -207,7 +206,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             errorProblem = NonlinearVariationalProblem(B - L + B_ - I, e)
             errorSolver = NonlinearVariationalSolver(errorProblem, solver_parameters=op.params)
 
-        msc.dis('Starting fixed mesh primal run (forwards in time)', op.printStats)
+        if op.printStats:
+            print('Starting fixed mesh primal run (forwards in time)')
         primalTimer = clock()
         if op.plotpvd:
             forwardFile.write(u, eta, time=t)
@@ -275,7 +275,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             #     Jval = assemble(switch * inner(k, q_) * dx)
             #     Jvals.append(Jval)
 
-            # # Mark timesteps to be used in adjoint simulation
+            # # Mark timesteps to be used in adjoint simulation     TODO: Update to pyadjoint
             # if useAdjoint:
             #     if t == 0.:
             #         adj_start_timestep()
@@ -294,7 +294,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         cnt -=1
         cntT = cnt  # Total number of steps
         primalTimer = clock() - primalTimer
-        msc.dis('Primal run complete. Run time: %.3fs' % primalTimer, op.printStats)
+        if op.printStats:
+            print('Primal run complete. Run time: %.3fs' % primalTimer)
 
         # Establish OF
         if useAdjoint:
@@ -313,7 +314,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
         if useAdjoint:
             # parameters["adjoint"]["stop_annotating"] = True     # Stop registering equations
-            msc.dis('\nStarting fixed mesh dual run (backwards in time)', op.printStats)
+            if op.printStats:
+                print('\nStarting fixed mesh dual run (backwards in time)')
             dualTimer = clock()
             # for (variable, solution) in compute_adjoint(J):
             #     if save:
@@ -346,7 +348,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             #         save = True
             #     if cnt == -1:
             #         break
-            dJdb = compute_gradient(J, Control(b))  # TODO: Perhaps could make a different, more relevant calculation?
+            dJdb = compute_gradient(J, Control(b))
             tape = get_working_tape()
             solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
 
@@ -358,15 +360,18 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 t -= dt
 
             dualTimer = clock() - dualTimer
-            msc.dis('Adjoint run complete. Run time: %.3fs' % dualTimer, op.printStats)
+            if op.printStats:
+                print('Adjoint run complete. Run time: %.3fs' % dualTimer)
             cnt += 1
 
     # Loop back over times to generate error estimators
     if getError:
-        msc.dis('\nStarting error estimate generation', op.printStats)
+        if op.printStats:
+            print('\nStarting error estimate generation')
         errorTimer = clock()
         for k in range(0, iEnd, op.rm):
-            msc.dis('Generating error estimate %d / %d' % (k / op.rm + 1, iEnd / op.rm + 1), op.printStats)
+            if op.printStats:
+                print('Generating error estimate %d / %d' % (k / op.rm + 1, iEnd / op.rm + 1))
             indexStr = msc.indexString(k)
 
             # Load forward / adjoint / residual data from HDF5
@@ -433,7 +438,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             if op.plotpvd:
                 errorFile.write(epsilon, time=float(k))
         errorTimer = clock() - errorTimer
-        msc.dis('Errors estimated. Run time: %.3fs' % errorTimer, op.printStats)
+        if op.printStats:
+            print('Errors estimated. Run time: %.3fs' % errorTimer)
 
     if approach != 'fixedMesh':
         # Reset initial conditions
@@ -444,7 +450,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             eta_.interpolate(eta0)
         if op.gradate:
             H0 = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(CellSize(mesh_H))
-        msc.dis('\nStarting adaptive mesh primal run (forwards in time)', op.printStats)
+        if op.printStats:
+            print('\nStarting adaptive mesh primal run (forwards in time)')
         adaptTimer = clock()
         while t <= T:
             if cnt % op.rm == 0:
@@ -471,7 +478,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                                 g = adap.constructGradient(eta)
                                 M = adap.isotropicMetric(g, invert=False, nVerT=nVerT, op=op)
                             elif approach == 'hessianBased':
-                                M = adap.computeSteadyMetric(eta, nVerT=nVerT, op=op)
+                                M = adap.steadyMetric(eta, nVerT=nVerT, op=op)
                         if cnt != 0:    # Can't adapt to zero velocity
                             if op.mtype != 'f':
                                 spd = Function(FunctionSpace(mesh_H, 'DG', 1)).interpolate(sqrt(dot(u, u)))
@@ -481,16 +488,14 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                                     g = adap.constructGradient(spd)
                                     M2 = adap.isotropicMetric(g, invert=False, nVerT=nVerT, op=op)
                                 elif approach == 'hessianBased':
-                                    M2 = adap.computeSteadyMetric(spd, nVerT=nVerT, op=op)
+                                    M2 = adap.steadyMetric(spd, nVerT=nVerT, op=op)
                                 M = adap.metricIntersection(M, M2) if op.mtype == 'b' else M2
                 if op.gradate:
                     M_ = adap.isotropicMetric(inte.interp(mesh_H, H0)[0], bdy=True, op=op) # Initial boundary metric
                     M = adap.metricIntersection(M, M_, bdy=True)
-                    adap.metricGradation(M, op=op)
-                    # TODO: always gradate to coast
+                    adap.metricGradation(M, op=op)                  # TODO: always gradate to coast
                 if op.advect:
-                    M = adap.advectMetric(M, u, 2*Dt, n=3*op.rm)
-                    # TODO: isotropic advection?
+                    M = adap.advectMetric(M, u, 2*Dt, n=3*op.rm)    # TODO: isotropic advection?
                 if op.outputMetric:
                     M.rename("Metric")
                     metricFile.write(M, time=t)
@@ -498,7 +503,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 # Adapt mesh and interpolate variables
                 if not (approach in ('fieldBased', 'gradientBased', 'hessianBased') and op.mtype != 'f' and cnt == 0):
                     mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
-                    V_H = VectorFunctionSpace(mesh_H, op.space1, op.degree1) * FunctionSpace(mesh_H, op.space2, op.degree2)
+                    V_H = op.mixedSpace(mesh_H)
                     q_ = inte.mixedPairInterp(mesh_H, V_H, q_)[0]
                     if mode == 'tohoku':
                         b = inte.interp(mesh_H, b)[0]
@@ -541,7 +546,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 adaptiveFile.write(u, eta, time=t)
                 if op.gauges:
                     gaugeData = tim.extractTimeseries(gauges, eta, t, gaugeData, v0, op=op)
-                msc.dis('t = %.2fs' % t, op.printStats)
+                if op.printStats:
+                    print('t = %.2fs' % t)
             t += dt
             cnt += 1
         adaptTimer = clock() - adaptTimer
@@ -553,7 +559,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         if op.outputOF:
             print('Estimated objective value J_h = ', J_h)
         rel = np.abs((op.J(mode) - J_h) / op.J(mode))
-        msc.dis('Adaptive primal run complete. Run time: %.3fs \nRelative error = %5.4f' % (adaptTimer, rel), op.printStats)
+        if op.printStats:
+            print('Adaptive primal run complete. Run time: %.3fs \nRelative error = %5.4f' % (adaptTimer, rel))
     else:
         av = nEle
 

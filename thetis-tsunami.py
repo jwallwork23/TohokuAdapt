@@ -8,20 +8,21 @@ import numpy as np
 from time import clock
 import datetime
 
-import utils.adaptivity as adap
-import utils.callbacks as cb
-import utils.error as err
-import utils.forms as form
-import utils.interpolation as inte
-import utils.mesh as msh
-import utils.misc as msc
-import utils.options as opt
+from utils.adaptivity import isoP2, constructGradient, isotropicMetric, steadyMetric, metricIntersection, metricGradation
+from utils.callbacks import TohokuCallback, ShallowWaterCallback, RossbyWaveCallback
+from utils.callbacks import ObjectiveTohokuCallback, ObjectiveSWCallback, ObjectiveRWCallback
+from utils.error import explicitErrorEstimator, fluxJumpError
+from utils.forms import formsSW, interelementTerm, strongResidualSW
+from utils.interpolation import *
+from utils.mesh import TohokuDomain, domainSW, domainRW, meshStats
+from utils.misc import cheatCodes, indexString, getMax
+from utils.options import *
 
 now = datetime.datetime.now()
 date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
 
-def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mode='tohoku', op=opt.Options()):
+def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mode='tohoku', op=Options()):
     """
     Run mesh adaptive simulations for the Tohoku problem.
 
@@ -35,16 +36,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     :param op: parameter values.
     :return: mean element count and relative error in objective functional value.
     """
-    if mode == 'tohoku':
-        msc.dis('*********************** TOHOKU TSUNAMI SIMULATION *********************\n', op.printStats)
-        g = 9.81
-    elif mode == 'shallow-water':
-        msc.dis('*********************** SHALLOW WATER TEST PROBLEM ********************\n', op.printStats)
-        g = 9.81
-    elif mode == 'rossby-wave':
-        msc.dis('****************** EQUATORIAL ROSSBY WAVE TEST PROBLEM ****************\n', op.printStats)
-        g = 1.
-    else:
+    try:
+        g = {'tohoku': 9.81, 'shallow-water': 9.81, 'rossby-wave': 1.}[mode]
+    except:
         raise NotImplementedError
     try:
         assert (float(physical_constants['g_grav'].dat.data) == g)
@@ -64,11 +58,13 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     # Load Mesh, initial condition and bathymetry
     if mode == 'tohoku':
-        mesh_H, eta0, b, BCs = msh.TohokuDomain(startRes, wd=op.wd)
+        mesh_H, eta0, b, BCs = TohokuDomain(startRes, wd=op.wd)
+        f = None
     elif mode == 'shallow-water':
-        mesh_H, eta0, b, BCs = msh.domainSW(startRes)
+        mesh_H, eta0, b, BCs = domainSW(startRes)
+        f = None
     else:
-        mesh_H, u0, eta0, b, BCs, f = msh.domainRW(startRes, op=op)
+        mesh_H, u0, eta0, b, BCs, f = domainRW(startRes, op=op)
     T = op.Tend
 
     # Define initial FunctionSpace and variables of problem and apply initial conditions
@@ -96,10 +92,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 dual_oi = Function(V_oi)
                 dual_oi_u, dual_oi_e = dual_oi.split()
         else:
-            mesh_h = adap.isoP2(mesh_H)
-            V_h = VectorFunctionSpace(mesh_h, op.space1, op.degree1) * FunctionSpace(mesh_h, op.space2, op.degree2)
+            mesh_h = isoP2(mesh_H)
+            V_h = op.mixedSpace(mesh_h)
             if mode == 'tohoku':
-                b_h = msh.TohokuDomain(mesh=mesh_h)[2]
+                b_h = TohokuDomain(mesh=mesh_h)[2]
             elif mode == 'shallow-water':
                 b_h = Function(FunctionSpace(mesh_h, "CG", 1)).assign(0.1)
             qh = Function(V_h)
@@ -116,7 +112,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             dual_u, dual_e = dual.split()
             dual_u.rename("Adjoint velocity")
             dual_e.rename("Adjoint elevation")
-        if approach in ('Implicit', 'DWE'):
+        if approach in ('implicit', 'DWE'):
             e_ = Function(V_oi)
             e = Function(V_oi)
             e0, e1 = e.split()
@@ -136,7 +132,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     v = TestFunction(P0)
 
     # Initialise adaptivity placeholders and counters
-    nEle, nVerT = msh.meshStats(mesh_H)
+    nEle, nVerT = meshStats(mesh_H)
     nVerT *= op.vscale                      # Target #Vertices
     mM = [nEle, nEle]                       # Min/max #Elements
     Sn = nEle
@@ -144,14 +140,14 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     # Get timestep
     solver_obj = solver2d.FlowSolver2d(mesh_H, b)
-    dt = 0.05                               # For consistency
+    dt = 0.5 if mode == 'tohoku' else 0.05  # For consistency
     Dt = Constant(dt)
     # iEnd = int(np.ceil(T / (dt * op.rm)))
     iEnd = int(T / (dt * op.rm))            # It appears this format is better for CFL criterion derived timesteps
     if op.gradate or op.wd:                 # Get initial boundary metric
         H0 = Function(P1).interpolate(CellSize(mesh_H))
     if op.wd:
-        g = adap.constructGradient(elev_2d)
+        g = constructGradient(elev_2d)
         spd = assemble(v * sqrt(inner(g, g)) * dx)
         gs = np.min(np.abs(spd.dat.data))
         print('#### gradient = ', gs)
@@ -164,7 +160,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     tic = clock()
     if getData:
-        msc.dis('Starting fixed mesh primal run (forwards in time)', op.printStats)
+        if op.printStats:
+            print('Starting fixed mesh primal run (forwards in time)')
         primalTimer = clock()
 
         # Get solver parameter values and construct solver
@@ -194,14 +191,14 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         else:
             solver_obj.assign_initial_conditions(elev=eta0)
         if mode == 'tohoku':
-            cb1 = cb.TohokuCallback(solver_obj)
-            cb2 = cb.ObjectiveTohokuCallback(solver_obj)
+            cb1 = TohokuCallback(solver_obj)
+            cb2 = ObjectiveTohokuCallback(solver_obj)
         elif mode == 'shallow-water':
-            cb1 = cb.ShallowWaterCallback(solver_obj)
-            cb2 = cb.ObjectiveSWCallback(solver_obj)
+            cb1 = ShallowWaterCallback(solver_obj)
+            cb2 = ObjectiveSWCallback(solver_obj)
         else:
-            cb1 = cb.RossbyWaveCallback(solver_obj)
-            cb2 = cb.ObjectiveRWCallback(solver_obj)
+            cb1 = RossbyWaveCallback(solver_obj)
+            cb2 = ObjectiveRWCallback(solver_obj)
         solver_obj.add_callback(cb1, 'timestep')
         solver_obj.add_callback(cb2, 'timestep')
         solver_obj.bnd_functions['shallow_water'] = BCs
@@ -224,17 +221,19 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     rm = options.timesteps_per_remesh
                     dt = options.timestep
                     options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
-            solver_obj.iterate(export_func=selector)    # TODO: This ^^^ doesn't always work
+            solver_obj.iterate(export_func=selector)
         else:
             solver_obj.iterate()
         J_h = cb1.__call__()[1]    # Evaluate objective functional
         primalTimer = clock() - primalTimer
-        msc.dis('Primal run complete. Run time: %.3fs' % primalTimer, op.printStats)
+        if op.printStats:
+            print('Primal run complete. Run time: %.3fs' % primalTimer)
 
         # Reset counters
         cntT = int(np.ceil(T/dt))
         if useAdjoint:
-            msc.dis('\nGenerating dual solutions...', op.printStats)
+            if op.printStats:
+                print('\nGenerating dual solutions...')
             dualTimer = clock()
 
             # Assemble objective functional
@@ -259,7 +258,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 dual_u, dual_e = dual.split()
                 dual_u.rename('Adjoint velocity')
                 dual_e.rename('Adjoint elevation')
-                with DumbCheckpoint(di+'hdf5/adjoint_'+msc.indexString(int((i-r+1)/op.rm)), mode=FILE_CREATE) as saveAdj:
+                with DumbCheckpoint(di+'hdf5/adjoint_'+indexString(int((i-r+1)/op.rm)), mode=FILE_CREATE) as saveAdj:
                     saveAdj.store(dual_u)
                     saveAdj.store(dual_e)
                     saveAdj.close()
@@ -268,47 +267,50 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 if op.printStats:
                     print('Adjoint simulation %.2f%% complete' % ((N - i + r - 1) / N * 100))
             dualTimer = clock() - dualTimer
-            msc.dis('Dual run complete. Run time: %.3fs' % dualTimer, op.printStats)
+            if op.printStats:
+                print('Dual run complete. Run time: %.3fs' % dualTimer)
     cnt = 0
 
     # Loop back over times to generate error estimators
     if getError:
-        msc.dis('\nStarting error estimate generation', op.printStats)
+        if op.printStats:
+            print('\nStarting error estimate generation')
         errorTimer = clock()
 
         # Define implicit error problem
         if approach in ('implicit', 'DWE'): # TODO: Check out situation with nonlinear option
-            B_, L = form.formsSW(q_oi, q_oi_, b, Dt, impermeable=False, coriolisFreq=f, nonlinear=True)
-            B = form.formsSW(e, e_, b, Dt, impermeable=False, coriolisFreq=f, nonlinear=True)[0]
-            I = form.interelementTerm(et1 * uv_2d_oi, n=normal) * dS
+            B_, L = formsSW(q_oi, q_oi_, b, Dt, impermeable=False, coriolisFreq=f, nonlinear=True)
+            B = formsSW(e, e_, b, Dt, impermeable=False, coriolisFreq=f, nonlinear=True)[0]
+            I = interelementTerm(et1 * uv_2d_oi, n=normal) * dS
             errorProblem = NonlinearVariationalProblem(B - L + B_ - I, e)
             errorSolver = NonlinearVariationalSolver(errorProblem, solver_parameters=op.params)
 
         for k in range(0, iEnd):
-            msc.dis('Generating error estimate %d / %d' % (k+1, iEnd), op.printStats)
+            if op.printStats:
+                print('Generating error estimate %d / %d' % (k+1, iEnd))
 
             if approach == 'DWF':
-                with DumbCheckpoint(di+'hdf5/Velocity2d_'+msc.indexString(k), mode=FILE_READ) as loadVel:
+                with DumbCheckpoint(di+'hdf5/Velocity2d_'+indexString(k), mode=FILE_READ) as loadVel:
                     loadVel.load(uv_2d)
                     loadVel.close()
-                with DumbCheckpoint(di+'hdf5/Elevation2d_'+msc.indexString(k), mode=FILE_READ) as loadElev:
+                with DumbCheckpoint(di+'hdf5/Elevation2d_'+indexString(k), mode=FILE_READ) as loadElev:
                     loadElev.load(elev_2d)
                     loadElev.close()
             else:
                 i1 = 0 if k == 0 else 2*k-1
                 i2 = 2*k
-                with DumbCheckpoint(di+'hdf5/Velocity2d_'+msc.indexString(i1), mode=FILE_READ) as loadVel:
+                with DumbCheckpoint(di+'hdf5/Velocity2d_'+indexString(i1), mode=FILE_READ) as loadVel:
                     loadVel.load(uv_2d)
                     loadVel.close()
-                with DumbCheckpoint(di+'hdf5/Elevation2d_'+msc.indexString(i1), mode=FILE_READ) as loadElev:
+                with DumbCheckpoint(di+'hdf5/Elevation2d_'+indexString(i1), mode=FILE_READ) as loadElev:
                     loadElev.load(elev_2d)
                     loadElev.close()
                 uv_2d_.assign(uv_2d)
                 elev_2d_.assign(elev_2d)
-                with DumbCheckpoint(di+'hdf5/Velocity2d_'+msc.indexString(i2), mode=FILE_READ) as loadVel:
+                with DumbCheckpoint(di+'hdf5/Velocity2d_'+indexString(i2), mode=FILE_READ) as loadVel:
                     loadVel.load(uv_2d)
                     loadVel.close()
-                with DumbCheckpoint(di+'hdf5/Elevation2d_'+msc.indexString(i2), mode=FILE_READ) as loadElev:
+                with DumbCheckpoint(di+'hdf5/Elevation2d_'+indexString(i2), mode=FILE_READ) as loadElev:
                     loadElev.load(elev_2d)
                     loadElev.close()
 
@@ -329,10 +331,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             # Approximate residuals
             if approach in ('explicit', 'residual', 'DWR'):
                 if op.orderChange:
-                    Au, Ae = form.strongResidualSW(q_oi, q_oi_, b, Dt, coriolisFreq=None, nonlinear=False, op=op)
+                    Au, Ae = strongResidualSW(q_oi, q_oi_, b, Dt, coriolisFreq=None, nonlinear=False, op=op)
                 else:
-                    qh, q_h = inte.mixedPairInterp(mesh_h, V_h, q, q_)
-                    Au, Ae = form.strongResidualSW(qh, q_h, b_h, Dt, coriolisFreq=None, nonlinear=False, op=op)
+                    qh, q_h = mixedPairInterp(mesh_h, V_h, q, q_)
+                    Au, Ae = strongResidualSW(qh, q_h, b_h, Dt, coriolisFreq=None, nonlinear=False, op=op)
                 rho_u.interpolate(Au)
                 rho_e.interpolate(Ae)
                 if op.plotpvd:
@@ -340,12 +342,12 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 if approach == 'residual':
                     epsilon = assemble(v * sqrt(inner(rho, rho)) * dx)
                 elif approach == 'explicit':
-                    epsilon = err.explicitErrorEstimator(q_oi if op.orderChange else q_h, rho,
+                    epsilon = explicitErrorEstimator(q_oi if op.orderChange else q_h, rho,
                                                          b if (op.orderChange or mode != 'tohoku') else b_h, v,
                                                          maxBathy=True if mode == 'tohoku' else False)
 
             if useAdjoint:
-                with DumbCheckpoint(di+'hdf5/adjoint_'+msc.indexString(k), mode=FILE_READ) as loadAdj:
+                with DumbCheckpoint(di+'hdf5/adjoint_'+indexString(k), mode=FILE_READ) as loadAdj:
                     loadAdj.load(dual_u)
                     loadAdj.load(dual_e)
                     loadAdj.close()
@@ -354,18 +356,18 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 elif approach == 'DWE':
                     epsilon = assemble(v* inner(e, dual) * dx)
                 elif approach == 'DWF':
-                    raise NotImplementedError
-                    # TODO: maximise DWF over time window
+                    raise NotImplementedError   # TODO: maximise DWF over time window
 
             # Store error estimates
             epsilon.rename("Error indicator")
-            with DumbCheckpoint(di+'hdf5/'+approach+'Error'+msc.indexString(k), mode=FILE_CREATE) as saveErr:
+            with DumbCheckpoint(di+'hdf5/'+approach+'Error'+indexString(k), mode=FILE_CREATE) as saveErr:
                 saveErr.store(epsilon)
                 saveErr.close()
             if op.plotpvd:
                 errorFile.write(epsilon, time=float(k))
         errorTimer = clock() - errorTimer
-        msc.dis('Errors estimated. Run time: %.3fs' % errorTimer, op.printStats)
+        if op.printStats:
+            print('Errors estimated. Run time: %.3fs' % errorTimer)
 
     if approach != 'fixedMesh':
         with pyadjoint.stop_annotating():
@@ -374,7 +376,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             elev_2d.interpolate(eta0)
             if aposteriori:
                 epsilon = Function(P0, name="Error indicator")
-            msc.dis('\nStarting adaptive mesh primal run (forwards in time)', op.printStats)
+            if op.printStats:
+                print('\nStarting adaptive mesh primal run (forwards in time)')
             adaptTimer = clock()
             # while cnt < np.ceil(T / dt):
             while cnt < int(T / dt):        # It appears this format is better for CFL criterion derived timesteps
@@ -385,56 +388,56 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     V_H = op.mixedSpace(mesh_H)
                     q = Function(V_H)
                     uv_2d, elev_2d = q.split()
-                    with DumbCheckpoint(di+'hdf5/Elevation2d_'+msc.indexString(int(cnt/op.ndump)), mode=FILE_READ) \
+                    with DumbCheckpoint(di+'hdf5/Elevation2d_'+indexString(int(cnt/op.ndump)), mode=FILE_READ) \
                             as loadElev:
                         loadElev.load(elev_2d, name='elev_2d')
                         loadElev.close()
-                    with DumbCheckpoint(di+'hdf5/Velocity2d_'+msc.indexString(int(cnt/op.ndump)), mode=FILE_READ) \
+                    with DumbCheckpoint(di+'hdf5/Velocity2d_'+indexString(int(cnt/op.ndump)), mode=FILE_READ) \
                             as loadVel:
                         loadVel.load(uv_2d, name='uv_2d')
                         loadVel.close()
 
                 # Construct metric
                 if aposteriori:
-                    with DumbCheckpoint(di+'hdf5/'+approach+'Error'+msc.indexString(int(cnt/op.rm)), mode=FILE_READ) \
+                    with DumbCheckpoint(di+'hdf5/'+approach+'Error'+indexString(int(cnt/op.rm)), mode=FILE_READ) \
                             as loadErr:
                         loadErr.load(epsilon)
                         loadErr.close()
-                    errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon)[0])
-                    M = adap.isotropicMetric(errEst, op=op, invert=False, nVerT=nVerT)
+                    errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(interp(mesh_H, epsilon)[0])
+                    M = isotropicMetric(errEst, op=op, invert=False, nVerT=nVerT)
                 else:
                     if approach == 'norm':
                         v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
                         epsilon = assemble(v * inner(q, q) * dx)
-                        M = adap.isotropicMetric(epsilon, invert=False, nVerT=nVerT, op=op)
+                        M = isotropicMetric(epsilon, invert=False, nVerT=nVerT, op=op)
                     elif approach =='fluxJump' and cnt != 0:
                         v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
-                        epsilon = err.fluxJumpError(q, v)
-                        M = adap.isotropicMetric(epsilon, invert=False, nVerT=nVerT, op=op)
+                        epsilon = fluxJumpError(q, v)
+                        M = isotropicMetric(epsilon, invert=False, nVerT=nVerT, op=op)
                     else:
                         if op.mtype != 's':
                             if approach == 'fieldBased':
-                                M = adap.isotropicMetric(elev_2d, invert=False, nVerT=nVerT, op=op)
+                                M = isotropicMetric(elev_2d, invert=False, nVerT=nVerT, op=op)
                             elif approach == 'gradientBased':
-                                g = adap.constructGradient(elev_2d)
-                                M = adap.isotropicMetric(g, invert=False, nVerT=nVerT, op=op)
+                                g = constructGradient(elev_2d)
+                                M = isotropicMetric(g, invert=False, nVerT=nVerT, op=op)
                             elif approach == 'hessianBased':
-                                M = adap.computeSteadyMetric(elev_2d, nVerT=nVerT, op=op)
+                                M = steadyMetric(elev_2d, nVerT=nVerT, op=op)
                         if cnt != 0:    # Can't adapt to zero velocity
                             if op.mtype != 'f':
                                 spd = Function(FunctionSpace(mesh_H, "DG", 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
                                 if approach == 'fieldBased':
-                                    M2 = adap.isotropicMetric(spd, invert=False, nVerT=nVerT, op=op)
+                                    M2 = isotropicMetric(spd, invert=False, nVerT=nVerT, op=op)
                                 elif approach == 'gradientBased':
-                                    g = adap.constructGradient(spd)
-                                    M2 = adap.isotropicMetric(g, invert=False, nVerT=nVerT, op=op)
+                                    g = constructGradient(spd)
+                                    M2 = isotropicMetric(g, invert=False, nVerT=nVerT, op=op)
                                 elif approach == 'hessianBased':
-                                    M2 = adap.computeSteadyMetric(spd, nVerT=nVerT, op=op)
-                                M = adap.metricIntersection(M, M2) if op.mtype == 'b' else M2
+                                    M2 = steadyMetric(spd, nVerT=nVerT, op=op)
+                                M = metricIntersection(M, M2) if op.mtype == 'b' else M2
                 if op.gradate:
-                    M_ = adap.isotropicMetric(inte.interp(mesh_H, H0)[0], bdy=True, op=op)  # Initial boundary metric
-                    M = adap.metricIntersection(M, M_, bdy=True)
-                    adap.metricGradation(M, op=op)
+                    M_ = isotropicMetric(interp(mesh_H, H0)[0], bdy=True, op=op)  # Initial boundary metric
+                    M = metricIntersection(M, M_, bdy=True)
+                    metricGradation(M, op=op)
                 if op.plotpvd:
                     File('plots/'+mode+'/mesh.pvd').write(mesh_H.coordinates, time=float(cnt))
 
@@ -443,9 +446,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                          or approach == 'fluxJump') and cnt == 0):
                     mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
                     P1 = FunctionSpace(mesh_H, "CG", 1)
-                    elev_2d, uv_2d = inte.interp(mesh_H, elev_2d, uv_2d)
+                    elev_2d, uv_2d = interp(mesh_H, elev_2d, uv_2d)
                     if mode == 'tohoku':
-                        b = inte.interp(mesh_H, b)[0]
+                        b = interp(mesh_H, b)[0]
                     elif mode == 'shallow-water':
                         b = Function(P1).assign(0.1)
                     else:
@@ -493,11 +496,11 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
                 # Evaluate callbacks and iterate
                 if mode == 'tohoku':
-                    cb1 = cb.TohokuCallback(adapSolver)
+                    cb1 = TohokuCallback(adapSolver)
                 elif mode == 'shallow-water':
-                    cb1 = cb.ShallowWaterCallback(adapSolver)
+                    cb1 = ShallowWaterCallback(adapSolver)
                 elif mode == 'rossby-wave':
-                    cb1 = cb.RossbyWaveCallback(adapSolver)
+                    cb1 = RossbyWaveCallback(adapSolver)
                 if cnt != 0:
                     cb1.objective_value = J_h
                 adapSolver.add_callback(cb1, 'timestep')
@@ -506,27 +509,28 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 J_h = cb1.__call__()[1]  # Evaluate objective functional
 
                 # Get mesh stats
-                nEle = msh.meshStats(mesh_H)[0]
+                nEle = meshStats(mesh_H)[0]
                 mM = [min(nEle, mM[0]), max(nEle, mM[1])]
                 Sn += nEle
                 cnt += op.rm
                 av = op.printToScreen(int(cnt/op.rm+1), clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, cnt*dt, dt)
 
             adaptTimer = clock() - adaptTimer
-            msc.dis('Adaptive primal run complete. Run time: %.3fs' % adaptTimer, op.printStats)
+            if op.printStats:
+                print('Adaptive primal run complete. Run time: %.3fs' % adaptTimer)
     else:
         av = nEle
     if op.printStats:
-        msc.printTimings(primalTimer, dualTimer, errorTimer, adaptTimer)
+        printTimings(primalTimer, dualTimer, errorTimer, adaptTimer)
 
     # Measure error using metrics, using data from Huang et al.
     if mode == 'rossby-wave':   # TODO: Plot / interpret these results
         index = int(cntT/op.ndump) if approach == 'fixedMesh' else int((cnt-op.rm) / op.ndump)
-        with DumbCheckpoint(di+'hdf5/Elevation2d_'+msc.indexString(index), mode=FILE_READ) as loadElev:
+        with DumbCheckpoint(di+'hdf5/Elevation2d_'+indexString(index), mode=FILE_READ) as loadElev:
             loadElev.load(elev_2d, name='elev_2d')
             loadElev.close()
-        # peak_i, peak = msc.getMax(inte.interp(adap.isoP2(mesh_H), elev_2d)[0].dat.data)
-        peak_i, peak = msc.getMax(elev_2d.dat.data)
+        # peak_i, peak = getMax(interp(isoP2(mesh_H), elev_2d)[0].dat.data)
+        peak_i, peak = getMax(elev_2d.dat.data)
         dgCoords = Function(VectorFunctionSpace(mesh_H, op.space2, op.degree2)).interpolate(mesh_H.coordinates)
         distanceTravelled = np.abs(dgCoords.dat.data[peak_i][0])
 
@@ -555,23 +559,22 @@ if __name__ == "__main__":
     mode = args.mode
 
     # Choose mode and set parameter values
-    approach, getData, getError, useAdjoint, aposteriori = msc.cheatCodes(args.approach)
-    op = opt.Options(mode=mode,
-                     # vscale=0.1 if approach in ('DWR', 'gradientBased') else 0.85,
-                     vscale=0.85,
-                     family='dg-dg',
-                     rm=60 if useAdjoint else 30,
-                     gradate=True if aposteriori else False,
-                     window=True if approach == 'DWF' else False,   # TODO
-                     outputMetric=False,
-                     plotpvd=True,
-                     gauges=False,  # TODO: Include callbacks for Tohoku case
-                     bootstrap=True if args.b else False,
-                     printStats=False,
-                     orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
-                     # orderChange=0,
-                     wd=True if args.w else False,
-                     ndump=10)
+    approach, getData, getError, useAdjoint, aposteriori = cheatCodes(args.approach)
+    op = Options(mode=mode,
+                 vscale=0.85,
+                 family='dg-dg',
+                 rm=100 if useAdjoint else 50,
+                 gradate=True if aposteriori else False,
+                 window=True if approach == 'DWF' else False,   # TODO
+                 outputMetric=False,
+                 plotpvd=True,
+                 gauges=False,  # TODO: Include callbacks for Tohoku case
+                 bootstrap=True if args.b else False,
+                 printStats=False,
+                 orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
+                 # orderChange=0,
+                 wd=True if args.w else False,
+                 ndump=10)
     if mode == 'shallow-water':
         op.rm = 20 if useAdjoint else 10
     elif mode == 'rossby-wave':
@@ -600,8 +603,8 @@ if __name__ == "__main__":
                       % (i, av, relativePeak, distanceTravelled, phaseSpd, timing))
                 textfile.write('%d, %.4f, %.4f, %.4f, %.1f\n' % (av, relativePeak, distanceTravelled, phaseSpd, timing))
             else:
-                av, rel, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
+                av, rel, J_h, tim = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
                 print('Run %d: Mean element count %6d Relative error %.4e Timing %.1fs'
-                      % (i, av, rel, timing))
-                textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, timing, J_h))
+                      % (i, av, rel, tim))
+                textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, tim, J_h))
     textfile.close()

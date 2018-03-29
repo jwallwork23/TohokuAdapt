@@ -129,8 +129,8 @@ if __name__ == "__main__":
         ms.generateMesh(wd=wd)
         ms.convertMesh()
 else:
-    from firedrake import *
-    from firedrake_adjoint import *
+    from thetis import *
+    from thetis_adjoint import *
 
     import scipy.interpolate as si
     from scipy.io.netcdf import NetCDFFile

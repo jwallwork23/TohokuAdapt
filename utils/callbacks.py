@@ -5,7 +5,8 @@ from .forms import indicator
 
 
 __all__ = ["FunctionalCallback", "TohokuCallback", "ShallowWaterCallback", "RossbyWaveCallback",
-           "GaugeCallback", "P02Callback", "P06Callback", "ObjectiveCallback", "ObjectiveSWCallback"]
+           "GaugeCallback", "P02Callback", "P06Callback", "ObjectiveCallback", "ObjectiveTohokuCallback",
+           "ObjectiveSWCallback", "ObjectiveRWCallback"]
 
 
 class FunctionalCallback(DiagnosticCallback):
