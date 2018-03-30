@@ -141,7 +141,7 @@ class Options:
         self.wd = wd
         assert(type(advect) == type(gradate) == type(nonlinear) == type(rotational) == type(window) == type(iso)
                == type(tAdapt) == type(bootstrap) == type(printStats) == type(capBathymetry) == type(outputMetric)
-               == type(plotpvd) == type(gauges) == type(wd) == bool)
+               == type(plotpvd) == type(gauges) == type(wd) == type(refinedSpace) == bool)
         self.hessMeth = hessMeth
         try:
             assert hessMeth in ('dL2', 'parts')
@@ -170,7 +170,7 @@ class Options:
         self.rm = rm
         self.orderChange = orderChange
         self.refinedSpace = refinedSpace
-        assert(type(ndump) == type(rm) == type(orderChange) == type(refinedSpace) == int)
+        assert(type(ndump) == type(rm) == type(orderChange) == int)
         self.timestepper = timestepper
 
         # Solver parameters for ``firedrake-tsunami`` case

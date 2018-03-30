@@ -63,85 +63,80 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         f = None
     else:
         mesh_H, u0, eta0, b, BCs, f = domainRW(startRes, op=op)
-    T = op.Tend
 
     # Define initial FunctionSpace and variables of problem and apply initial conditions
-    V_H = op.mixedSpace(mesh_H)
-    q = Function(V_H)
+    V = op.mixedSpace(mesh_H)
+    q = Function(V)
     uv_2d, elev_2d = q.split()  # Needed to load data into
     uv_2d.rename("uv_2d")
     elev_2d.rename("elev_2d")
     P1 = FunctionSpace(mesh_H, "CG", 1)
     if approach in ('residual', 'implicit', 'DWR', 'DWE', 'explicit'):
-        q_ = Function(V_H)
+        q_ = Function(V)
         uv_2d_, elev_2d_ = q_.split()
 
     # Define Functions relating to a posteriori estimators
     P0 = FunctionSpace(mesh_H, "DG", 0)
     if aposteriori or approach == 'norm':
         if useAdjoint:                          # Define adjoint variables
-            dual = Function(V_H)
+            dual = Function(V)
             dual_u, dual_e = dual.split()
             dual_u.rename("Adjoint velocity")
             dual_e.rename("Adjoint elevation")
         if op.orderChange:                      # Define variables on higher/lower order space
-            V_oi = op.mixedSpace(mesh_H, orderChange=op.orderChange)
-            q_oi = Function(V_oi)
-            uv_2d_oi, elev_2d_oi = q_oi.split()
-            q_oi_ = Function(V_oi)
-            uv_2d_oi_, elev_2d_oi_ = q_oi_.split()
+            Ve = op.mixedSpace(mesh_H, orderChange=op.orderChange)
+            qe = Function(Ve)
+            ue, ee = qe.split()
+            qe_ = Function(Ve)
+            ue_, ee_ = qe_.split()
             if useAdjoint:
-                dual_oi = Function(V_oi)
-                dual_oi_u, dual_oi_e = dual_oi.split()
+                duale = Function(Ve)
+                duale_u, duale_e = duale.split()
+            be = Function(FunctionSpace(mesh_H, "CG", 1+op.orderChange)).assign(float(np.average(b.dat.data)))
         elif op.refinedSpace:                   # Define variables on refined space
             mesh_h = isoP2(mesh_H)
-            V_h = op.mixedSpace(mesh_h)
+            Ve = op.mixedSpace(mesh_h)
             if mode == 'tohoku':
-                b_h = TohokuDomain(mesh=mesh_h)[2]
+                be = TohokuDomain(mesh=mesh_h)[2]
             else:
-                b_h = Function(FunctionSpace(mesh_h, "CG", 1)).assign(float(np.average(b.dat.data)))
-            qh = Function(V_h)
-            uh, eh = qh.split()
-            uh.rename("Fine velocity")
-            eh.rename("Fine elevation")
-            if useAdjoint:
-                dual_h = Function(V_h)
-                dual_h_u, dual_h_e = dual_h.split()
-                dual_h_u.rename('Fine adjoint velocity')
-                dual_h_e.rename('Fine adjoint elevation')
+                be = Function(FunctionSpace(mesh_h, "CG", 1)).assign(float(np.average(b.dat.data)))
+            qe = Function(Ve)
+            P0 = FunctionSpace(mesh_h, "DG", 0)
+        else:
+            Ve = V
+            qe = q
+            qe_ = q_
+            be = b
         if approach in ('implicit', 'DWE'):     # Define variables for implicit error estimation
-            e_ = Function(V_oi)
-            e = Function(V_oi)
+            e_ = Function(Ve)
+            e = Function(Ve)
             e0, e1 = e.split()
             e0.rename("Implicit error 0")
             e1.rename("Implicit error 1")
-            et = TestFunction(V_oi)
+            et = TestFunction(Ve)
             (et0, et1) = (as_vector((et[0], et[1])), et[2])
             normal = FacetNormal(mesh_H)
-        if approach in ('residual', 'explicit', 'DWR'):
-            rho = Function(V_oi if op.orderChange else V_h)
+        elif approach in ('residual', 'explicit', 'DWR'):
+            rho = Function(Ve)
             rho_u, rho_e = rho.split()
             rho_u.rename("Velocity residual")
             rho_e.rename("Elevation residual")
-            if not op.orderChange:
-                P0 = FunctionSpace(mesh_h, "DG", 0)
         epsilon = Function(P0, name="Error indicator")
     v = TestFunction(P0)
 
-    # Initialise adaptivity placeholders and counters
+    # Initialise parameters and counters
     nEle, nVerT = meshStats(mesh_H)
     nVerT *= op.vscale                      # Target #Vertices
     mM = [nEle, nEle]                       # Min/max #Elements
     Sn = nEle
     endT = 0.
-
-    # Get timestep
-    solver_obj = solver2d.FlowSolver2d(mesh_H, b)
     dt = op.dt
     Dt = Constant(dt)
-    # iEnd = int(np.ceil(T / (dt * op.rm)))
-    iEnd = int(T / (dt * op.rm))            # It appears this format is better for CFL criterion derived timesteps
-    if op.gradate or op.wd:                 # Get initial boundary metric
+    T = op.Tend
+    iEnd = int(T / (dt * op.rm))
+
+    # Get initial boundary metric and TODO wetting and drying parameter
+    if op.gradate or op.wd:
         H0 = Function(P1).interpolate(CellSize(mesh_H))
     if op.wd:
         g = constructGradient(elev_2d)
@@ -150,7 +145,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         print('#### gradient = ', gs)
         ls = np.min([H0.dat.data[i] for i in DirichletBC(P1, 0, 'on_boundary').nodes])
         print('#### ls = ', ls)
-        alpha = Constant(gs * ls)           # TODO: How to set wetting-and-drying parameter?
+        alpha = Constant(gs * ls)
         print('#### alpha = ', alpha.dat.data)
         # alpha = Constant(0.5)
         # exit(23)
@@ -162,6 +157,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         primalTimer = clock()
 
         # Get solver parameter values and construct solver
+        solver_obj = solver2d.FlowSolver2d(mesh_H, b)
         options = solver_obj.options
         options.element_family = op.family
         options.use_nonlinear_equations = True if op.nonlinear else False
@@ -276,9 +272,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
         # Define implicit error problem
         if approach in ('implicit', 'DWE'): # TODO: Check out situation with nonlinear option
-            B_, L = formsSW(q_oi, q_oi_, b, Dt, impermeable=False, coriolisFreq=f, nonlinear=True)
+            B_, L = formsSW(qe, qe_, b, Dt, impermeable=False, coriolisFreq=f, nonlinear=True)
             B = formsSW(e, e_, b, Dt, impermeable=False, coriolisFreq=f, nonlinear=True)[0]
-            I = interelementTerm(et1 * uv_2d_oi, n=normal) * dS
+            I = interelementTerm(et1 * ue, n=normal) * dS
             errorProblem = NonlinearVariationalProblem(B - L + B_ - I, e)
             errorSolver = NonlinearVariationalSolver(errorProblem, solver_parameters=op.params)
 
@@ -313,10 +309,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
             # Solve implicit error problem
             if approach in ('implicit', 'DWE') or op.orderChange:
-                uv_2d_oi.interpolate(uv_2d)
-                elev_2d_oi.interpolate(elev_2d)
-                uv_2d_oi_.interpolate(uv_2d_)
-                elev_2d_oi_.interpolate(elev_2d_)
+                ue.interpolate(uv_2d)
+                ee.interpolate(elev_2d)
+                ue_.interpolate(uv_2d_)
+                ee_.interpolate(elev_2d_)
                 if approach in ('implicit', 'DWE'):
                     errorSolver.solve()
                     e_.assign(e)
@@ -327,11 +323,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
             # Approximate residuals
             if approach in ('explicit', 'residual', 'DWR'):
-                if op.orderChange:
-                    Au, Ae = strongResidualSW(q_oi, q_oi_, b, Dt, coriolisFreq=None, nonlinear=False, op=op)
-                else:
-                    qh, q_h = mixedPairInterp(mesh_h, V_h, q, q_)
-                    Au, Ae = strongResidualSW(qh, q_h, b_h, Dt, coriolisFreq=None, nonlinear=False, op=op)
+                if op.refinedSpace:
+                    qe, qe_ = mixedPairInterp(mesh_h, Ve, q, q_)
+                Au, Ae = strongResidualSW(qe, qe_, be, Dt, coriolisFreq=None, op=op)
                 rho_u.interpolate(Au)
                 rho_e.interpolate(Ae)
                 if op.plotpvd:
@@ -339,19 +333,33 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 if approach == 'residual':
                     epsilon = assemble(v * sqrt(inner(rho, rho)) * dx)
                 elif approach == 'explicit':
-                    epsilon = explicitErrorEstimator(q_oi if op.orderChange else q_h, rho,
-                                                         b if (op.orderChange or mode != 'tohoku') else b_h, v,
-                                                         maxBathy=True if mode == 'tohoku' else False)
+                    epsilon = explicitErrorEstimator(qe, rho, be if op.orderChange else be, v, maxBathy=True)
 
             if useAdjoint:
                 with DumbCheckpoint(di+'hdf5/adjoint_'+indexString(k), mode=FILE_READ) as loadAdj:
                     loadAdj.load(dual_u)
                     loadAdj.load(dual_e)
                     loadAdj.close()
-                if approach == 'DWR':   # TODO: Also consider higher order / refined duals
-                    epsilon = assemble(v * inner(rho, dual) * dx)
+                if approach == 'DWR':
+                    if op.orderChange:
+                        duale_u.interpolate(dual_u)
+                        duale_e.interpolate(dual_e)
+                        epsilon = assemble(v * inner(rho, duale) * dx)
+                    elif op.refinedSpace:
+                        duale = mixedPairInterp(mesh_h, dual)[0]
+                        epsilon = assemble(v * inner(rho, duale) * dx)
+                    else:
+                        epsilon = assemble(v * inner(rho, dual) * dx)
                 elif approach == 'DWE':
-                    epsilon = assemble(v* inner(e, dual) * dx)
+                    if op.orderChange:
+                        duale_u.interpolate(dual_u)
+                        duale_e.interpolate(dual_e)
+                        epsilon = assemble(v * inner(e, duale) * dx)
+                    elif op.refinedSpace:
+                        duale = mixedPairInterp(mesh_h, dual)[0]
+                        epsilon = assemble(v * inner(e, duale) * dx)
+                    else:
+                        epsilon = assemble(v * inner(e, dual) * dx)
                 elif approach == 'DWF':
                     raise NotImplementedError   # TODO: maximise DWF over time window
 
@@ -368,7 +376,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     if approach != 'fixedMesh':
         with pyadjoint.stop_annotating():
-            q = Function(V_H)
+            q = Function(V)
             uv_2d, elev_2d = q.split()
             elev_2d.interpolate(eta0)
             if aposteriori:
@@ -382,8 +390,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
                 # Load variables from disk
                 if cnt != 0:
-                    V_H = op.mixedSpace(mesh_H)
-                    q = Function(V_H)
+                    V = op.mixedSpace(mesh_H)
+                    q = Function(V)
                     uv_2d, elev_2d = q.split()
                     with DumbCheckpoint(di+'hdf5/Elevation2d_'+indexString(int(cnt/op.ndump)), mode=FILE_READ) \
                             as loadElev:
@@ -550,9 +558,9 @@ if __name__ == "__main__":
                                          "'DWR', 'DWE'}" )
     parser.add_argument("-w", help="Use wetting and drying")
     parser.add_argument("-b", help="Use bootstrapping")
-    parser.add_argument("-ho", help="Compute residuals in a higher order space")
-    parser.add_argument("-lo", help="Compute residuals in a lower order space")
-    parser.add_argument("-r", help="Compute residuals in a refined space")
+    parser.add_argument("-ho", help="Compute errors and residuals in a higher order space")
+    parser.add_argument("-lo", help="Compute errors and residuals in a lower order space")
+    parser.add_argument("-r", help="Compute errors and residuals in a refined space")
     args = parser.parse_args()
     orderBool = (not args.ho) or (not args.lo)
     assert(orderBool)
@@ -593,8 +601,8 @@ if __name__ == "__main__":
         filename += '_BOOTSTRAP'
     textfile = open(filename +'.txt', 'w+')
     if op.bootstrap:
-        # for i in range(11):
-        for i in range(8):   # TODO: Can't currently do multiple adjoint runs
+        # for i in range(11):   # TODO: Can't currently do multiple adjoint runs
+        for i in range(5, 6):
             av, rel, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
             var = np.abs(J_h - J_h_) if i > 0 else 0.
             J_h_ = J_h
