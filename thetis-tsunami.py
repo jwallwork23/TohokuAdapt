@@ -37,16 +37,14 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     :return: mean element count and relative error in objective functional value.
     """
     try:
-        g = {'tohoku': 9.81, 'shallow-water': 9.81, 'rossby-wave': 1.}[mode]
+        assert(mode in ('tohoku', 'shallow-water', 'rossby-wave'))
     except:
         raise NotImplementedError
     try:
-        assert (float(physical_constants['g_grav'].dat.data) == g)
+        assert (float(physical_constants['g_grav'].dat.data) == op.g)
     except:
-        physical_constants['g_grav'].assign(g)
+        physical_constants['g_grav'].assign(op.g)
     primalTimer = dualTimer = errorTimer = adaptTimer = False
-    if approach in ('implicit', 'DWE'):
-        op.orderChange = 1
 
     # Establish filenames
     di = 'plots/'+mode+'/'
@@ -81,9 +79,13 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     # Define Functions relating to a posteriori estimators
     P0 = FunctionSpace(mesh_H, "DG", 0)
     if aposteriori or approach == 'norm':
-        if op.orderChange:
-            V_oi = VectorFunctionSpace(mesh_H, op.space1, op.degree1 + op.orderChange) \
-                   * FunctionSpace(mesh_H, op.space2, op.degree2 + op.orderChange)
+        if useAdjoint:                          # Define adjoint variables
+            dual = Function(V_H)
+            dual_u, dual_e = dual.split()
+            dual_u.rename("Adjoint velocity")
+            dual_e.rename("Adjoint elevation")
+        if op.orderChange:                      # Define variables on higher/lower order space
+            V_oi = op.mixedSpace(mesh_H, orderChange=op.orderChange)
             q_oi = Function(V_oi)
             uv_2d_oi, elev_2d_oi = q_oi.split()
             q_oi_ = Function(V_oi)
@@ -91,13 +93,13 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             if useAdjoint:
                 dual_oi = Function(V_oi)
                 dual_oi_u, dual_oi_e = dual_oi.split()
-        else:
+        elif op.refinedSpace:                   # Define variables on refined space
             mesh_h = isoP2(mesh_H)
             V_h = op.mixedSpace(mesh_h)
             if mode == 'tohoku':
                 b_h = TohokuDomain(mesh=mesh_h)[2]
-            elif mode == 'shallow-water':
-                b_h = Function(FunctionSpace(mesh_h, "CG", 1)).assign(0.1)
+            else:
+                b_h = Function(FunctionSpace(mesh_h, "CG", 1)).assign(float(np.average(b.dat.data)))
             qh = Function(V_h)
             uh, eh = qh.split()
             uh.rename("Fine velocity")
@@ -107,12 +109,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 dual_h_u, dual_h_e = dual_h.split()
                 dual_h_u.rename('Fine adjoint velocity')
                 dual_h_e.rename('Fine adjoint elevation')
-        if useAdjoint:
-            dual = Function(V_H)
-            dual_u, dual_e = dual.split()
-            dual_u.rename("Adjoint velocity")
-            dual_e.rename("Adjoint elevation")
-        if approach in ('implicit', 'DWE'):
+        if approach in ('implicit', 'DWE'):     # Define variables for implicit error estimation
             e_ = Function(V_oi)
             e = Function(V_oi)
             e0, e1 = e.split()
@@ -140,7 +137,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     # Get timestep
     solver_obj = solver2d.FlowSolver2d(mesh_H, b)
-    dt = 0.5 if mode == 'tohoku' else 0.05  # For consistency
+    dt = op.dt
     Dt = Constant(dt)
     # iEnd = int(np.ceil(T / (dt * op.rm)))
     iEnd = int(T / (dt * op.rm))            # It appears this format is better for CFL criterion derived timesteps
@@ -553,7 +550,13 @@ if __name__ == "__main__":
                                          "'DWR', 'DWE'}" )
     parser.add_argument("-w", help="Use wetting and drying")
     parser.add_argument("-b", help="Use bootstrapping")
+    parser.add_argument("-ho", help="Compute residuals in a higher order space")
+    parser.add_argument("-lo", help="Compute residuals in a lower order space")
+    parser.add_argument("-r", help="Compute residuals in a refined space")
     args = parser.parse_args()
+    orderBool = (not args.ho) or (not args.lo)
+    assert(orderBool)
+    assert(orderBool or (not args.r))
     print("Mode: ", args.mode)
     print("Approach: ", args.approach)
     mode = args.mode
@@ -571,14 +574,18 @@ if __name__ == "__main__":
                  gauges=False,  # TODO: Include callbacks for Tohoku case
                  bootstrap=True if args.b else False,
                  printStats=False,
-                 orderChange=1 if approach in ('explicit', 'DWR', 'residual') else 0,
-                 # orderChange=0,
                  wd=True if args.w else False,
                  ndump=50)
     if mode == 'shallow-water':
         op.rm = 10 if useAdjoint else 5
     elif mode == 'rossby-wave':
         op.rm = 48 if useAdjoint else 24
+    if args.ho:
+        op.orderChange = 1
+    elif args.lo:
+        op.orderChange = -1
+    elif args.r:
+        op.refinedSpace = True
 
     # Run simulation(s)
     filename = 'outdata/outputs/'+mode+'/'+approach+date

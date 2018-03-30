@@ -38,10 +38,11 @@ class Options:
                  gauges=False,
                  Tstart=300.,
                  Tend=1500.,
-                 dt=1.,
+                 dt=0.5,
                  ndump=15,
                  rm=30,
                  orderChange=0,
+                 refinedSpace=False,
                  timestepper='CrankNicolson',
                  wd=False):
         """
@@ -77,6 +78,7 @@ class Options:
         :param ndump: Timesteps per data dump.
         :param rm: Timesteps per remesh. (Should be an integer multiple of ndump.)
         :param orderChange: change in polynomial degree for residual approximation.
+        :param refinedSpace: refine space too compute errors and residuals.
         :param timestepper: timestepping scheme.
         :param wd: toggle wetting and drying.
         """
@@ -167,7 +169,8 @@ class Options:
         self.ndump = ndump
         self.rm = rm
         self.orderChange = orderChange
-        assert(type(ndump) == type(rm) == type(orderChange) == int)
+        self.refinedSpace = refinedSpace
+        assert(type(ndump) == type(rm) == type(orderChange) == type(refinedSpace) == int)
         self.timestepper = timestepper
 
         # Solver parameters for ``firedrake-tsunami`` case
@@ -186,6 +189,7 @@ class Options:
             self.hmin = 1e-4
             self.hmax = 1.
             self.rm = 5
+            self.dt = 0.05
             self.ndump = 5
         elif self.mode == 'rossby-wave':
             self.Tstart = 30.
@@ -193,8 +197,10 @@ class Options:
             self.hmin = 5e-3
             self.hmax = 10.
             self.rm = 24
+            self.dt = 0.05
             self.ndump = 12
             self.nonlinear = True
+            self.g = 1.
 
         # Define FunctionSpaces
         self.degree1 = 2 if family == 'cg-cg' else 1
@@ -246,8 +252,10 @@ class Options:
             if input('Hit enter if happy to proceed.'):
                 exit(23)
 
-    def mixedSpace(self, mesh):
-        return VectorFunctionSpace(mesh, self.space1, self.degree1) * FunctionSpace(mesh, self.space2, self.degree2)
+    def mixedSpace(self, mesh, orderChange=0):
+        deg1 = self.degree1 + orderChange
+        deg2 = self.degree2 + orderChange
+        return VectorFunctionSpace(mesh, self.space1, deg1) * FunctionSpace(mesh, self.space2, deg2)
 
     def printToScreen(self, mn, outerTime, innerTime, nEle, Sn, mM, t, dt):
         """

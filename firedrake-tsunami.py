@@ -130,8 +130,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             v0[gauge] = float(eta.at(op.gaugeCoord(gauge)))
 
     if op.orderChange:
-        V_oi = VectorFunctionSpace(mesh_H, op.space1, op.degree1+op.orderChange) \
-               * FunctionSpace(mesh_H, op.space2, op.degree2+op.orderChange)
+        V_oi = op.mixedSpace(mesh_H, orderChange=op.orderChange)
         q_oi = Function(V_oi)
         u_oi, eta_oi = q_oi.split()
         q_oi_ = Function(V_oi)
