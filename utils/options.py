@@ -20,12 +20,10 @@ class Options:
                  p=2,
                  mtype='s',                 # Best approach for tsunami modelling
                  iso=False,
-                 advect=False,
                  gradate=False,
                  nonlinear=False,
                  rotational=False,
                  window=False,
-                 tAdapt=False,
                  bootstrap=False,
                  printStats=True,
                  capBathymetry=True,        # TODO: change this under W&D
@@ -39,8 +37,8 @@ class Options:
                  Tstart=300.,
                  Tend=1500.,
                  dt=0.5,
-                 ndump=15,
-                 rm=30,
+                 ndump=50,
+                 rm=50,
                  orderChange=0,
                  refinedSpace=False,
                  timestepper='CrankNicolson',
@@ -56,12 +54,10 @@ class Options:
         :param p: norm order in the Lp normalisation approach, where ``p => 1`` and ``p = infty`` is an option.
         :param mtype: Adapt w.r.t 's'peed, 'f'ree surface or 'b'oth.
         :param iso: Toggle isotropic / anisotropic algorithm.
-        :param advect: Toggle metric advection.
         :param gradate: Toggle metric gradation.
         :param nonlinear: Toggle nonlinear / linear equations.
         :param rotational: Toggle rotational / non-rotational equations.
         :param window: generate error estimators over a time window of relevance.
-        :param tAdapt: implement adaptive timestepping.
         :param bootstrap: implement mesh bootstrapping to establish initial mesh.
         :param printStats: print to screen during simulation.
         :param capBathymetry: under no wetting-and-drying.
@@ -126,12 +122,10 @@ class Options:
         except:
             raise ValueError('Field for adaption ``%s`` not recognised.' % mtype)
         self.iso = iso
-        self.advect = advect
         self.gradate = gradate
         self.nonlinear = nonlinear
         self.rotational = rotational
         self.window = window
-        self.tAdapt = tAdapt
         self.bootstrap = bootstrap
         self.printStats = printStats
         self.capBathymetry = capBathymetry
@@ -139,9 +133,9 @@ class Options:
         self.plotpvd = plotpvd
         self.gauges = gauges
         self.wd = wd
-        assert(type(advect) == type(gradate) == type(nonlinear) == type(rotational) == type(window) == type(iso)
-               == type(tAdapt) == type(bootstrap) == type(printStats) == type(capBathymetry) == type(outputMetric)
-               == type(plotpvd) == type(gauges) == type(wd) == type(refinedSpace) == bool)
+        assert(type(gradate) == type(nonlinear) == type(rotational) == type(window) == type(iso) == type(bootstrap)
+               == type(printStats) == type(capBathymetry) == type(outputMetric) == type(plotpvd) == type(gauges)
+               == type(wd) == type(refinedSpace) == bool)
         self.hessMeth = hessMeth
         try:
             assert hessMeth in ('dL2', 'parts')

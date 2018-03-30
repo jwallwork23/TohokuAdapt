@@ -7,7 +7,7 @@ from .timestepping import timestepScheme, timestepCoeffs
 
 
 __all__ = ["strongResidualSW", "formsSW", "adjointSW", "weakResidualSW", "interelementTerm", "solutionHuang",
-           "weakMetricAdvection", "indicator"]
+           "indicator"]
 
 
 def strongResidualSW(q, q_, b, Dt, coriolisFreq=None, op=Options()):
@@ -140,23 +140,6 @@ def interelementTerm(v, n=None):
         return 0.5 * (v('+') * n('+') - v('-') * n('-'))
     else:
         return 0.5 * (dot(v('+'), n('+')) - dot(v('-'), n('-')))
-
-
-def weakMetricAdvection(M, M_, w, Dt, timestepper='ImplicitEuler'):
-    """
-    Advect a metric. Also works for vector fields.
-
-    :arg M: metric at current timestep.
-    :arg M_: metric at previous timestep.
-    :arg w: wind vector.
-    :param Dt: timestep expressed as a FiredrakeConstant.
-    :param timestepper: time integration scheme used.
-    :return: weak residual for metric advection.
-    """
-    Mt = TestFunction(M.function_space())
-    Mm = timestepScheme(M, M_, timestepper)
-    F = (inner(M - M_, Mt) / Dt + inner(dot(w, nabla_grad(Mm)), Mt)) * dx
-    return F
 
 
 def indicator(V, mode='tohoku'):

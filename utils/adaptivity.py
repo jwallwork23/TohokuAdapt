@@ -5,14 +5,13 @@ import numpy
 from numpy import linalg as la
 from scipy import linalg as sla
 
-from .forms import weakMetricAdvection
 from .mesh import meshStats
 from .options import Options
 
 
 __all__ = ["constructGradient", "constructHessian", "steadyMetric", "isotropicMetric", "isoP2", "anisoRefine",
            "metricGradation", "localMetricIntersection", "metricIntersection", "metricConvexCombination",
-           "symmetricProduct", "pointwiseMax", "metricComplexity", "advectMetric", "__main__"]
+           "symmetricProduct", "pointwiseMax", "metricComplexity", "__main__"]
 
 
 def constructGradient(f):
@@ -184,7 +183,7 @@ def isotropicMetric(f, bdy=False, invert=True, nVerT=None, op=Options()):
     gnorm = max(assemble(sqrt(inner(g, g))*dx), 1e-6)   # Equivalent to scaling by (thresholded) metric complexity
     if not nVerT:
         nVerT = op.vscale * meshStats(mesh)[1]
-    g.dat.data[:] = np.abs(g.dat.data) * nVerT / gnorm  # TODO: changes in 3D case
+    g.dat.data[:] = np.abs(g.dat.data) * nVerT / gnorm  # NOTE this changes in 3D case
 
     for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(len(g.dat.data)):
         if scalar:
@@ -411,112 +410,6 @@ def metricComplexity(M):
     :return: Complexity thereof. This provides a continuous analogue for the number of mesh vertices.
     """
     return assemble(sqrt(det(M)) * dx)
-
-
-def isotropicAdvection(M_, h_, w, Dt, n=1, timestepper='ImplicitEuler'):
-    """
-    'Advect' an isotropic metric with finest resolution in direction of fluid velocity/wind field.
-
-    :arg M_: metric field defined on current mesh, at current timestep.
-    :arg h_: scalar field determining metric.
-    :arg w: (vector) velocity field on current mesh. Can be Function, list or ndarray.
-    :param Dt: timestep expressed as a FiredrakeConstant.
-    :param n: number of timesteps to advect over.
-    :param timestepper: time integration scheme used.
-    """
-    # TODO: More rigourous analysis of what `metric advection` is and how it is best implemented
-
-    # Set up variational problem
-    V = M_.function_space()
-    W = h_.function_space()
-    h = Function(W)
-    ht = TestFunction(W)
-    F = weakResidualAD(h, h_, ht, w, Dt, nu=0., timestepper=timestepper)
-
-    # Time integrate
-    for i in range(1, n + 1):
-        solve(F == 0, h)
-        M_.assign(metricIntersection(M_, isotropicMetric(V, h)))
-        h_.assign(h)
-
-    return M_
-
-
-def advectMetric(M_, w, Dt, n=1, outfile=None, bc=None, timestepper='ImplicitEuler', fieldToAdvect='M'):
-    """
-    'Advect' metric with finest resolution in direction of fluid velocity/wind field.
-    
-    :arg M_: metric field defined on current mesh, at current timestep.
-    :arg w: (vector) velocity field on current mesh. Can be Function, list or ndarray.
-    :arg Dt: timestep expressed as a FiredrakeConstant.
-    :param n: number of timesteps to advect over.
-    :param outfile: toggle metric output and location.
-    :param bc: boundary condition on Tensor advection PDE problem.
-    :param timestepper: time integration scheme used.
-    :param fieldToAdvect: individial enties ('Mij') eigenvalues ('li'), eigenpairs ('ei') or metric itself ('M').
-    """
-    V = M_.function_space()
-    mesh = V.mesh()
-    M = Function(V)
-
-    if outfile != None:
-        Mfile = File(outfile)
-        Mfile.write(M_, time=0)
-
-    if fieldToAdvect == 'M':
-
-        # Define test function
-        Mt = TestFunction(V)
-
-        # Set up tensor advection FEM problem
-        F = weakMetricAdvection(M, M_, Mt, w, Dt, timestepper=timestepper)
-        prob = NonlinearVariationalProblem(F, M)
-        solv = NonlinearVariationalSolver(prob, bc=bc)
-
-        # Time integrate
-        for i in range(1, n+1):
-            solv.solve()
-            M_.assign(metricIntersection(M_, M))
-            if outfile != None:
-                Mfile.write(M_, time=i)
-
-    elif fieldToAdvect == 'li':     # TODO: Fix this approach
-
-        # Define trial and test functions
-        W = VectorFunctionSpace(mesh, 'CG', 1)
-        lt = TestFunction(W)
-        l = Function(W)
-        l_ = Function(W)    # Eigenvalues
-        v = Function(V)     # Eigenvectors
-        b = Function(W)
-
-        # Get eigenpairs on current mesh
-        for i in range(mesh.topology.num_vertices()):
-            l_.dat.data[i], v.dat.data[i] = la.eig(M_.dat.data[i])
-            if i in DirichletBC(W, 0, 'on_boundary').nodes:
-                b.dat.data[i] = l_.dat.data[i]
-
-        # Set up vector advection FEM problem
-        F = weakMetricAdvection(l, l_, lt, w, Dt, timestepper=timestepper)
-        prob = NonlinearVariationalProblem(F, l)
-        solv = NonlinearVariationalSolver(prob, bc=DirichletBC(W, b, 'on_boundary'))
-
-        for i in range(1, n+1):
-            solv.solve()
-            l_.assign(l)
-
-            # Reconstruct metric from advected eigenvalues and intersect
-            for i in range(mesh.topology.num_vertices()):
-                M.dat.data[i] = v.dat.data[i] * [[max(l.dat.data[i, 0], 1), 0], [0, max(l.dat.data[i, 1], 1)]] \
-                              * np.transpose(v.dat.data[i])
-            M_.assign(metricIntersection(M_, M))
-            if outfile != None:
-                Mfile.write(M_, time=i)
-
-    else:
-        raise NotImplementedError   # TODO: investigate and implement other methods. Check BCs work.
-
-    return M_
 
 
 if __name__ == "__main__":

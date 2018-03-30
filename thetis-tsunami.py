@@ -193,29 +193,15 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         solver_obj.add_callback(cb2, 'timestep')
         solver_obj.bnd_functions['shallow_water'] = BCs
         if aposteriori and approach != 'DWF':
-            if mode == 'tohoku':
-                def selector():
-                    t = solver_obj.simulation_time
-                    rm = options.timesteps_per_remesh
-                    dt = options.timestep
-                    options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
-            elif mode == 'shallow-water':
-                def selector():
-                    t = solver_obj.simulation_time
-                    rm = options.timesteps_per_remesh
-                    dt = options.timestep
-                    options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
-            else:
-                def selector():
-                    t = solver_obj.simulation_time
-                    rm = options.timesteps_per_remesh
-                    dt = options.timestep
-                    options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
-            primalTimer = clock()
-            solver_obj.iterate(export_func=selector)
+            def selector():
+                t = solver_obj.simulation_time
+                rm = options.timesteps_per_remesh
+                dt = options.timestep
+                options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
         else:
-            primalTimer = clock()
-            solver_obj.iterate()
+            selector = None
+        primalTimer = clock()
+        solver_obj.iterate(export_func=selector)
         primalTimer = clock() - primalTimer
         J_h = cb1.__call__()[1]    # Evaluate objective functional
         if op.printStats:
@@ -383,7 +369,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             if op.printStats:
                 print('\nStarting adaptive mesh primal run (forwards in time)')
             adaptTimer = clock()
-            # while cnt < np.ceil(T / dt):
             while cnt < int(T / dt):        # It appears this format is better for CFL criterion derived timesteps
                 stepTimer = clock()
 
@@ -577,13 +562,11 @@ if __name__ == "__main__":
                  rm=100 if useAdjoint else 50,
                  gradate=True if aposteriori else False,
                  window=True if approach == 'DWF' else False,   # TODO
-                 outputMetric=False,
                  plotpvd=True,
                  gauges=False,  # TODO: Include callbacks for Tohoku case
                  bootstrap=True if args.b else False,
                  printStats=False,
-                 wd=True if args.w else False,
-                 ndump=50)
+                 wd=True if args.w else False)
     if mode == 'shallow-water':
         op.rm = 10 if useAdjoint else 5
     elif mode == 'rossby-wave':
