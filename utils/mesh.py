@@ -193,7 +193,7 @@ def TohokuDomain(level=0, mesh=None, output=False, wd=False):
         File('plots/initialisation/surf.pvd').write(eta0)
         File('plots/initialisation/bathymetry.pvd').write(b)
 
-    return mesh, eta0, b, {}
+    return mesh, eta0, b, {}, None
 
 
 def domainSW(level=4):
@@ -209,7 +209,7 @@ def domainSW(level=4):
     x, y = SpatialCoordinate(mesh)
     eta0 = Function(P1).interpolate(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))))
     b = Function(P1).assign(0.1)
-    return mesh, eta0, b, {}
+    return mesh, eta0, b, {}, None
 
 
 def domainRW(level=1, op=Options()):

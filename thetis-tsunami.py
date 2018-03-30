@@ -36,6 +36,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     :param op: parameter values.
     :return: mean element count and relative error in objective functional value.
     """
+    fullTime = clock()
     try:
         assert(mode in ('tohoku', 'shallow-water', 'rossby-wave'))
     except:
@@ -56,11 +57,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
     # Load Mesh, initial condition and bathymetry
     if mode == 'tohoku':
-        mesh_H, eta0, b, BCs = TohokuDomain(startRes, wd=op.wd)
-        f = None
+        mesh_H, eta0, b, BCs, f = TohokuDomain(startRes, wd=op.wd)
     elif mode == 'shallow-water':
-        mesh_H, eta0, b, BCs = domainSW(startRes)
-        f = None
+        mesh_H, eta0, b, BCs, f = domainSW(startRes)
     else:
         mesh_H, u0, eta0, b, BCs, f = domainRW(startRes, op=op)
 
@@ -72,11 +71,11 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     elev_2d.rename("elev_2d")
     P1 = FunctionSpace(mesh_H, "CG", 1)
     if approach in ('residual', 'implicit', 'DWR', 'DWE', 'explicit'):
-        q_ = Function(V)
+        q_ = Function(V)        # Variable at previous timestep
         uv_2d_, elev_2d_ = q_.split()
+    P0 = FunctionSpace(mesh_H, "DG", 0)
 
     # Define Functions relating to a posteriori estimators
-    P0 = FunctionSpace(mesh_H, "DG", 0)
     if aposteriori or approach == 'norm':
         if useAdjoint:                          # Define adjoint variables
             dual = Function(V)
@@ -102,7 +101,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 be = Function(FunctionSpace(mesh_h, "CG", 1)).assign(float(np.average(b.dat.data)))
             qe = Function(Ve)
             P0 = FunctionSpace(mesh_h, "DG", 0)
-        else:
+        else:                                   # Copy standard variables to mimic enriched space labels
             Ve = V
             qe = q
             qe_ = q_
@@ -121,7 +120,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             rho_u, rho_e = rho.split()
             rho_u.rename("Velocity residual")
             rho_e.rename("Elevation residual")
-        epsilon = Function(P0, name="Error indicator")
     v = TestFunction(P0)
 
     # Initialise parameters and counters
@@ -154,7 +152,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     if getData:
         if op.printStats:
             print('Starting fixed mesh primal run (forwards in time)')
-        primalTimer = clock()
 
         # Get solver parameter values and construct solver
         solver_obj = solver2d.FlowSolver2d(mesh_H, b)
@@ -214,11 +211,13 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     rm = options.timesteps_per_remesh
                     dt = options.timestep
                     options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
+            primalTimer = clock()
             solver_obj.iterate(export_func=selector)
         else:
+            primalTimer = clock()
             solver_obj.iterate()
-        J_h = cb1.__call__()[1]    # Evaluate objective functional
         primalTimer = clock() - primalTimer
+        J_h = cb1.__call__()[1]    # Evaluate objective functional
         if op.printStats:
             print('Primal run complete. Run time: %.3fs' % primalTimer)
 
@@ -227,7 +226,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         if useAdjoint:
             if op.printStats:
                 print('\nGenerating dual solutions...')
-            dualTimer = clock()
 
             # Assemble objective functional
             Jfuncs = cb2.__call__()[1]
@@ -236,6 +234,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 J += 0.5 * (Jfuncs[i - 1] + Jfuncs[i]) * dt
 
             # Compute gradient
+            dualTimer = clock()
             dJdb = compute_gradient(J, Control(b))      # TODO: Rewrite pyadjoint code to avoid computing this
             File(di + 'gradient.pvd').write(dJdb)
             print("Norm of gradient = %e" % dJdb.dat.norm)
@@ -272,8 +271,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
         # Define implicit error problem
         if approach in ('implicit', 'DWE'): # TODO: Check out situation with nonlinear option
-            B_, L = formsSW(qe, qe_, b, Dt, impermeable=False, coriolisFreq=f, nonlinear=True)
-            B = formsSW(e, e_, b, Dt, impermeable=False, coriolisFreq=f, nonlinear=True)[0]
+            B_, L = formsSW(qe, qe_, b, Dt, impermeable=False, coriolisFreq=f, op=op)
+            B = formsSW(e, e_, b, Dt, impermeable=False, coriolisFreq=f, op=op)[0]
             I = interelementTerm(et1 * ue, n=normal) * dS
             errorProblem = NonlinearVariationalProblem(B - L + B_ - I, e)
             errorSolver = NonlinearVariationalSolver(errorProblem, solver_parameters=op.params)
@@ -525,8 +524,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 print('Adaptive primal run complete. Run time: %.3fs' % adaptTimer)
     else:
         av = nEle
+    fullTime = clock() - fullTime
     if op.printStats:
-        printTimings(primalTimer, dualTimer, errorTimer, adaptTimer)
+        printTimings(primalTimer, dualTimer, errorTimer, adaptTimer, fullTime)
 
     # Measure error using metrics, using data from Huang et al.
     if mode == 'rossby-wave':   # TODO: Plot / interpret these results

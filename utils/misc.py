@@ -44,7 +44,7 @@ def cheatCodes(approach, default='DWR'):
     return approach, getData, getError, useAdjoint, aposteriori
 
 
-def printTimings(primal, dual=False, error=False, adapt=False):
+def printTimings(primal, dual=False, error=False, adapt=False, full=False):
     """
     Print timings for the various sections of code.
     
@@ -63,7 +63,9 @@ def printTimings(primal, dual=False, error=False, adapt=False):
         print("Error run     %5.3fs" % error)
     if bool(adapt):
         print("Adaptive run  %5.3fs" % adapt)
-    print("Total         %5.3fs\n" % (primal + float(dual) + float(error) + float(adapt)))
+    if bool(full):
+        print("Setups        %5.3fs" % (float(full) - (primal + float(dual) + float(error) + float(adapt))))
+        print("Total         %5.3fs\n" % full)
 
 
 def getMax(array):
