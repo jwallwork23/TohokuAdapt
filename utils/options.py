@@ -1,7 +1,5 @@
 from thetis import *
 
-import numpy as np
-
 from .conversion import from_latlon
 
 
@@ -33,7 +31,6 @@ class Options:
                  g=9.81,
                  outputMetric=False,
                  plotpvd=True,
-                 gauges=False,
                  Tstart=300.,
                  Tend=1500.,
                  dt=0.5,
@@ -67,7 +64,6 @@ class Options:
         :param g: gravitational acceleration.
         :param outputMetric: toggle saving metric to PVD.
         :param plotpvd: toggle saving solution fields to PVD.
-        :param gauges: toggle saving of elevation to HDF5 for timeseries analysis. 
         :param Tstart: Lower time range limit (s), before which we can assume the wave won't reach the shore.
         :param Tend: Simulation duration (s).
         :param dt: Timestep (s).
@@ -131,11 +127,10 @@ class Options:
         self.capBathymetry = capBathymetry
         self.outputMetric = outputMetric
         self.plotpvd = plotpvd
-        self.gauges = gauges
         self.wd = wd
         assert(type(gradate) == type(nonlinear) == type(rotational) == type(window) == type(iso) == type(bootstrap)
-               == type(printStats) == type(capBathymetry) == type(outputMetric) == type(plotpvd) == type(gauges)
-               == type(wd) == type(refinedSpace) == bool)
+               == type(printStats) == type(capBathymetry) == type(outputMetric) == type(plotpvd) == type(wd) ==
+               type(refinedSpace) == bool)
         self.hessMeth = hessMeth
         try:
             assert hessMeth in ('dL2', 'parts')
@@ -236,20 +231,12 @@ class Options:
         E, N, zn, zl = from_latlon(self.glatlon[gauge][0], self.glatlon[gauge][1], force_zone_number=54)
         return E, N
 
-    def checkCFL(self, b):
-        """
-        :param b: bathymetry profile considered.
-        """
-        cdt = self.hmin / np.sqrt(self.g * max(b.dat.data))
-        if self.dt > cdt:
-            print('WARNING: chosen timestep dt = %.4fs exceeds recommended value of %.4fs' % (self.dt, cdt))
-            if input('Hit enter if happy to proceed.'):
-                exit(23)
 
     def mixedSpace(self, mesh, orderChange=0):
         deg1 = self.degree1 + orderChange
         deg2 = self.degree2 + orderChange
         return VectorFunctionSpace(mesh, self.space1, deg1) * FunctionSpace(mesh, self.space2, deg2)
+
 
     def printToScreen(self, mn, outerTime, innerTime, nEle, Sn, mM, t, dt):
         """

@@ -8,7 +8,6 @@ import utils.conversion as conv
 import utils.error as err
 import utils.mesh as msh
 import utils.options as opt
-import utils.timeseries as tim
 
 now = datetime.datetime.now()
 date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
@@ -86,21 +85,14 @@ if __name__ == '__main__':
     errorfile = open(filename + '.txt', 'w+')
     gaugeFileP02 = open(filename + 'P02.txt', 'w+')
     gaugeFileP06 = open(filename + 'P06.txt', 'w+')
-    splineP02 = tim.extractSpline('P02')
-    splineP06 = tim.extractSpline('P06')
 
     for k in range(10):     # TODO: Could turn it up to 11...
         print("\nStarting run %d... Nonlinear = %s, Rotational = %s\n" % (k, op.nonlinear, op.rotational))
         J_h, gP02, gP06, timing = solverSW(k, op=op)
         gaugeFileP02.writelines(["%s," % val for val in gP02])
         gaugeFileP06.writelines(["%s," % val for val in gP06])
-        times = np.linspace(0., 25., len(gP02))
-        errorsP02 = [gP02[i]-splineP02(times[i]) for i in range(len(gP02))]
-        errorsP06 = [gP06[i]-splineP06(times[i]) for i in range(len(gP06))]
-        exactP02 = err.totalVariation([splineP02(times[i]) for i in range(len(gP02))])
-        exactP06 = err.totalVariation([splineP06(times[i]) for i in range(len(gP06))])
-        totalVarP02 = err.totalVariation(errorsP02) / exactP02
-        totalVarP06 = err.totalVariation(errorsP06) / exactP06
+        totalVarP02 = err.gaugeTV("P02")
+        totalVarP06 = err.gaugeTV("P06")
         errorfile.write('%d, %.4e, %.4e, %.4e, %.1f\n' % (k, J_h, totalVarP02, totalVarP06, timing))
         print("\nRun %d... J_h: %.4e TV P02: %.3f, TV P06: %.3f, time: %.1f\n"
               % (k, J_h, totalVarP02, totalVarP06, timing))

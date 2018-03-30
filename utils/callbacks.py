@@ -2,6 +2,7 @@ from thetis_adjoint import *
 from thetis.callback import DiagnosticCallback
 
 from .forms import indicator
+from .options import Options
 
 
 __all__ = ["FunctionalCallback", "TohokuCallback", "ShallowWaterCallback", "RossbyWaveCallback",
@@ -177,7 +178,7 @@ class P02Callback(GaugeCallback):
             """
             elev_2d = solver_obj.fields.solution_2d.split()[1]
 
-            return elev_2d.at(options.Options().gaugeCoord("P02"))
+            return elev_2d.at(Options().gaugeCoord("P02"))
 
         super(P02Callback, self).__init__(extractP02, solver_obj, **kwargs)
 
@@ -199,7 +200,7 @@ class P06Callback(GaugeCallback):
             """
             elev_2d = solver_obj.fields.solution_2d.split()[1]
 
-            return elev_2d.at(options.Options().gaugeCoord("P06"))
+            return elev_2d.at(Options().gaugeCoord("P06"))
 
         super(P06Callback, self).__init__(extractP06, solver_obj, **kwargs)
 

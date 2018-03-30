@@ -1,4 +1,4 @@
-__all__ = ["indexString", "cheatCodes", "printTimings", "dis", "getMax"]
+__all__ = ["indexString", "cheatCodes", "printTimings", "getMax"]
 
 
 def indexString(index):
@@ -52,7 +52,7 @@ def printTimings(primal, dual=False, error=False, adapt=False, full=False):
     :arg dual: dual solver.
     :arg error: error estimation phase.
     :arg adapt: adaptive primal solver.
-    :return: 
+    :arg full: total time to solution.
     """
     print("TIMINGS:")
     if bool(primal):

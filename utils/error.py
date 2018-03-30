@@ -3,9 +3,10 @@ from thetis import *
 import numpy as np
 
 from .interpolation import mixedPairInterp
+from .timeseries import extractSpline
 
 
-__all__ = ["explicitErrorEstimator", "DWR", "fluxJumpError", "basicErrorEstimator", "totalVariation"]
+__all__ = ["explicitErrorEstimator", "DWR", "fluxJumpError", "basicErrorEstimator", "totalVariation", "gaugeTV"]
 
 
 def explicitErrorEstimator(q, residual, b, v, maxBathy=False):
@@ -120,3 +121,16 @@ def totalVariation(data):
             elif i == len(data)-1:
                 TV += np.abs(data[i] - data[iStart])
     return TV
+
+
+def gaugeTV(data, gauge="P02"):
+    """
+    :param data: timeseries to calculate error of.
+    :param gauge: gauge considered.
+    :return: total variation. 
+    """
+    N = len(data)
+    spline = extractSpline(gauge)
+    times = np.linspace(0., 25., N)
+    errors = [data[i] - spline(times[i]) for i in range(N)]
+    return totalVariation(errors) / totalVariation([spline(times[i]) for i in range(N)])

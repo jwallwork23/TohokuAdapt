@@ -6,8 +6,7 @@ from .options import Options
 from .timestepping import timestepScheme, timestepCoeffs
 
 
-__all__ = ["strongResidualSW", "formsSW", "adjointSW", "weakResidualSW", "interelementTerm", "solutionHuang",
-           "indicator"]
+__all__ = ["strongResidualSW", "formsSW", "adjointSW", "weakResidualSW", "interelementTerm", "solutionRW", "indicator"]
 
 
 def strongResidualSW(q, q_, b, Dt, coriolisFreq=None, op=Options()):
@@ -180,8 +179,10 @@ def indicator(V, mode='tohoku'):
     return iA
 
 
-def solutionHuang(V, t=0., B=0.395):
+def solutionRW(V, t=0., B=0.395):
     """
+    Analytic solution for equatorial Rossby wave test problem, as given by Huang.
+    
     :arg V: Mixed function space upon which to define solutions.
     :arg t: current time.
     :param B: Parameter controlling amplitude of soliton.

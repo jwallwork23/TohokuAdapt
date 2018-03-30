@@ -6,10 +6,8 @@ import numpy as np
 class OutOfRangeError(ValueError):
     pass
 
-__all__ = ["to_latlon", "from_latlon", "vectorlonlat2utm", "get_latitude", "latitude_to_zone_letter",
-           "latlon_to_zone_number", "zone_number_to_central_longitude", "vectorlonlat2tangentxy", "earth_radius",
-           "lonlat2tangentxy", "vectorlonlat2utm", "latlonMesh2tangentPlane", "xy2barycentric",
-           "rescaleMesh"]
+__all__ = ["to_latlon", "from_latlon", "get_latitude", "latitude_to_zone_letter", "latlon_to_zone_number",
+           "zone_number_to_central_longitude", "earth_radius", "vectorlonlat_to_utm"]
 
 K0 = 0.9996
 
@@ -236,7 +234,7 @@ def zone_number_to_central_longitude(zone_number):
     return (zone_number - 1) * 6 - 180 + 3
 
 
-def vectorlonlat2utm(latitude, longitude, force_zone_number):
+def vectorlonlat_to_utm(latitude, longitude, force_zone_number):
     """
     Convert a vector of longitude-latitude coordinate pairs to UTM coordinates.
     
@@ -245,8 +243,8 @@ def vectorlonlat2utm(latitude, longitude, force_zone_number):
     :param force_zone_number: 
     :return: force coordinates to fall within a particular UTM zone.
     """
-    x = np.zeros((len(longitude), 1))
-    y = np.zeros((len(latitude), 1))
+    x = np.zeros((len(longitude)))
+    y = np.zeros((len(latitude)))
     assert (len(x) == len(y))
     for i in range(len(x)):
         x[i], y[i], zn, zl = from_latlon(latitude[i], longitude[i], force_zone_number=force_zone_number)
@@ -262,125 +260,3 @@ def earth_radius(latitude):
     k = 1. / 298.257  # Earth flatness constant
     a = 6378136.3  # Semi-major axis of the Earth (m)
     return (1 - k * (math.sin(math.radians(latitude)) ** 2)) * a
-
-
-def lonlat2tangentxy(latitude, longitude, latitude0, longitude0):
-    """
-    Project latitude-longitude coordinates onto a tangent plane at (lon0, lat0), in metric Cartesian coordinates (x,y).
-
-    :arg latitude: latitudinal coordinate for projection.
-    :arg longitude: longitudinal coordinate for projection.
-    :param latitude0: latitudinal tangent coordinate. 
-    :param longitude0: longitudinal tangent coordinate.
-    :return: Cartesian coordinates on tangent plane.
-    """
-    re = earth_radius(latitude)
-    rphi = re * math.cos(math.radians(latitude))
-    x = rphi * math.sin(math.radians(longitude - longitude0))
-    y = rphi * (1 - math.cos(math.radians(longitude - longitude0))) * math.sin(math.radians(latitude0)) \
-        + re * math.sin(math.radians(latitude - latitude0))
-    return x, y
-
-
-def vectorlonlat2tangentxy(latitude, longitude, latitude0, longitude0):
-    """
-    Project a vector of latitude-longitude coordinates onto a tangent plane at (lon0, lat0), in metric Cartesian 
-    coordinates (x,y).
-
-    :arg latitude: latitudinal coordinate for projection.
-    :arg longitude: longitudinal coordinate for projection.
-    :param latitude0: latitudinal tangent coordinate. 
-    :param longitude0: longitudinal tangent coordinate.
-    :return: vector of Cartesian coordinates on tangent plane.
-    """
-    x = np.zeros((len(longitude), 1))
-    y = np.zeros((len(latitude), 1))
-    assert (len(x) == len(y))
-    for i in range(len(x)):
-        x[i], y[i] = lonlat2tangentxy(latitude[i], longitude[i], longitude0, latitude0)
-    return x, y
-
-
-def latlonMesh2tangentPlane(meshfile, latitude0, longitude0):
-    """
-    Project a mesh file from latitude-longitude coordinates onto a tangent plane at (lon0, lat0), in metric Cartesian 
-    coordinates (x,y).
-
-    :arg meshfile: .msh file to be converted.
-    :param latitude0: latitudinal tangent coordinate. 
-    :param longitude0: longitudinal tangent coordinate.
-    :return: corresponding mesh file in Cartesian coordinates on tangent plane.
-    """
-    mesh1 = open(meshfile, 'r')
-    mesh2 = open('resources/meshes/CartesianTohoku.msh', 'w')
-    i = 0
-    mode = 0
-    cnt = 0
-    n = -1
-    for line in mesh1:
-        i += 1
-        if i == 5:
-            mode += 1
-        if mode == 1:                       # Read number
-            n = int(line)                   # Number of nodes
-            mode += 1
-        elif mode == 2:                     # Edit nodes
-            xy = line.split()
-            xy[1], xy[2] = lonlat2tangentxy(float(xy[2]), float(xy[1]), latitude0, longitude0)
-            xy[1] = str(xy[1])
-            xy[2] = str(xy[2])
-            line = ' '.join(xy)
-            line += '\n'
-            cnt += 1
-            if cnt == n:
-                assert int(xy[0]) == n      # Check all nodes have been covered
-                mode += 1                   # The end of the nodes has been reached
-        mesh2.write(line)
-    mesh1.close()
-    mesh2.close()
-
-
-def xy2barycentric(crdM, crdTri, i):
-    """
-    Compute the barycentric coordinate of M in triangle Tri = P0, P1, P2 with respect to the ith vertex 
-    crd = det(MPj, MPk) / det(PiPj, PiPk). Courtesy of Nicolas Barral, 2016.
-    
-    :arg crdM: coordinate for conversion.
-    :arg crdTri: vertices of the triangle.
-    :param i: vertex index.
-    :return: 
-    """
-
-    # Get other indices using a consistent numbering order:
-    j = (i + 1) % 3
-    k = (i + 2) % 3
-
-    res1 = (crdTri[j][0] - crdM[0]) * (crdTri[k][1] - crdM[1]) - (crdTri[k][0] - crdM[0]) * (crdTri[j][1] - crdM[1])
-    res2 = (crdTri[j][0] - crdTri[i][0]) * (crdTri[k][1] - crdTri[i][1]) - \
-           (crdTri[k][0] - crdTri[i][0]) * (crdTri[j][1] - crdTri[i][1])
-    res = res1 / res2
-
-    return res
-
-
-def rescaleMesh(mesh):
-    """
-    :arg mesh: mesh to be converted.
-    :return: mesh rescaled to [-1, 1] x [-1, 1]. 
-    """
-    xy = Function(mesh.coordinates)
-    xmin = min(xy.dat.data[:, 0])
-    xmax = max(xy.dat.data[:, 0])
-    ymin = min(xy.dat.data[:, 1])
-    ymax = max(xy.dat.data[:, 1])
-    xdiff = xmax - xmin
-    ydiff = ymax - ymin
-    cx = (xmax + xmin) / xdiff
-    cy = (ymax + ymin) / ydiff
-
-    for i in range(len(xy.dat.data)):
-        xy.dat.data[i, 0] = 2 * xy.dat.data[i, 0] / xdiff - cx
-        xy.dat.data[i, 1] = 2 * xy.dat.data[i, 1] / ydiff - cy
-    mesh.coordinates.assign(xy)
-
-    return mesh
