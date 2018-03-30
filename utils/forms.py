@@ -2,10 +2,6 @@ from thetis import *
 from thetis_adjoint import *
 from firedrake import Expression
 
-# import numpy as np
-# from time import clock
-#
-# from .mesh import meshStats, TohokuDomain
 from .options import Options
 from .timestepping import timestepScheme, timestepCoeffs
 
@@ -67,7 +63,7 @@ def formsSW(q, q_, b, Dt, coriolisFreq=None, nonlinear=False, impermeable=True, 
 
     B = (inner(q, qt)) / Dt * dx + a1 * g * inner(grad(eta), w) * dx        # LHS bilinear form
     L = (inner(q_, qt)) / Dt * dx - a2 * g * inner(grad(eta_), w) * dx      # RHS linear functional
-    L -= a2 * div(b * u_) * xi * dx     # Note: Don't "apply BCs" to linear functional
+    L -= a2 * div(b * u_) * xi * dx                                     # Note: Don't "apply BCs" to linear functional
     if impermeable:
         B -= a1 * inner(b * u, grad(xi)) * dx
         if V.sub(0).ufl_element().family() != 'Lagrange':
@@ -233,69 +229,3 @@ def solutionHuang(V, t=0., B=0.395):
                     * exp(-0.5 * y * y))
 
     return q
-
-
-# def continuousAdjointSW(n, op=Options(Tstart=0.5, Tend=2.5, family='dg-cg')):
-#
-#     # Define Mesh and FunctionSpace
-#     lx = 2 * np.pi
-#     mesh = SquareMesh(2*n, 2*n, lx, lx)
-#     x, y = SpatialCoordinate(mesh)
-#     V = op.mixedSpace(mesh)
-#
-#     # Specify solver parameters
-#     b = Constant(0.1)
-#     h = Function(FunctionSpace(mesh, "CG", 1)).interpolate(CellSize(mesh))
-#     dt = min(0.9 * min(h.dat.data) / np.sqrt(op.g * 0.1), op.Tend/2)
-#     Dt = Constant(dt)
-#
-#     # Apply initial condition and define Functions
-#     ic = project(exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))), V.sub(1))
-#     q_ = Function(V)
-#     u_, eta_ = q_.split()
-#     u_.interpolate(Expression([0, 0]))
-#     eta_.assign(ic)
-#     q = Function(V)
-#     l_ = Function(V)
-#     lu_, le_ = l_.split()
-#     lu_.interpolate(Expression([0, 0]))
-#     le_.interpolate(Expression(0))
-#     l = Function(V)
-#
-#     # Define forward problem
-#     qt = TestFunction(V)
-#     forwardProblem = NonlinearVariationalProblem(weakResidualSW(q, q_, qt, b, Dt, impermeable=True), q)
-#     forwardSolver = NonlinearVariationalSolver(forwardProblem, solver_parameters=op.params)
-#
-#     # Define adjoint problem
-#     switch = Constant(1.)
-#     adjointProblem = NonlinearVariationalProblem(weakResidualSW(l, l_, qt, b, Dt, impermeable=True,
-#                                                                      adjoint=True, switch=switch), l)
-#     adjointSolver = NonlinearVariationalSolver(adjointProblem, solver_parameters=op.params)
-#
-#     t = 0.
-#     cnt = 0
-#     primalTimer = clock()
-#     while t < op.Tend - 0.9*dt:
-#         forwardSolver.solve()
-#         q_.assign(q)
-#         t += dt
-#         cnt += 1
-#     primalTimer = clock() - primalTimer
-#     dualTimer = clock()
-#     while t > 0.1*dt:
-#         adjointSolver.solve()
-#         l_.assign(l)
-#         t -= dt
-#         cnt -= 1
-#         if t < op.Tstart:
-#             switch.assign(0.)
-#     dualTimer = clock() - dualTimer
-#     assert (cnt == 0)
-#     slowdown = dualTimer/primalTimer
-#     slow = slowdown > 1
-#     if not slow:
-#         slowdown = 1./slowdown
-#     print('Cts case: Adjoint run %.3fx %s than forward run.' % (slowdown, 'slower' if slow else 'faster'))
-#
-#     return primalTimer, dualTimer, meshStats(mesh)[0]
