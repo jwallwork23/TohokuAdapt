@@ -538,7 +538,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     if mode == 'rossby-wave':
         return av, np.abs(peak/0.1567020), distanceTravelled, distanceTravelled/47.18, toc
     elif mode == 'tohoku':
-        return av, np.abs(op.J(mode) - J_h) / np.abs(op.J(mode)), gaugeP02, gaugeP06, J_h, toc
+        return av, np.abs(op.J(mode) - J_h) / np.abs(op.J(mode)), J_h, gaugeP02, gaugeP06, toc
     else:
         return av, np.abs(op.J(mode) - J_h)/np.abs(op.J(mode)), J_h, toc
 
