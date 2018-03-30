@@ -502,7 +502,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     solver_obj.add_callback(cb4, 'timestep')
                 solver_obj.bnd_functions['shallow_water'] = BCs
                 adapSolver.iterate()
-                J_h = cb1.__call__()[1]  # Evaluate objective functional
+                J_h = cb1.__call__()[1]
                 if mode == 'tohoku':
                     gaugeP02 = cb3.__call__()[1]
                     gaugeP06 = cb4.__call__()[1]
