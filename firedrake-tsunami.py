@@ -425,8 +425,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                         loadAdj.load(dual_e)
                         loadAdj.close()
                     epsilon_ = err.basicErrorEstimator(q, dual, v)
-                for j in range(len(epsilon.dat.data)):
-                    epsilon.dat.data[j] = max(epsilon.dat.data[j], epsilon_.dat.data[j])
+                    for j in range(len(epsilon.dat.data)):
+                        epsilon.dat.data[j] = max(epsilon.dat.data[j], epsilon_.dat.data[j])
             epsilon.dat.data[:] = np.abs(epsilon.dat.data) * nVerT / (np.abs(assemble(epsilon * dx)) or 1.)  # Normalise
             epsilon.rename("Error indicator")
 

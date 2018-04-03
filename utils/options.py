@@ -21,7 +21,6 @@ class Options:
                  gradate=False,
                  nonlinear=False,
                  rotational=False,
-                 window=False,
                  bootstrap=False,
                  printStats=True,
                  capBathymetry=True,        # TODO: change this under W&D
@@ -54,7 +53,6 @@ class Options:
         :param gradate: Toggle metric gradation.
         :param nonlinear: Toggle nonlinear / linear equations.
         :param rotational: Toggle rotational / non-rotational equations.
-        :param window: generate error estimators over a time window of relevance.
         :param bootstrap: implement mesh bootstrapping to establish initial mesh.
         :param printStats: print to screen during simulation.
         :param capBathymetry: under no wetting-and-drying.
@@ -121,14 +119,13 @@ class Options:
         self.gradate = gradate
         self.nonlinear = nonlinear
         self.rotational = rotational
-        self.window = window
         self.bootstrap = bootstrap
         self.printStats = printStats
         self.capBathymetry = capBathymetry
         self.outputMetric = outputMetric
         self.plotpvd = plotpvd
         self.wd = wd
-        assert(type(gradate) == type(nonlinear) == type(rotational) == type(window) == type(iso) == type(bootstrap)
+        assert(type(gradate) == type(nonlinear) == type(rotational) == type(iso) == type(bootstrap)
                == type(printStats) == type(capBathymetry) == type(outputMetric) == type(plotpvd) == type(wd) ==
                type(refinedSpace) == bool)
         self.hessMeth = hessMeth

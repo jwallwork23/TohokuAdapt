@@ -124,7 +124,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     dt = op.dt
     Dt = Constant(dt)
     T = op.Tend
-    iEnd = int(T / (dt * op.rm))
+    iStart = int(op.Tstart / dt)
+    iEnd = int(T / (dt * op.rm)) if aposteriori and approach != 'DWF' else int(T / (dt * op.ndump))
 
     # Get initial boundary metric and TODO wetting and drying parameter
     if op.gradate or op.wd:
@@ -155,7 +156,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         options.use_grad_div_viscosity_term = False
         if mode == 'rossby-wave':
             options.coriolis_frequency = f
-        options.simulation_export_time = dt * (op.rm-1) if aposteriori else dt * op.ndump
+        options.simulation_export_time = dt * (op.rm-1) if aposteriori and approach != 'DWF' else dt * op.ndump
         options.simulation_end_time = T
         options.period_of_interest_start = op.Tstart
         options.period_of_interest_end = T
@@ -348,7 +349,15 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     else:
                         epsilon = assemble(v * inner(e, dual) * dx)
                 elif approach == 'DWF':
-                    raise NotImplementedError   # TODO: maximise DWF over time window
+                    epsilon = assemble(v * inner(q, dual) * dx)
+                    for i in range(k, min(k + iEnd - iStart, iEnd)):
+                        with DumbCheckpoint(di + 'hdf5/adjoint_H_' + msc.indexString(i), mode=FILE_READ) as loadAdj:
+                            loadAdj.load(dual_u)
+                            loadAdj.load(dual_e)
+                            loadAdj.close()
+                        epsilon_ = assemble(v * inner(q, dual) * dx)
+                        for j in range(len(epsilon.dat.data)):
+                            epsilon.dat.data[j] = max(epsilon.dat.data[j], epsilon_.dat.data[j])
 
             # Store error estimates
             epsilon.rename("Error indicator")
@@ -573,7 +582,6 @@ if __name__ == "__main__":
                  family='dg-dg',
                  rm=100 if useAdjoint else 50,
                  gradate=True if aposteriori else False,
-                 window=True if approach == 'DWF' else False,   # TODO
                  plotpvd=False,
                  bootstrap=True if args.b else False,
                  printStats=False,
