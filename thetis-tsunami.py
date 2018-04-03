@@ -498,9 +498,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     cb1.objective_value = J_h
                 adapSolver.add_callback(cb1, 'timestep')
                 if mode == 'tohoku':
-                    solver_obj.add_callback(cb3, 'timestep')
-                    solver_obj.add_callback(cb4, 'timestep')
-                solver_obj.bnd_functions['shallow_water'] = BCs
+                    adapSolver.add_callback(cb3, 'timestep')
+                    adapSolver.add_callback(cb4, 'timestep')
+                adapSolver.bnd_functions['shallow_water'] = BCs
                 adapSolver.iterate()
                 J_h = cb1.__call__()[1]
                 if mode == 'tohoku':
