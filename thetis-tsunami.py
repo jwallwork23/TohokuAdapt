@@ -97,8 +97,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         else:                                   # Copy standard variables to mimic enriched space labels
             Ve = V
             qe = q
-            qe_ = q_
             be = b
+            if approach != 'DWF':
+                qe_ = q_
         if approach in ('implicit', 'DWE'):     # Define variables for implicit error estimation
             e_ = Function(Ve)
             e = Function(Ve)
@@ -230,16 +231,16 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
 
             # Extract adjoint solutions
             tape = get_working_tape()
-            # tape.visualise()
             solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
             N = len(solve_blocks)
-            r = N % op.rm   # Number of extra tape annotations in setup
-            for i in range(N-1, r-2, -op.rm):
+            diff = op.ndump if approach == 'DWF' else op.rm
+            r = N % diff   # Number of extra tape annotations in setup
+            for i in range(N-1, r-2, -diff):
                 dual.assign(solve_blocks[i].adj_sol)
                 dual_u, dual_e = dual.split()
                 dual_u.rename('Adjoint velocity')
                 dual_e.rename('Adjoint elevation')
-                with DumbCheckpoint(di+'hdf5/adjoint_'+indexString(int((i-r+1)/op.rm)), mode=FILE_CREATE) as saveAdj:
+                with DumbCheckpoint(di+'hdf5/adjoint_'+indexString(int((i-r+1)/diff)), mode=FILE_CREATE) as saveAdj:
                     saveAdj.store(dual_u)
                     saveAdj.store(dual_e)
                     saveAdj.close()
@@ -351,7 +352,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 elif approach == 'DWF':
                     epsilon = assemble(v * inner(q, dual) * dx)
                     for i in range(k, min(k + iEnd - iStart, iEnd)):
-                        with DumbCheckpoint(di + 'hdf5/adjoint_H_' + msc.indexString(i), mode=FILE_READ) as loadAdj:
+                        with DumbCheckpoint(di + 'hdf5/adjoint_' + indexString(i), mode=FILE_READ) as loadAdj:
                             loadAdj.load(dual_u)
                             loadAdj.load(dual_e)
                             loadAdj.close()
@@ -380,7 +381,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             if op.printStats:
                 print('\nStarting adaptive mesh primal run (forwards in time)')
             adaptTimer = clock()
-            while cnt < int(T / dt):        # It appears this format is better for CFL criterion derived timesteps
+            while cnt < int(T / dt):
                 stepTimer = clock()
 
                 # Load variables from disk
@@ -618,7 +619,7 @@ if __name__ == "__main__":
                   % (i, av, J_h, timing, var))
             textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, J_h, timing, var))
     else:
-        for i in range(9):       # TODO: Can't currently do multiple adjoint runs
+        for i in range(8, 9):       # TODO: Can't currently do multiple adjoint runs
             if mode == 'rossby-wave':
                 av, relativePeak, distanceTravelled, phaseSpd, timing = \
                     solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)

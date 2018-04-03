@@ -48,9 +48,11 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     plt.rc('legend', fontsize='x-large')
-    labels = ("Fixed mesh", "Hessian based", "Explicit", "Implicit", "Adjoint based", "Goal based")
-    names = ("fixedMesh", "hessianBased", "explicit", "implicit", "DWF", "DWR")
-    styles = {labels[0]: 's', labels[1]: '^', labels[2]: 'x', labels[3]: 'o', labels[4]: '*', labels[5]: 'h'}
+    labels = ("Fixed mesh", "Hessian based", "Explicit", "Implicit", "DWF", "DWR", "Higher order DWR",
+              "Lower order DWR", "Refined DWR")
+    names = ("fixedMesh", "hessianBased", "explicit", "implicit", "DWF", "DWR", "DWR_ho", "DWR_lo", "DWR_r")
+    styles = {labels[0]: 's', labels[1]: '^', labels[2]: 'x', labels[3]: 'o', labels[4]: '*', labels[5]: 'h',
+              labels[6]: 'v', labels[7]: '8', labels[8]: 's'}
     err = {}
     nEls = {}
     tim = {}
@@ -116,7 +118,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", help="Choose problem from {'tohoku', 'shallow-water', 'rossby-wave'}.")
-    parser.add_argument("-b", help="Implement bootstrapping")
+    parser.add_argument("-b", help="Specify bootstrapping")
     parser.add_argument("-d", help="Specify a date")
     args = parser.parse_args()
     errorVsElements(args.mode, bootstrapping=args.b, date=args.d)
