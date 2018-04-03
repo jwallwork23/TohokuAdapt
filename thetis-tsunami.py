@@ -574,7 +574,7 @@ if __name__ == "__main__":
                  rm=100 if useAdjoint else 50,
                  gradate=True if aposteriori else False,
                  window=True if approach == 'DWF' else False,   # TODO
-                 plotpvd=True,
+                 plotpvd=False,
                  bootstrap=True if args.b else False,
                  printStats=False,
                  wd=True if args.w else False)
@@ -582,20 +582,27 @@ if __name__ == "__main__":
         op.rm = 10 if useAdjoint else 5
     elif mode == 'rossby-wave':
         op.rm = 48 if useAdjoint else 24
+
+    filename = 'outdata/outputs/' + mode + '/' + approach
     if args.ho:
         op.orderChange = 1
+        filename += '_ho'
     elif args.lo:
         op.orderChange = -1
+        filename += '_lo'
     elif args.r:
         op.refinedSpace = True
+        filename += '_r'
+    if args.w:
+        filename += '_w'
+    filename += date
 
     # Run simulation(s)
-    filename = 'outdata/outputs/'+mode+'/'+approach+date
     if op.bootstrap:
         filename += '_BOOTSTRAP'
     textfile = open(filename +'.txt', 'w+')
     if op.bootstrap:
-        for i in range(11):   # TODO: Can't currently do multiple adjoint runs
+        for i in range(10):
             av, rel, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
             var = np.abs(J_h - J_h_) if i > 0 else 0.
             J_h_ = J_h
@@ -603,8 +610,7 @@ if __name__ == "__main__":
                   % (i, av, J_h, timing, var))
             textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, J_h, timing, var))
     else:
-        # for i in range(1, 6):
-        for i in range(1):
+        for i in range(9):       # TODO: Can't currently do multiple adjoint runs
             if mode == 'rossby-wave':
                 av, relativePeak, distanceTravelled, phaseSpd, timing = \
                     solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)

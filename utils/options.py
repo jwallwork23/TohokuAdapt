@@ -173,7 +173,7 @@ class Options:
 
         # Override default parameter choices for SW and RW cases:
         if self.mode == 'shallow-water':
-            self.Tstart = 0.5
+            self.Tstart = 0.1
             self.Tend = 2.5
             self.hmin = 1e-4
             self.hmax = 1.
@@ -215,7 +215,7 @@ class Options:
         :return: 'exact' objective functional value, converged to 3 s.f.
         """
         dat = {'tohoku': 1.2185e+13,            # On mesh of 196,560 elements     TODO: Verify this
-               'shallow-water': 1.0647e-03,     # On mesh of 524,288 elements     TODO: Verify this
+               'shallow-water': 1.1184e-3,      # On mesh of 524,288 elements
                }                                                                # TODO: rossby-wave test case
         if mode in dat.keys():
             return dat[mode]
