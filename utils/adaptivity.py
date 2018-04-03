@@ -5,13 +5,12 @@ import numpy
 from numpy import linalg as la
 from scipy import linalg as sla
 
-from .mesh import meshStats
 from .options import Options
 
 
 __all__ = ["constructGradient", "constructHessian", "steadyMetric", "isotropicMetric", "isoP2", "anisoRefine",
            "metricGradation", "localMetricIntersection", "metricIntersection", "metricConvexCombination",
-           "symmetricProduct", "pointwiseMax", "metricComplexity", "__main__"]
+           "symmetricProduct", "pointwiseMax", "metricComplexity"]
 
 
 def constructGradient(f):
@@ -410,14 +409,3 @@ def metricComplexity(M):
     :return: Complexity thereof. This provides a continuous analogue for the number of mesh vertices.
     """
     return assemble(sqrt(det(M)) * dx)
-
-
-if __name__ == "__main__":
-
-    mesh = RectangleMesh(64, 16, 4, 1)
-    V = TensorFunctionSpace(mesh, "CG", 1)
-    M = Function(V, name="Metric").interpolate(Expression([['2+sin(pi * x[0] / 2)', 0], [0, '1']]))
-    w = Function(VectorFunctionSpace(mesh, "CG", 1)).interpolate(Expression([1, 0]))
-    advectMetric(M, w, 0.05, 20, outfile='plots/tests/utils/meshAdvect.pvd')
-
-    # TODO: Do proper testing of all functionalities and produce plots
