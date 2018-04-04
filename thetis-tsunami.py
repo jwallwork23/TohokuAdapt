@@ -589,7 +589,7 @@ if __name__ == "__main__":
     elif mode == 'rossby-wave':
         op.rm = 48 if useAdjoint else 24
 
-    filename = 'outdata/outputs/' + mode + '/' + approach
+    filename = 'outdata/' + mode + '/' + approach
     if args.ho:
         op.orderChange = 1
         filename += '_ho'

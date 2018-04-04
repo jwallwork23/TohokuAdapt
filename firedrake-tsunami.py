@@ -619,7 +619,7 @@ if __name__ == '__main__':
     # Run simulation(s)
     minRes = 0 if mode == 'tohoku' else 1
     maxRes = 4 if mode == 'tohoku' else 6
-    textfile = open('outdata/outputs/'+mode+'/'+approach+date+'.txt', 'w+')
+    textfile = open('outdata/'+mode+'/'+approach+date+'.txt', 'w+')
     for i in range(minRes, maxRes+1):
         av, rel, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
         print('Run %d:  Mean element count %6d  Relative error %.4f     Timing %.1fs' % (i, av, rel, timing))
