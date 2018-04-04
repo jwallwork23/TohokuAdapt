@@ -3,8 +3,12 @@ from firedrake import *
 import matplotlib.pyplot as plt
 
 from utils.adaptivity import *
+from utils.forms import indicator
 from utils.mesh import meshStats
 
+
+subset = True   # TODO: argparse this up
+space = "CG"
 
 di = "plots/adapt-tests/"
 
@@ -22,51 +26,57 @@ plt.subplot(212)
 plt.xlabel("Element count")
 plt.ylabel("L2 error in Hessian")
 for i in range(len(functions)):
-    for space in ("CG", "DG"):
-        grad_diff = []
-        hess_diff = []
-        nEls = []
-        for j in range(2, 8):
-            n = pow(2, j)
-            mesh = SquareMesh(n, n, 2, 2)
-            nEle = meshStats(mesh)[0]
-            nEls.append(nEle)
-            xy = Function(mesh.coordinates)
-            xy.dat.data[:, :] -= [1, 1]
-            mesh.coordinates.assign(xy)
+    grad_diff = []
+    hess_diff = []
+    nEls = []
+    for j in range(2, 8):
+        n = pow(2, j)
+        mesh = SquareMesh(n, n, 2, 2)
+        nEle = meshStats(mesh)[0]
+        nEls.append(nEle)
+        xy = Function(mesh.coordinates)
+        xy.dat.data[:, :] -= [1, 1]
+        mesh.coordinates.assign(xy)
 
-            Vs = FunctionSpace(mesh, space, 1)
-            Vv = VectorFunctionSpace(mesh, space, 1)
-            Vt = TensorFunctionSpace(mesh, "CG", 1)
+        Vs = FunctionSpace(mesh, space, 1)
+        Vv = VectorFunctionSpace(mesh, space, 1)
+        Vt = TensorFunctionSpace(mesh, "CG", 1)
 
-            # Establish function and (analytical) derivatives thereof
-            f = Function(Vs).interpolate(Expression(functions[i]))
-            grad_f = Function(Vv).interpolate(Expression([gradients[i][0], gradients[i][1]]))
-            hess_f = Function(Vt).interpolate(Expression(hessians[i]))
+        # Establish function and (analytical) derivatives thereof
+        f = Function(Vs).interpolate(Expression(functions[i]))
+        grad_f = Function(Vv).interpolate(Expression([gradients[i][0], gradients[i][1]]))
+        hess_f = Function(Vt).interpolate(Expression(hessians[i]))
 
-            # Compute these numerically and check similarity
-            g = constructGradient(f)
-            grad_err = errornorm(grad_f, g)
-            H = constructHessian(f, g=g)
-            hess_err = errornorm(hess_f, H)
-            grad_diff.append(grad_err)
-            hess_diff.append(hess_err)        # TODO: Test different projections
-            print("Function %d, run %d, %s space, %d elements: Gradient error = %.4f, Hessian error = %.4f"
-                  % (i, j, space, nEle, grad_err, hess_err))
+        # Compute these numerically and check similarity
+        g = constructGradient(f)
+        H = constructHessian(f, g=g)
+        if subset:
+            iA = indicator(Vs, 'basic')
+            grad_err = norm(iA * (grad_f - g)) / norm(iA * grad_f)
+            hess_err = norm(iA * (hess_f - H)) / norm(iA * hess_f)
+        else:
+            grad_err = errornorm(grad_f, g) / norm(grad_f)
+            hess_err = errornorm(hess_f, H) / norm(hess_f)
+        grad_diff.append(grad_err)
+        hess_diff.append(hess_err)
+        print("Function %d, run %d, %s space, %d elements: Gradient error = %.4f, Hessian error = %.4f"
+              % (i, j, space, nEle, grad_err, hess_err))
 
-            File(di + "field_" + str(i) + ".pvd").write(f)
-            File(di + "gradient_" + str(i) + ".pvd").write(g)
-            File(di + "hessian_" + str(i) + ".pvd").write(H)
+        File(di + "field_" + str(i) + ".pvd").write(f)
+        File(di + "gradient_" + str(i) + ".pvd").write(g)
+        File(di + "hessian_" + str(i) + ".pvd").write(H)
 
-        stamp = space
         plt.subplot(211)
-        plt.semilogy(nEls, grad_diff, label=stamp)
+        plt.loglog(nEls, grad_diff)
         plt.subplot(212)
-        plt.plot(nEls, hess_diff, label=stamp)
-    plt.legend()
+        if subset:
+            plt.loglog(nEls, hess_diff)
+        else:
+            plt.semilogx(nEls, hess_diff)
+    # plt.legend()
     plt.subplot(211)
-    plt.legend()
-    plt.savefig("outdata/adapt-tests/numerical-vs-analytical_"+str(i)+".pdf")
+    # plt.legend()
+    plt.savefig("outdata/adapt-tests/numerical-vs-analytical_subset="+str(subset)+"_function"+str(i)+".pdf")
     plt.clf()
 
 # TODO: More tests

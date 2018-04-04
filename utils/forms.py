@@ -154,6 +154,8 @@ def indicator(V, mode='tohoku'):
         xy = [0., 0.2, 0.4, 0.6]
     elif mode == 'helmholtz2':
         xy = [0.1, 0.3, 0.1, 0.3]
+    elif mode == 'basic':
+        xy = [-0.5, 0.5, -0.5, 0.5]
     elif mode == 'advection-diffusion':
         xy = [2.5, 3.5, 0.1, 0.9]
     elif mode == 'shallow-water':
