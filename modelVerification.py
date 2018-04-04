@@ -1,10 +1,8 @@
 from thetis import *
 
-import numpy as np
 from time import clock
 import datetime
 
-from utils.conversion import get_latitude
 from utils.callbacks import TohokuCallback, P02Callback, P06Callback
 from utils.error import gaugeTV
 from utils.mesh import problemDomain
@@ -16,14 +14,7 @@ date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
 
 def solverSW(startRes, op=Options()):
-    mesh, eta0, b = problemDomain(startRes, wd=op.wd)[:3]
-
-    # Get Coriolis frequency
-    f = Function(FunctionSpace(mesh, 'CG', 1))
-    if op.rotational:
-        Omega = 7.291e-5
-        for i, v in zip(range(len(mesh.coordinates.dat.data)), mesh.coordinates.dat.data):
-            f.dat.data[i] = 2 * Omega * np.sin(np.radians(get_latitude(v[0], v[1], 54, northern=True)))
+    mesh, u0, eta0, b, BCs, f = problemDomain(level=startRes, op=op)
 
     # Get solver parameter values and construct solver
     solver_obj = solver2d.FlowSolver2d(mesh, b)
@@ -36,14 +27,13 @@ def solverSW(startRes, op=Options()):
     options.simulation_export_time = 100.
     options.simulation_end_time = op.Tend
     options.timestepper_type = op.timestepper
-    options.timestep = dt
+    options.timestep = op.dt
     options.no_exports = True
-    # options.use_wetting_and_drying = op.wd        # TODO: Consider w&d
+    # options.use_wetting_and_drying = op.wd        # TODO: Make this work
     # if op.wd:
     #     options.wetting_and_drying_alpha = alpha
-
-    # Apply ICs and establish Callbacks
-    solver_obj.assign_initial_conditions(elev=eta0)
+    solver_obj.bnd_functions['shallow_water'] = BCs
+    solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
     cb1 = TohokuCallback(solver_obj)        # Objective functional computation error
     solver_obj.add_callback(cb1, 'timestep')
     cb2 = P02Callback(solver_obj)           # Gauge timeseries error P02

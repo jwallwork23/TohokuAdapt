@@ -142,6 +142,7 @@ class Options:
 
         # Physical parameters
         self.g = g
+        self.Omega = 7.291e-5   # Planetary rotation rate
         try:
             assert(g > 0)
         except:

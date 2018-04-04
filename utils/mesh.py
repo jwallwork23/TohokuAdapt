@@ -135,7 +135,7 @@ else:
     import scipy.interpolate as si
     from scipy.io.netcdf import NetCDFFile
 
-    from .conversion import vectorlonlat_to_utm
+    from .conversion import vectorlonlat_to_utm, get_latitude
     from .forms import solutionRW
     from .options import Options
 
@@ -189,9 +189,14 @@ def problemDomain(mode='tohoku', level=0, mesh=None, output=False, op=Options())
 
         # Post-process the bathymetry to have a minimum depth of 30m and if no wetting-and-drying
         if not op.wd:
-            b.assign(conditional(lt(30, b), b, 30), annotate=False)
+            b.assign(conditional(lt(30, b), b, 30))
         BCs = {}
-        f = None
+        if op.rotational:
+            f = Function(FunctionSpace(mesh, 'CG', 1))
+            for i, v in zip(range(len(mesh.coordinates.dat.data)), mesh.coordinates.dat.data):
+                f.dat.data[i] = 2 * op.Omega * np.sin(np.radians(get_latitude(v[0], v[1], 54, northern=True)))
+        else:
+            f = None
     elif mode == 'shallow-water':
         n = pow(2, level)
         lx = 2 * pi
