@@ -214,7 +214,7 @@ def problemDomain(mode='tohoku', level=0, mesh=None, output=False, op=Options())
         ly = 24
         mesh = RectangleMesh(lx * n, ly * n, lx, ly)
         xy = Function(mesh.coordinates)
-        xy.dat.data[:, :] -= [lx / 2, ly / 2]
+        xy.dat.data[:, :] -= [lx / 2, ly / 2]       # TODO: This could be the problem for adjoint
         mesh.coordinates.assign(xy)
         P1 = FunctionSpace(mesh, "CG", 1)
         b = Function(P1).assign(1.)

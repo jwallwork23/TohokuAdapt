@@ -32,15 +32,16 @@ def constructGradient(f):
     return g
 
 
-def constructHessian(f, op=Options()):
+def constructHessian(f, g=None, op=Options()):
     """
     Reconstructs the hessian of a scalar solution field with respect to the current mesh. The code for the integration 
     by parts reconstruction approach is based on the Monge-Amp\`ere tutorial provided in the Firedrake website 
     documentation.
 
     :arg f: P1 solution field.
+    :kwarg g: gradient (if already computed).
     :param op: Options class object providing min/max cell size values.
-    :return: reconstructed Hessian associated with ``sol``.
+    :return: reconstructed Hessian associated with ``f``.
     """
     mesh = f.function_space().mesh()
     V = TensorFunctionSpace(mesh, "CG", 1)
@@ -52,7 +53,8 @@ def constructHessian(f, op=Options()):
         Lh -= (tau[0, 1] * nhat[1] * f.dx(0) + tau[1, 0] * nhat[0] * f.dx(1)) * ds
         Lh -= (tau[0, 0] * nhat[1] * f.dx(0) + tau[1, 1] * nhat[0] * f.dx(1)) * ds  # Term not in Firedrake tutorial
     elif op.hessMeth == 'dL2':
-        g = constructGradient(f)
+        if g is None:
+            g = constructGradient(f)
         Lh = (inner(tau, H) + inner(div(tau), g)) * dx
         Lh -= (tau[0, 1] * nhat[1] * g[0] + tau[1, 0] * nhat[0] * g[1]) * ds
         Lh -= (tau[0, 0] * nhat[1] * g[0] + tau[1, 1] * nhat[0] * g[1]) * ds
