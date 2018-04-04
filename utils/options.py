@@ -178,8 +178,8 @@ class Options:
             self.dt = 0.05
             self.ndump = 5
         elif self.mode == 'rossby-wave':
-            self.Tstart = 30.
-            self.Tend = 120.
+            self.Tstart = 20.
+            self.Tend = 60.
             self.hmin = 5e-3
             self.hmax = 10.
             self.rm = 24

@@ -206,13 +206,13 @@ def problemDomain(mode='tohoku', level=0, mesh=None, output=False, op=Options())
     else:
         lx = 48
         ly = 24
-        mesh = RectangleMesh(3 * lx * level, ly * level, 3 * lx, ly)
+        mesh = RectangleMesh(lx * level, ly * level, lx, ly)
         xy = Function(mesh.coordinates)
-        xy.dat.data[:, :] -= [3 * lx / 2, ly / 2]
+        xy.dat.data[:, :] -= [lx / 2, ly / 2]
         mesh.coordinates.assign(xy)
         P1 = FunctionSpace(mesh, "CG", 1)
         b = Function(P1).assign(1.)
-        q = solutionRW(VectorFunctionSpace(mesh, op.space1, op.degree1) * FunctionSpace(mesh, op.space2, op.degree2))
+        q = solutionRW(op.mixedSpace(mesh))
         u0, eta0 = q.split()
         BCs = {1: {'uv': Constant(0.)}, 2: {'uv': Constant(0.)}, 3: {'uv': Constant(0.)}, 4: {'uv': Constant(0.)}}
         f = Function(P1).interpolate(SpatialCoordinate(mesh)[1])

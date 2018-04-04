@@ -171,10 +171,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         options.use_wetting_and_drying = op.wd
         if op.wd:
             options.wetting_and_drying_alpha = alpha
-        if mode == 'rossby-wave':
-            solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
-        else:
-            solver_obj.assign_initial_conditions(elev=eta0)
+        solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         if mode == 'tohoku':
             cb1 = TohokuCallback(solver_obj)
             cb2 = ObjectiveTohokuCallback(solver_obj)
@@ -619,7 +616,7 @@ if __name__ == "__main__":
                   % (i, av, J_h, timing, var))
             textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, J_h, timing, var))
     else:
-        for i in range(8, 9):       # TODO: Can't currently do multiple adjoint runs
+        for i in range(6):       # TODO: Can't currently do multiple adjoint runs
             if mode == 'rossby-wave':
                 av, relativePeak, distanceTravelled, phaseSpd, timing = \
                     solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)

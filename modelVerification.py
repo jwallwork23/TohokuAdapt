@@ -9,29 +9,23 @@ import utils.error as err
 import utils.mesh as msh
 import utils.options as opt
 
+
 now = datetime.datetime.now()
 date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
+
 def solverSW(startRes, op=opt.Options()):
-    mesh_H, eta0, b = msh.TohokuDomain(startRes, wd=op.wd)[:3]
+    mesh, eta0, b = msh.TohokuDomain(startRes, wd=op.wd)[:3]
 
     # Get Coriolis frequency
-    f = Function(FunctionSpace(mesh_H, 'CG', 1))
+    f = Function(FunctionSpace(mesh, 'CG', 1))
     if op.rotational:
         Omega = 7.291e-5
-        for i, v in zip(range(len(mesh_H.coordinates.dat.data)), mesh_H.coordinates.dat.data):
+        for i, v in zip(range(len(mesh.coordinates.dat.data)), mesh.coordinates.dat.data):
             f.dat.data[i] = 2 * Omega * np.sin(np.radians(conv.get_latitude(v[0], v[1], 54, northern=True)))
 
-    # Get timestep, ensuring simulation time is achieved exactly
-    solver_obj = solver2d.FlowSolver2d(mesh_H, b)
-    solver_obj.create_equations()
-    dt = min(np.abs(solver_obj.compute_time_step().dat.data))
-    for i in (3., 2.5, 2., 1.5, 1., 0.5, 0.25, 0.2, 0.1, 0.05):
-        if dt > i:
-            dt = i
-            break
-
     # Get solver parameter values and construct solver
+    solver_obj = solver2d.FlowSolver2d(mesh, b)
     options = solver_obj.options
     options.element_family = op.family
     options.use_nonlinear_equations = True if op.nonlinear else False
