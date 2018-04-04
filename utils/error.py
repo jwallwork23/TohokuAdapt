@@ -6,7 +6,7 @@ from .interpolation import mixedPairInterp
 from .timeseries import extractSpline
 
 
-__all__ = ["explicitErrorEstimator", "DWR", "fluxJumpError", "basicErrorEstimator", "totalVariation", "gaugeTV"]
+__all__ = ["explicitErrorEstimator", "fluxJumpError", "totalVariation", "gaugeTV"]
 
 
 def explicitErrorEstimator(q, residual, b, v, maxBathy=False):
@@ -39,11 +39,6 @@ def explicitErrorEstimator(q, residual, b, v, maxBathy=False):
     j0 = assemble(dot(v * grad(u[0]), n) * ds)
     j1 = assemble(dot(v * grad(u[1]), n) * ds)
     j2 = assemble(jump(v * b0 * u, n=n) * dS)
-    # jumpTerm = assemble(v * h * j2 * j2 * dx)
-
-    # j0 = assemble(jump(v * grad(u[0]), n=n) * dS)
-    # j1 = assemble(jump(v * grad(u[1]), n=n) * dS)
-    # j2 = assemble(jump(v * grad(eta), n=n) * dS)
     jumpTerm = assemble(v * h * (j0 * j0 + j1 * j1 + j2 * j2) * dx)
 
     return assemble(sqrt(resTerm + jumpTerm))
@@ -67,37 +62,6 @@ def fluxJumpError(q, v):
     j2 = assemble(jump(v * grad(etah), n=n) * dS)
 
     return assemble(v * h * (j0 * j0 + j1 * j1 + j2 * j2) * dx)
-
-
-def DWR(residual, adjoint, v):
-    """
-    :arg residual: approximation of residual for primal equations. 
-    :arg adjoint: approximate solution of adjoint equations.
-    :arg v: P0 test function over the same function space.
-    :return: dual weighted residual.
-    """
-    n = len(adjoint.function_space().dof_count)
-    assert(len(residual.function_space().dof_count) == n)
-    if n == 1:
-        return assemble(v * inner(residual, adjoint) * dx)
-    else:
-        return assemble(v * sum([inner(residual.split()[k], adjoint.split()[k]) for k in range(n)]) * dx)
-
-
-def basicErrorEstimator(primal, dual, v):
-    """
-    :arg primal: approximate solution of primal equations. 
-    :arg dual: approximate solution of dual equations.
-    :arg v: P0 test function over the same function space.
-    :return: error estimate as in DL16.
-    """
-    m = len(primal.function_space().dof_count)
-    n = len(dual.function_space().dof_count)
-    assert(m == n)
-    if n == 1:
-        return assemble(v * inner(primal, dual) * dx)
-    else:
-        return assemble(v * sum([inner(primal.split()[k], dual.split()[k]) for k in range(n)]) * dx)
 
 
 def totalVariation(data):

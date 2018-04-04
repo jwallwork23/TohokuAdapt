@@ -410,9 +410,12 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             if approach == 'DWF':
                 epsilon = err.basicErrorEstimator(q, dual, v)
             elif approach == 'DWR':
-                epsilon = err.DWR(rho, dual_oi if op.orderChange else dual_h, v)
+                if op.orderChange:
+                    epsilon = assemble(v * inner(rho, dual_oi) * dx)
+                else:
+                    epsilon = assemble(v * inner(rho, dual_h) * dx)
             elif approach == 'DWE':
-                epsilon = err.DWR(e, dual_oi, v)
+                epsilon = assemble(v * inner(e, dual_oi) * dx)
             elif approach == 'explicit':
                 epsilon = err.explicitErrorEstimator(q_oi if op.orderChange else q, rho, b, v,
                                                      maxBathy=True if mode == 'tohoku' else False)
@@ -424,7 +427,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                         loadAdj.load(dual_u)
                         loadAdj.load(dual_e)
                         loadAdj.close()
-                    epsilon_ = err.basicErrorEstimator(q, dual, v)
+                    epsilon_ = assemble(v * inner(q, dual) * dx)
                     for j in range(len(epsilon.dat.data)):
                         epsilon.dat.data[j] = max(epsilon.dat.data[j], epsilon_.dat.data[j])
             epsilon.dat.data[:] = np.abs(epsilon.dat.data) * nVerT / (np.abs(assemble(epsilon * dx)) or 1.)  # Normalise
