@@ -41,15 +41,11 @@ def solverSW(startRes, op=Options()):
     cb3 = P06Callback(solver_obj)           # Gauge timeseries error P06
     solver_obj.add_callback(cb3, 'timestep')
 
-    # Run simulation and extract values from Callbacks
     timer = clock()
-    solver_obj.iterate()
+    solver_obj.iterate()    # Run simulation
     timer = clock() - timer
-    J_h = cb1.__call__()[1]     # Evaluate objective functional
-    gP02 = cb2.__call__()[1]
-    gP06 = cb3.__call__()[1]
 
-    return J_h, gP02, gP06, timer
+    return cb1.__call__()[1], cb2.__call__()[1], cb3.__call__()[1], timer
 
 
 if __name__ == '__main__':

@@ -203,7 +203,7 @@ def solutionRW(V, t=0., B=0.395):
         -2 * B * tanh(B * (x + t_)) *
         A * (1 / (cosh(B * (x + t_)) ** 2))
         * 2 * y * exp(-0.5 * y * y))
-    u.dat.data[:, 0] = u0.dat.data
+    u.dat.data[:, 0] = u0.dat.data          # TODO: Shouldn't really do this in adjointland
     u.dat.data[:, 1] = u1.dat.data
     eta.interpolate(A * (1 / (cosh(B * (x + t_)) ** 2))
                     * 0.25 * (3 + 6 * y * y)
