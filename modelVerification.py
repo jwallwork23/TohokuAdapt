@@ -75,8 +75,8 @@ if __name__ == '__main__':
         J_h, gP02, gP06, timing = solverSW(k, op=op)
         gaugeFileP02.writelines(["%s," % val for val in gP02])
         gaugeFileP06.writelines(["%s," % val for val in gP06])
-        totalVarP02 = gaugeTV("P02")
-        totalVarP06 = gaugeTV("P06")
+        totalVarP02 = gaugeTV(gP02, "P02")
+        totalVarP06 = gaugeTV(gP06, "P06")
         errorfile.write('%d, %.4e, %.4e, %.4e, %.1f\n' % (k, J_h, totalVarP02, totalVarP06, timing))
         print("\nRun %d... J_h: %.4e TV P02: %.3f, TV P06: %.3f, time: %.1f\n"
               % (k, J_h, totalVarP02, totalVarP06, timing))

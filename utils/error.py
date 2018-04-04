@@ -132,5 +132,8 @@ def gaugeTV(data, gauge="P02"):
     N = len(data)
     spline = extractSpline(gauge)
     times = np.linspace(0., 25., N)
+    print("#### DEBUG: data = ", data)
+    print("#### DEBUG: gauge = ", gauge)
+    print("#### DEBUG: times = ", times)
     errors = [data[i] - spline(times[i]) for i in range(N)]
     return totalVariation(errors) / totalVariation([spline(times[i]) for i in range(N)])
