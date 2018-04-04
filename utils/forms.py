@@ -182,7 +182,7 @@ def indicator(V, mode='tohoku'):
 def solutionRW(V, t=0., B=0.395):
     """
     Analytic solution for equatorial Rossby wave test problem, as given by Huang.
-    
+
     :arg V: Mixed function space upon which to define solutions.
     :arg t: current time.
     :param B: Parameter controlling amplitude of soliton.
@@ -193,13 +193,19 @@ def solutionRW(V, t=0., B=0.395):
     u, eta = q.split()
 
     A = 0.771 * B * B
-    u.interpolate(Expression(["""%f * (1 / (cosh(%f * (x[0] + %f)) ** 2))
-        * 0.25 * (-9 + 6 * x[1] * x[1])
-        * exp(-0.5 * x[1] * x[1])""" % (A, B, 0.4 * t),
-                              """-2 * %f * tanh(%f * (x[0] + %f)) *
-        %f * (1 / (cosh(%f * (x[0] + %f)) ** 2))
-        * 2 * x[1] * exp(-0.5 * x[1] * x[1])""" % (B, B, 0.4 * t, A, B, 0.4 * t)]))
-    eta.interpolate(A * (1 / (cosh(B * (x + 0.4 * t)) ** 2))
+    t_ = 0.4 * t
+    W = FunctionSpace(V.mesh(), V.sub(0).ufl_element().family(), V.sub(0).ufl_element().degree())
+    u0 = Function(W).interpolate(
+        A * (1 / (cosh(B * (x + t_)) ** 2))
+        * 0.25 * (-9 + 6 * y * y)
+        * exp(-0.5 * y * y))
+    u1 = Function(W).interpolate(
+        -2 * B * tanh(B * (x + t_)) *
+        A * (1 / (cosh(B * (x + t_)) ** 2))
+        * 2 * y * exp(-0.5 * y * y))
+    u.dat.data[:, 0] = u0.dat.data
+    u.dat.data[:, 1] = u1.dat.data
+    eta.interpolate(A * (1 / (cosh(B * (x + t_)) ** 2))
                     * 0.25 * (3 + 6 * y * y)
                     * exp(-0.5 * y * y))
 

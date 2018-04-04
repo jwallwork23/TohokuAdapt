@@ -209,9 +209,10 @@ def problemDomain(mode='tohoku', level=0, mesh=None, output=False, op=Options())
         BCs = {}
         f = None
     else:
+        n = level + 1
         lx = 48
         ly = 24
-        mesh = RectangleMesh(lx * level, ly * level, lx, ly)
+        mesh = RectangleMesh(lx * n, ly * n, lx, ly)
         xy = Function(mesh.coordinates)
         xy.dat.data[:, :] -= [lx / 2, ly / 2]
         mesh.coordinates.assign(xy)

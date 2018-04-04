@@ -192,10 +192,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         solver_obj.bnd_functions['shallow_water'] = BCs
         if aposteriori and approach != 'DWF':
             def selector():
-                t = solver_obj.simulation_time
                 rm = options.timesteps_per_remesh
                 dt = options.timestep
-                options.simulation_export_time = dt if int(t / dt) % rm == 0 else (rm - 1) * dt
+                options.simulation_export_time = dt if int(solver_obj.simulation_time / dt) % rm == 0 else (rm - 1) * dt
         else:
             selector = None
         primalTimer = clock()
@@ -495,8 +494,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 # Evaluate callbacks and iterate
                 if mode == 'tohoku':
                     cb1 = TohokuCallback(adapSolver)
-                    cb3 = P02Callback(solver_obj)
-                    cb4 = P06Callback(solver_obj)
+                    cb3 = P02Callback(adapSolver)
+                    cb4 = P06Callback(adapSolver)
                 elif mode == 'shallow-water':
                     cb1 = ShallowWaterCallback(adapSolver)
                 elif mode == 'rossby-wave':
@@ -626,8 +625,8 @@ if __name__ == "__main__":
             elif mode == 'tohoku':
                 av, rel, J_h, gaugeP02, gaugeP06, tim = solverSW(i, approach, getData, getError, useAdjoint,
                                                                  aposteriori, mode=mode, op=op)
-                totalVarP02 = gaugeTV(gaugeP02)
-                totalVarP06 = gaugeTV(gaugeP06)
+                totalVarP02 = gaugeTV(gaugeP02, gauge="P02")
+                totalVarP06 = gaugeTV(gaugeP06, gauge="P06")
                 print('Run %d: Mean element count %6d Relative error %.4e P02: %.3f P06: %.3f Timing %.1fs'
                       % (i, av, rel, totalVarP02, totalVarP06, tim))
                 textfile.write('%d, %.4e, %.3f, %.3f, %.1f, %.4e\n' % (av, rel, totalVarP02, totalVarP06, tim, J_h))
