@@ -40,3 +40,6 @@ pyadjoint-test-burgers.py
 pyadjoint-test-thetis.py
 rossby-test-thetis.py
 rossby-test-firedrake.py
+
+# Patches
+adapt_attrs.patch
