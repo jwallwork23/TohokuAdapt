@@ -206,7 +206,7 @@ def isoP2(mesh):
     return MeshHierarchy(mesh, 1).__getitem__(1)
 
 
-def anisoRefine(M, direction=0):    # TODO: Test this
+def anisoRefine(M, direction=0):
     """
     Approximately half element size in x- or y-direction by scaling corresponding eigenvalue.
        
