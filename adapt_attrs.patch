@@ -1,0 +1,187 @@
+From 814cba14fec0c266898d9cc53924d80b08df8153 Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Tue, 27 Mar 2018 16:07:48 +0100
+Subject: [PATCH 1/6] Established adjoint mode
+
+---
+ thetis_config/__init__.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/thetis_config/__init__.py b/thetis_config/__init__.py
+index 4842c0f..5bdbd28 100644
+--- a/thetis_config/__init__.py
++++ b/thetis_config/__init__.py
+@@ -1,2 +1,2 @@
+ # Globally configurable options for thetis
+-adjoint = False
++adjoint = True
+-- 
+2.12.0
+
+
+From 722d14fe97119c1cb0c503a356db44bf87e6c5a1 Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Thu, 29 Mar 2018 09:46:10 +0100
+Subject: [PATCH 2/6] Additional options for adjoint and mesh adaptivity
+
+---
+ thetis/options.py | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
+
+diff --git a/thetis/options.py b/thetis/options.py
+index 95fe1a9..243ac99 100644
+--- a/thetis/options.py
++++ b/thetis/options.py
+@@ -386,10 +386,28 @@ class CommonModelOptions(FrozenConfigurable):
+         """).tag(config=True)
+     simulation_end_time = PositiveFloat(
+         1000.0, help="Simulation duration in seconds").tag(config=True)
++    period_of_interest_start = PositiveFloat(
++        500.0, help="""
++        Start time of period of interest in seconds
++        
++        For using objective functionals which do not integrate over all time.
++        """).tag(config=True)
++    period_of_interest_end = PositiveFloat(
++        1000.0, help="""
++        End time of period of interest in seconds
++        
++        For using objective functionals which do not integrate over all time.
++        """).tag(config=True)
++    timesteps_per_remesh = NonNegativeInteger(
++        10, help="""
++        Number of timesteps between each mesh adaption
++        
++        For use in mesh adaptivity.
++        """).tag(config=True)
+     horizontal_velocity_scale = FiredrakeConstant(
+         Constant(0.1), help="""
+         Maximum horizontal velocity magnitude
+-
++ d
+         Used to compute max stable advection time step.
+         """).tag(config=True)
+     horizontal_viscosity_scale = FiredrakeConstant(
+-- 
+2.12.0
+
+
+From ec4945d961598fb6ef3b62c46422f018c338614b Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Thu, 29 Mar 2018 11:05:31 +0100
+Subject: [PATCH 3/6] Should activate adjoint using `import thetis_adjoint`
+
+---
+ thetis_config/__init__.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/thetis_config/__init__.py b/thetis_config/__init__.py
+index 5bdbd28..4842c0f 100644
+--- a/thetis_config/__init__.py
++++ b/thetis_config/__init__.py
+@@ -1,2 +1,2 @@
+ # Globally configurable options for thetis
+-adjoint = True
++adjoint = False
+-- 
+2.12.0
+
+
+From a378e84ddb4a0d653ed70b2992e478e131759b66 Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Wed, 4 Apr 2018 10:11:07 +0100
+Subject: [PATCH 4/6] Removed typo
+
+---
+ thetis/options.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/thetis/options.py b/thetis/options.py
+index 243ac99..3a627e3 100644
+--- a/thetis/options.py
++++ b/thetis/options.py
+@@ -407,7 +407,7 @@ class CommonModelOptions(FrozenConfigurable):
+     horizontal_velocity_scale = FiredrakeConstant(
+         Constant(0.1), help="""
+         Maximum horizontal velocity magnitude
+- d
++        
+         Used to compute max stable advection time step.
+         """).tag(config=True)
+     horizontal_viscosity_scale = FiredrakeConstant(
+-- 
+2.12.0
+
+
+From d24773a5d69f5fc0f74e154bdddcf139db19c891 Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Wed, 4 Apr 2018 10:12:05 +0100
+Subject: [PATCH 5/6] Removed indents
+
+---
+ thetis/options.py | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/thetis/options.py b/thetis/options.py
+index 3a627e3..7da409c 100644
+--- a/thetis/options.py
++++ b/thetis/options.py
+@@ -389,25 +389,25 @@ class CommonModelOptions(FrozenConfigurable):
+     period_of_interest_start = PositiveFloat(
+         500.0, help="""
+         Start time of period of interest in seconds
+-        
++
+         For using objective functionals which do not integrate over all time.
+         """).tag(config=True)
+     period_of_interest_end = PositiveFloat(
+         1000.0, help="""
+         End time of period of interest in seconds
+-        
++
+         For using objective functionals which do not integrate over all time.
+         """).tag(config=True)
+     timesteps_per_remesh = NonNegativeInteger(
+         10, help="""
+         Number of timesteps between each mesh adaption
+-        
++
+         For use in mesh adaptivity.
+         """).tag(config=True)
+     horizontal_velocity_scale = FiredrakeConstant(
+         Constant(0.1), help="""
+         Maximum horizontal velocity magnitude
+-        
++
+         Used to compute max stable advection time step.
+         """).tag(config=True)
+     horizontal_viscosity_scale = FiredrakeConstant(
+-- 
+2.12.0
+
+
+From f5f239b7dbd1889035e73551cd6a26353414374c Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Wed, 4 Apr 2018 10:15:28 +0100
+Subject: [PATCH 6/6] NonNegative period of interest start
+
+---
+ thetis/options.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/thetis/options.py b/thetis/options.py
+index 7da409c..5c7580a 100644
+--- a/thetis/options.py
++++ b/thetis/options.py
+@@ -386,7 +386,7 @@ class CommonModelOptions(FrozenConfigurable):
+         """).tag(config=True)
+     simulation_end_time = PositiveFloat(
+         1000.0, help="Simulation duration in seconds").tag(config=True)
+-    period_of_interest_start = PositiveFloat(
++    period_of_interest_start = NonNegativeFloat(
+         500.0, help="""
+         Start time of period of interest in seconds
+ 
+-- 
+2.12.0
+
