@@ -5,7 +5,8 @@ from time import clock
 import datetime
 
 from utils.conversion import get_latitude
-from utils.error import TohokuCallback, P02Callback, P06Callback, gaugeTV
+from utils.callbacks import TohokuCallback, P02Callback, P06Callback
+from utils.error import gaugeTV
 from utils.mesh import problemDomain
 from utils.options import Options
 
