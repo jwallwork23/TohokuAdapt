@@ -81,11 +81,11 @@ def steadyMetric(f, H=None, nVerT=None, errTarget=1e-3, op=Options()):
     V = H.function_space()
     mesh = V.mesh()
     if not nVerT:
-        nVerT = op.vscale * meshStats(mesh)[1]      # TODO: verify this is indeed vertices, not elements
+        nVerT = op.vscale * meshStats(mesh)[1]      # TODO: Verify this is indeed vertices, not elements
 
-    ia2 = 1. / pow(op.a, 2)         # Inverse square aspect ratio
-    ihmin2 = 1. / pow(op.hmin, 2)   # Inverse square minimal side-length
-    ihmax2 = 1. / pow(op.hmax, 2)   # Inverse square maximal side-length
+    ia2 = 1. / pow(op.maxAnisotropy, 2)     # Inverse square max aspect ratio
+    ihmin2 = 1. / pow(op.hmin, 2)           # Inverse square minimal side-length
+    ihmax2 = 1. / pow(op.hmax, 2)           # Inverse square maximal side-length
     M = Function(V)
     if op.ntype == 'manual':
         f_min = 1e-3  # Minimum tolerated value for the solution field
@@ -133,8 +133,8 @@ def steadyMetric(f, H=None, nVerT=None, errTarget=1e-3, op=Options()):
             M.dat.data[i][0, 1] = lam1 * v1[0] * v1[1] + lam2 * v2[0] * v2[1]
             M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
             M.dat.data[i][1, 1] = lam1 * v1[1] * v1[1] + lam2 * v2[1] * v2[1]
-            M.dat.data[i] *= pow(det, -1. / (2 * op.p + 2))
-            detH.dat.data[i] = pow(det, op.p / (2. * op.p + 2))
+            M.dat.data[i] *= pow(det, -1. / (2 * op.normOrder + 2))
+            detH.dat.data[i] = pow(det, op.normOrder / (2. * op.normOrder + 2))
 
         M *= nVerT / assemble(detH * dx)    # Scale by the target number of vertices and Hessian complexity
         for i in range(mesh.topology.num_vertices()):
@@ -239,7 +239,7 @@ def metricGradation(M, op=Options()):
     :param op: Options class object providing parameter values.
     :return: gradated metric.
     """
-    ln_beta = np.log(op.beta)
+    ln_beta = np.log(op.maxGrowth)
 
     # Get vertices and edges of mesh
     mesh = M.function_space().mesh()

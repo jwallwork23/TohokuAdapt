@@ -9,26 +9,22 @@ __all__ = ["Options"]
 class Options:
     def __init__(self,
                  mode='tohoku',
-                 family='dg-cg',
+                 family='dg-dg',
                  vscale=0.85,
                  hmin=500.,
                  hmax=1e6,
-                 a=100,
+                 maxAnisotropy=100,
                  ntype='lp',
-                 p=2,
+                 normOrder=2,
                  mtype='s',                 # Best approach for tsunami modelling
                  iso=False,
                  gradate=False,
                  nonlinear=False,
                  rotational=False,
-                 bootstrap=False,
                  printStats=True,
-                 capBathymetry=True,        # TODO: change this under W&D
                  hessMeth='dL2',
-                 beta=1.4,
-                 gamma=1.,
+                 maxGrowth=1.4,
                  g=9.81,
-                 outputMetric=False,
                  plotpvd=True,
                  Tstart=300.,
                  Tend=1500.,
@@ -45,23 +41,19 @@ class Options:
         :param vscale: Scaling parameter for target number of vertices.
         :param hmin: Minimal tolerated element size (m).
         :param hmax: Maximal tolerated element size (m).
-        :param a: maximum tolerated aspect ratio.
+        :param maxAnisotropy: maximum tolerated aspect ratio.
         :param ntype: Normalisation approach: 'lp' or 'manual'.
-        :param p: norm order in the Lp normalisation approach, where ``p => 1`` and ``p = infty`` is an option.
+        :param normOrder: norm order in the Lp normalisation approach, where ``p => 1`` and ``p = infty`` is an option.
         :param mtype: Adapt w.r.t 's'peed, 'f'ree surface or 'b'oth.
         :param iso: Toggle isotropic / anisotropic algorithm.
         :param gradate: Toggle metric gradation.
         :param nonlinear: Toggle nonlinear / linear equations.
         :param rotational: Toggle rotational / non-rotational equations.
-        :param bootstrap: implement mesh bootstrapping to establish initial mesh.
         :param printStats: print to screen during simulation.
-        :param capBathymetry: under no wetting-and-drying.
         :param hessMeth: Method of Hessian reconstruction: 'dL2' or 'parts'.
-        :param beta: metric gradation scaling parameter.
-        :param gamma: metric rescaling parameter.
+        :param maxGrowth: metric gradation scaling parameter.
         :param g: gravitational acceleration.
-        :param outputMetric: toggle saving metric to PVD.
-        :param plotpvd: toggle saving solution fields to PVD.
+        :param plotpvd: toggle saving solution fields to .pvd.
         :param Tstart: Lower time range limit (s), before which we can assume the wave won't reach the shore.
         :param Tend: Simulation duration (s).
         :param dt: Timestep (s).
@@ -72,93 +64,91 @@ class Options:
         :param timestepper: timestepping scheme.
         :param wd: toggle wetting and drying.
         """
-        self.mode = mode
         try:
             assert mode in ('tohoku', 'shallow-water', 'rossby-wave')
+            self.mode = mode
         except:
             raise ValueError('Test problem not recognised.')
-
-        # Adaptivity parameters
-        self.family = family
         try:
             assert family in ('dg-dg', 'dg-cg', 'cg-cg')
+            self.family = family
         except:
             raise ValueError('Mixed function space not recognised.')
-        self.vscale = vscale
         try:
             assert vscale > 0
+            self.vscale = vscale
         except:
             raise ValueError('Invalid value for scaling parameter. vscale > 0 is required.')
-        self.hmin = hmin
-        self.hmax = hmax
         try:
             assert (hmin > 0) & (hmax > hmin)
+            self.hmin = hmin
+            self.hmax = hmax
         except:
             raise ValueError('Invalid min/max element sizes. hmax > hmin > 0 is required.')
-        self.a = a
         try:
-            assert a > 0
+            assert maxAnisotropy > 0
+            self.maxAnisotropy = maxAnisotropy
         except:
             raise ValueError('Invalid anisotropy value. a > 0 is required.')
-        self.ntype = ntype
         try:
             assert ntype in ('lp', 'manual')
+            self.ntype = ntype
         except:
             raise ValueError('Normalisation approach ``%s`` not recognised.' % ntype)
-        self.p = p
         try:
-            assert p > 0
+            assert normOrder > 0
+            self.normOrder = normOrder
         except:
             raise ValueError('Invalid value for p. p > 0 is required.')
-        self.mtype = mtype
         try:
             assert mtype in ('f', 's', 'b')
+            self.mtype = mtype
         except:
             raise ValueError('Field for adaption ``%s`` not recognised.' % mtype)
+        for i in (gradate, nonlinear, rotational, iso, printStats, plotpvd, wd, refinedSpace):
+            assert(isinstance(i, bool))
         self.iso = iso
         self.gradate = gradate
         self.nonlinear = nonlinear
         self.rotational = rotational
-        self.bootstrap = bootstrap
         self.printStats = printStats
-        self.capBathymetry = capBathymetry
-        self.outputMetric = outputMetric
         self.plotpvd = plotpvd
         self.wd = wd
-        assert(type(gradate) == type(nonlinear) == type(rotational) == type(iso) == type(bootstrap)
-               == type(printStats) == type(capBathymetry) == type(outputMetric) == type(plotpvd) == type(wd) ==
-               type(refinedSpace) == bool)
-        self.hessMeth = hessMeth
         try:
             assert hessMeth in ('dL2', 'parts')
+            self.hessMeth = hessMeth
         except:
             raise ValueError('Hessian reconstruction method ``%s`` not recognised.' % hessMeth)
-        self.beta = beta
-        self.gamma = gamma
         try:
-            assert (beta > 1) & (gamma > 0)
+            assert (maxGrowth > 1)
+            self.maxGrowth = maxGrowth
         except:
-            raise ValueError('Invalid value for scaling parameter.')
+            raise ValueError('Invalid value for growth parameter.')
 
         # Physical parameters
-        self.g = g
         self.Omega = 7.291e-5   # Planetary rotation rate
         try:
-            assert(g > 0)
+            assert g > 0
+            self.g = g          # Gravitational acceleration
         except:
             raise ValueError('Unphysical physical parameters!')
 
         # Timestepping parameters
+        for i in (Tstart, Tend, dt):
+            assert isinstance(i, float)
         self.Tstart = Tstart
         self.Tend = Tend
         self.dt = dt
-        assert(type(Tstart) == type(Tend) == type(dt) == float)
+        for i in (ndump, rm, orderChange):
+            assert isinstance(i, int)
         self.ndump = ndump
         self.rm = rm
         self.orderChange = orderChange
-        self.refinedSpace = refinedSpace
-        assert(type(ndump) == type(rm) == type(orderChange) == int)
-        self.timestepper = timestepper
+        try:
+            assert timestepper in ('CrankNicolson', 'ImplicitEuler', 'ExplicitEuler')
+            self.timestepper = timestepper
+        except:
+            raise NotImplementedError
 
         # Solver parameters for ``firedrake-tsunami`` case
         self.params = {'mat_type': 'matfree',

@@ -530,7 +530,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         printTimings(primalTimer, dualTimer, errorTimer, adaptTimer, fullTime)
 
     # Measure error using metrics, using data from Huang et al.
-    if mode == 'rossby-wave':   # TODO: Plot / interpret these results
+    if mode == 'rossby-wave':
         index = int(cntT/op.ndump) if approach == 'fixedMesh' else int((cnt-op.rm) / op.ndump)
         with DumbCheckpoint(di+'hdf5/Elevation2d_'+indexString(index), mode=FILE_READ) as loadElev:
             loadElev.load(elev_2d, name='elev_2d')
@@ -541,7 +541,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         distanceTravelled = np.abs(dgCoords.dat.data[peak_i][0])
 
     toc = clock() - tic
-    if mode == 'rossby-wave':
+    if mode == 'rossby-wave':   # TODO: Use analytic solution to get these values
         return av, np.abs(peak/0.1567020), distanceTravelled, distanceTravelled/47.18, toc
     elif mode == 'tohoku':
         return av, np.abs(op.J(mode) - J_h) / np.abs(op.J(mode)), J_h, gaugeP02, gaugeP06, toc
@@ -560,7 +560,6 @@ if __name__ == "__main__":
                                          "'hessianBased', 'residual', 'explicit', 'fluxJump', 'implicit', 'DWF', "
                                          "'DWR', 'DWE'}" )
     parser.add_argument("-w", help="Use wetting and drying")
-    parser.add_argument("-b", help="Use bootstrapping")
     parser.add_argument("-ho", help="Compute errors and residuals in a higher order space")
     parser.add_argument("-lo", help="Compute errors and residuals in a lower order space")
     parser.add_argument("-r", help="Compute errors and residuals in a refined space")
@@ -580,7 +579,6 @@ if __name__ == "__main__":
                  rm=100 if useAdjoint else 50,
                  gradate=True if aposteriori else False,
                  plotpvd=False,
-                 bootstrap=True if args.b else False,
                  printStats=False,
                  wd=True if args.w else False)
     if mode == 'shallow-water':
@@ -588,6 +586,7 @@ if __name__ == "__main__":
     elif mode == 'rossby-wave':
         op.rm = 48 if useAdjoint else 24
 
+    # Establish filename
     filename = 'outdata/' + mode + '/' + approach
     if args.ho:
         op.orderChange = 1
@@ -600,39 +599,28 @@ if __name__ == "__main__":
         filename += '_r'
     if args.w:
         filename += '_w'
-    filename += date
+    textfile = open(filename + date + '.txt', 'w+')
 
-    # Run simulation(s)
-    if op.bootstrap:
-        filename += '_BOOTSTRAP'
-    textfile = open(filename +'.txt', 'w+')
-    if op.bootstrap:
-        for i in range(10):
-            av, rel, J_h, timing = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
-            var = np.abs(J_h - J_h_) if i > 0 else 0.
-            J_h_ = J_h
-            print('Run %d:  Mean element count %6d      Objective value %.4e        Timing %.1fs    Difference %.4e'
-                  % (i, av, J_h, timing, var))
-            textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, J_h, timing, var))
-    else:
-        for i in range(6):       # TODO: Can't currently do multiple adjoint runs
-            if mode == 'rossby-wave':
-                av, relativePeak, distanceTravelled, phaseSpd, timing = \
-                    solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
-                print('Run %d: <#Elements>: %6d  Height error: %.4f  Distance: %.4fm  Speed error: %.4fm  Timing %.1fs'
-                      % (i, av, relativePeak, distanceTravelled, phaseSpd, timing))
-                textfile.write('%d, %.4f, %.4f, %.4f, %.1f\n' % (av, relativePeak, distanceTravelled, phaseSpd, timing))
-            elif mode == 'tohoku':
-                av, rel, J_h, gaugeP02, gaugeP06, tim = solverSW(i, approach, getData, getError, useAdjoint,
-                                                                 aposteriori, mode=mode, op=op)
-                totalVarP02 = gaugeTV(gaugeP02, gauge="P02")
-                totalVarP06 = gaugeTV(gaugeP06, gauge="P06")
-                print('Run %d: Mean element count %6d Relative error %.4e P02: %.3f P06: %.3f Timing %.1fs'
-                      % (i, av, rel, totalVarP02, totalVarP06, tim))
-                textfile.write('%d, %.4e, %.3f, %.3f, %.1f, %.4e\n' % (av, rel, totalVarP02, totalVarP06, tim, J_h))
-            else:
-                av, rel, J_h, tim = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
-                print('Run %d: Mean element count %6d Relative error %.4e Timing %.1fs'
-                      % (i, av, rel, tim))
-                textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, tim, J_h))
+    # Run simulations
+    for i in range(6):       # TODO: Can't currently do multiple adjoint runs
+        if mode == 'rossby-wave':
+            av, relativePeak, distanceTravelled, phaseSpd, timing = \
+                solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
+            print('Run %d: <#Elements>: %6d  Height error: %.4f  Distance: %.4fm  Speed error: %.4fm  Timing %.1fs'
+                  % (i, av, relativePeak, distanceTravelled, phaseSpd, timing))
+            # TODO: Plot these results as errors vs #Elements
+            textfile.write('%d, %.4f, %.4f, %.4f, %.1f\n' % (av, relativePeak, distanceTravelled, phaseSpd, timing))
+        elif mode == 'tohoku':
+            av, rel, J_h, gaugeP02, gaugeP06, tim = solverSW(i, approach, getData, getError, useAdjoint,
+                                                             aposteriori, mode=mode, op=op)
+            totalVarP02 = gaugeTV(gaugeP02, gauge="P02")
+            totalVarP06 = gaugeTV(gaugeP06, gauge="P06")
+            print('Run %d: Mean element count %6d Relative error %.4e P02: %.3f P06: %.3f Timing %.1fs'
+                  % (i, av, rel, totalVarP02, totalVarP06, tim))
+            textfile.write('%d, %.4e, %.3f, %.3f, %.1f, %.4e\n' % (av, rel, totalVarP02, totalVarP06, tim, J_h))
+        else:
+            av, rel, J_h, tim = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
+            print('Run %d: Mean element count %6d Relative error %.4e Timing %.1fs'
+                  % (i, av, rel, tim))
+            textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, tim, J_h))
     textfile.close()

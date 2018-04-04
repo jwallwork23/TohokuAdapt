@@ -51,8 +51,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         residualFile = File(di + "residual.pvd")
         errorFile = File(di + "errorIndicator.pvd")
     adaptiveFile = File(di + approach + ".pvd")
-    if op.outputMetric:
-        metricFile = File(di + "metric.pvd")
     if useAdjoint:
         adjointFile = File(di + "adjoint.pvd")
 
@@ -498,9 +496,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     adap.metricGradation(M, op=op)
                 if op.advect:
                     M = adap.advectMetric(M, u, 2*Dt, n=3*op.rm)
-                if op.outputMetric:
-                    M.rename("Metric")
-                    metricFile.write(M, time=t)
 
                 # Adapt mesh and interpolate variables
                 if not (approach in ('fieldBased', 'gradientBased', 'hessianBased') and op.mtype != 'f' and cnt == 0):
@@ -599,7 +594,6 @@ if __name__ == '__main__':
                      gradate=True if useAdjoint else False,
                      advect=False,
                      window=True if approach == 'DWF' else False,
-                     outputMetric=False,
                      plotpvd=True,
                      gauges=False,
                      # iso=False if approach in ('gradientBased', 'hessianBased') else True,
