@@ -167,8 +167,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             e1.rename("Implicit error 1")
 
     # Initialise adaptivity placeholders and counters
-    nEle, nVerT = msh.meshStats(mesh_H)
-    nVerT *= op.vscale                              # Target #Vertices
+    nEle, op.nVerT = msh.meshStats(mesh_H)
+    op.nVerT *= op.rescaling                        # Target #Vertices
     mM = [nEle, nEle]                               # Min/max #Elements
     Sn = nEle
     t = 0.
@@ -428,7 +428,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     epsilon_ = assemble(v * inner(q, dual) * dx)
                     for j in range(len(epsilon.dat.data)):
                         epsilon.dat.data[j] = max(epsilon.dat.data[j], epsilon_.dat.data[j])
-            epsilon.dat.data[:] = np.abs(epsilon.dat.data) * nVerT / (np.abs(assemble(epsilon * dx)) or 1.)  # Normalise
             epsilon.rename("Error indicator")
 
             # Store error estimates
@@ -469,27 +468,27 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     if approach in ('norm', 'fluxJump'):
                         v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
                         norm = assemble(v * inner(q, q) * dx) if approach == 'norm' else err.fluxJumpError(q, v)
-                        M = adap.isotropicMetric(norm, invert=False, nVerT=nVerT, op=op)
+                        M = adap.isotropicMetric(norm, invert=False, op=op)
                     else:
-                        if op.mtype != 's':
+                        if op.adaptField != 's':
                             if approach == 'fieldBased':
-                                M = adap.isotropicMetric(eta, invert=False, nVerT=nVerT, op=op)
+                                M = adap.isotropicMetric(eta, invert=False, op=op)
                             elif approach == 'gradientBased':
                                 g = adap.constructGradient(eta)
-                                M = adap.isotropicMetric(g, invert=False, nVerT=nVerT, op=op)
+                                M = adap.isotropicMetric(g, invert=False, op=op)
                             elif approach == 'hessianBased':
-                                M = adap.steadyMetric(eta, nVerT=nVerT, op=op)
+                                M = adap.steadyMetric(eta, op=op)
                         if cnt != 0:    # Can't adapt to zero velocity
-                            if op.mtype != 'f':
+                            if op.adaptField != 'f':
                                 spd = Function(FunctionSpace(mesh_H, 'DG', 1)).interpolate(sqrt(dot(u, u)))
                                 if approach == 'fieldBased':
-                                    M2 = adap.isotropicMetric(spd, invert=False, nVerT=nVerT, op=op)
+                                    M2 = adap.isotropicMetric(spd, invert=False, op=op)
                                 elif approach == 'gradientBased':
                                     g = adap.constructGradient(spd)
-                                    M2 = adap.isotropicMetric(g, invert=False, nVerT=nVerT, op=op)
+                                    M2 = adap.isotropicMetric(g, invert=False, op=op)
                                 elif approach == 'hessianBased':
-                                    M2 = adap.steadyMetric(spd, nVerT=nVerT, op=op)
-                                M = adap.metricIntersection(M, M2) if op.mtype == 'b' else M2
+                                    M2 = adap.steadyMetric(spd, op=op)
+                                M = adap.metricIntersection(M, M2) if op.adaptField == 'b' else M2
                 if op.gradate:
                     M_ = adap.isotropicMetric(inte.interp(mesh_H, H0)[0], bdy=True, op=op) # Initial boundary metric
                     M = adap.metricIntersection(M, M_, bdy=True)
@@ -498,7 +497,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     M = adap.advectMetric(M, u, 2*Dt, n=3*op.rm)
 
                 # Adapt mesh and interpolate variables
-                if not (approach in ('fieldBased', 'gradientBased', 'hessianBased') and op.mtype != 'f' and cnt == 0):
+                if not (approach in ('fieldBased', 'gradientBased', 'hessianBased') and op.adaptField != 'f' and cnt == 0):
                     mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
                     V_H = op.mixedSpace(mesh_H)
                     q_ = inte.mixedPairInterp(mesh_H, V_H, q_)[0]
@@ -588,7 +587,7 @@ if __name__ == '__main__':
     mode = args.mode
 
     approach, getData, getError, useAdjoint, aposteriori = msc.cheatCodes(args.approach)
-    op = opt.Options(vscale=0.1 if approach == 'DWR' else 0.85,
+    op = opt.Options(rescaling=0.1 if approach == 'DWR' else 0.85,
                      family='cg-cg' if mode == 'rossby-wave' else 'dg-dg',
                      rm=60 if useAdjoint else 30,
                      gradate=True if useAdjoint else False,

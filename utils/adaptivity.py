@@ -64,14 +64,13 @@ def constructHessian(f, op=Options()):
     return H
 
 
-def steadyMetric(f, H=None, nVerT=None, errTarget=1e-3, op=Options()):
+def steadyMetric(f, H=None, errTarget=1e-3, op=Options()):
     """
-    Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``steadyMetric``, from 
+    Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``computeSteadyMetric``, from 
     ``adapt.py``, 2016.
 
     :arg f: P1 solution field.
     :arg H: reconstructed Hessian, usually chosen to be associated with ``sol``.
-    :param nVerT: target number of vertices, in the case of Lp normalisation.
     :param errTarget: target error, in the case of manual normalisation.
     :param op: Options class object providing min/max cell size values.
     :return: steady metric associated with Hessian H.
@@ -80,14 +79,12 @@ def steadyMetric(f, H=None, nVerT=None, errTarget=1e-3, op=Options()):
         H = constructHessian(f, op=op)
     V = H.function_space()
     mesh = V.mesh()
-    if not nVerT:
-        nVerT = op.vscale * meshStats(mesh)[1]      # TODO: Verify this is indeed vertices, not elements
 
     ia2 = 1. / pow(op.maxAnisotropy, 2)     # Inverse square max aspect ratio
     ihmin2 = 1. / pow(op.hmin, 2)           # Inverse square minimal side-length
     ihmax2 = 1. / pow(op.hmax, 2)           # Inverse square maximal side-length
     M = Function(V)
-    if op.ntype == 'manual':
+    if op.normalisation == 'manual':
         f_min = 1e-3  # Minimum tolerated value for the solution field
 
         for i in range(mesh.topology.num_vertices()):
@@ -136,7 +133,7 @@ def steadyMetric(f, H=None, nVerT=None, errTarget=1e-3, op=Options()):
             M.dat.data[i] *= pow(det, -1. / (2 * op.normOrder + 2))
             detH.dat.data[i] = pow(det, op.normOrder / (2. * op.normOrder + 2))
 
-        M *= nVerT / assemble(detH * dx)    # Scale by the target number of vertices and Hessian complexity
+        M *= op.nVerT / assemble(detH * dx)    # Scale by the target number of vertices and Hessian complexity
         for i in range(mesh.topology.num_vertices()):
             # Find eigenpairs of metric and truncate eigenvalues
             lam, v = la.eig(M.dat.data[i])
@@ -155,35 +152,31 @@ def steadyMetric(f, H=None, nVerT=None, errTarget=1e-3, op=Options()):
     return M
 
 
-def isotropicMetric(f, bdy=False, invert=True, nVerT=None, op=Options()):
+def isotropicMetric(f, bdy=False, invert=True, op=Options()):
     """
     :arg f: function to adapt to.
     :param bdy: toggle boundary metric.
     :param invert: toggle cell size vs error.
-    :param nVerT: target number of vertices.
     :param op: Options class object providing min/max cell size values.
     :return: isotropic metric corresponding to the scalar function.
     """
-    mesh = f.function_space().mesh()
-    V = TensorFunctionSpace(mesh, "CG", 1)
     hmin2 = pow(op.hmin, 2)
     hmax2 = pow(op.hmax, 2)
-    M = Function(V)
     scalar = len(f.ufl_element().value_shape()) == 0
+    mesh = f.function_space().mesh()
     g = Function(FunctionSpace(mesh, "CG", 1) if scalar else VectorFunctionSpace(mesh, "CG", 1))
-    family = f.ufl_element().family()
-    deg = f.ufl_element().degree()
-    if (family == 'Lagrange') & (deg == 1):
+    if (f.ufl_element().family() == 'Lagrange') & (f.ufl_element().degree() == 1):
         g.assign(f)
     else:
         g.interpolate(f)
 
     # Normalise error estimate
-    gnorm = max(assemble(sqrt(inner(g, g))*dx), 1e-6)   # Equivalent to scaling by (thresholded) metric complexity
-    if not nVerT:
-        nVerT = op.vscale * meshStats(mesh)[1]
-    g.dat.data[:] = np.abs(g.dat.data) * nVerT / gnorm  # NOTE this changes in 3D case
+    gnorm = max(assemble(sqrt(inner(g, g)) * dx), 1e-6)     # Equivalent to scaling by (thresholded) metric complexity
+    g.dat.data[:] = np.abs(g.dat.data) * op.nVerT / gnorm   # NOTE this changes in 3D case
 
+    # Establish metric
+    V = TensorFunctionSpace(mesh, "CG", 1)
+    M = Function(V)
     for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(len(g.dat.data)):
         if scalar:
             if invert:

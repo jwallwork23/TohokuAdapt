@@ -117,8 +117,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     v = TestFunction(P0)
 
     # Initialise parameters and counters
-    nEle, nVerT = meshStats(mesh_H)
-    nVerT *= op.vscale                      # Target #Vertices
+    nEle, op.nVerT = meshStats(mesh_H)
+    op.nVerT *= op.rescaling                # Target #Vertices
     mM = [nEle, nEle]                       # Min/max #Elements
     Sn = nEle
     endT = 0.
@@ -401,36 +401,36 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                         loadErr.load(epsilon)
                         loadErr.close()
                     errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(interp(mesh_H, epsilon)[0])
-                    M = isotropicMetric(errEst, op=op, invert=False, nVerT=nVerT)
+                    M = isotropicMetric(errEst, invert=False, op=op)
                 else:
                     if approach == 'norm':
                         v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
                         epsilon = assemble(v * inner(q, q) * dx)
-                        M = isotropicMetric(epsilon, invert=False, nVerT=nVerT, op=op)
+                        M = isotropicMetric(epsilon, invert=False, op=op)
                     elif approach =='fluxJump' and cnt != 0:
                         v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
                         epsilon = fluxJumpError(q, v)
-                        M = isotropicMetric(epsilon, invert=False, nVerT=nVerT, op=op)
+                        M = isotropicMetric(epsilon, invert=False, op=op)
                     else:
-                        if op.mtype != 's':
+                        if op.adaptField != 's':
                             if approach == 'fieldBased':
-                                M = isotropicMetric(elev_2d, invert=False, nVerT=nVerT, op=op)
+                                M = isotropicMetric(elev_2d, invert=False, op=op)
                             elif approach == 'gradientBased':
                                 g = constructGradient(elev_2d)
-                                M = isotropicMetric(g, invert=False, nVerT=nVerT, op=op)
+                                M = isotropicMetric(g, invert=False, op=op)
                             elif approach == 'hessianBased':
-                                M = steadyMetric(elev_2d, nVerT=nVerT, op=op)
+                                M = steadyMetric(elev_2d, op=op)
                         if cnt != 0:    # Can't adapt to zero velocity
-                            if op.mtype != 'f':
+                            if op.adaptField != 'f':
                                 spd = Function(FunctionSpace(mesh_H, "DG", 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
                                 if approach == 'fieldBased':
-                                    M2 = isotropicMetric(spd, invert=False, nVerT=nVerT, op=op)
+                                    M2 = isotropicMetric(spd, invert=False, op=op)
                                 elif approach == 'gradientBased':
                                     g = constructGradient(spd)
-                                    M2 = isotropicMetric(g, invert=False, nVerT=nVerT, op=op)
+                                    M2 = isotropicMetric(g, invert=False, op=op)
                                 elif approach == 'hessianBased':
-                                    M2 = steadyMetric(spd, nVerT=nVerT, op=op)
-                                M = metricIntersection(M, M2) if op.mtype == 'b' else M2
+                                    M2 = steadyMetric(spd, op=op)
+                                M = metricIntersection(M, M2) if op.adaptField == 'b' else M2
                 if op.gradate:
                     M_ = isotropicMetric(interp(mesh_H, H0)[0], bdy=True, op=op)  # Initial boundary metric
                     M = metricIntersection(M, M_, bdy=True)
@@ -439,7 +439,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     File('plots/'+mode+'/mesh.pvd').write(mesh_H.coordinates, time=float(cnt))
 
                 # Adapt mesh and interpolate variables
-                if not (((approach in ('fieldBased', 'gradientBased', 'hessianBased') and op.mtype != 'f')
+                if not (((approach in ('fieldBased', 'gradientBased', 'hessianBased') and op.adaptField != 'f')
                          or approach == 'fluxJump') and cnt == 0):
                     mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
                     P1 = FunctionSpace(mesh_H, "CG", 1)
@@ -574,8 +574,6 @@ if __name__ == "__main__":
     # Choose mode and set parameter values
     approach, getData, getError, useAdjoint, aposteriori = cheatCodes(args.approach)
     op = Options(mode=mode,
-                 vscale=0.85,
-                 family='dg-dg',
                  rm=100 if useAdjoint else 50,
                  gradate=True if aposteriori else False,
                  plotpvd=False,

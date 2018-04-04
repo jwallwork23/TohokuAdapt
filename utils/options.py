@@ -1,7 +1,5 @@
 from thetis import *
 
-from .conversion import from_latlon
-
 
 __all__ = ["Options"]
 
@@ -10,13 +8,13 @@ class Options:
     def __init__(self,
                  mode='tohoku',
                  family='dg-dg',
-                 vscale=0.85,
+                 rescaling=0.85,
                  hmin=500.,
                  hmax=1e6,
                  maxAnisotropy=100,
-                 ntype='lp',
+                 normalisation='lp',
                  normOrder=2,
-                 mtype='s',                 # Best approach for tsunami modelling
+                 adaptField='s',                 # Best approach for tsunami modelling
                  iso=False,
                  gradate=False,
                  nonlinear=False,
@@ -31,6 +29,7 @@ class Options:
                  dt=0.5,
                  ndump=50,
                  rm=50,
+                 nVerT=1000,
                  orderChange=0,
                  refinedSpace=False,
                  timestepper='CrankNicolson',
@@ -38,13 +37,13 @@ class Options:
         """
         :param mode: problem considered.
         :param family: mixed function space family, from {'dg-dg', 'dg-cg'}.
-        :param vscale: Scaling parameter for target number of vertices.
+        :param rescaling: Scaling parameter for target number of vertices.
         :param hmin: Minimal tolerated element size (m).
         :param hmax: Maximal tolerated element size (m).
         :param maxAnisotropy: maximum tolerated aspect ratio.
-        :param ntype: Normalisation approach: 'lp' or 'manual'.
+        :param normalisation: Normalisation approach: 'lp' or 'manual'.
         :param normOrder: norm order in the Lp normalisation approach, where ``p => 1`` and ``p = infty`` is an option.
-        :param mtype: Adapt w.r.t 's'peed, 'f'ree surface or 'b'oth.
+        :param adaptField: Adapt w.r.t 's'peed, 'f'ree surface or 'b'oth.
         :param iso: Toggle isotropic / anisotropic algorithm.
         :param gradate: Toggle metric gradation.
         :param nonlinear: Toggle nonlinear / linear equations.
@@ -59,6 +58,7 @@ class Options:
         :param dt: Timestep (s).
         :param ndump: Timesteps per data dump.
         :param rm: Timesteps per remesh. (Should be an integer multiple of ndump.)
+        :param nVerT: target number of vertices.
         :param orderChange: change in polynomial degree for residual approximation.
         :param refinedSpace: refine space too compute errors and residuals.
         :param timestepper: timestepping scheme.
@@ -75,10 +75,10 @@ class Options:
         except:
             raise ValueError('Mixed function space not recognised.')
         try:
-            assert vscale > 0
-            self.vscale = vscale
+            assert rescaling > 0
+            self.rescaling = rescaling
         except:
-            raise ValueError('Invalid value for scaling parameter. vscale > 0 is required.')
+            raise ValueError('Invalid value for scaling parameter. rescaling > 0 is required.')
         try:
             assert (hmin > 0) & (hmax > hmin)
             self.hmin = hmin
@@ -91,20 +91,20 @@ class Options:
         except:
             raise ValueError('Invalid anisotropy value. a > 0 is required.')
         try:
-            assert ntype in ('lp', 'manual')
-            self.ntype = ntype
+            assert normalisation in ('lp', 'manual')
+            self.normalisation = normalisation
         except:
-            raise ValueError('Normalisation approach ``%s`` not recognised.' % ntype)
+            raise ValueError('Normalisation approach ``%s`` not recognised.' % normalisation)
         try:
             assert normOrder > 0
             self.normOrder = normOrder
         except:
             raise ValueError('Invalid value for p. p > 0 is required.')
         try:
-            assert mtype in ('f', 's', 'b')
-            self.mtype = mtype
+            assert adaptField in ('f', 's', 'b')
+            self.adaptField = adaptField
         except:
-            raise ValueError('Field for adaption ``%s`` not recognised.' % mtype)
+            raise ValueError('Field for adaption ``%s`` not recognised.' % adaptField)
         for i in (gradate, nonlinear, rotational, iso, printStats, plotpvd, wd, refinedSpace):
             assert(isinstance(i, bool))
         self.iso = iso
@@ -139,11 +139,12 @@ class Options:
         self.Tstart = Tstart
         self.Tend = Tend
         self.dt = dt
-        for i in (ndump, rm, orderChange):
+        for i in (ndump, rm, orderChange, nVerT):
             assert isinstance(i, int)
         self.ndump = ndump
         self.rm = rm
         self.orderChange = orderChange
+        self.nVerT = nVerT
         try:
             assert timestepper in ('CrankNicolson', 'ImplicitEuler', 'ExplicitEuler')
             self.timestepper = timestepper
@@ -202,7 +203,7 @@ class Options:
         :param mode: test problem choice.
         :return: 'exact' objective functional value, converged to 3 s.f.
         """
-        dat = {'tohoku': 1.2185e+13,            # On mesh of 196,560 elements     TODO: Verify this
+        dat = {'tohoku': 1.2185e+13,            # On mesh of 196,560 elements     TODO: Verify this by modelVerification
                'shallow-water': 1.1184e-3,      # On mesh of 524,288 elements
                }                                                                # TODO: rossby-wave test case
         if mode in dat.keys():
@@ -216,6 +217,8 @@ class Options:
         :param gauge: Tide / pressure gauge name, from {P02, P06, 801, 802, 803, 804, 806}.
         :return: UTM coordinate for chosen gauge.
         """
+        from .conversion import from_latlon
+
         E, N, zn, zl = from_latlon(self.glatlon[gauge][0], self.glatlon[gauge][1], force_zone_number=54)
         return E, N
 
