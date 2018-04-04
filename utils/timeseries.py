@@ -15,7 +15,7 @@ def readErrors(date, approach, mode='tohoku', bootstrapping=False):
     :param bootstrapping: was bootstrapping used?
     :return: mean element count, relative error and CPU time.
     """
-    filename = 'outdata/outputs/'+mode+'/'+approach+date
+    filename = 'outdata/'+mode+'/'+approach+date
     if bootstrapping:
         filename += '_BOOTSTRAP'
     textfile = open(filename+'.txt', 'r')
@@ -32,7 +32,7 @@ def readErrors(date, approach, mode='tohoku', bootstrapping=False):
 
 
 def extractSpline(gauge):
-    measuredFile = open('outdata/timeseries/'+gauge+'data_25mins.txt', 'r')
+    measuredFile = open('resources/gauges/'+gauge+'data_25mins.txt', 'r')
     x = []
     y = []
     for line in measuredFile:
@@ -82,7 +82,7 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=
         plt.xlabel(r'Mean element count')
         plt.ylabel(r'Objective value $J(\textbf{q})=\int_{T_{\mathrm{start}}}^{T_{\mathrm{end}}}\int\int_A'
                    +r'\eta(x,y,t)\,\mathrm{d}x\,\mathrm{d}y\,\mathrm{d}t$')
-        plt.savefig('outdata/outputs/' + mode + '/objectiveVsElements.pdf', bbox_inches='tight')
+        plt.savefig('outdata/' + mode + '/objectiveVsElements.pdf', bbox_inches='tight')
         plt.clf()
     else:
         # Plot errors
@@ -95,7 +95,7 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=
         if mode == 'tohoku':
             plt.xlim([5000, 60000])
             plt.ylim([1e-4, 5e-1])
-        plt.savefig('outdata/outputs/'+mode+'/errorVsElements.pdf', bbox_inches='tight')
+        plt.savefig('outdata/'+mode+'/errorVsElements.pdf', bbox_inches='tight')
         plt.clf()
 
     # Plot timings
@@ -108,7 +108,7 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=
     if mode == 'tohoku':
         plt.xlim([0, 55000])
         plt.ylim([0, 5000])
-    plt.savefig('outdata/outputs/'+mode+'/timeVsElements.pdf', bbox_inches='tight')
+    plt.savefig('outdata/'+mode+'/timeVsElements.pdf', bbox_inches='tight')
 
 
 if __name__ == "__main__":
