@@ -9,7 +9,9 @@ __all__ = ["interp", "mixedPairInterp"]
 def interp(mesh, *fields):
     """
     Transfer solution fields from the old mesh to the new mesh. Based around the function ``transfer_solution`` by
-    Nicolas Barral, 2017.
+    Nicolas Barral, 2017. The main modification is to manually 'push' vertices back into the domain when they are
+    located either outside the domain, or on the domain boundary but considered as an interior node. This is achieved
+    by sequentially increasing the tolerance involved involved in point evaluation.
 
     :arg mesh: new mesh onto which fields are to be interpolated.
     :arg fields: tuple of functions defined on the old mesh that one wants to transfer
@@ -67,7 +69,10 @@ def interp(mesh, *fields):
             if eps >= 1e8:
                 raise OutOfRangeError('Playing with epsilons failed. Abort.')
         fields_new += (f_new,)
-    return fields_new
+    if len(fields_new) == 1:
+        return fields_new[0]    # TODO: Test this
+    else:
+        return fields_new
 
 
 def mixedPairInterp(mesh, V, *fields):
@@ -76,8 +81,8 @@ def mixedPairInterp(mesh, V, *fields):
 
     :arg mesh: new mesh to be interpolated onto.
     :arg V: mixed function space defined on new mesh, with same type as that on which fields are defined.
-    :arg fields: fields to be interpolated.
-    :return: interpolated function pairs.
+    :arg fields: (mixed function space) fields to be interpolated.
+    :return: interpolated function pair(s).
     """
     fields_new = ()
     for q in fields:
@@ -87,4 +92,7 @@ def mixedPairInterp(mesh, V, *fields):
         q0, q1 = interp(mesh, q0, q1)
         p0.assign(q0), p1.assign(q1)
         fields_new += (p,)
-    return fields_new
+    if len(fields_new) == 1:
+        return fields_new[0]
+    else:
+        return fields_new

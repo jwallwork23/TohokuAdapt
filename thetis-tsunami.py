@@ -331,7 +331,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                         duale_e.interpolate(dual_e)
                         epsilon = assemble(v * inner(rho, duale) * dx)
                     elif op.refinedSpace:
-                        duale = mixedPairInterp(mesh_h, dual)[0]
+                        duale = mixedPairInterp(mesh_h, dual)
                         epsilon = assemble(v * inner(rho, duale) * dx)
                     else:
                         epsilon = assemble(v * inner(rho, dual) * dx)
@@ -341,7 +341,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                         duale_e.interpolate(dual_e)
                         epsilon = assemble(v * inner(e, duale) * dx)
                     elif op.refinedSpace:
-                        duale = mixedPairInterp(mesh_h, dual)[0]
+                        duale = mixedPairInterp(mesh_h, dual)
                         epsilon = assemble(v * inner(e, duale) * dx)
                     else:
                         epsilon = assemble(v * inner(e, dual) * dx)
@@ -402,7 +402,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                                 as loadErr:
                             loadErr.load(epsilon)
                             loadErr.close()
-                        errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(interp(mesh_H, epsilon)[0])
+                        errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(interp(mesh_H, epsilon))
                         M = isotropicMetric(errEst, invert=False, op=op)
                     else:
                         if approach == 'norm':
@@ -432,7 +432,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                                         M2 = steadyMetric(spd, op=op)
                                     M = metricIntersection(M, M2) if op.adaptField == 'b' else M2
                     if op.gradate:
-                        M_ = isotropicMetric(interp(mesh_H, H0)[0], bdy=True, op=op)  # Initial boundary metric
+                        M_ = isotropicMetric(interp(mesh_H, H0), bdy=True, op=op)  # Initial boundary metric
                         M = metricIntersection(M, M_, bdy=True)
                         metricGradation(M, op=op)
                     if op.plotpvd:
@@ -445,7 +445,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                         P1 = FunctionSpace(mesh_H, "CG", 1)
                         elev_2d, uv_2d = interp(mesh_H, elev_2d, uv_2d)
                         if mode == 'tohoku':
-                            b = interp(mesh_H, b)[0]
+                            b = interp(mesh_H, b)
                         elif mode == 'shallow-water':
                             b = Function(P1).assign(0.1)
                         else:
@@ -535,7 +535,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         with DumbCheckpoint(di+'hdf5/Elevation2d_'+indexString(index), mode=FILE_READ) as loadElev:
             loadElev.load(elev_2d, name='elev_2d')
             loadElev.close()
-        # peak_i, peak = getMax(interp(isoP2(mesh_H), elev_2d)[0].dat.data)
+        # peak_i, peak = getMax(interp(isoP2(mesh_H), elev_2d).dat.data)
         peak_i, peak = getMax(elev_2d.dat.data)
         dgCoords = Function(VectorFunctionSpace(mesh_H, op.space2, op.degree2)).interpolate(mesh_H.coordinates)
         distanceTravelled = np.abs(dgCoords.dat.data[peak_i][0])

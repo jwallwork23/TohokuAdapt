@@ -329,7 +329,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             #                 saveAdjH.store(dual_e)
             #                 saveAdjH.close()
             #         elif (approach == 'DWR') and cnt % op.rm == 0:
-            #             dual_h = inte.mixedPairInterp(mesh_h, V_h, dual)[0]
+            #             dual_h = inte.mixedPairInterp(mesh_h, V_h, dual)
             #             dual_h_u, dual_h_e = dual_h.split()
             #             dual_h_u.rename('Fine adjoint velocity')
             #             dual_h_e.rename('Fine adjoint elevation')
@@ -462,7 +462,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     with DumbCheckpoint(di + 'hdf5/error_' + msc.indexString(cnt), mode=FILE_READ) as loadError:
                         loadError.load(epsilon)
                         loadError.close()
-                    errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon)[0])
+                    errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(inte.interp(mesh_H, epsilon))
                     M = adap.isotropicMetric(errEst, op=op, invert=False)
                 else:
                     if approach in ('norm', 'fluxJump'):
@@ -490,7 +490,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                                     M2 = adap.steadyMetric(spd, op=op)
                                 M = adap.metricIntersection(M, M2) if op.adaptField == 'b' else M2
                 if op.gradate:
-                    M_ = adap.isotropicMetric(inte.interp(mesh_H, H0)[0], bdy=True, op=op) # Initial boundary metric
+                    M_ = adap.isotropicMetric(inte.interp(mesh_H, H0), bdy=True, op=op) # Initial boundary metric
                     M = adap.metricIntersection(M, M_, bdy=True)
                     adap.metricGradation(M, op=op)
                 if op.advect:
@@ -500,9 +500,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 if not (approach in ('fieldBased', 'gradientBased', 'hessianBased') and op.adaptField != 'f' and cnt == 0):
                     mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
                     V_H = op.mixedSpace(mesh_H)
-                    q_ = inte.mixedPairInterp(mesh_H, V_H, q_)[0]
+                    q_ = inte.mixedPairInterp(mesh_H, V_H, q_)
                     if mode == 'tohoku':
-                        b = inte.interp(mesh_H, b)[0]
+                        b = inte.interp(mesh_H, b)
                     elif mode == 'shallow-water':
                         b = Function(FunctionSpace(mesh_H, "CG", 1)).assign(0.1)
                     elif mode == 'rossby-wave':
