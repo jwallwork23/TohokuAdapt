@@ -29,6 +29,7 @@ class Options:
                  dt=0.5,
                  ndump=50,
                  rm=50,
+                 nAdapt=1,
                  nVerT=1000,
                  orderChange=0,
                  refinedSpace=False,
@@ -58,6 +59,7 @@ class Options:
         :param dt: Timestep (s).
         :param ndump: Timesteps per data dump.
         :param rm: Timesteps per remesh. (Should be an integer multiple of ndump.)
+        :param nAdapt: number of mesh adaptions per mesh regeneration.
         :param nVerT: target number of vertices.
         :param orderChange: change in polynomial degree for residual approximation.
         :param refinedSpace: refine space too compute errors and residuals.
@@ -139,10 +141,15 @@ class Options:
         self.Tstart = Tstart
         self.Tend = Tend
         self.dt = dt
-        for i in (ndump, rm, orderChange, nVerT):
+        for i in (ndump, rm, orderChange, nVerT, nAdapt):
             assert isinstance(i, int)
+            try:
+                assert rm % ndump == 0
+            except:
+                raise ValueError("`rm` should be an integer multiple of `ndump`.")
         self.ndump = ndump
         self.rm = rm
+        self.nAdapt = nAdapt
         self.orderChange = orderChange
         self.nVerT = nVerT
         try:

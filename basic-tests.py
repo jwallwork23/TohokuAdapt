@@ -102,6 +102,9 @@ def directionalRefine(eps=1e-4):
             print(ratio)    # TODO: Check what is going on here
 
 
+# TODO: Multiple adaption tests
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("test", help="Choose a test from {'Hessian', 'dirRefine'}")

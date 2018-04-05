@@ -394,64 +394,64 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                         loadVel.load(uv_2d, name='uv_2d')
                         loadVel.close()
 
-                # Construct metric
-                if aposteriori:
-                    with DumbCheckpoint(di+'hdf5/'+approach+'Error'+indexString(int(cnt/op.rm)), mode=FILE_READ) \
-                            as loadErr:
-                        loadErr.load(epsilon)
-                        loadErr.close()
-                    errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(interp(mesh_H, epsilon)[0])
-                    M = isotropicMetric(errEst, invert=False, op=op)
-                else:
-                    if approach == 'norm':
-                        v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
-                        epsilon = assemble(v * inner(q, q) * dx)
-                        M = isotropicMetric(epsilon, invert=False, op=op)
-                    elif approach =='fluxJump' and cnt != 0:
-                        v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
-                        epsilon = fluxJumpError(q, v)
-                        M = isotropicMetric(epsilon, invert=False, op=op)
-                    else:
-                        if op.adaptField != 's':
-                            if approach == 'fieldBased':
-                                M = isotropicMetric(elev_2d, invert=False, op=op)
-                            elif approach == 'gradientBased':
-                                g = constructGradient(elev_2d)
-                                M = isotropicMetric(g, invert=False, op=op)
-                            elif approach == 'hessianBased':
-                                M = steadyMetric(elev_2d, op=op)
-                        if cnt != 0:    # Can't adapt to zero velocity
-                            if op.adaptField != 'f':
-                                spd = Function(FunctionSpace(mesh_H, "DG", 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
-                                if approach == 'fieldBased':
-                                    M2 = isotropicMetric(spd, invert=False, op=op)
-                                elif approach == 'gradientBased':
-                                    g = constructGradient(spd)
-                                    M2 = isotropicMetric(g, invert=False, op=op)
-                                elif approach == 'hessianBased':
-                                    M2 = steadyMetric(spd, op=op)
-                                M = metricIntersection(M, M2) if op.adaptField == 'b' else M2
-                if op.gradate:
-                    M_ = isotropicMetric(interp(mesh_H, H0)[0], bdy=True, op=op)  # Initial boundary metric
-                    M = metricIntersection(M, M_, bdy=True)
-                    metricGradation(M, op=op)
-                if op.plotpvd:
-                    File('plots/'+mode+'/mesh.pvd').write(mesh_H.coordinates, time=float(cnt))
+                for l in range(op.nAdapt):      # TODO: Test this functionality
 
-                # Adapt mesh and interpolate variables
-                if not (((approach in ('fieldBased', 'gradientBased', 'hessianBased') and op.adaptField != 'f')
-                         or approach == 'fluxJump') and cnt == 0):
-                    mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
-                    P1 = FunctionSpace(mesh_H, "CG", 1)
-                    elev_2d, uv_2d = interp(mesh_H, elev_2d, uv_2d)
-                    if mode == 'tohoku':
-                        b = interp(mesh_H, b)[0]
-                    elif mode == 'shallow-water':
-                        b = Function(P1).assign(0.1)
+                    # Construct metric
+                    if aposteriori:
+                        with DumbCheckpoint(di+'hdf5/'+approach+'Error'+indexString(int(cnt/op.rm)), mode=FILE_READ) \
+                                as loadErr:
+                            loadErr.load(epsilon)
+                            loadErr.close()
+                        errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(interp(mesh_H, epsilon)[0])
+                        M = isotropicMetric(errEst, invert=False, op=op)
                     else:
-                        b = Function(P1).assign(1.)
-                    uv_2d.rename('uv_2d')
-                    elev_2d.rename('elev_2d')
+                        if approach == 'norm':
+                            v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
+                            epsilon = assemble(v * inner(q, q) * dx)
+                            M = isotropicMetric(epsilon, invert=False, op=op)
+                        elif approach =='fluxJump' and cnt != 0:
+                            v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
+                            epsilon = fluxJumpError(q, v)
+                            M = isotropicMetric(epsilon, invert=False, op=op)
+                        else:
+                            if op.adaptField != 's':
+                                if approach == 'fieldBased':
+                                    M = isotropicMetric(elev_2d, invert=False, op=op)
+                                elif approach == 'gradientBased':
+                                    M = isotropicMetric(constructGradient(elev_2d), invert=False, op=op)
+                                elif approach == 'hessianBased':
+                                    M = steadyMetric(elev_2d, op=op)
+                            if cnt != 0:    # Can't adapt to zero velocity
+                                if op.adaptField != 'f':
+                                    spd = Function(FunctionSpace(mesh_H, "DG", 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
+                                    if approach == 'fieldBased':
+                                        M2 = isotropicMetric(spd, invert=False, op=op)
+                                    elif approach == 'gradientBased':
+                                        M2 = isotropicMetric(constructGradient(spd), invert=False, op=op)
+                                    elif approach == 'hessianBased':
+                                        M2 = steadyMetric(spd, op=op)
+                                    M = metricIntersection(M, M2) if op.adaptField == 'b' else M2
+                    if op.gradate:
+                        M_ = isotropicMetric(interp(mesh_H, H0)[0], bdy=True, op=op)  # Initial boundary metric
+                        M = metricIntersection(M, M_, bdy=True)
+                        metricGradation(M, op=op)
+                    if op.plotpvd:
+                        File('plots/'+mode+'/mesh.pvd').write(mesh_H.coordinates, time=float(cnt))
+
+                    # Adapt mesh and interpolate variables
+                    if not (((approach in ('fieldBased', 'gradientBased', 'hessianBased') and op.adaptField != 'f')
+                             or approach == 'fluxJump') and cnt == 0):
+                        mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
+                        P1 = FunctionSpace(mesh_H, "CG", 1)
+                        elev_2d, uv_2d = interp(mesh_H, elev_2d, uv_2d)
+                        if mode == 'tohoku':
+                            b = interp(mesh_H, b)[0]
+                        elif mode == 'shallow-water':
+                            b = Function(P1).assign(0.1)
+                        else:
+                            b = Function(P1).assign(1.)
+                        uv_2d.rename('uv_2d')
+                        elev_2d.rename('elev_2d')
 
                 # Solver object and equations
                 adapSolver = solver2d.FlowSolver2d(mesh_H, b)
