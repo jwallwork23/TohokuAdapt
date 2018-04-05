@@ -15,11 +15,12 @@ __all__ = ["constructGradient", "constructHessian", "steadyMetric", "isotropicMe
 
 def constructGradient(f):
     """
-    Reconstructs the gradient of a scalar solution field with respect to the current mesh.
+    Assuming the function `f` is P1 (piecewise linear and continuous), direct differentiation will give a gradient which
+    is P0 (piecewise constant and discontinuous). Since we would prefer a smooth gradient, an L2 projection gradient 
+    recovery technique is performed, which makes use of the Cl\'ement interpolation operator.
 
-    :arg f: P1 solution field.
-    :param op: Options class object providing min/max cell size values.
-    :return: reconstructed gradient associated with f.
+    :arg f: (scalar) P1 solution field.
+    :return: reconstructed gradient associated with `f`.
     """
     W = VectorFunctionSpace(f.function_space().mesh(), "CG", 1)
     g = Function(W)
@@ -34,9 +35,16 @@ def constructGradient(f):
 
 def constructHessian(f, g=None, op=Options()):
     """
-    Reconstructs the hessian of a scalar solution field with respect to the current mesh. The code for the integration 
-    by parts reconstruction approach is based on the Monge-Amp\`ere tutorial provided in the Firedrake website 
-    documentation.
+    Assuming the smooth solution field has been approximated by a function `f` which is P1, all second derivative
+    information has been lost. As such, the Hessian of `f` cannot be directly computed. We provide two means of
+    recovering it, as follows.
+    
+    (1) "Integration by parts" ('parts'):
+    This involves solving the PDE $H = \nabla^T\nabla f$ in the weak sense. Code is based on the Monge-Amp\`ere 
+    tutorial provided on the Firedrake website: https://firedrakeproject.org/demos/ma-demo.py.html.
+    
+    (2) "Double L2 projection" ('dL2'):
+    This involves two applications of the L2 projection operator given by `computeGradient`, above.
 
     :arg f: P1 solution field.
     :kwarg g: gradient (if already computed).
@@ -52,7 +60,7 @@ def constructHessian(f, g=None, op=Options()):
         Lh = (inner(tau, H) + inner(div(tau), grad(f))) * dx
         Lh -= (tau[0, 1] * nhat[1] * f.dx(0) + tau[1, 0] * nhat[0] * f.dx(1)) * ds
         Lh -= (tau[0, 0] * nhat[1] * f.dx(0) + tau[1, 1] * nhat[0] * f.dx(1)) * ds  # Term not in Firedrake tutorial
-    elif op.hessMeth == 'dL2':
+    elif op.hessMeth == 'dL2':  # TODO: Alternatively, we could actually solve the mixed FE problem.
         if g is None:
             g = constructGradient(f)
         Lh = (inner(tau, H) + inner(div(tau), g)) * dx
@@ -66,14 +74,13 @@ def constructHessian(f, g=None, op=Options()):
     return H
 
 
-def steadyMetric(f, H=None, errTarget=1e-3, op=Options()):
+def steadyMetric(f, H=None, op=Options()):
     """
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``computeSteadyMetric``, from 
     ``adapt.py``, 2016.
 
     :arg f: P1 solution field.
-    :arg H: reconstructed Hessian, usually chosen to be associated with ``sol``.
-    :param errTarget: target error, in the case of manual normalisation.
+    :arg H: reconstructed Hessian associated with `f` (if already computed).
     :param op: Options class object providing min/max cell size values.
     :return: steady metric associated with Hessian H.
     """
@@ -92,7 +99,7 @@ def steadyMetric(f, H=None, errTarget=1e-3, op=Options()):
         for i in range(mesh.topology.num_vertices()):
 
             # Generate local Hessian
-            H_loc = H.dat.data[i] / (errTarget * max(np.sqrt(assemble(f * f * dx)), f_min))  # Avoid round-off error
+            H_loc = H.dat.data[i] / (op.targetError * max(np.sqrt(assemble(f * f * dx)), f_min)) # Avoid round-off error
             mean_diag = 0.5 * (H_loc[0][1] + H_loc[1][0])
             H_loc[0][1] = mean_diag
             H_loc[1][0] = mean_diag
@@ -156,11 +163,13 @@ def steadyMetric(f, H=None, errTarget=1e-3, op=Options()):
 
 def isotropicMetric(f, bdy=False, invert=True, op=Options()):
     """
+    Given a scalar error indicator field `f`, construct an associated isotropic metric field.
+    
     :arg f: function to adapt to.
-    :param bdy: toggle boundary metric.
-    :param invert: toggle cell size vs error.
+    :param bdy: when True, only values of `f` on the domain boundary contribute towards the metric.
+    :param invert: when True, the inverse square of field `f` is considered, as in anisotropic mesh adaptivity.
     :param op: Options class object providing min/max cell size values.
-    :return: isotropic metric corresponding to the scalar function.
+    :return: isotropic metric corresponding to `f`.
     """
     hmin2 = pow(op.hmin, 2)
     hmax2 = pow(op.hmax, 2)
@@ -200,19 +209,21 @@ def isotropicMetric(f, bdy=False, invert=True, op=Options()):
 
 def isoP2(mesh):
     """
-    :arg mesh: mesh to be refined.
-    :return: iso-P2 refined mesh (nodes of a quadratic element on the initial mesh become vertices of the new mesh).
+    Uniformly refine a mesh (in each canonical direction) using an iso-P2 refinement. That is, nodes of a quadratic 
+    element on the initial mesh become vertices of the new mesh.
     """
     return MeshHierarchy(mesh, 1).__getitem__(1)
 
 
 def anisoRefine(M, direction=0):
     """
-    Approximately half element size in x- or y-direction by scaling corresponding eigenvalue.
+    (Anisotropically) refine a mesh (or, more precisely, the metric field `M` associated with a mesh) in such a way as 
+    to approximately half the element size in a canonical direction (x- or y-), by scaling of the corresponding 
+    eigenvalue.
        
     :param M: metric to refine.
-    :param direction: 0 or 1 corresponds to x- and y-direction, resp.
-    :return: refined metric.
+    :param direction: 0 or 1, corresponding to x- or y-direction, respectively.
+    :return: anisotropically refined metric.
     """
     for i in range(len(M.dat.data)):
         lam, v = la.eig(M.dat.data[i])
@@ -228,7 +239,8 @@ def anisoRefine(M, direction=0):
 def metricGradation(M, op=Options()):
     """
     Perform anisotropic metric gradation in the method described in Alauzet 2010, using linear interpolation. Python
-    code based on Nicolas Barral's function ``DMPlexMetricGradation2d_Internal`` in ``plex-metGradation.c``, 2017.
+    code found here is based on the C code of Nicolas Barral's function ``DMPlexMetricGradation2d_Internal``, found in 
+    ``plex-metGradation.c``, 2017.
 
     :arg M: metric to be gradated.
     :param op: Options class object providing parameter values.
@@ -314,9 +326,7 @@ def metricGradation(M, op=Options()):
 
 def localMetricIntersection(M1, M2):
     """
-    :arg M1: first metric to be intersected.
-    :arg M2: second metric to be intersected.
-    :return: intersection of local metrics M1 and M2.
+    Intersect two metrics `M1` and `M2` defined at a particular point in space.
     """
     # print('#### localMetricIntersection DEBUG: attempting to compute sqrtm of matrix with determinant ', la.det(M1))
     sqM1 = sla.sqrtm(M1)
@@ -327,6 +337,8 @@ def localMetricIntersection(M1, M2):
 
 def metricIntersection(M1, M2, bdy=False):
     """
+    Intersect a metric field, i.e. intersect (globally) over all local metrics.
+    
     :arg M1: first metric to be intersected.
     :arg M2: second metric to be intersected.
     :param bdy: when True, intersection with M2 only contributes on the domain boundary.
@@ -344,8 +356,12 @@ def metricIntersection(M1, M2, bdy=False):
 
 def metricConvexCombination(M1, M2, alpha=0.5):
     """
-    :arg M1: first metric to be intersected.
-    :arg M2: second metric to be intersected.
+    Alternatively to intersection, pointwise metric information may be combined using a convex combination. Whilst this
+    method does not have as clear an interpretation as metric intersection, it has the benefit that the combination may 
+    be weighted towards one of the metrics in question.
+    
+    :arg M1: first metric to be combined.
+    :arg M2: second metric to be combined.
     :param alpha: scalar parameter in [0,1].
     :return: convex combination of metrics M1 and M2 with parameter alpha.
     """
@@ -358,9 +374,7 @@ def metricConvexCombination(M1, M2, alpha=0.5):
 
 def symmetricProduct(A, b):
     """
-    :arg A: symmetric, 2x2 matrix / metric field.
-    :arg b: 2-vector / vector field.
-    :return: product b^T * A * b.
+    Compute the product of 2-vector `b` with itself, under the scalar product $b^T A b$ defined by the 2x2 matrix `A`.
     """
     # assert(isinstance(A, numpy.ndarray) | isinstance(A, Function))
     # assert(isinstance(b, list) | isinstance(b, numpy.ndarray) | isinstance(b, Function))
@@ -382,9 +396,7 @@ def symmetricProduct(A, b):
 
 def pointwiseMax(f, g):
     """
-    :arg f: first field to be considered.
-    :arg g: second field to be considered.
-    :return: field taking pointwise maximal values in modulus.
+    Take the pointwise maximum (in modulus) of arrays `f` and `g`.
     """
     try:
         assert(len(f.dat.data) == len(g.dat.data))
@@ -400,7 +412,6 @@ def pointwiseMax(f, g):
 
 def metricComplexity(M):
     """
-    :param M: metric field.
-    :return: Complexity thereof. This provides a continuous analogue for the number of mesh vertices.
+    Compute the complexity of a metric, which approximates the number of vertices in a mesh adapted based thereupon.
     """
     return assemble(sqrt(det(M)) * dx)

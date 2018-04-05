@@ -97,6 +97,8 @@ class Options:
             self.normalisation = normalisation
         except:
             raise ValueError('Normalisation approach ``%s`` not recognised.' % normalisation)
+        if normalisation == 'manual':
+            self.targetError = 1e-3
         try:
             assert normOrder > 0
             self.normOrder = normOrder

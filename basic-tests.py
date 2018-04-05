@@ -102,7 +102,7 @@ def directionalRefine(eps=1e-4):
             print(ratio)    # TODO: Check what is going on here
 
 
-# TODO: Multiple adaption tests
+# TODO: Multiple adaption tests for steady problems
 
 
 if __name__ == "__main__":
