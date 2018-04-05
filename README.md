@@ -20,11 +20,12 @@ adaptivity:
     * Default parameters are specified using ``options``.
     * Time series and error estimate data can be stored and plotted using ``timeseries``.
     * Time stepping routines for the standalone model in ``timestepping``.
+* Some basic tests for the mesh adaptivity functionalities above are provided in ``basic-tests.py``.
 * A ``resources`` directory, containing bathymetry and coastline data for the ocean domain surrounding Fukushima. Mesh
 files have been removed for copyright reasons, but may be generated in [QMESH][6] using the script ``utils/mesh``.
 * Shallow water models ``firedrake-tsunami`` and ``thetis-tsunami`` for (1) a realistic domain, applied to the 2011 
 Tohoku tsunami, which notably struck the Japanese coast at Fukushima; and (2) test scripts on quadrilateral model 
-domains. Testing of linear vs. nonlinear and rotational vs. nonrotational models is achieved by ``modelVerification``.
+domains. Testing of linear vs. nonlinear and rotational vs. nonrotational models is achieved by ``model-verification``.
 The following meshing strategies are implemented:
     * fixed meshes of various levels of refinement;
     * field, gradient and hessian based error estimates;

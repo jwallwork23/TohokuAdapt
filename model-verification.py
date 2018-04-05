@@ -60,7 +60,7 @@ if __name__ == '__main__':
                  wd=True if args.w else False)
     op.nonlinear = False if args.l else True
     op.rotational = True if args.r else False
-    filename = 'outdata/modelVerification/nonlinear=' + str(op.nonlinear) + '_'
+    filename = 'outdata/model-verification/nonlinear=' + str(op.nonlinear) + '_'
     filename += 'rotational=' + str(op.rotational) + '_' + date
     errorfile = open(filename + '.txt', 'w+')
     gaugeFileP02 = open(filename + 'P02.txt', 'w+')

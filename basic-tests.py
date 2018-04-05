@@ -2,7 +2,6 @@ from firedrake import *
 
 import matplotlib.pyplot as plt
 import argparse
-import numpy as np
 
 from utils.adaptivity import *
 from utils.forms import indicator
