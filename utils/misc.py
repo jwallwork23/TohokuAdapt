@@ -22,17 +22,17 @@ def cheatCodes(approach, default='DWR'):
         getError = False
         useAdjoint = False
         aposteriori = False
-    elif approach in ('residual', 'explicit', 'implicit', 'DWR', 'DWE', 'DWF'):
+    elif approach in ('residual', 'explicit', 'implicit', 'DWR', 'DWE', 'DWP'):
         getData = True
         getError = True
-        useAdjoint = approach in ('DWR', 'DWE', 'DWF')
+        useAdjoint = approach in ('DWR', 'DWE', 'DWP')
         aposteriori = True
     elif approach in ('saved', 'regen'):
         getError = approach == 'regen'
-        approach = input("""Choose error estimator from 'residual', 'explicit', 'implicit', 'DWF', 'DWR' or 'DWE': """)\
+        approach = input("""Choose error estimator from 'residual', 'explicit', 'implicit', 'DWP', 'DWR' or 'DWE': """)\
                    or 'DWR'
         getData = False
-        useAdjoint = approach in ('DWR', 'DWE', 'DWF')
+        useAdjoint = approach in ('DWR', 'DWE', 'DWP')
         aposteriori = True
     else:
         approach = 'fixedMesh'

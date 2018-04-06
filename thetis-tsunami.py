@@ -98,7 +98,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             Ve = V
             qe = q
             be = b
-            if approach != 'DWF':
+            if approach != 'DWP':
                 qe_ = q_
         if approach in ('implicit', 'DWE'):     # Define variables for implicit error estimation
             e_ = Function(Ve)
@@ -126,7 +126,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     Dt = Constant(dt)
     T = op.Tend
     iStart = int(op.Tstart / dt)
-    iEnd = int(T / (dt * op.rm)) if aposteriori and approach != 'DWF' else int(T / (dt * op.ndump))
+    iEnd = int(T / (dt * op.rm)) if aposteriori and approach != 'DWP' else int(T / (dt * op.ndump))
 
     # Get initial boundary metric and TODO wetting and drying parameter
     if op.gradate or op.wd:
@@ -157,7 +157,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         options.use_grad_div_viscosity_term = False
         if mode == 'rossby-wave':
             options.coriolis_frequency = f
-        options.simulation_export_time = dt * (op.rm-1) if aposteriori and approach != 'DWF' else dt * op.ndump
+        options.simulation_export_time = dt * (op.rm-1) if aposteriori and approach != 'DWP' else dt * op.ndump
         options.simulation_end_time = T
         options.period_of_interest_start = op.Tstart
         options.period_of_interest_end = T
@@ -190,7 +190,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             solver_obj.add_callback(cb3, 'timestep')
             solver_obj.add_callback(cb4, 'timestep')
         solver_obj.bnd_functions['shallow_water'] = BCs
-        if aposteriori and approach != 'DWF':
+        if aposteriori and approach != 'DWP':
             def selector():
                 rm = options.timesteps_per_remesh
                 dt = options.timestep
@@ -229,7 +229,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             tape = get_working_tape()
             solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
             N = len(solve_blocks)
-            diff = op.ndump if approach == 'DWF' else op.rm
+            diff = op.ndump if approach == 'DWP' else op.rm
             r = N % diff   # Number of extra tape annotations in setup
             for i in range(N-1, r-2, -diff):
                 dual.assign(solve_blocks[i].adj_sol)
@@ -267,7 +267,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             if op.printStats:
                 print('Generating error estimate %d / %d' % (k+1, iEnd))
 
-            if approach == 'DWF':
+            if approach == 'DWP':
                 with DumbCheckpoint(di+'hdf5/Velocity2d_'+indexString(k), mode=FILE_READ) as loadVel:
                     loadVel.load(uv_2d)
                     loadVel.close()
@@ -345,7 +345,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                         epsilon = assemble(v * inner(e, duale) * dx)
                     else:
                         epsilon = assemble(v * inner(e, dual) * dx)
-                elif approach == 'DWF':
+                elif approach == 'DWP':
                     epsilon = assemble(v * inner(q, dual) * dx)
                     for i in range(k, min(k + iEnd - iStart, iEnd)):
                         with DumbCheckpoint(di + 'hdf5/adjoint_' + indexString(i), mode=FILE_READ) as loadAdj:
@@ -557,7 +557,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", help="Choose problem from {'tohoku', 'shallow-water', 'rossby-wave'}")
     parser.add_argument("approach", help="Choose error estimator from {'norm', 'fieldBased', 'gradientBased', "
-                                         "'hessianBased', 'residual', 'explicit', 'fluxJump', 'implicit', 'DWF', "
+                                         "'hessianBased', 'residual', 'explicit', 'fluxJump', 'implicit', 'DWP', "
                                          "'DWR', 'DWE'}" )
     parser.add_argument("-w", help="Use wetting and drying")
     parser.add_argument("-ho", help="Compute errors and residuals in a higher order space")

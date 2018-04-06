@@ -255,7 +255,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                             saveRes.close()
                         if op.plotpvd:
                             residualFile.write(rho_u, rho_e, time=t)
-                if approach in ('DWF', 'explicit', 'fluxJump'):
+                if approach in ('DWP', 'explicit', 'fluxJump'):
                     with DumbCheckpoint(di + 'hdf5/forward_' + indexStr, mode=FILE_CREATE) as saveFor:
                         saveFor.store(u)
                         saveFor.store(eta)
@@ -320,7 +320,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             #         indexStr = msc.indexString(cnt)
             #
             #         dual.assign(variable, annotate=False)
-            #         if op.window or ((op.orderChange or approach == 'DWF') and cnt % op.rm == 0):
+            #         if op.window or ((op.orderChange or approach == 'DWP') and cnt % op.rm == 0):
             #             dual_u, dual_e = dual.split()
             #             dual_u.rename('Adjoint velocity')
             #             dual_e.rename('Adjoint elevation')
@@ -386,7 +386,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     if op.orderChange:
                         dual_oi_u.interpolate(dual_u)
                         dual_oi_e.interpolate(dual_e)
-            if (approach in ('explicit', 'DWF')):
+            if (approach in ('explicit', 'DWP')):
                 with DumbCheckpoint(di + 'hdf5/forward_' + indexStr, mode=FILE_READ) as loadFor:
                     loadFor.load(u)
                     loadFor.load(eta)
@@ -405,7 +405,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     loadIE.load(e1)
                     loadIE.close()
 
-            if approach == 'DWF':
+            if approach == 'DWP':
                 epsilon = err.basicErrorEstimator(q, dual, v)
             elif approach == 'DWR':
                 if op.orderChange:
@@ -580,7 +580,7 @@ if __name__ == '__main__':
     parser.add_argument("mode", help="Choose problem from {'tohoku', 'shallow-water', 'rossby-wave'}.")
     parser.add_argument("approach", help=
     """Choose error estimator from {'norm', 'fieldBased', 'gradientBased', 'hessianBased', 
-    'residual', 'explicit', 'fluxJump', 'implicit', 'DWF', 'DWR', 'DWE'}: """)
+    'residual', 'explicit', 'fluxJump', 'implicit', 'DWP', 'DWR', 'DWE'}: """)
     args = parser.parse_args()
     print("Mode: ", args.mode)
     print("Approach: ", args.approach)
@@ -592,7 +592,7 @@ if __name__ == '__main__':
                      rm=60 if useAdjoint else 30,
                      gradate=True if useAdjoint else False,
                      advect=False,
-                     window=True if approach == 'DWF' else False,
+                     window=True if approach == 'DWP' else False,
                      plotpvd=True,
                      gauges=False,
                      # iso=False if approach in ('gradientBased', 'hessianBased') else True,
