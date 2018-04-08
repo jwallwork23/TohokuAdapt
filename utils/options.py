@@ -206,6 +206,8 @@ class Options:
         self.stamps = {self.labels[0]: 'fixedMesh', self.labels[1]: 'hessianBased', self.labels[2]: 'explicit',
                        self.labels[3]: 'implicit', self.labels[4]: 'DWF', self.labels[5]: 'DWR'}
 
+        self.meshSizes = (5916, 7062, 8666, 10980, 14166, 19094, 27262, 41712, 72612, 150590, 681666)
+
 
     def J(self, mode):
         """
