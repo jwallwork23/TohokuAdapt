@@ -102,15 +102,15 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=
         errorlabels = [r'Relative error $\frac{|J(\textbf{q})-J(\textbf{q}_h)|}{|J(\textbf{q})|}$']
         errornames = ['rel']
     if mode in ('tohoku', 'model-verification'):
-        errortypes = 3  # [rel, gP02, gP06]
-        errorlabels.append('Total variation at gauge P02')
-        errorlabels.append('Total variation at gauge P06')
+        errortypes = 3
+        errorlabels.append('Relative total variation at gauge P02')
+        errorlabels.append('Relative total variation at gauge P06')
         errornames.append('P02')
         errornames.append('P06')
     elif mode == 'shallow-water':
-        errortypes = 1  # [rel]
+        errortypes = 1
     elif mode == 'rossby-wave':
-        errortypes = 4  # [rel, peak, dis, spd]
+        errortypes = 4
         errorlabels.append('Relative error in solition peak')
         errorlabels.append('Relative error in distance travelled')
         errorlabels.append('Relative error in phase speed')
