@@ -154,7 +154,7 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=
             for mesh in err:
                 plt.semilogx(nEls[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
             plt.gcf()
-            plt.legend(loc=4)
+            plt.legend(loc=1 if errornames[m] in ('P02', 'P06') else 4)
             plt.xlabel(r'Mean element count')
             plt.ylabel(errorlabels[m])
             plt.savefig(di + errornames[m] + '_objectiveVsElements.pdf', bbox_inches='tight')
@@ -185,3 +185,4 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=
                 plt.xlim([0, 55000])
                 plt.ylim([0, 5000])
             plt.savefig(di + 'timeVsElements.pdf', bbox_inches='tight')
+            plt.clf()
