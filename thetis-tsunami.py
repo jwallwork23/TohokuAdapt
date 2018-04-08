@@ -541,12 +541,13 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         distanceTravelled = np.abs(dgCoords.dat.data[peak_i][0])
 
     toc = clock() - tic
+    rel = np.abs(op.J(mode) - J_h) / np.abs(op.J(mode))
     if mode == 'rossby-wave':   # TODO: Use analytic solution to get these values
-        return av, np.abs(peak/0.1567020), distanceTravelled, distanceTravelled/47.18, toc
+        return av, rel, J_h, np.abs(peak/0.1567020), distanceTravelled, distanceTravelled/47.18, toc
     elif mode == 'tohoku':
-        return av, np.abs(op.J(mode) - J_h) / np.abs(op.J(mode)), J_h, gaugeP02, gaugeP06, toc
+        return av, rel, J_h, gaugeP02, gaugeP06, toc
     else:
-        return av, np.abs(op.J(mode) - J_h)/np.abs(op.J(mode)), J_h, toc
+        return av, rel, J_h, toc
 
     # TODO: Also generate and output a timeseries plot for the integrand of the objective functional [Anca Belme paper]
 
@@ -602,12 +603,12 @@ if __name__ == "__main__":
     # Run simulations
     for i in range(6):       # TODO: Can't currently do multiple adjoint runs
         if mode == 'rossby-wave':
-            av, relativePeak, distanceTravelled, phaseSpd, timing = \
+            av, rel, J_h, relativePeak, distanceTravelled, phaseSpd, tim = \
                 solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
-            print('Run %d: <#Elements>: %6d  Height error: %.4f  Distance: %.4fm  Speed error: %.4fm  Timing %.1fs'
-                  % (i, av, relativePeak, distanceTravelled, phaseSpd, timing))
-            # TODO: Plot these results as errors vs #Elements
-            textfile.write('%d, %.4f, %.4f, %.4f, %.1f\n' % (av, relativePeak, distanceTravelled, phaseSpd, timing))
+            print('Run %d: <#Elements>: %6d Obj. error: %.4e  Height error: %.4f  Distance: %.4fm  Speed error: %.4fm  Timing %.1fs'
+                  % (i, av, rel, relativePeak, distanceTravelled, phaseSpd, tim))
+            textfile.write('%d, %.4e, %.4f, %.4f, %.4f, %.1f, %.4e\n'
+                           % (av, rel, relativePeak, distanceTravelled, phaseSpd, tim, J_h))
         elif mode == 'tohoku':
             av, rel, J_h, gaugeP02, gaugeP06, tim = solverSW(i, approach, getData, getError, useAdjoint,
                                                              aposteriori, mode=mode, op=op)
