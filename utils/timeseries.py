@@ -16,16 +16,17 @@ def readErrors(date, approach, mode='tohoku', bootstrapping=False):
     :return: mean element count, relative error and CPU time.
     """
     filename = 'outdata/'+mode+'/'+approach+date
-    if bootstrapping:
-        filename += '_BOOTSTRAP'
     textfile = open(filename+'.txt', 'r')
     nEls = []
     err = []
     tim = []
     for line in textfile:
-        av, rel, timing = line.split(',')[:3]
-        nEls.append(int(av))
-        err.append(float(rel))
+        av, rel, timing, J_h = line.split(',')    # TODO: rossby-wave case has different format
+        nEls.append(int(av))                      # TODO: so is model-verification
+        if bootstrapping:
+            err.append(float(J_h))
+        else:
+            err.append(float(rel))
         tim.append(float(timing))
     textfile.close()
     return nEls, err, tim
@@ -44,15 +45,25 @@ def extractSpline(gauge):
     return spline
 
 
-def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=None):
+def errorVsElements(mode='tohoku', modelVerif=False, bootstrapping=False, noTinyMeshes=True, date=None):
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     plt.rc('legend', fontsize='x-large')
-    labels = ("Fixed mesh", "Hessian based", "Explicit", "Implicit", "DWF", "DWR", "Higher order DWR",
-              "Lower order DWR", "Refined DWR")
-    names = ("fixedMesh", "hessianBased", "explicit", "implicit", "DWF", "DWR", "DWR_ho", "DWR_lo", "DWR_r")
-    styles = {labels[0]: 's', labels[1]: '^', labels[2]: 'x', labels[3]: 'o', labels[4]: '*', labels[5]: 'h',
-              labels[6]: 'v', labels[7]: '8', labels[8]: 's'}
+    if modelVerif:
+        labels = ("Linear, non-rotational", "Linear, rotational", "Nonlinear, non-rotational", "Nonlinear, rotational")
+        names = ("nonlinear=False_rotational=False_", "nonlinear=False_rotational=True_",
+                 "nonlinear=True_rotational=False_", "nonlinear=True_rotational=True_")
+    else:
+        labels = ("Fixed mesh", "Hessian based", "Explicit", "Implicit", "DWF", "DWR", "Higher order DWR",
+                  "Lower order DWR", "Refined DWR")
+        names = ("fixedMesh", "hessianBased", "explicit", "implicit", "DWF", "DWR", "DWR_ho", "DWR_lo", "DWR_r")
+    styles = {labels[0]: 's', labels[1]: '^', labels[2]: 'x', labels[3]: 'o'}
+    if not modelVerif:
+        styles[labels[4]] = '*'
+        styles[labels[5]] = 'h'
+        styles[labels[6]] = 'v'
+        styles[labels[7]] = '8'
+        styles[labels[8]] = 's'
     err = {}
     nEls = {}
     tim = {}
@@ -73,6 +84,11 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=
         except:
             pass
 
+    di = 'outdata/'
+    if modelVerif:
+        di += 'model-verification/'
+    else:
+        di += mode + '/'
     if bootstrapping:
         # Plot OF values
         for mesh in err:
@@ -82,7 +98,7 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=
         plt.xlabel(r'Mean element count')
         plt.ylabel(r'Objective value $J(\textbf{q})=\int_{T_{\mathrm{start}}}^{T_{\mathrm{end}}}\int\int_A'
                    +r'\eta(x,y,t)\,\mathrm{d}x\,\mathrm{d}y\,\mathrm{d}t$')
-        plt.savefig('outdata/' + mode + '/objectiveVsElements.pdf', bbox_inches='tight')
+        plt.savefig(di + 'objectiveVsElements.pdf', bbox_inches='tight')
         plt.clf()
     else:
         # Plot errors
@@ -95,7 +111,7 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=
         if mode == 'tohoku':
             plt.xlim([5000, 60000])
             plt.ylim([1e-4, 5e-1])
-        plt.savefig('outdata/'+mode+'/errorVsElements.pdf', bbox_inches='tight')
+        plt.savefig(di + 'errorVsElements.pdf', bbox_inches='tight')
         plt.clf()
 
     # Plot timings
@@ -108,7 +124,7 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=
     if mode == 'tohoku':
         plt.xlim([0, 55000])
         plt.ylim([0, 5000])
-    plt.savefig('outdata/'+mode+'/timeVsElements.pdf', bbox_inches='tight')
+    plt.savefig(di + 'timeVsElements.pdf', bbox_inches='tight')
 
 
 if __name__ == "__main__":
@@ -118,7 +134,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", help="Choose problem from {'tohoku', 'shallow-water', 'rossby-wave'}.")
+    parser.add_argument("-mv", help="Specify use of model verification")
     parser.add_argument("-b", help="Specify bootstrapping")
     parser.add_argument("-d", help="Specify a date")
     args = parser.parse_args()
-    errorVsElements(args.mode, bootstrapping=args.b, date=args.d)
+    errorVsElements(args.mode, modelVerif=args.mv, bootstrapping=args.b, date=args.d)
