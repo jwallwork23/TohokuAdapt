@@ -2,6 +2,7 @@ from thetis import *
 
 import scipy.interpolate as si
 import matplotlib.pyplot as plt
+import datetime
 
 from .options import Options
 
@@ -123,6 +124,8 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=
     for n in range(len(names)):
         if date is None:
             dates.append(input("Date to use for %s approach: " % labels[n]))
+            now = datetime.datetime.now()
+            date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
         else:
             dates.append(date)
 
@@ -157,7 +160,7 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=
             plt.legend(loc=1 if errornames[m] in ('P02', 'P06') else 4)
             plt.xlabel(r'Mean element count')
             plt.ylabel(errorlabels[m])
-            plt.savefig(di + errornames[m] + '_objectiveVsElements.pdf', bbox_inches='tight')
+            plt.savefig(di + errornames[m] + 'VsElements' + date + '.pdf', bbox_inches='tight')
             plt.clf()
         else:
             # Plot errors
@@ -170,7 +173,7 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=
             if mode == 'tohoku':
                 plt.xlim([5000, 60000])
                 plt.ylim([1e-4, 5e-1])
-            plt.savefig(di + errornames[m] + '_errorVsElements.pdf', bbox_inches='tight')
+            plt.savefig(di + errornames[m] + 'VsElements' + date + '.pdf', bbox_inches='tight')
             plt.clf()
 
         # Plot timings
@@ -184,5 +187,5 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=
             if mode == 'tohoku':
                 plt.xlim([0, 55000])
                 plt.ylim([0, 5000])
-            plt.savefig(di + 'timeVsElements.pdf', bbox_inches='tight')
+            plt.savefig(di + 'timeVsElements' + date + '.pdf', bbox_inches='tight')
             plt.clf()
