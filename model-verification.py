@@ -66,7 +66,7 @@ if __name__ == '__main__':
     gaugeFileP02 = open(filename + 'P02.txt', 'w+')
     gaugeFileP06 = open(filename + 'P06.txt', 'w+')
 
-    for k in range(10):     # TODO: Could turn it up to 11...
+    for k in range(10, 11):
         print("\nStarting run %d... Nonlinear = %s, Rotational = %s\n" % (k, op.nonlinear, op.rotational))
         J_h, gP02, gP06, timing = solverSW(k, op=op)
         gaugeFileP02.writelines(["%s," % val for val in gP02])
