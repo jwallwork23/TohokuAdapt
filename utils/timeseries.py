@@ -76,17 +76,21 @@ def extractSpline(gauge):
     return spline
 
 
-def plotTimeseries(filename, date, mode='tohoku', quantity='integrand', op=Options()):
+def plotTimeseries(filename, date, mode='tohoku', quantity='Integrand', op=Options()):
     assert mode in ('tohoku', 'shallow-water', 'rossby-wave', 'model-verification')
-    assert quantity in ('integrand', 'P02', 'P06')
+    assert quantity in ('Integrand', 'P02', 'P06')
     f = open(filename, 'r')
     plt.gcf()
     i = 0
     for line in f:
-        dat = line.split(',')
+        separated = line.split(',')
+        dat = [float(d) for d in separated[:-1]]    # Ignore carriage return
         tim = np.linspace(0, op.Tend, len(dat))
-        plt.plot(tim, dat, label=str(i))
+        plt.plot(tim[::10], dat[::10], label=str(i))
         i += 1
+    plt.xlabel('Time (mins)')
+    plt.ylabel(quantity+' value')
+    # plt.show()
     plt.savefig('outdata/' + mode + '/' + quantity + date + '.pdf', bbox_inches='tight')
 
 

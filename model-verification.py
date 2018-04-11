@@ -83,7 +83,7 @@ if __name__ == '__main__':
     integrandFile = open(filename + 'Integrand.txt', 'w+')
     di = 'plots/model-verification/' + tag + '/'
 
-    for k in range(1):
+    for k in range(1):      # TODO: Calculate order of convergence
         print("\nStarting run %d... Nonlinear = %s, Rotational = %s\n" % (k, op.nonlinear, op.rotational))
         J_h, integrand, gP02, totalVarP02, gP06, totalVarP06, timing = solverSW(k, di, op=op)
         gaugeFileP02.writelines(["%s," % val for val in gP02])
