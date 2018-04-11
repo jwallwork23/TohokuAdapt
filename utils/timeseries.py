@@ -76,9 +76,10 @@ def extractSpline(gauge):
     return spline
 
 
-def plotTimeseries(filename, date, mode='tohoku', quantity='Integrand', op=Options()):
+def plotTimeseries(fileExt, date, mode='tohoku', quantity='Integrand', op=Options()):
     assert mode in ('tohoku', 'shallow-water', 'rossby-wave', 'model-verification')
     assert quantity in ('Integrand', 'P02', 'P06')
+    filename = 'outdata/' + mode + '/' + fileExt + '_' + date + quantity + '.txt'
     f = open(filename, 'r')
     plt.gcf()
     i = 0
@@ -90,7 +91,8 @@ def plotTimeseries(filename, date, mode='tohoku', quantity='Integrand', op=Optio
         i += 1
     plt.xlabel('Time (s)')
     plt.ylabel(quantity+' value')
-    plt.savefig('outdata/' + mode + '/' + quantity + date + '.pdf', bbox_inches='tight')    # TODO: Needs changing
+    plt.savefig('outdata/' + mode + '/' + fileExt + '_' + quantity + date + '.pdf', bbox_inches='tight')
+    plt.clf()
 
 
 def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=None):

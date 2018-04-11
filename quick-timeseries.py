@@ -13,11 +13,10 @@ args = parser.parse_args()
 
 for quantity in ('Integrand', 'P02', 'P06'):
     if args.mode == 'model-verification':
-        filename = 'outdata/' + args.mode + '/nonlinear='
-        filename += 'False' if args.l else 'True'
-        filename += '_rotational='
-        filename += 'True' if args.r else 'False'
-        filename += '_' + args.d + quantity + '.txt'
+        fileExt = 'nonlinear='
+        fileExt += 'False' if args.l else 'True'
+        fileExt += '_rotational='
+        fileExt += 'True' if args.r else 'False'
     else:
         raise NotImplementedError
-    plotTimeseries(filename, date=args.d, mode=args.mode, quantity=quantity)
+    plotTimeseries(fileExt, date=args.d, mode=args.mode, quantity=quantity)
