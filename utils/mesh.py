@@ -136,7 +136,7 @@ else:
     from scipy.io.netcdf import NetCDFFile
 
     from .conversion import vectorlonlat_to_utm, get_latitude
-    from .forms import solutionRW
+    from .forms import solutionRW, indicator
     from .options import Options
 
 
@@ -183,8 +183,10 @@ def problemDomain(mode='tohoku', level=0, mesh=None, output=False, op=Options())
         assert meshCoords.shape[0] == b_vec.shape[0]
 
         # Interpolate data onto initial surface and bathymetry profiles
+        indi = indicator(P1, 'tohoku-init')
+        indidat = indi.dat.data
         for i, p in enumerate(meshCoords):
-            eta0vec[i] = interpolatorSurf(p[1], p[0])
+            eta0vec[i] = interpolatorSurf(p[1], p[0]) * indidat[i]
             b_vec[i] = - interpolatorSurf(p[1], p[0]) - interpolatorBath(p[1], p[0])
 
         # Post-process the bathymetry to have a minimum depth of 30m and if no wetting-and-drying

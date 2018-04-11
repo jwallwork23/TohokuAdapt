@@ -164,6 +164,8 @@ def indicator(V, mode='tohoku'):
         xy = [0., 8., 10., 14.]
     elif mode == 'tohoku':
         xy = [490e3, 640e3, 4160e3, 4360e3]
+    elif mode == 'tohoku-init':
+        xy = [4e5, 8.7e5, 3.9e6, 4.6e6]
     else:
         raise NotImplementedError
     if smooth:
