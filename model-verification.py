@@ -55,7 +55,7 @@ def solverSW(startRes, di, op=Options()):
     solver_obj.iterate()    # Run simulation
     timer = clock() - timer
 
-    return cb1.__call__()[1], cb2.__call__()[1], cb3.__call__()[1], timer
+    return cb1.quadrature(), cb1.__call__()[1], cb2.__call__()[1], cb3.__call__()[1], timer
 
 
 if __name__ == '__main__':
@@ -79,13 +79,18 @@ if __name__ == '__main__':
     errorfile = open(filename + '.txt', 'w+')
     gaugeFileP02 = open(filename + 'P02.txt', 'w+')
     gaugeFileP06 = open(filename + 'P06.txt', 'w+')
+    integrandFile = open(filename + 'Integrand.txt', 'w+')
     di = 'plots/model-verification/' + tag + '/'
 
     for k in range(1):
         print("\nStarting run %d... Nonlinear = %s, Rotational = %s\n" % (k, op.nonlinear, op.rotational))
-        J_h, gP02, gP06, timing = solverSW(k, di, op=op)
+        J_h, integrand, gP02, gP06, timing = solverSW(k, di, op=op)
         gaugeFileP02.writelines(["%s," % val for val in gP02])
+        gaugeFileP02.write("\n")
         gaugeFileP06.writelines(["%s," % val for val in gP06])
+        gaugeFileP06.write("\n")
+        integrandFile.writelines(["%s," % val for val in integrand])
+        integrandFile.write("\n")
         totalVarP02 = gaugeTV(gP02, "P02")
         totalVarP06 = gaugeTV(gP06, "P06")
         errorfile.write('%d, %.4e, %.4e, %.4e, %.1f\n' % (k, J_h, totalVarP02, totalVarP06, timing))
@@ -94,3 +99,4 @@ if __name__ == '__main__':
     errorfile.close()
     gaugeFileP02.close()
     gaugeFileP06.close()
+    integrandFile.close()

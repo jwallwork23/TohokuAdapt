@@ -26,22 +26,27 @@ class FunctionalCallback(DiagnosticCallback):
         """
         super(FunctionalCallback, self).__init__(solver_obj, **kwargs)
         self.scalar_callback = scalar_callback
-        self.objective_value = 0.5 * scalar_callback() * solver_obj.options.timestep
+        self.objective_value = [scalar_callback()]
         self.append_to_hdf5 = False
         self.append_to_log = False
 
     def __call__(self):
-        dt = self.solver_obj.options.timestep
-        value = self.scalar_callback() * dt
-        if self.solver_obj.simulation_time > self.solver_obj.options.simulation_end_time - 0.5 * dt:
-            value *= 0.5
-        self.objective_value += value
+        value = self.scalar_callback()
+        self.objective_value.append(value)
 
         return value, self.objective_value
 
     def message_str(self, *args):
         line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
         return line
+
+    def quadrature(self):
+        dt = self.options.timestep
+        func = self.objective_value
+        J = 0
+        for i in range(1, len(func)):
+            J += 0.5 * (func[i] + func[i-1]) * dt
+        return J
 
 
 class TohokuCallback(FunctionalCallback):

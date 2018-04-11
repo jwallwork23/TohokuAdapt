@@ -184,7 +184,7 @@ def problemDomain(mode='tohoku', level=0, mesh=None, output=False, op=Options())
 
         # Interpolate data onto initial surface and bathymetry profiles
         indi = indicator(P1, 'tohoku-init')
-        indidat = indi.dat.data
+        indidat = indi.dat.data                 # TODO: Would be better to have a smooth IC
         for i, p in enumerate(meshCoords):
             eta0vec[i] = interpolatorSurf(p[1], p[0]) * indidat[i]
             b_vec[i] = - interpolatorSurf(p[1], p[0]) - interpolatorBath(p[1], p[0])
