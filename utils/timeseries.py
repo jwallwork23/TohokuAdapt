@@ -2,12 +2,18 @@ from thetis import *
 
 import scipy.interpolate as si
 import matplotlib.pyplot as plt
+import numpy as np
 import datetime
 
 from .options import Options
 
 
 __all__ = ["readErrors", "extractSpline", "errorVsElements", "__main__"]
+
+
+plt.rc('text', usetex=True)
+plt.rc('font', family='serif')
+plt.rc('legend', fontsize='x-large')
 
 
 def readErrors(date, approach, mode='tohoku', bootstrapping=False):
@@ -70,10 +76,21 @@ def extractSpline(gauge):
     return spline
 
 
+def plotTimeseries(filename, date, mode='tohoku', quantity='integrand', op=Options()):
+    assert mode in ('tohoku', 'shallow-water', 'rossby-wave', 'model-verification')
+    assert quantity in ('integrand', 'P02', 'P06')
+    f = open(filename, 'r')
+    plt.gcf()
+    i = 0
+    for line in f:
+        dat = line.split(',')
+        tim = np.linspace(0, op.Tend, len(dat))
+        plt.plot(tim, dat, label=str(i))
+        i += 1
+    plt.savefig('outdata/' + mode + '/' + quantity + date + '.pdf', bbox_inches='tight')
+
+
 def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=None):
-    plt.rc('text', usetex=True)
-    plt.rc('font', family='serif')
-    plt.rc('legend', fontsize='x-large')
     if mode == 'model-verification':
         labels = ("Linear, non-rotational", "Linear, rotational", "Nonlinear, non-rotational", "Nonlinear, rotational")
         names = ("nonlinear=False_rotational=False_", "nonlinear=False_rotational=True_",

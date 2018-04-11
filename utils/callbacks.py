@@ -1,6 +1,7 @@
 from thetis_adjoint import *
 from thetis.callback import DiagnosticCallback
 
+from .error import gaugeTV
 from .forms import indicator
 from .options import Options
 
@@ -29,6 +30,7 @@ class FunctionalCallback(DiagnosticCallback):
         self.objective_value = [scalar_callback()]
         self.append_to_hdf5 = False
         self.append_to_log = False
+        self.dt = solver_obj.options.timestep
 
     def __call__(self):
         value = self.scalar_callback()
@@ -41,11 +43,10 @@ class FunctionalCallback(DiagnosticCallback):
         return line
 
     def quadrature(self):
-        dt = self.options.timestep
         func = self.objective_value
         J = 0
         for i in range(1, len(func)):
-            J += 0.5 * (func[i] + func[i-1]) * dt
+            J += 0.5 * (func[i] + func[i-1]) * self.dt
         return J
 
 
@@ -65,15 +66,17 @@ class TohokuCallback(FunctionalCallback):
             :param solver_obj: FlowSolver2d object.
             :return: objective functional value for callbacks.
             """
-            elev_2d = solver_obj.fields.solution_2d.split()[1]
-            ks = indicator(elev_2d.function_space(), mode='tohoku')
+            V = solver_obj.fields.solution_2d.function_space()
+            ks = Function(V)
+            k0, k1 = ks.split()
+            k1.assign(indicator(V.sub(1), mode='tohoku'))
             kt = Constant(0.)
             dt = solver_obj.options.timestep
             Tstart = solver_obj.options.period_of_interest_start
-            if solver_obj.simulation_time > Tstart - 0.5 * dt:
+            if solver_obj.simulation_time > Tstart - 0.5 * dt:      # Slightly smooth transition
                 kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * dt else 0.5)
 
-            return assemble(elev_2d * ks * kt * dx)
+            return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
 
         super(TohokuCallback, self).__init__(indicatorTohoku, solver_obj, **kwargs)
 
@@ -94,15 +97,17 @@ class ShallowWaterCallback(FunctionalCallback):
             :param solver_obj: FlowSolver2d object.
             :return: objective functional value for callbacks.
             """
-            elev_2d = solver_obj.fields.solution_2d.split()[1]
-            ks = indicator(elev_2d.function_space(), mode='shallow-water')
+            V = solver_obj.fields.solution_2d.function_space()
+            ks = Function(V)
+            k0, k1 = ks.split()
+            k1.assign(indicator(V.sub(1), mode='shallow-water'))
             kt = Constant(0.)
             dt = solver_obj.options.timestep
             Tstart = solver_obj.options.period_of_interest_start
-            if solver_obj.simulation_time > Tstart - 0.5 * dt:
+            if solver_obj.simulation_time > Tstart - 0.5 * dt:      # Slightly smooth transition
                 kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * dt else 0.5)
 
-            return assemble(elev_2d * ks * kt * dx)
+            return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
 
         super(ShallowWaterCallback, self).__init__(indicatorSW, solver_obj, **kwargs)
 
@@ -123,15 +128,17 @@ class RossbyWaveCallback(FunctionalCallback):
             :param solver_obj: FlowSolver2d object.
             :return: objective functional value for callbacks.
             """
-            elev_2d = solver_obj.fields.solution_2d.split()[1]
-            ks = indicator(elev_2d.function_space(), mode='rossby-wave')
+            V = solver_obj.fields.solution_2d.function_space()
+            ks = Function(V)
+            k0, k1 = ks.split()
+            k1.assign(indicator(V.sub(1), mode='rossby-wave'))
             kt = Constant(0.)
             dt = solver_obj.options.timestep
             Tstart = solver_obj.options.period_of_interest_start
-            if solver_obj.simulation_time > Tstart - 0.5 * dt:
+            if solver_obj.simulation_time > Tstart - 0.5 * dt:      # Slightly smooth transition
                 kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * dt else 0.5)
 
-            return assemble(elev_2d * ks * kt * dx)
+            return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
 
         super(RossbyWaveCallback, self).__init__(indicatorRW, solver_obj, **kwargs)
 
@@ -187,6 +194,10 @@ class P02Callback(GaugeCallback):
 
         super(P02Callback, self).__init__(extractP02, solver_obj, **kwargs)
 
+    def totalVariation(self):
+        return gaugeTV(self.gauge_values, gauge="P02")
+
+
 
 class P06Callback(GaugeCallback):
     """Evaluates at gauge P06."""
@@ -208,6 +219,9 @@ class P06Callback(GaugeCallback):
             return elev_2d.at(Options().gaugeCoord("P06"))
 
         super(P06Callback, self).__init__(extractP06, solver_obj, **kwargs)
+
+    def totalVariation(self):
+        return gaugeTV(self.gauge_values, gauge="P06")
 
 
 class ObjectiveCallback(DiagnosticCallback):

@@ -200,12 +200,12 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         primalTimer = clock()
         solver_obj.iterate(export_func=selector)
         primalTimer = clock() - primalTimer
-        J_h = cb1.__call__()[1]    # Evaluate objective functional
+        J_h = cb1.quadrature()      # Evaluate objective functional
         if op.printStats:
             print('Primal run complete. Run time: %.3fs' % primalTimer)
         if mode == 'tohoku' and approach == 'fixedMesh':
-            gaugeP02 = cb3.__call__()[1]
-            gaugeP06 = cb4.__call__()[1]
+            totalVarP02 = cb3.totalVariation()
+            totalVarP06 = cb4.totalVariation()
 
         # Reset counters
         cntT = int(np.ceil(T/dt))
@@ -508,10 +508,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     adapSolver.add_callback(cb4, 'timestep')
                 adapSolver.bnd_functions['shallow_water'] = BCs
                 adapSolver.iterate()
-                J_h = cb1.__call__()[1]
+                J_h = cb1.quadrature()
                 if mode == 'tohoku':
-                    gaugeP02 = cb3.__call__()[1]
-                    gaugeP06 = cb4.__call__()[1]
+                    totalVarP02 = cb3.totalVariation()
+                    totalVarP06 = cb4.totalVariation()
 
                 # Get mesh stats
                 nEle = meshStats(mesh_H)[0]
@@ -545,7 +545,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     if mode == 'rossby-wave':   # TODO: Use analytic solution to get these values
         return av, rel, J_h, np.abs(peak/0.1567020), distanceTravelled, distanceTravelled/47.18, toc
     elif mode == 'tohoku':
-        return av, rel, J_h, gaugeP02, gaugeP06, toc
+        return av, rel, J_h, totalVarP02, totalVarP06, toc
     else:
         return av, rel, J_h, toc
 
@@ -610,10 +610,8 @@ if __name__ == "__main__":
             textfile.write('%d, %.4e, %.4f, %.4f, %.4f, %.1f, %.4e\n'
                            % (av, rel, relativePeak, distanceTravelled, phaseSpd, tim, J_h))
         elif mode == 'tohoku':
-            av, rel, J_h, gaugeP02, gaugeP06, tim = solverSW(i, approach, getData, getError, useAdjoint,
+            av, rel, J_h, totalVarP02, totalVarP06, tim = solverSW(i, approach, getData, getError, useAdjoint,
                                                              aposteriori, mode=mode, op=op)
-            totalVarP02 = gaugeTV(gaugeP02, gauge="P02")
-            totalVarP06 = gaugeTV(gaugeP06, gauge="P06")
             print('Run %d: Mean element count %6d Relative error %.4e P02: %.3f P06: %.3f Timing %.1fs'
                   % (i, av, rel, totalVarP02, totalVarP06, tim))
             textfile.write('%d, %.4e, %.3f, %.3f, %.1f, %.4e\n' % (av, rel, totalVarP02, totalVarP06, tim, J_h))
