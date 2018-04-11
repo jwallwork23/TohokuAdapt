@@ -24,15 +24,21 @@ def solverSW(startRes, di, op=Options()):
     options.use_grad_depth_viscosity_term = False
     options.use_grad_div_viscosity_term = False
     options.coriolis_frequency = f
-    options.simulation_export_time = 100.
+    options.simulation_export_time = 50. if op.plotpvd else 100.
     options.simulation_end_time = op.Tend
     options.timestepper_type = op.timestepper
     options.timestep = op.dt
     if op.plotpvd:
-        options.simulation_export_time = op.ndump * op.dt
         options.output_directory = di
     else:
         options.no_exports = True
+    if op.printStats:
+        options.timestepper_options.solver_parameters = {   # TODO: Why is linear solver still taking 2 iterations?
+                                                         # 'snes_monitor': True,
+                                                         # 'snes_view': True,
+                                                         'snes_converged_reason': True,
+                                                         'ksp_converged_reason': True,
+                                                        }
     # options.use_wetting_and_drying = op.wd        # TODO: Make this work
     # if op.wd:
     #     options.wetting_and_drying_alpha = alpha
@@ -52,7 +58,7 @@ def solverSW(startRes, di, op=Options()):
     return cb1.__call__()[1], cb2.__call__()[1], cb3.__call__()[1], timer
 
 
-if __name__ == '__main__':  # TODO: Output some PETSc solver stats
+if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -60,9 +66,11 @@ if __name__ == '__main__':  # TODO: Output some PETSc solver stats
     parser.add_argument("-l", help="Use linearised equations")
     parser.add_argument("-w", help="Use wetting and drying")
     parser.add_argument("-ne", help="No exports (default True)")
+    parser.add_argument("-s", help="Print solver statistics")
     args = parser.parse_args()
     op = Options(family='dg-dg',
                  plotpvd=False if args.ne else True,
+                 printStats=True if args.s else False,
                  wd=True if args.w else False)
     op.nonlinear = False if args.l else True
     op.rotational = True if args.r else False
