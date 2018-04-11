@@ -13,7 +13,7 @@ now = datetime.datetime.now()
 date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
 
-def solverSW(startRes, op=Options()):
+def solverSW(startRes, di, op=Options()):
     mesh, u0, eta0, b, BCs, f = problemDomain(level=startRes, op=op)
 
     # Get solver parameter values and construct solver
@@ -28,7 +28,11 @@ def solverSW(startRes, op=Options()):
     options.simulation_end_time = op.Tend
     options.timestepper_type = op.timestepper
     options.timestep = op.dt
-    options.no_exports = True
+    if op.plotpvd:
+        options.simulation_export_time = op.ndump * op.dt
+        options.output_directory = di
+    else:
+        options.no_exports = True
     # options.use_wetting_and_drying = op.wd        # TODO: Make this work
     # if op.wd:
     #     options.wetting_and_drying_alpha = alpha
@@ -48,27 +52,30 @@ def solverSW(startRes, op=Options()):
     return cb1.__call__()[1], cb2.__call__()[1], cb3.__call__()[1], timer
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # TODO: Output some PETSc solver stats
     import argparse
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-r", help="Use rotational equations")
     parser.add_argument("-l", help="Use linearised equations")
     parser.add_argument("-w", help="Use wetting and drying")
+    parser.add_argument("-ne", help="No exports (default True)")
     args = parser.parse_args()
     op = Options(family='dg-dg',
+                 plotpvd=False if args.ne else True,
                  wd=True if args.w else False)
     op.nonlinear = False if args.l else True
     op.rotational = True if args.r else False
-    filename = 'outdata/model-verification/nonlinear=' + str(op.nonlinear) + '_'
-    filename += 'rotational=' + str(op.rotational) + '_' + date
+    tag = 'nonlinear=' + str(op.nonlinear) + '_' + 'rotational=' + str(op.rotational)
+    filename = 'outdata/model-verification/' + tag + '_' + date
     errorfile = open(filename + '.txt', 'w+')
     gaugeFileP02 = open(filename + 'P02.txt', 'w+')
     gaugeFileP06 = open(filename + 'P06.txt', 'w+')
+    di = 'plots/model-verification/' + tag + '/'
 
-    for k in range(10, 11):
+    for k in range(1):
         print("\nStarting run %d... Nonlinear = %s, Rotational = %s\n" % (k, op.nonlinear, op.rotational))
-        J_h, gP02, gP06, timing = solverSW(k, op=op)
+        J_h, gP02, gP06, timing = solverSW(k, di, op=op)
         gaugeFileP02.writelines(["%s," % val for val in gP02])
         gaugeFileP06.writelines(["%s," % val for val in gP06])
         totalVarP02 = gaugeTV(gP02, "P02")

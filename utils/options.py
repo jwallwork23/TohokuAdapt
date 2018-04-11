@@ -214,9 +214,9 @@ class Options:
         :param mode: test problem choice.
         :return: 'exact' objective functional value, converged to 3 s.f.
         """
-        dat = {'tohoku': 1.2185e+13,            # On mesh of 196,560 elements     TODO: Verify this by modelVerification
+        dat = {'tohoku': 1.240e+13,             # On mesh of 681,666 elements   TODO: consider nonlinear/rotational case
                'shallow-water': 1.1184e-3,      # On mesh of 524,288 elements
-               }                                                                # TODO: rossby-wave test case
+               }                                                              # TODO: rossby-wave test case
         if mode in dat.keys():
             return dat[mode]
         else:
