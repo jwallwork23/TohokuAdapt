@@ -32,6 +32,7 @@ The following meshing strategies are implemented:
     * explicit and implicit a posteriori error estimators based on shallow water residuals;
     * a 'domain of dependence' type estimator as used in Davis and LeVeque 2016;
     * goal-oriented mesh adaptivity, weighting error estimates by adjoint solution data.
+* Plotting of timeseries and error curves are achieved using ``quick-timeseries`` and ``quick-plot``, respectively.
 
 For feedback, comments and questions, please email j.wallwork16@imperial.ac.uk.
 

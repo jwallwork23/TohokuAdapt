@@ -2,9 +2,9 @@ from thetis import *
 
 from time import clock
 import datetime
+import numpy as np
 
 from utils.callbacks import TohokuCallback, P02Callback, P06Callback
-from utils.error import gaugeTV
 from utils.mesh import problemDomain
 from utils.options import Options
 
@@ -84,9 +84,15 @@ if __name__ == '__main__':
     integrandFile = open(filename + 'Integrand.txt', 'w+')
     di = 'plots/model-verification/' + tag + '/'
 
-    for k in range(1):      # TODO: Calculate order of convergence
+    resolutions = range(11)
+    Jlist = np.zeros(len(resolutions))
+    g2list = np.zeros(len(resolutions))
+    g6list = np.zeros(len(resolutions))
+    for k, i in zip(resolutions, range(len(resolutions))):
         print("\nStarting run %d... Nonlinear = %s, Rotational = %s\n" % (k, op.nonlinear, op.rotational))
         J_h, integrand, gP02, totalVarP02, gP06, totalVarP06, timing = solverSW(k, di, op=op)
+
+        # Save to disk
         gaugeFileP02.writelines(["%s," % val for val in gP02])
         gaugeFileP02.write("\n")
         gaugeFileP06.writelines(["%s," % val for val in gP06])
@@ -96,6 +102,16 @@ if __name__ == '__main__':
         errorfile.write('%d, %.4e, %.4e, %.4e, %.1f\n' % (k, J_h, totalVarP02, totalVarP06, timing))
         print("\nRun %d... J_h: %.4e TV P02: %.3f, TV P06: %.3f, time: %.1f\n"
               % (k, J_h, totalVarP02, totalVarP06, timing))
+
+        # Calculate orders of convergence
+        Jlist[i] = J_h
+        g2list[i] = totalVarP02
+        g6list[i] = totalVarP06
+        if i > 1:
+            Jconv = (Jlist[i] - Jlist[i - 1]) / (Jlist[i - 1] - Jlist[i - 2])
+            g2conv = (g2list[i] - g2list[i - 1]) / (g2list[i - 1] - g2list[i - 2])
+            g6conv = (g6list[i] - g6list[i - 1]) / (g6list[i - 1] - g6list[i - 2])
+            print("Orders of convergence... J: %.4f, P02: %.4f, P06: %.4f" % (Jconv, g2conv, g6conv))
     errorfile.close()
     gaugeFileP02.close()
     gaugeFileP06.close()
