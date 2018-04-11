@@ -15,7 +15,7 @@ from utils.error import explicitErrorEstimator, fluxJumpError, gaugeTV
 from utils.forms import formsSW, interelementTerm, strongResidualSW
 from utils.interpolation import *
 from utils.mesh import problemDomain, meshStats
-from utils.misc import cheatCodes, indexString, getMax
+from utils.misc import cheatCodes, indexString, getMax, printTimings
 from utils.options import Options
 
 now = datetime.datetime.now()
@@ -502,7 +502,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 elif mode == 'rossby-wave':
                     cb1 = RossbyWaveCallback(adapSolver)
                 if cnt != 0:
-                    cb1.objective_value = J_h
+                    cb1.objective_value = integrand
+                    cb3.gauge_values = gP02
+                    cb4.gauge_values = gP06
                 adapSolver.add_callback(cb1, 'timestep')
                 if mode == 'tohoku':
                     adapSolver.add_callback(cb3, 'timestep')
@@ -512,8 +514,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 J_h = cb1.quadrature()
                 integrand = cb1.__call__()[1]
                 if mode == 'tohoku':
-                    totalVarP02 = cb3.totalVariation()
-                    totalVarP06 = cb4.totalVariation()
+                    gP02 = cb3.__call__()[1]
+                    gP06 = cb4.__call__()[1]
 
                 # Get mesh stats
                 nEle = meshStats(mesh_H)[0]
@@ -523,6 +525,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 av = op.printToScreen(int(cnt/op.rm+1), clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, cnt*dt, dt)
 
             adaptTimer = clock() - adaptTimer
+            if mode == 'tohoku':
+                totalVarP02 = cb3.totalVariation()
+                totalVarP06 = cb4.totalVariation()
             if op.printStats:
                 print('Adaptive primal run complete. Run time: %.3fs' % adaptTimer)
     else:
@@ -566,8 +571,8 @@ if __name__ == "__main__":
     parser.add_argument("-r", help="Compute errors and residuals in a refined space")
     args = parser.parse_args()
     orderBool = (not args.ho) or (not args.lo)
-    assert(orderBool)
-    assert(orderBool or (not args.r))
+    assert orderBool
+    assert orderBool or (not args.r)
     print("Mode: ", args.mode)
     print("Approach: ", args.approach)
     mode = args.mode
@@ -603,7 +608,14 @@ if __name__ == "__main__":
     integrandFile = open(filename + 'Integrand.txt', 'w+')
 
     # Run simulations
-    for i in range(10):       # TODO: Can't currently do multiple adjoint runs
+    resolutions = range(8)
+    Jlist = np.zeros(len(resolutions))
+    if mode == 'tohoku':
+        g2list = np.zeros(len(resolutions))
+        g6list = np.zeros(len(resolutions))
+    for i in resolutions:       # TODO: Can't currently do multiple adjoint runs
+
+        # Get data and save to disk
         if mode == 'rossby-wave':
             av, rel, J_h, integrand, relativePeak, distanceTravelled, phaseSpd, tim = \
                 solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
@@ -624,5 +636,20 @@ if __name__ == "__main__":
             textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, tim, J_h))
         integrandFile.writelines(["%s," % val for val in integrand])
         integrandFile.write("\n")
+
+        # Calculate orders of convergence
+        Jlist[i] = J_h
+        convList = np.zeros(len(resolutions) - 2)   # TODO
+        if mode == 'tohoku':
+            g2list[i] = totalVarP02
+            g6list[i] = totalVarP06
+        if i > 1:
+            Jconv = (Jlist[i] - Jlist[i - 1]) / (Jlist[i - 1] - Jlist[i - 2])
+            if mode == 'tohoku':
+                g2conv = (g2list[i] - g2list[i - 1]) / (g2list[i - 1] - g2list[i - 2])
+                g6conv = (g6list[i] - g6list[i - 1]) / (g6list[i - 1] - g6list[i - 2])
+                print("Orders of convergence... J: %.4f, P02: %.4f, P06: %.4f" % (Jconv, g2conv, g6conv))
+            else:
+                print("Order of convergence: %.4f" % Jconv)
     textfile.close()
     integrandFile.close()
