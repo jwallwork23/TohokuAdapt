@@ -88,10 +88,9 @@ def plotTimeseries(filename, date, mode='tohoku', quantity='Integrand', op=Optio
         tim = np.linspace(0, op.Tend, len(dat))
         plt.plot(tim[::10], dat[::10], label=str(i))
         i += 1
-    plt.xlabel('Time (mins)')
+    plt.xlabel('Time (s)')
     plt.ylabel(quantity+' value')
-    # plt.show()
-    plt.savefig('outdata/' + mode + '/' + quantity + date + '.pdf', bbox_inches='tight')
+    plt.savefig('outdata/' + mode + '/' + quantity + date + '.pdf', bbox_inches='tight')    # TODO: Needs changing
 
 
 def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=None):

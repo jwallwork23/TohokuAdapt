@@ -25,6 +25,7 @@ def solverSW(startRes, di, op=Options()):
     options.use_grad_div_viscosity_term = False
     options.coriolis_frequency = f
     options.simulation_export_time = 50. if op.plotpvd else 100.
+    options.period_of_interest_start = op.Tstart
     options.simulation_end_time = op.Tend
     options.timestepper_type = op.timestepper
     options.timestep = op.dt
@@ -33,7 +34,7 @@ def solverSW(startRes, di, op=Options()):
     else:
         options.no_exports = True
     if op.printStats:
-        options.timestepper_options.solver_parameters = {   # TODO: Why is linear solver still taking 2 iterations?
+        options.timestepper_options.solver_parameters = {# TODO: Why is linear solver still taking 2 iterations?
                                                          # 'snes_monitor': True,
                                                          # 'snes_view': True,
                                                          'snes_converged_reason': True,
