@@ -90,6 +90,7 @@ def plotTimeseries(fileExt, date, quantity='Integrand', op=Options()):
         i += 1
     plt.xlabel('Time (s)')
     plt.ylabel(quantity+' value')
+    plt.legend(loc=2)
     plt.savefig('outdata/' + op.mode + '/' + fileExt + '_' + quantity + date + '.pdf', bbox_inches='tight')
     plt.clf()
 

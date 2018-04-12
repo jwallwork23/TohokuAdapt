@@ -118,6 +118,7 @@ class Options:
         self.printStats = printStats
         self.plotpvd = plotpvd
         self.wd = wd
+        self.refinedSpace = refinedSpace
         try:
             assert hessMeth in ('dL2', 'parts')
             self.hessMeth = hessMeth

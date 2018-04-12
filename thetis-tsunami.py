@@ -404,7 +404,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                             loadErr.load(epsilon)
                             loadErr.close()
                         errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(interp(mesh_H, epsilon))
-                        M = isotropicMetric(errEst, invert=False, op=op)
+                        M = isotropicMetric(errEst, invert=False, op=op)    # TODO: Not sure normalisation is working
                     else:
                         if approach == 'norm':
                             v = TestFunction(FunctionSpace(mesh_H, "DG", 0))
@@ -503,8 +503,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     cb1 = RossbyWaveCallback(adapSolver)
                 if cnt != 0:
                     cb1.objective_value = integrand
-                    cb3.gauge_values = gP02
-                    cb4.gauge_values = gP06
+                    if mode == 'tohoku':
+                        cb3.gauge_values = gP02
+                        cb4.gauge_values = gP06
                 adapSolver.add_callback(cb1, 'timestep')
                 if mode == 'tohoku':
                     adapSolver.add_callback(cb3, 'timestep')
@@ -582,7 +583,7 @@ if __name__ == "__main__":
     op = Options(mode=mode,
                  rm=100 if useAdjoint else 50,
                  gradate=True if aposteriori else False,
-                 plotpvd=False,
+                 plotpvd=True,
                  printStats=False,
                  wd=True if args.w else False)
     if mode == 'shallow-water':
@@ -624,13 +625,14 @@ if __name__ == "__main__":
             textfile.write('%d, %.4e, %.4f, %.4f, %.4f, %.1f, %.4e\n'
                            % (av, rel, relativePeak, distanceTravelled, phaseSpd, tim, J_h))
         elif mode == 'tohoku':
-            av, rel, J_h, integrand, totalVarP02, totalVarP06, tim = solverSW(i, approach, getData, getError, useAdjoint,
-                                                             aposteriori, mode=mode, op=op)
+            av, rel, J_h, integrand, totalVarP02, totalVarP06, tim = solverSW(i, approach, getData, getError,
+                                                                              useAdjoint, aposteriori, mode=mode, op=op)
             print('Run %d: Mean element count %6d Relative error %.4e P02: %.3f P06: %.3f Timing %.1fs'
                   % (i, av, rel, totalVarP02, totalVarP06, tim))
             textfile.write('%d, %.4e, %.3f, %.3f, %.1f, %.4e\n' % (av, rel, totalVarP02, totalVarP06, tim, J_h))
         else:
-            av, rel, J_h, integrand, tim = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
+            av, rel, J_h, integrand, tim = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode,
+                                                    op=op)
             print('Run %d: Mean element count %6d Relative error %.4e Timing %.1fs'
                   % (i, av, rel, tim))
             textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, tim, J_h))
@@ -638,18 +640,19 @@ if __name__ == "__main__":
         integrandFile.write("\n")
 
         # Calculate orders of convergence
-        Jlist[i] = J_h
-        convList = np.zeros(len(resolutions) - 2)   # TODO
-        if mode == 'tohoku':
-            g2list[i] = totalVarP02
-            g6list[i] = totalVarP06
-        if i > 1:
-            Jconv = (Jlist[i] - Jlist[i - 1]) / (Jlist[i - 1] - Jlist[i - 2])
+        if not useAdjoint:  # TODO: Get around this
+            Jlist[i] = J_h
+            convList = np.zeros(len(resolutions) - 2)   # TODO
             if mode == 'tohoku':
-                g2conv = (g2list[i] - g2list[i - 1]) / (g2list[i - 1] - g2list[i - 2])
-                g6conv = (g6list[i] - g6list[i - 1]) / (g6list[i - 1] - g6list[i - 2])
-                print("Orders of convergence... J: %.4f, P02: %.4f, P06: %.4f" % (Jconv, g2conv, g6conv))
-            else:
-                print("Order of convergence: %.4f" % Jconv)
+                g2list[i] = totalVarP02
+                g6list[i] = totalVarP06
+            if i > 1:
+                Jconv = (Jlist[i] - Jlist[i - 1]) / (Jlist[i - 1] - Jlist[i - 2])
+                if mode == 'tohoku':
+                    g2conv = (g2list[i] - g2list[i - 1]) / (g2list[i - 1] - g2list[i - 2])
+                    g6conv = (g6list[i] - g6list[i - 1]) / (g6list[i - 1] - g6list[i - 2])
+                    print("Orders of convergence... J: %.4f, P02: %.4f, P06: %.4f" % (Jconv, g2conv, g6conv))
+                else:
+                    print("Order of convergence: %.4f" % Jconv)
     textfile.close()
     integrandFile.close()
