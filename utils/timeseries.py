@@ -8,7 +8,7 @@ import datetime
 from .options import Options
 
 
-__all__ = ["readErrors", "extractSpline", "errorVsElements", "__main__"]
+__all__ = ["readErrors", "extractSpline", "errorVsElements", "__main__", "plotTimeseries", "compareTimeseries"]
 
 
 plt.rc('text', usetex=True)
@@ -95,6 +95,40 @@ def plotTimeseries(fileExt, date, quantity='Integrand', op=Options()):
     plt.clf()
 
 
+def compareTimeseries(date, run, quantity='Integrand', op=Options()):
+    assert quantity in ('Integrand', 'P02', 'P06')
+    approaches = ("fixedMesh", "hessianBased", "DWR")
+
+    # Get dates (if necessary)
+    dates = {}
+    now = datetime.datetime.now()
+    today = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
+    for approach in approaches:
+        if date is None:
+            try:
+                dates[approach] = input("Date to use for %s approach: " % approach)
+            except:
+                dates[approach] = today
+        else:
+            dates[approach] = date
+    plt.gcf()
+    for approach in approaches:
+        filename = 'outdata/' + op.mode + '/' + approach + '_' + dates[approach] + quantity + '.txt'
+        f = open(filename, 'r')
+        for i in range(run):
+            f.readline()
+        separated = f.readline().split(',')
+        dat = [float(d) for d in separated[:-1]]  # Ignore carriage return
+        tim = np.linspace(0, op.Tend, len(dat))
+        plt.plot(tim[::5], dat[::5], label=approach)
+    plt.xlabel('Time (s)')
+    plt.ylabel(quantity + ' value')
+    plt.legend(loc=2)
+    plt.savefig('outdata/' + op.mode + '/' + quantity + today + '_' +  str(run) + '.pdf', bbox_inches='tight')
+    plt.clf()
+
+
+
 def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=None):
     if mode == 'model-verification':
         labels = ("Linear, non-rotational", "Linear, rotational", "Nonlinear, non-rotational", "Nonlinear, rotational")
@@ -145,9 +179,11 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=
     dates = []
     for n in range(len(names)):
         if date is None:
-            dates.append(input("Date to use for %s approach: " % labels[n]))
-            now = datetime.datetime.now()
-            date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
+            try:
+                dates.append(input("Date to use for %s approach: " % labels[n]))
+            except:
+                now = datetime.datetime.now()
+                dates.append(str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000))
         else:
             dates.append(date)
 
