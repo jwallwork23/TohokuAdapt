@@ -381,18 +381,17 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             adaptTimer = clock()
             while cnt < int(T / dt):
                 stepTimer = clock()
+                indexStr = indexString(int(cnt/op.ndump))
 
                 # Load variables from disk
                 if cnt != 0:
                     V = op.mixedSpace(mesh_H)
                     q = Function(V)
                     uv_2d, elev_2d = q.split()
-                    with DumbCheckpoint(di+'hdf5/Elevation2d_'+indexString(int(cnt/op.ndump)), mode=FILE_READ) \
-                            as loadElev:
+                    with DumbCheckpoint(di+'hdf5/Elevation2d_'+indexStr, mode=FILE_READ) as loadElev:
                         loadElev.load(elev_2d, name='elev_2d')
                         loadElev.close()
-                    with DumbCheckpoint(di+'hdf5/Velocity2d_'+indexString(int(cnt/op.ndump)), mode=FILE_READ) \
-                            as loadVel:
+                    with DumbCheckpoint(di+'hdf5/Velocity2d_'+indexStr, mode=FILE_READ) as loadVel:
                         loadVel.load(uv_2d, name='uv_2d')
                         loadVel.close()
 
@@ -605,7 +604,7 @@ if __name__ == "__main__":
         filename += '_r'
     if args.w:
         filename += '_w'
-    filename += '_' + date      # TODO: This underscore might cause problems
+    filename += '_' + date
     textfile = open(filename + '.txt', 'w+')
     integrandFile = open(filename + 'Integrand.txt', 'w+')
 
@@ -616,7 +615,6 @@ if __name__ == "__main__":
         g2list = np.zeros(len(resolutions))
         g6list = np.zeros(len(resolutions))
     for i in resolutions:       # TODO: Can't currently do multiple adjoint runs
-
         # Get data and save to disk
         if mode == 'rossby-wave':
             av, rel, J_h, integrand, relativePeak, distance, phaseSpd, tim = \
@@ -641,7 +639,7 @@ if __name__ == "__main__":
         integrandFile.write("\n")
 
         # Calculate orders of convergence
-        if not useAdjoint:  # TODO: Get around this
+        if not useAdjoint:                              # TODO: Get around this
             Jlist[i] = J_h
             convList = np.zeros(len(resolutions) - 2)   # TODO
             if mode == 'tohoku':

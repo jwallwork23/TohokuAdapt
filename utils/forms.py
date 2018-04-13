@@ -161,7 +161,7 @@ def indicator(V, mode='tohoku'):
     elif mode == 'shallow-water':
         xy = [0., 0.5 * pi, 0.5 * pi, 1.5 * pi]
     elif mode == 'rossby-wave':
-        xy = [0., 8., 10., 14.]
+        xy = [-24., -20., -2., 2.]
     elif mode == 'tohoku':
         xy = [490e3, 640e3, 4160e3, 4360e3]
     elif mode == 'tohoku-init':
