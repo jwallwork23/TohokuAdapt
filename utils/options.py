@@ -181,7 +181,7 @@ class Options:
             self.ndump = 5
         elif self.mode == 'rossby-wave':
             self.Tstart = 20.
-            self.Tend = 45.
+            self.Tend = 45.60
             self.hmin = 5e-3
             self.hmax = 10.
             self.rm = 24

@@ -610,7 +610,7 @@ if __name__ == "__main__":
     integrandFile = open(filename + 'Integrand.txt', 'w+')
 
     # Run simulations
-    resolutions = range(6)
+    resolutions = range(3)
     Jlist = np.zeros(len(resolutions))
     if mode == 'tohoku':
         g2list = np.zeros(len(resolutions))
