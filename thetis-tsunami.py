@@ -471,8 +471,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 adapOpt.timestepper_type = op.timestepper
                 adapOpt.timestep = dt
                 adapOpt.output_directory = di
-                adapOpt.log_output = op.printStats
                 adapOpt.export_diagnostics = True
+                adapOpt.log_output = op.printStats
                 adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
                 adapOpt.use_wetting_and_drying = op.wd
                 if op.wd:
