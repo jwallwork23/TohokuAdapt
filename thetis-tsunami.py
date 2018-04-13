@@ -172,23 +172,22 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         if op.wd:
             options.wetting_and_drying_alpha = alpha
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
-        if mode == 'tohoku':
+        if mode == 'rossby-wave':
+            cb1 = RossbyWaveCallback(solver_obj)
+            cb2 = ObjectiveRWCallback(solver_obj)
+        elif mode == 'shallow-water':
+            cb1 = ShallowWaterCallback(solver_obj)
+            cb2 = ObjectiveSWCallback(solver_obj)
+        else:
             cb1 = TohokuCallback(solver_obj)
             cb2 = ObjectiveTohokuCallback(solver_obj)
             if approach == 'fixedMesh':
                 cb3 = P02Callback(solver_obj)
                 cb4 = P06Callback(solver_obj)
-        elif mode == 'shallow-water':
-            cb1 = ShallowWaterCallback(solver_obj)
-            cb2 = ObjectiveSWCallback(solver_obj)
-        else:
-            cb1 = RossbyWaveCallback(solver_obj)
-            cb2 = ObjectiveRWCallback(solver_obj)
+                solver_obj.add_callback(cb3, 'timestep')
+                solver_obj.add_callback(cb4, 'timestep')
         solver_obj.add_callback(cb1, 'timestep')
         solver_obj.add_callback(cb2, 'timestep')
-        if mode == 'tohoku' and approach == 'fixedMesh':
-            solver_obj.add_callback(cb3, 'timestep')
-            solver_obj.add_callback(cb4, 'timestep')
         solver_obj.bnd_functions['shallow_water'] = BCs
         if aposteriori and approach != 'DWP':
             def selector():
@@ -373,6 +372,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             q = Function(V)
             uv_2d, elev_2d = q.split()
             elev_2d.interpolate(eta0)
+            uv_2d.interpolate(u0)
             if aposteriori:
                 epsilon = Function(P0, name="Error indicator")
             if op.printStats:
@@ -493,14 +493,14 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     e.set_next_export_ix(adapSolver.i_export)
 
                 # Evaluate callbacks and iterate
-                if mode == 'tohoku':
+                if mode == 'rossby-wave':
+                    cb1 = RossbyWaveCallback(adapSolver)
+                elif mode == 'shallow-water':
+                    cb1 = ShallowWaterCallback(adapSolver)
+                else:
                     cb1 = TohokuCallback(adapSolver)
                     cb3 = P02Callback(adapSolver)
                     cb4 = P06Callback(adapSolver)
-                elif mode == 'shallow-water':
-                    cb1 = ShallowWaterCallback(adapSolver)
-                elif mode == 'rossby-wave':
-                    cb1 = RossbyWaveCallback(adapSolver)
                 if cnt != 0:
                     cb1.objective_value = integrand
                     if mode == 'tohoku':

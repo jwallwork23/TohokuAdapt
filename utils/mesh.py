@@ -224,6 +224,7 @@ def problemDomain(mode='tohoku', level=0, mesh=None, output=False, op=Options())
         u0, eta0 = q.split()
         BCs = {1: {'uv': Constant(0.)}, 2: {'uv': Constant(0.)}, 3: {'uv': Constant(0.)}, 4: {'uv': Constant(0.)}}
         f = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
+
     if output:
         File('plots/initialisation/surf.pvd').write(eta0)
         File('plots/initialisation/bathymetry.pvd').write(b)
