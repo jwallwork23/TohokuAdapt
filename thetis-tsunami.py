@@ -9,14 +9,13 @@ from time import clock
 import datetime
 
 from utils.adaptivity import isoP2, constructGradient, isotropicMetric, steadyMetric, metricIntersection, metricGradation
-from utils.callbacks import TohokuCallback, ShallowWaterCallback, RossbyWaveCallback, P02Callback, P06Callback
-from utils.callbacks import ObjectiveTohokuCallback, ObjectiveSWCallback, ObjectiveRWCallback
+from utils.callbacks import *
 from utils.error import explicitErrorEstimator, fluxJumpError, gaugeTV
-from utils.forms import formsSW, interelementTerm, strongResidualSW
+from utils.forms import formsSW, interelementTerm, strongResidualSW, solutionRW
 from utils.interpolation import *
 from utils.mesh import problemDomain, meshStats
-from utils.misc import cheatCodes, indexString, getMax, printTimings
-from utils.options import Options
+from utils.misc import *
+from utils.options import *
 
 now = datetime.datetime.now()
 date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
@@ -67,6 +66,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         q_ = Function(V)        # Variable at previous timestep
         uv_2d_, elev_2d_ = q_.split()
     P0 = FunctionSpace(mesh_H, "DG", 0)
+    if mode == 'rossby-wave':
+        peak_a, distance_a = peakAndDistance(solutionRW(V, t=op.Tend).split()[1])   # Analytic final-time state
 
     # Define Functions relating to a posteriori estimators
     if aposteriori or approach == 'norm':
@@ -537,21 +538,18 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     if op.printStats:
         printTimings(primalTimer, dualTimer, errorTimer, adaptTimer, fullTime)
 
-    # Measure error using metrics, using data from Huang et al.
-    if mode == 'rossby-wave':
+    if mode == 'rossby-wave':   # Measure error using metrics, using data from Huang et al.
         index = int(cntT/op.ndump) if approach == 'fixedMesh' else int((cnt-op.rm) / op.ndump)
         with DumbCheckpoint(di+'hdf5/Elevation2d_'+indexString(index), mode=FILE_READ) as loadElev:
             loadElev.load(elev_2d, name='elev_2d')
             loadElev.close()
-        # peak_i, peak = getMax(interp(isoP2(mesh_H), elev_2d).dat.data)
-        peak_i, peak = getMax(elev_2d.dat.data)
-        dgCoords = Function(VectorFunctionSpace(mesh_H, op.space2, op.degree2)).interpolate(mesh_H.coordinates)
-        distanceTravelled = np.abs(dgCoords.dat.data[peak_i][0])
+        peak, distance = peakAndDistance(elev_2d, op=op)
+        print('Peak %.4f vs. %.4f, distance %.4f vs. %.4f' % (peak, peak_a, distance, distance_a))
 
     toc = clock() - tic
     rel = np.abs(op.J(mode) - J_h) / np.abs(op.J(mode))
-    if mode == 'rossby-wave':   # TODO: Use analytic solution to get these values
-        return av, rel, J_h, integrand, np.abs(peak/0.1567020), distanceTravelled, distanceTravelled/47.18, toc
+    if mode == 'rossby-wave':
+        return av, rel, J_h, integrand, np.abs(peak/peak_a), distance, distance/distance_a, toc
     elif mode == 'tohoku':
         return av, rel, J_h, integrand, totalVarP02, totalVarP06, toc
     else:
@@ -571,9 +569,12 @@ if __name__ == "__main__":
     parser.add_argument("-lo", help="Compute errors and residuals in a lower order space")
     parser.add_argument("-r", help="Compute errors and residuals in a refined space")
     args = parser.parse_args()
-    orderBool = (not args.ho) or (not args.lo)
-    assert orderBool
-    assert orderBool or (not args.r)
+    if args.ho:
+        assert (not args.r) and (not args.lo)
+    if args.lo:
+        assert (not args.r) and (not args.ho)
+    if args.r:
+        assert (not args.ho) and (not args.lo)
     print("Mode: ", args.mode)
     print("Approach: ", args.approach)
     mode = args.mode
@@ -609,7 +610,7 @@ if __name__ == "__main__":
     integrandFile = open(filename + 'Integrand.txt', 'w+')
 
     # Run simulations
-    resolutions = range(8)
+    resolutions = range(6)
     Jlist = np.zeros(len(resolutions))
     if mode == 'tohoku':
         g2list = np.zeros(len(resolutions))
@@ -618,12 +619,12 @@ if __name__ == "__main__":
 
         # Get data and save to disk
         if mode == 'rossby-wave':
-            av, rel, J_h, integrand, relativePeak, distanceTravelled, phaseSpd, tim = \
+            av, rel, J_h, integrand, relativePeak, distance, phaseSpd, tim = \
                 solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
             print('Run %d: <#Elements>: %6d Obj. error: %.4e  Height error: %.4f  Distance: %.4fm  Speed error: %.4fm  Timing %.1fs'
-                  % (i, av, rel, relativePeak, distanceTravelled, phaseSpd, tim))
+                  % (i, av, rel, relativePeak, distance, phaseSpd, tim))
             textfile.write('%d, %.4e, %.4f, %.4f, %.4f, %.1f, %.4e\n'
-                           % (av, rel, relativePeak, distanceTravelled, phaseSpd, tim, J_h))
+                           % (av, rel, relativePeak, distance, phaseSpd, tim, J_h))
         elif mode == 'tohoku':
             av, rel, J_h, integrand, totalVarP02, totalVarP06, tim = solverSW(i, approach, getData, getError,
                                                                               useAdjoint, aposteriori, mode=mode, op=op)
