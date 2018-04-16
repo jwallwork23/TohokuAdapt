@@ -112,22 +112,34 @@ class MeshSetup:
 
 if __name__ == "__main__":
     import qmesh
+    import argparse
 
-    generateAll = bool(input("Press 0 to generate a single mesh or 1 to generate all meshes in the hierarchy. "))
-    wd = bool(input("Press 0 for a standard mesh or 1 to generate a mesh for wetting and drying. "))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-a", help="Generate all meshes in the hierarchy")
+    parser.add_argument("-m", help="Generate a particular mesh, using index in range 0:10")
+    parser.add_argument("-w", help="Use wetting and drying")
+    args = parser.parse_args()
+    if args.a is None:
+        assert args.m is not None
+    if args.m is None:
+        assert args.a is not None
+
+    generateAll = True if args.a else False
     if generateAll:
         for i in range(11):
-            ms = MeshSetup(i, wd=wd)
+            ms = MeshSetup(i, wd=args.w)
             qmesh.setLogOutputFile(ms.dirName+'generateMesh.log')   # Store QMESH log for later reference
             qmesh.initialise()                                      # Initialise QGIS API
-            ms.generateMesh(wd=wd)                                  # Generate the mesh
+            ms.generateMesh(wd=args.w)                             # Generate the mesh
             ms.convertMesh()                                        # Convert to shapefile, for visualisation with QGIS
     else:
-        ms = MeshSetup(input('Choose refinement level from 0-10: ') or 0, wd=wd)
+        ms = MeshSetup(args.m, wd=args.w)
         qmesh.setLogOutputFile(ms.dirName+'generateMesh.log')
         qmesh.initialise()
-        ms.generateMesh(wd=wd)
+        ms.generateMesh(wd=args.w)
         ms.convertMesh()
+
+    exit(23)
 else:
     from thetis import *
     from thetis_adjoint import *
