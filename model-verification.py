@@ -67,11 +67,11 @@ if __name__ == '__main__':
     parser.add_argument("-r", help="Use rotational equations")
     parser.add_argument("-l", help="Use linearised equations")
     parser.add_argument("-w", help="Use wetting and drying")
-    parser.add_argument("-ne", help="No exports (default True)")
+    parser.add_argument("-o", help="Output data")
     parser.add_argument("-s", help="Print solver statistics")
     args = parser.parse_args()
     op = Options(family='dg-dg',
-                 plotpvd=False if args.ne else True,
+                 plotpvd=True if args.o else False,
                  printStats=True if args.s else False,
                  wd=True if args.w else False)
     op.nonlinear = False if args.l else True
@@ -84,7 +84,7 @@ if __name__ == '__main__':
     integrandFile = open(filename + 'Integrand.txt', 'w+')
     di = 'plots/model-verification/' + tag + '/'
 
-    resolutions = range(11)
+    resolutions = range(1)
     Jlist = np.zeros(len(resolutions))
     g2list = np.zeros(len(resolutions))
     g6list = np.zeros(len(resolutions))

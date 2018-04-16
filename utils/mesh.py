@@ -175,9 +175,9 @@ def problemDomain(mode='tohoku', level=0, mesh=None, output=False, op=Options())
         b = Function(P1, name='Bathymetry profile')
 
         # Read and interpolate initial surface data (courtesy of Saito)
-        nc1 = NetCDFFile('resources/initialisation/surf.nc', mmap=False)
-        lon1 = nc1.variables['x'][:]
-        lat1 = nc1.variables['y'][:]
+        nc1 = NetCDFFile('resources/initialisation/surf_zeroed.nc', mmap=False)
+        lon1 = nc1.variables['lon'][:]
+        lat1 = nc1.variables['lat'][:]
         x1, y1 = vectorlonlat_to_utm(lat1, lon1, force_zone_number=54)      # Our mesh mainly resides in UTM zone 54
         elev1 = nc1.variables['z'][:, :]
         interpolatorSurf = si.RectBivariateSpline(y1, x1, elev1)
@@ -195,10 +195,8 @@ def problemDomain(mode='tohoku', level=0, mesh=None, output=False, op=Options())
         assert meshCoords.shape[0] == b_vec.shape[0]
 
         # Interpolate data onto initial surface and bathymetry profiles
-        indi = indicator(P1, 'tohoku-init')
-        indidat = indi.dat.data                 # TODO: Would be better to have a smooth IC
         for i, p in enumerate(meshCoords):
-            eta0vec[i] = interpolatorSurf(p[1], p[0]) * indidat[i]
+            eta0vec[i] = interpolatorSurf(p[1], p[0])
             b_vec[i] = - interpolatorSurf(p[1], p[0]) - interpolatorBath(p[1], p[0])
 
         # Post-process the bathymetry to have a minimum depth of 30m and if no wetting-and-drying
