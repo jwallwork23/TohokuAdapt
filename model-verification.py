@@ -84,7 +84,7 @@ if __name__ == '__main__':
     integrandFile = open(filename + 'Integrand.txt', 'w+')
     di = 'plots/model-verification/' + tag + '/'
 
-    resolutions = range(1)
+    resolutions = range(11)
     Jlist = np.zeros(len(resolutions))
     g2list = np.zeros(len(resolutions))
     g6list = np.zeros(len(resolutions))
