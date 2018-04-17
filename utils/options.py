@@ -11,6 +11,7 @@ class Options:
                  rescaling=0.85,
                  hmin=500.,
                  hmax=1e6,
+                 minNorm=1.,
                  maxAnisotropy=100,
                  normalisation='lp',
                  normOrder=2,
@@ -41,6 +42,7 @@ class Options:
         :param rescaling: Scaling parameter for target number of vertices.
         :param hmin: Minimal tolerated element size (m).
         :param hmax: Maximal tolerated element size (m).
+        :param minNorm: Minimal tolerated norm for error estimates.
         :param maxAnisotropy: maximum tolerated aspect ratio.
         :param normalisation: Normalisation approach: 'lp' or 'manual'.
         :param normOrder: norm order in the Lp normalisation approach, where ``p => 1`` and ``p = infty`` is an option.
@@ -82,9 +84,10 @@ class Options:
         except:
             raise ValueError('Invalid value for scaling parameter. rescaling > 0 is required.')
         try:
-            assert (hmin > 0) & (hmax > hmin)
+            assert (hmin > 0) and (hmax > hmin) and (minNorm > 0)
             self.hmin = hmin
             self.hmax = hmax
+            self.minNorm = minNorm
         except:
             raise ValueError('Invalid min/max element sizes. hmax > hmin > 0 is required.')
         try:
@@ -176,6 +179,7 @@ class Options:
             self.Tend = 2.5
             self.hmin = 1e-4
             self.hmax = 1.
+            self.minNorm = 1e-6
             self.rm = 5
             self.dt = 0.05
             self.ndump = 5
@@ -184,6 +188,7 @@ class Options:
             self.Tend = 45.60
             self.hmin = 5e-3
             self.hmax = 10.
+            self.minNorm = 1e-4
             self.rm = 24
             self.dt = 0.05
             self.ndump = 12

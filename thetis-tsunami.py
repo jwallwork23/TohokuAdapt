@@ -223,7 +223,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
             # Compute gradient
             dualTimer = clock()
             dJdb = compute_gradient(J, Control(b))      # TODO: Rewrite pyadjoint code to avoid computing this
-            File(di + 'gradient.pvd').write(dJdb)
+            # File(di + 'gradient.pvd').write(dJdb)     # Too memory intensive in Tohoku case
             print("Norm of gradient = %e" % dJdb.dat.norm)
 
             # Extract adjoint solutions
@@ -585,7 +585,7 @@ if __name__ == "__main__":
     print("Approach: ", args.approach)
     mode = args.mode
 
-    # Choose mode and set parameter values
+    # Choose mode and set parameter values      TODO: use parsers for this
     approach, getData, getError, useAdjoint, aposteriori = cheatCodes(args.approach)
     op = Options(mode=mode,
                  rm=100 if useAdjoint else 50,
