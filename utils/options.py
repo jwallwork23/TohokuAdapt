@@ -67,7 +67,7 @@ class Options:
         :param wd: toggle wetting and drying.
         """
         try:
-            assert mode in ('tohoku', 'shallow-water', 'rossby-wave')
+            assert mode in ('tohoku', 'shallow-water', 'rossby-wave', 'model-verification')
             self.mode = mode
         except:
             raise ValueError('Test problem not recognised.')
@@ -187,7 +187,7 @@ class Options:
             self.rm = 24
             self.dt = 0.05
             self.ndump = 12
-            self.nonlinear = True
+            self.nonlinear = True       # TODO: Adjoint not working in nonlinear case
             self.g = 1.
 
         # Define FunctionSpaces

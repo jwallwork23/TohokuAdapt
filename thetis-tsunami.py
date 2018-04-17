@@ -567,6 +567,8 @@ if __name__ == "__main__":
     parser.add_argument("-ho", help="Compute errors and residuals in a higher order space")
     parser.add_argument("-lo", help="Compute errors and residuals in a lower order space")
     parser.add_argument("-r", help="Compute errors and residuals in a refined space")
+    parser.add_argument("-o", help="Output data")
+    parser.add_argument("-f", help="Field for adaption")
     args = parser.parse_args()
     if args.ho:
         assert (not args.r) and (not args.lo)
@@ -574,6 +576,11 @@ if __name__ == "__main__":
         assert (not args.r) and (not args.ho)
     if args.r:
         assert (not args.ho) and (not args.lo)
+    if args.f:
+        assert(args.f in ('s', 'f', 'b'))
+        f = args.f
+    else:
+        f = 's'
     print("Mode: ", args.mode)
     print("Approach: ", args.approach)
     mode = args.mode
@@ -583,9 +590,10 @@ if __name__ == "__main__":
     op = Options(mode=mode,
                  rm=100 if useAdjoint else 50,
                  gradate=True if aposteriori else False,
-                 plotpvd=True,
+                 plotpvd=True if args.o else False,
                  printStats=False,
-                 wd=True if args.w else False)
+                 wd=True if args.w else False,
+                 adaptField=f)
     if mode == 'shallow-water':
         op.rm = 10 if useAdjoint else 5
     elif mode == 'rossby-wave':
@@ -609,7 +617,7 @@ if __name__ == "__main__":
     integrandFile = open(filename + 'Integrand.txt', 'w+')
 
     # Run simulations
-    resolutions = range(3)
+    resolutions = range(1, 2)
     Jlist = np.zeros(len(resolutions))
     if mode == 'tohoku':
         g2list = np.zeros(len(resolutions))

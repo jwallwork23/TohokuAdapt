@@ -13,6 +13,7 @@ parser.add_argument("-r", help="Use rotational equations")
 parser.add_argument("-l", help="Use linearised equations")
 parser.add_argument("-d", help="Specify a date")
 parser.add_argument("-c", help="Compare timeseries")
+parser.add_argument("-g", help="Include actual gauge data")
 args = parser.parse_args()
 op = Options(mode=args.mode)
 approach = args.approach
@@ -33,4 +34,4 @@ for quantity in quantities:
         for i in range(6):
             compareTimeseries(args.d, i, quantity=quantity, op=op)
     else:
-        plotTimeseries(fileExt, date=args.d, quantity=quantity, op=op)
+        plotTimeseries(fileExt, date=args.d, quantity=quantity, realData=bool(args.g), op=op)

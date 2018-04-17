@@ -8,7 +8,8 @@ import datetime
 from .options import Options
 
 
-__all__ = ["readErrors", "extractSpline", "errorVsElements", "__main__", "plotTimeseries", "compareTimeseries"]
+__all__ = ["readErrors", "extractSpline", "extractData", "errorVsElements", "__main__", "plotTimeseries",
+           "compareTimeseries"]
 
 
 plt.rc('text', usetex=True)
@@ -76,7 +77,18 @@ def extractSpline(gauge):
     return spline
 
 
-def plotTimeseries(fileExt, date, quantity='Integrand', op=Options()):
+def extractData(gauge):
+    measuredFile = open('resources/gauges/' + gauge + 'data_25mins.txt', 'r')
+    x = []
+    y = []
+    for line in measuredFile:
+        xy = line.split()
+        x.append(float(xy[0]))
+        y.append(float(xy[1]))
+    return x, y
+
+
+def plotTimeseries(fileExt, date, quantity='Integrand', realData=False, op=Options()):
     assert quantity in ('Integrand', 'P02', 'P06')
     filename = 'outdata/' + op.mode + '/' + fileExt + '_' + date + quantity + '.txt'
     f = open(filename, 'r')
@@ -88,9 +100,12 @@ def plotTimeseries(fileExt, date, quantity='Integrand', op=Options()):
         tim = np.linspace(0, op.Tend, len(dat))
         plt.plot(tim[::5], dat[::5], label=str(i))
         i += 1
+    if realData and quantity in ('P02', 'P06'):
+        x, y = extractData(quantity)
+        plt.plot(np.linspace(0, op.Tend, len(x)), y, label='Gauge data', marker='*', color='black')
     plt.xlabel('Time (s)')
     plt.ylabel(quantity+' value')
-    plt.legend(loc=2)
+    plt.legend(loc=2, bbox_to_anchor=(1.05, 1))
     plt.savefig('outdata/' + op.mode + '/' + fileExt + '_' + quantity + date + '.pdf', bbox_inches='tight')
     plt.clf()
 

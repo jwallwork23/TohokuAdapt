@@ -197,11 +197,10 @@ def problemDomain(mode='tohoku', level=0, mesh=None, output=False, op=Options())
         # Interpolate data onto initial surface and bathymetry profiles
         for i, p in enumerate(meshCoords):
             eta0vec[i] = interpolatorSurf(p[1], p[0])
-            b_vec[i] = - interpolatorSurf(p[1], p[0]) - interpolatorBath(p[1], p[0])
+            depth = - eta0vec[i] - interpolatorBath(p[1], p[0])
+            b_vec[i] = depth if op.wd else max(depth, 30)
 
         # Post-process the bathymetry to have a minimum depth of 30m and if no wetting-and-drying
-        if not op.wd:
-            b.assign(conditional(lt(30, b), b, 30))
         BCs = {}
         if op.rotational:
             f = Function(FunctionSpace(mesh, 'CG', 1))
