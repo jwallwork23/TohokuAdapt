@@ -182,8 +182,11 @@ def isotropicMetric(f, bdy=False, invert=True, op=Options()):
         g.interpolate(f)
 
     # Normalise error estimate
-    gnorm = max(assemble(sqrt(inner(g, g)) * dx), op.minNorm)   # Equiv. to scaling by (thresholded) metric complexity
-    g.dat.data[:] = np.abs(g.dat.data) * op.nVerT / gnorm       # NOTE this changes in 3D case
+    if scalar:
+        gnorm = max(np.abs(assemble(g * dx)), op.minNorm)
+    else:
+        gnorm = max(assemble(sqrt(inner(g, g)) * dx), op.minNorm)   # Equiv. to scaling by thresholded metric complexity
+    g.dat.data[:] = np.abs(g.dat.data) * op.nVerT / gnorm           # NOTE this changes in 3D case
 
     # Establish metric
     V = TensorFunctionSpace(mesh, "CG", 1)

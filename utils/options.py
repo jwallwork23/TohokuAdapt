@@ -10,7 +10,7 @@ class Options:
                  family='dg-dg',
                  rescaling=0.85,
                  hmin=500.,
-                 hmax=1e6,
+                 hmax=1e5,
                  minNorm=1.,
                  maxAnisotropy=100,
                  normalisation='lp',
