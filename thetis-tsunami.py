@@ -169,19 +169,15 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, op=
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         cb1 = SWCallback(solver_obj)
         cb1.op = op
-        if op.mode == 'rossby-wave':
-            cb2 = ObjectiveRWCallback(solver_obj)
-        elif op.mode == 'shallow-water':
-            cb2 = ObjectiveSWCallback(solver_obj)
-        else:
-            cb2 = ObjectiveTohokuCallback(solver_obj)
-            if approach == 'fixedMesh':
-                cb3 = P02Callback(solver_obj)
-                cb4 = P06Callback(solver_obj)
-                solver_obj.add_callback(cb3, 'timestep')
-                solver_obj.add_callback(cb4, 'timestep')
         solver_obj.add_callback(cb1, 'timestep')
+        cb2 = ObjectiveSWCallback(solver_obj)
+        cb2.op = op
         solver_obj.add_callback(cb2, 'timestep')
+        if mode == 'tohoku' and approach == 'fixedMesh':
+            cb3 = P02Callback(solver_obj)
+            cb4 = P06Callback(solver_obj)
+            solver_obj.add_callback(cb3, 'timestep')
+            solver_obj.add_callback(cb4, 'timestep')
         solver_obj.bnd_functions['shallow_water'] = BCs
         if aposteriori and approach != 'DWP':
             def selector():
@@ -487,12 +483,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, op=
                     e.set_next_export_ix(adapSolver.i_export)
 
                 # Evaluate callbacks and iterate
-                if op.mode == 'rossby-wave':
-                    cb1 = RossbyWaveCallback(adapSolver)
-                elif op.mode == 'shallow-water':
-                    cb1 = ShallowWaterCallback(adapSolver)
-                else:
-                    cb1 = TohokuCallback(adapSolver)
+                cb1 = SWCallback(adapSolver)
+                cb1.op = op
+                if op.mode == 'tohoku':
                     cb3 = P02Callback(adapSolver)
                     cb4 = P06Callback(adapSolver)
                 if cnt != 0:

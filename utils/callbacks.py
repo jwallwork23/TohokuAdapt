@@ -6,9 +6,8 @@ from .forms import indicator
 from .options import Options
 
 
-__all__ = ["FunctionalCallback", "SWCallback",
-           "GaugeCallback", "P02Callback", "P06Callback", "ObjectiveCallback", "ObjectiveTohokuCallback",
-           "ObjectiveSWCallback", "ObjectiveRWCallback"]
+__all__ = ["FunctionalCallback", "SWCallback", "ObjectiveCallback", "ObjectiveSWCallback",
+           "GaugeCallback", "P02Callback", "P06Callback"]
 
 
 class FunctionalCallback(DiagnosticCallback):
@@ -62,8 +61,9 @@ class SWCallback(FunctionalCallback):
         from firedrake import assemble
 
         self.op = Options()
+        dt = solver_obj.options.timestep
 
-        def indicatorSW():
+        def objectiveSW():
             """
             :param solver_obj: FlowSolver2d object.
             :return: objective functional value for callbacks.
@@ -73,12 +73,74 @@ class SWCallback(FunctionalCallback):
             k0, k1 = ks.split()
             k1.assign(indicator(V.sub(1), op=self.op))
             kt = Constant(0.)
-            if solver_obj.simulation_time > self.op.Tstart - 0.5 * self.op.dt:      # Slightly smooth transition
-                kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * self.op.dt else 0.5)
+            if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:      # Slightly smooth transition
+                kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * dt else 0.5)
 
             return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
 
-        super(SWCallback, self).__init__(indicatorSW, solver_obj, **kwargs)
+        super(SWCallback, self).__init__(objectiveSW, solver_obj, **kwargs)
+
+
+class ObjectiveCallback(DiagnosticCallback):
+    """Base class for callbacks that form objective functionals."""
+    variable_names = ['current functional', 'objective functional']
+
+    def __init__(self, scalar_callback, solver_obj, **kwargs):
+        """
+        Creates error comparison check callback object
+
+        :arg scalar_callback: Python function that takes the solver object as an argument and
+            returns a scalar quantity of interest
+        :arg solver_obj: Thetis solver object
+        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+        """
+        super(ObjectiveCallback, self).__init__(solver_obj, **kwargs)
+        self.scalar_callback = scalar_callback
+        self.objective_functional = [scalar_callback()]
+        self.append_to_hdf5 = False
+        self.append_to_log = False
+
+    def __call__(self):
+        value = self.scalar_callback()
+        self.objective_functional.append(value)
+
+        return value, self.objective_functional
+
+    def message_str(self, *args):
+        line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
+        return line
+
+
+class ObjectiveSWCallback(ObjectiveCallback):
+    """Integrates objective functional in shallow water case."""
+    name = 'SW objective functional'
+
+    def __init__(self, solver_obj, **kwargs):
+        """
+        :arg solver_obj: Thetis solver object
+        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+        """
+        from firedrake_adjoint import assemble
+
+        self.op = Options()
+        dt = solver_obj.options.timestep
+
+        def objectiveSW():
+            """
+            :param solver_obj: FlowSolver2d object.
+            :return: objective functional value for callbacks.
+            """
+            V = solver_obj.fields.solution_2d.function_space()
+            ks = Function(V)
+            k0, k1 = ks.split()
+            k1.assign(indicator(V.sub(1), mode=self.op))
+            kt = Constant(0.)
+            if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:
+                kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * dt else 0.5)
+
+            return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
+
+        super(ObjectiveSWCallback, self).__init__(objectiveSW, solver_obj, **kwargs)
 
 
 class GaugeCallback(DiagnosticCallback):
@@ -160,127 +222,3 @@ class P06Callback(GaugeCallback):
 
     def totalVariation(self):
         return gaugeTV(self.gauge_values, gauge="P06")
-
-
-class ObjectiveCallback(DiagnosticCallback):
-    """Base class for callbacks that form objective functionals."""
-    variable_names = ['current functional', 'objective functional']
-
-    def __init__(self, scalar_callback, solver_obj, **kwargs):
-        """
-        Creates error comparison check callback object
-
-        :arg scalar_callback: Python function that takes the solver object as an argument and
-            returns a scalar quantity of interest
-        :arg solver_obj: Thetis solver object
-        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
-        """
-        super(ObjectiveCallback, self).__init__(solver_obj, **kwargs)
-        self.scalar_callback = scalar_callback
-        self.objective_functional = [scalar_callback()]
-        self.append_to_hdf5 = False
-        self.append_to_log = False
-
-    def __call__(self):
-        value = self.scalar_callback()
-        self.objective_functional.append(value)
-
-        return value, self.objective_functional
-
-    def message_str(self, *args):
-        line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
-        return line
-
-
-class ObjectiveTohokuCallback(ObjectiveCallback):
-    """Integrates objective functional in Tohoku case."""
-    name = 'Tohoku objective functional'
-
-    def __init__(self, solver_obj, **kwargs):
-        """
-        :arg solver_obj: Thetis solver object
-        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
-        """
-        from firedrake_adjoint import assemble
-
-
-        def objectiveTohoku():
-            """
-            :param solver_obj: FlowSolver2d object.
-            :return: objective functional value for callbacks.
-            """
-            V = solver_obj.fields.solution_2d.function_space()
-            ks = Function(V)
-            k0, k1 = ks.split()
-            k1.assign(indicator(V.sub(1), mode='tohoku'))
-            kt = Constant(0.)
-            dt = solver_obj.options.timestep
-            Tstart = solver_obj.options.period_of_interest_start
-            if solver_obj.simulation_time > Tstart - 0.5 * dt:
-                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * dt else 0.5)
-
-            return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
-
-        super(ObjectiveTohokuCallback, self).__init__(objectiveTohoku, solver_obj, **kwargs)
-
-
-class ObjectiveSWCallback(ObjectiveCallback):
-    """Integrates objective functional in shallow water case."""
-    name = 'SW objective functional'
-
-    def __init__(self, solver_obj, **kwargs):
-        """
-        :arg solver_obj: Thetis solver object
-        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
-        """
-        from firedrake_adjoint import assemble
-
-        def objectiveSW():
-            """
-            :param solver_obj: FlowSolver2d object.
-            :return: objective functional value for callbacks.
-            """
-            V = solver_obj.fields.solution_2d.function_space()
-            ks = Function(V)
-            k0, k1 = ks.split()
-            k1.assign(indicator(V.sub(1), mode='shallow-water'))
-            kt = Constant(0.)
-            dt = solver_obj.options.timestep
-            Tstart = solver_obj.options.period_of_interest_start
-            if solver_obj.simulation_time > Tstart - 0.5 * dt:
-                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * dt else 0.5)
-
-            return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
-
-        super(ObjectiveSWCallback, self).__init__(objectiveSW, solver_obj, **kwargs)
-
-
-class ObjectiveRWCallback(ObjectiveCallback):
-    """Integrates objective functional in equatorial Rossby wave case."""
-    name = 'Rossby wave objective functional'
-
-    def __init__(self, solver_obj, **kwargs):
-        """
-        :arg solver_obj: Thetis solver object
-        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
-        """
-        from firedrake_adjoint import assemble
-
-        def objectiveRW():
-            """
-            :param solver_obj: FlowSolver2d object.
-            :return: objective functional value for callbacks.
-            """
-            V = solver_obj.fields.solution_2d.function_space()
-            ks = Function(V)
-            k0, k1 = ks.split()
-            k1.assign(indicator(V.sub(1), mode='rossby-wave'))
-            kt = Constant(0.)
-            dt = solver_obj.options.timestep
-            Tstart = solver_obj.options.period_of_interest_start
-            if solver_obj.simulation_time > Tstart - 0.5 * dt:
-                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * dt else 0.5)
-
-            return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
-
-        super(ObjectiveRWCallback, self).__init__(objectiveRW, solver_obj, **kwargs)
