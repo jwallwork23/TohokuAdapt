@@ -1,11 +1,13 @@
-from thetis import *
+from thetis_adjoint import *
 import pyadjoint
 
 import numpy as np
 from time import clock
 
+from utils.adaptivity import metricIntersection, steadyMetric
 from utils.callbacks import *
 from utils.forms import solutionRW
+from utils.interpolation import interp
 from utils.mesh import meshStats, problemDomain
 from utils.misc import indexString, peakAndDistance
 from utils.options import Options
@@ -13,20 +15,22 @@ from utils.options import Options
 
 def fixedMesh(startRes, op=Options()):
     with pyadjoint.stop_annotating():
-        di = 'plots/' + op.mode + '/'
+        di = 'plots/' + op.mode + '/fixedMesh/'
 
         # Initialise domain and physical parameters
         try:
             assert (float(physical_constants['g_grav'].dat.data) == op.g)
         except:
             physical_constants['g_grav'].assign(op.g)
-        mesh_H, u0, eta0, b, BCs, f = problemDomain(startRes, op=op)
-        nEls = meshStats(mesh_H)
-        V = op.mixedSpace(mesh_H)
+        mesh, u0, eta0, b, BCs, f = problemDomain(startRes, op=op)
+        nEle = meshStats(mesh)
+        V = op.mixedSpace(mesh)
         uv_2d, elev_2d = Function(V).split()  # Needed to load data into
+        if op.mode == 'rossby-wave':
+            peak_a, distance_a = peakAndDistance(solutionRW(V, t=op.Tend).split()[1])  # Analytic final-time state
 
         # Initialise solver
-        solver_obj = solver2d.FlowSolver2d(mesh_H, b)
+        solver_obj = solver2d.FlowSolver2d(mesh, b)
         options = solver_obj.options
         options.element_family = op.family
         options.use_nonlinear_equations = True if op.nonlinear else False
@@ -86,16 +90,179 @@ def fixedMesh(startRes, op=Options()):
                 loadElev.load(elev_2d, name='elev_2d')
                 loadElev.close()
             peak, distance = peakAndDistance(elev_2d, op=op)
-            peak_a, distance_a = peakAndDistance(solutionRW(V, t=op.Tend).split()[1])  # Analytic final-time state
             print('Peak %.4f vs. %.4f, distance %.4f vs. %.4f' % (peak, peak_a, distance, distance_a))
 
         rel = np.abs(op.J - J_h) / np.abs(op.J)
         if op.mode == 'rossby-wave':
-            return nEls, rel, J_h, integrand, np.abs(peak/peak_a), distance, distance/distance_a, primalTimer
+            return nEle, rel, J_h, integrand, np.abs(peak/peak_a), distance, distance/distance_a, primalTimer
         elif op.mode == 'tohoku':
-            return nEls, rel, J_h, integrand, totalVarP02, totalVarP06, primalTimer
+            return nEle, rel, J_h, integrand, totalVarP02, totalVarP06, primalTimer
         else:
-            return nEls, rel, J_h, integrand, primalTimer
+            return nEle, rel, J_h, integrand, primalTimer
+
+
+def hessianBased(startRes, op=Options()):
+    with pyadjoint.stop_annotating():
+        di = 'plots/' + op.mode + '/fixedMesh/'
+
+        # Initialise domain and physical parameters
+        try:
+            assert (float(physical_constants['g_grav'].dat.data) == op.g)
+        except:
+            physical_constants['g_grav'].assign(op.g)
+        mesh, u0, eta0, b, BCs, f = problemDomain(startRes, op=op)
+        V = op.mixedSpace(mesh)
+        uv_2d, elev_2d = Function(V).split()  # Needed to load data into
+        if op.mode == 'rossby-wave':
+            peak_a, distance_a = peakAndDistance(solutionRW(V, t=op.Tend).split()[1])  # Analytic final-time state
+        elev_2d.interpolate(eta0)
+        uv_2d.interpolate(u0)
+
+        # Initialise parameters and counters
+        nEle, op.nVerT = meshStats(mesh)
+        op.nVerT *= op.rescaling  # Target #Vertices
+        mM = [nEle, nEle]  # Min/max #Elements
+        Sn = nEle
+        cnt = 0
+        endT = 0.
+
+        adaptTimer = clock()
+        while cnt < op.cntT:
+            stepTimer = clock()
+            indexStr = indexString(int(cnt / op.ndump))
+
+            # Load variables from disk
+            if cnt != 0:
+                V = op.mixedSpace(mesh)
+                q = Function(V)
+                uv_2d, elev_2d = q.split()
+                with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as loadElev:
+                    loadElev.load(elev_2d, name='elev_2d')
+                    loadElev.close()
+                with DumbCheckpoint(di + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as loadVel:
+                    loadVel.load(uv_2d, name='uv_2d')
+                    loadVel.close()
+
+            for l in range(op.nAdapt):  # TODO: Test this functionality
+
+                # Construct metric
+                if op.adaptField != 's':
+                    M = steadyMetric(elev_2d, op=op)
+                if cnt != 0:  # Can't adapt to zero velocity
+                    if op.adaptField != 'f':
+                        spd = Function(FunctionSpace(mesh, "DG", 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
+                        M2 = steadyMetric(spd, op=op)
+                        M = metricIntersection(M, M2) if op.adaptField == 'b' else M2
+
+                # Adapt mesh and interpolate variables
+                if cnt != 0 or op.adaptField == 's':
+                    mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
+                    P1 = FunctionSpace(mesh, "CG", 1)
+                    elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
+                    if op.mode == 'tohoku':
+                        b = interp(mesh, b)
+                    elif op.mode == 'shallow-water':
+                        b = Function(P1).assign(0.1)
+                    else:
+                        b = Function(P1).assign(1.)
+                    uv_2d.rename('uv_2d')
+                    elev_2d.rename('elev_2d')
+
+            # Solver object and equations
+            adapSolver = solver2d.FlowSolver2d(mesh, b)
+            adapOpt = adapSolver.options
+            adapOpt.element_family = op.family
+            adapOpt.use_nonlinear_equations = True if op.nonlinear else False
+            adapOpt.use_grad_depth_viscosity_term = False
+            adapOpt.use_grad_div_viscosity_term = False
+            adapOpt.use_lax_friedrichs_velocity = False  # TODO: This is a temporary fix
+            adapOpt.simulation_export_time = op.dt * op.ndump
+            startT = endT
+            endT += op.dt * op.rm
+            adapOpt.simulation_end_time = endT
+            adapOpt.period_of_interest_start = op.Tstart
+            adapOpt.period_of_interest_end = op.Tend
+            adapOpt.timestepper_type = op.timestepper
+            adapOpt.timestep = op.dt
+            adapOpt.output_directory = di
+            adapOpt.export_diagnostics = True
+            adapOpt.log_output = op.printStats
+            adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+            adapOpt.use_wetting_and_drying = op.wd
+            # if op.wd:                                             TODO
+            #     adapOpt.wetting_and_drying_alpha = alpha
+            if op.mode == 'rossby-wave':
+                adapOpt.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
+            field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
+            e = exporter.ExportManager(di + 'hdf5',
+                                       ['elev_2d', 'uv_2d'],
+                                       field_dict,
+                                       field_metadata,
+                                       export_type='hdf5')
+            adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
+            adapSolver.i_export = int(cnt / op.ndump)
+            adapSolver.iteration = cnt
+            adapSolver.simulation_time = startT
+            adapSolver.next_export_t = startT + adapOpt.simulation_export_time  # For next export
+            for e in adapSolver.exporters.values():
+                e.set_next_export_ix(adapSolver.i_export)
+
+            # Evaluate callbacks and iterate
+            if op.mode == 'rossby-wave':
+                cb1 = RossbyWaveCallback(adapSolver)
+            elif op.mode == 'shallow-water':
+                cb1 = ShallowWaterCallback(adapSolver)
+            else:
+                cb1 = TohokuCallback(adapSolver)
+                cb3 = P02Callback(adapSolver)
+                cb4 = P06Callback(adapSolver)
+            if cnt != 0:
+                cb1.objective_value = integrand
+                if op.mode == 'tohoku':
+                    cb3.gauge_values = gP02
+                    cb4.gauge_values = gP06
+            adapSolver.add_callback(cb1, 'timestep')
+            if op.mode == 'tohoku':
+                adapSolver.add_callback(cb3, 'timestep')
+                adapSolver.add_callback(cb4, 'timestep')
+            adapSolver.bnd_functions['shallow_water'] = BCs
+            adapSolver.iterate()
+            J_h = cb1.quadrature()
+            integrand = cb1.__call__()[1]
+            if op.mode == 'tohoku':
+                gP02 = cb3.__call__()[1]
+                gP06 = cb4.__call__()[1]
+
+            # Get mesh stats
+            nEle = meshStats(mesh)[0]
+            mM = [min(nEle, mM[0]), max(nEle, mM[1])]
+            Sn += nEle
+            cnt += op.rm
+            av = op.printToScreen(int(cnt/op.rm+1), clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, cnt * op.dt)
+
+            adaptTimer = clock() - adaptTimer
+            if op.mode == 'tohoku':
+                totalVarP02 = cb3.totalVariation()
+                totalVarP06 = cb4.totalVariation()
+            if op.printStats:
+                print('Adaptive primal run complete. Run time: %.3fs' % adaptTimer)
+
+            # Measure error using metrics, as in Huang et al.
+            if op.mode == 'rossby-wave':
+                index = int(op.cntT / op.ndump)
+                with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexString(index), mode=FILE_READ) as loadElev:
+                    loadElev.load(elev_2d, name='elev_2d')
+                    loadElev.close()
+                peak, distance = peakAndDistance(elev_2d, op=op)
+                print('Peak %.4f vs. %.4f, distance %.4f vs. %.4f' % (peak, peak_a, distance, distance_a))
+
+            rel = np.abs(op.J - J_h) / np.abs(op.J)
+            if op.mode == 'rossby-wave':
+                return av, rel, J_h, integrand, np.abs(peak / peak_a), distance, distance / distance_a, adaptTimer
+            elif op.mode == 'tohoku':
+                return av, rel, J_h, integrand, totalVarP02, totalVarP06, adaptTimer
+            else:
+                return av, rel, J_h, integrand, adaptTimer
 
 
 if __name__ == "__main__":

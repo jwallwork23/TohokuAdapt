@@ -519,7 +519,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, op=
                 mM = [min(nEle, mM[0]), max(nEle, mM[1])]
                 Sn += nEle
                 cnt += op.rm
-                av = op.printToScreen(int(cnt/op.rm+1), clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, cnt*dt, dt)
+                av = op.printToScreen(int(cnt/op.rm+1), clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, cnt*dt)
 
             adaptTimer = clock() - adaptTimer
             if op.mode == 'tohoku':

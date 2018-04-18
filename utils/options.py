@@ -156,6 +156,8 @@ class Options:
             except:
                 raise ValueError("`rm` should be an integer multiple of `ndump`.")
         self.ndump = ndump
+        self.iStart = Tstart / (ndump * dt)
+        self.iEnd = self.cntT / ndump
         self.rm = rm
         self.nAdapt = nAdapt
         self.orderChange = orderChange
@@ -238,7 +240,7 @@ class Options:
         return VectorFunctionSpace(mesh, self.space1, deg1) * FunctionSpace(mesh, self.space2, deg2)
 
 
-    def printToScreen(self, mn, outerTime, innerTime, nEle, Sn, mM, t, dt):
+    def printToScreen(self, mn, outerTime, innerTime, nEle, Sn, mM, t):
         """
         :arg mn: mesh number.
         :arg outerTime: time taken so far.
@@ -247,7 +249,6 @@ class Options:
         :arg Sn: sum over #Elements.
         :arg mM: tuple of min and max #Elements.
         :arg t: current simuation time.
-        :arg dt: current timestep.
         :returns: mean element count.
         """
         av = Sn / mn
@@ -256,5 +257,5 @@ class Options:
 Percent complete  : %4.1f%%    Elapsed time : %4.2fs (This step : %4.2fs)     
 #Elements... Current : %d  Mean : %d  Minimum : %s  Maximum : %s
 Current timestep : %4.3fs\n""" %
-                  (mn, 100 * t / self.Tend, outerTime, innerTime, nEle, av, mM[0], mM[1], dt))
+                  (mn, 100 * t / self.Tend, outerTime, innerTime, nEle, av, mM[0], mM[1], self.dt))
         return av
