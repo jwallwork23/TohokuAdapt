@@ -69,7 +69,7 @@ class TohokuCallback(FunctionalCallback):
             V = solver_obj.fields.solution_2d.function_space()
             ks = Function(V)
             k0, k1 = ks.split()
-            k1.assign(indicator(V.sub(1), mode='tohoku'))
+            k1.assign(indicator(V.sub(1), op=Options(mode='tohoku')))   # TODO: These callbacks could be generalised
             kt = Constant(0.)
             dt = solver_obj.options.timestep
             Tstart = solver_obj.options.period_of_interest_start
@@ -100,7 +100,7 @@ class ShallowWaterCallback(FunctionalCallback):
             V = solver_obj.fields.solution_2d.function_space()
             ks = Function(V)
             k0, k1 = ks.split()
-            k1.assign(indicator(V.sub(1), mode='shallow-water'))
+            k1.assign(indicator(V.sub(1), op=Options(mode='shallow-water')))
             kt = Constant(0.)
             dt = solver_obj.options.timestep
             Tstart = solver_obj.options.period_of_interest_start
@@ -131,7 +131,7 @@ class RossbyWaveCallback(FunctionalCallback):
             V = solver_obj.fields.solution_2d.function_space()
             ks = Function(V)
             k0, k1 = ks.split()
-            k1.assign(indicator(V.sub(1), mode='rossby-wave'))
+            k1.assign(indicator(V.sub(1), op=Options(mode='rossby-wave')))
             kt = Constant(0.)
             dt = solver_obj.options.timestep
             Tstart = solver_obj.options.period_of_interest_start

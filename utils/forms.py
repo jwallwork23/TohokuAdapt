@@ -143,33 +143,16 @@ def interelementTerm(v, n=None):
         return 0.5 * (dot(v('+'), n('+')) - dot(v('-'), n('-')))
 
 
-def indicator(V, mode='tohoku'):
+def indicator(V, op=Options()):
     """
     :arg V: Function space to use.
-    :param mode: test problem considered.
+    :param op: options parameter class.
     :return: ('Smoothened') indicator function for region A = [x1, x2] x [y1, y1]
     """
-    smooth = True if mode == 'tohoku' else False
+    smooth = True if op.mode == 'tohoku' else False
 
     # Define extent of region A
-    if mode == 'helmholtz1':
-        xy = [0., 0.2, 0.4, 0.6]
-    elif mode == 'helmholtz2':
-        xy = [0.1, 0.3, 0.1, 0.3]
-    elif mode == 'basic':
-        xy = [-0.5, 0.5, -0.5, 0.5]
-    elif mode == 'advection-diffusion':
-        xy = [2.5, 3.5, 0.1, 0.9]
-    elif mode == 'shallow-water':
-        xy = [0., 0.5 * pi, 0.5 * pi, 1.5 * pi]
-    elif mode == 'rossby-wave':
-        xy = [-24., -20., -2., 2.]
-    elif mode == 'tohoku':
-        xy = [490e3, 640e3, 4160e3, 4360e3]
-    elif mode == 'tohoku-init':
-        xy = [4e5, 8.7e5, 3.9e6, 4.6e6]
-    else:
-        raise NotImplementedError
+    xy = op.xy
     if smooth:
         xd = (xy[1] - xy[0]) / 2
         yd = (xy[3] - xy[2]) / 2
@@ -179,8 +162,6 @@ def indicator(V, mode='tohoku'):
     else:
         ind = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' % (xy[0], xy[1], xy[2], xy[3])
     iA = Function(V, name="Region of interest").interpolate(Expression(ind))
-    if plot:
-        File("plots/adjointBased/kernel.pvd").write(iA)
 
     return iA
 

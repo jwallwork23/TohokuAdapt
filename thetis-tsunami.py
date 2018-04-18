@@ -1,6 +1,5 @@
 from thetis_adjoint import *
 from thetis.field_defs import field_metadata
-from firedrake_adjoint import *
 import pyadjoint
 from fenics_adjoint.solving import SolveBlock
 

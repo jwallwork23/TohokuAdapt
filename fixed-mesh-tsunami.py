@@ -1,5 +1,7 @@
 from thetis_adjoint import *
+from thetis.field_defs import field_metadata
 import pyadjoint
+from fenics_adjoint.solving import SolveBlock
 
 import numpy as np
 from time import clock

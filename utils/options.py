@@ -188,6 +188,7 @@ class Options:
             self.dt = 0.05
             self.ndump = 5
             self.J = 1.1184e-3,     # On mesh of 524,288 elements
+            self.xy = [0., 0.5 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
         elif self.mode == 'rossby-wave':
             self.Tstart = 20.
             self.Tend = 45.60
@@ -200,8 +201,10 @@ class Options:
             self.nonlinear = True
             self.g = 1.
             self.J = 1.                                                 # TODO: establish this
+            self.xy = [-24., -20., -2., 2.]
         elif self.mode in ('tohoku', 'model-verification'):
             self.J = 1.240e+13          # On mesh of 681,666 elements     TODO: consider nonlinear/rotational case
+            self.xy = [490e3, 640e3, 4160e3, 4360e3]
 
         # Define FunctionSpaces
         self.degree1 = 2 if family == 'cg-cg' else 1
