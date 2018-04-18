@@ -12,8 +12,7 @@ adaptivity:
     * Hessians and metrics are approximated using ``adaptivity``.
     * Callbacks for assembling objective functionals and extracting timeseries are provided in ``callbacks``.
     * Coordinate transformations are achieved using ``conversion``.
-    * (Local) error indicators are computed using ``error``.
-    * Strong and weak forms of PDEs are available in ``forms``.
+    * PDE strong and weak forms, (local) error indicators and analytic solutions are available in ``forms``.
     * Interpolation of functions from an old mesh to a newly adapted mesh is achieved using ``interpolation``.
     * Meshes of the physical domain can be generated using ``mesh``.
     * Some generic functions may be found in ``misc``.
@@ -32,7 +31,8 @@ The following meshing strategies are implemented:
     * explicit and implicit a posteriori error estimators based on shallow water residuals;
     * a 'domain of dependence' type estimator as used in Davis and LeVeque 2016;
     * goal-oriented mesh adaptivity, weighting error estimates by adjoint solution data.
-* Plotting of timeseries and error curves are achieved using ``quick-timeseries`` and ``quick-plot``, respectively.
+* Timeseries may be plotted using ``quick-timeseries``. Total variations between timeseries may be calculated using
+``quick-difference``. Error curves and CPU timings may be plotted using  and ``quick-plot``.
 
 For feedback, comments and questions, please email j.wallwork16@imperial.ac.uk.
 

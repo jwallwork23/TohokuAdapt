@@ -10,8 +10,7 @@ import datetime
 
 from utils.adaptivity import isoP2, constructGradient, isotropicMetric, steadyMetric, metricIntersection, metricGradation
 from utils.callbacks import *
-from utils.error import explicitErrorEstimator, fluxJumpError
-from utils.forms import formsSW, interelementTerm, strongResidualSW, solutionRW
+from utils.forms import formsSW, interelementTerm, strongResidualSW, solutionRW, explicitErrorEstimator, fluxJumpError
 from utils.interpolation import *
 from utils.mesh import problemDomain, meshStats
 from utils.misc import *
