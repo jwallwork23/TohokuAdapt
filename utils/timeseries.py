@@ -9,12 +9,48 @@ from .options import Options
 
 
 __all__ = ["readErrors", "extractSpline", "extractData", "errorVsElements", "__main__", "plotTimeseries",
-           "compareTimeseries"]
+           "compareTimeseries", "timeseriesDifference", "totalVariation", "gaugeTV"]
 
 
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 plt.rc('legend', fontsize='x-large')
+
+
+def totalVariation(data):
+    """
+    :arg data: (one-dimensional) timeseries record.
+    :return: total variation thereof.
+    """
+    TV = 0
+    iStart = 0
+    for i in range(len(data)):
+        if i == 1:
+            sign = (data[i] - data[i-1]) / np.abs(data[i] - data[i-1])
+        elif i > 1:
+            sign_ = sign
+            sign = (data[i] - data[i - 1]) / np.abs(data[i] - data[i - 1])
+            if sign != sign_:
+                TV += np.abs(data[i-1] - data[iStart])
+                iStart = i-1
+                if i == len(data)-1:
+                    TV += np.abs(data[i] - data[i-1])
+            elif i == len(data)-1:
+                TV += np.abs(data[i] - data[iStart])
+    return TV
+
+
+def gaugeTV(data, gauge="P02"):
+    """
+    :param data: timeseries to calculate error of.
+    :param gauge: gauge considered.
+    :return: total variation. 
+    """
+    N = len(data)
+    spline = extractSpline(gauge)
+    times = np.linspace(0., 25., N)
+    errors = [data[i] - spline(times[i]) for i in range(N)]
+    return totalVariation(errors) / totalVariation([spline(times[i]) for i in range(N)])
 
 
 def readErrors(date, approach, mode='tohoku', bootstrapping=False):
@@ -110,6 +146,26 @@ def plotTimeseries(fileExt, date, quantity='Integrand', realData=False, op=Optio
     plt.clf()
 
 
+def timeseriesDifference(fileExt1, date1, fileExt2, date2, quantity='Integrand', op=Options()):
+    assert quantity in ('Integrand', 'P02', 'P06')
+    filename1 = 'outdata/' + op.mode + '/' + fileExt1 + '_' + date1 + quantity + '.txt'
+    filename2 = 'outdata/' + op.mode + '/' + fileExt2 + '_' + date2 + quantity + '.txt'
+    f1 = open(filename1, 'r')
+    f2 = open(filename2, 'r')
+    errs = []
+    for line in f1:
+        separated = line.split(',')
+        dat1 = [float(d) for d in separated[:-1]]
+        separated = f2.readline().split(',')
+        dat2 = [float(d) for d in separated[:-1]]
+        try:
+            assert np.shape(dat1) == np.shape(dat2)
+            errs.append(totalVariation(np.asarray(dat1) - np.asarray(dat2)))
+        except:
+            pass
+    return ['%.4e' % i for i in errs]
+
+
 def compareTimeseries(date, run, quantity='Integrand', op=Options()):
     assert quantity in ('Integrand', 'P02', 'P06')
     approaches = ("fixedMesh", "hessianBased", "DWR")
@@ -143,8 +199,10 @@ def compareTimeseries(date, run, quantity='Integrand', op=Options()):
     plt.clf()
 
 
-
 def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=None):
+    now = datetime.datetime.now()
+    today = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
+
     if mode == 'model-verification':
         labels = ("Linear, non-rotational", "Linear, rotational", "Nonlinear, non-rotational", "Nonlinear, rotational")
         names = ("nonlinear=False_rotational=False_", "nonlinear=False_rotational=True_",
@@ -194,11 +252,7 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=
     dates = []
     for n in range(len(names)):
         if date is None:
-            try:
-                dates.append(input("Date to use for %s approach: " % labels[n]))
-            except:
-                now = datetime.datetime.now()
-                dates.append(str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000))
+            dates.append(input("Date to use for %s approach: " % labels[n]))
         else:
             dates.append(date)
 
@@ -233,7 +287,7 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=
             plt.legend(loc=1 if errornames[m] in ('P02', 'P06') else 4)
             plt.xlabel(r'Mean element count')
             plt.ylabel(errorlabels[m])
-            plt.savefig(di + errornames[m] + 'VsElements' + date + '.pdf', bbox_inches='tight')
+            plt.savefig(di + errornames[m] + 'VsElements' + today + '.pdf', bbox_inches='tight')
             plt.clf()
         else:
             # Plot errors
@@ -246,7 +300,7 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=
             if mode == 'tohoku':
                 plt.xlim([5000, 60000])
                 plt.ylim([1e-4, 5e-1])
-            plt.savefig(di + errornames[m] + 'VsElements' + date + '.pdf', bbox_inches='tight')
+            plt.savefig(di + errornames[m] + 'VsElements' + today + '.pdf', bbox_inches='tight')
             plt.clf()
 
         # Plot timings
@@ -260,5 +314,5 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=
             if mode == 'tohoku':
                 plt.xlim([0, 55000])
                 plt.ylim([0, 5000])
-            plt.savefig(di + 'timeVsElements' + date + '.pdf', bbox_inches='tight')
+            plt.savefig(di + 'timeVsElements' + today + '.pdf', bbox_inches='tight')
             plt.clf()

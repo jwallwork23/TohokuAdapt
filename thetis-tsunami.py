@@ -10,7 +10,7 @@ import datetime
 
 from utils.adaptivity import isoP2, constructGradient, isotropicMetric, steadyMetric, metricIntersection, metricGradation
 from utils.callbacks import *
-from utils.error import explicitErrorEstimator, fluxJumpError, gaugeTV
+from utils.error import explicitErrorEstimator, fluxJumpError
 from utils.forms import formsSW, interelementTerm, strongResidualSW, solutionRW
 from utils.interpolation import *
 from utils.mesh import problemDomain, meshStats
@@ -585,19 +585,21 @@ if __name__ == "__main__":
     print("Approach: ", args.approach)
     mode = args.mode
 
-    # Choose mode and set parameter values      TODO: use parsers for this
+    # Choose mode and set parameter values
     approach, getData, getError, useAdjoint, aposteriori = cheatCodes(args.approach)
     op = Options(mode=mode,
                  rm=100 if useAdjoint else 50,
-                 gradate=True if aposteriori else False,
+                 # gradate=True if aposteriori and mode == 'tohoku' else False,
+                 gradate=False,     # TODO: Fix this for tohoku case
                  plotpvd=True if args.o else False,
-                 printStats=False,
+                 printStats=True,
                  wd=True if args.w else False,
                  adaptField=f)
     if mode == 'shallow-water':
         op.rm = 10 if useAdjoint else 5
     elif mode == 'rossby-wave':
         op.rm = 48 if useAdjoint else 24
+    op.nonlinear = False        # TODO: This is only temporary, while pyadjoint and nonlinear are incompatible
 
     # Establish filename
     filename = 'outdata/' + mode + '/' + approach

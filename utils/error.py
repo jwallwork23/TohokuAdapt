@@ -1,12 +1,10 @@
 from thetis import *
 
-import numpy as np
 
 from .interpolation import mixedPairInterp
-from .timeseries import extractSpline
 
 
-__all__ = ["explicitErrorEstimator", "fluxJumpError", "totalVariation", "gaugeTV"]
+__all__ = ["explicitErrorEstimator", "fluxJumpError"]
 
 
 def explicitErrorEstimator(q, residual, b, v, maxBathy=False):
@@ -62,39 +60,3 @@ def fluxJumpError(q, v):
     j2 = assemble(jump(v * grad(etah), n=n) * dS)
 
     return assemble(v * h * (j0 * j0 + j1 * j1 + j2 * j2) * dx)
-
-
-def totalVariation(data):
-    """
-    :arg data: (one-dimensional) timeseries record.
-    :return: total variation thereof.
-    """
-    TV = 0
-    iStart = 0
-    for i in range(len(data)):
-        if i == 1:
-            sign = (data[i] - data[i-1]) / np.abs(data[i] - data[i-1])
-        elif i > 1:
-            sign_ = sign
-            sign = (data[i] - data[i - 1]) / np.abs(data[i] - data[i - 1])
-            if sign != sign_:
-                TV += np.abs(data[i-1] - data[iStart])
-                iStart = i-1
-                if i == len(data)-1:
-                    TV += np.abs(data[i] - data[i-1])
-            elif i == len(data)-1:
-                TV += np.abs(data[i] - data[iStart])
-    return TV
-
-
-def gaugeTV(data, gauge="P02"):
-    """
-    :param data: timeseries to calculate error of.
-    :param gauge: gauge considered.
-    :return: total variation. 
-    """
-    N = len(data)
-    spline = extractSpline(gauge)
-    times = np.linspace(0., 25., N)
-    errors = [data[i] - spline(times[i]) for i in range(N)]
-    return totalVariation(errors) / totalVariation([spline(times[i]) for i in range(N)])
