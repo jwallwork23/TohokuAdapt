@@ -38,7 +38,6 @@ advection-diffusion.py
 pyadjoint-test-firedrake.py
 pyadjoint-test-burgers.py
 pyadjoint-test-thetis.py
-rossby-test-thetis.py
 rossby-test-firedrake.py
 
 # Patches

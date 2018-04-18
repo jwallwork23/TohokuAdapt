@@ -20,7 +20,7 @@ now = datetime.datetime.now()
 date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
 
-def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mode='tohoku', op=Options()):
+def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, op=Options(mode='tohoku')):
     """
     Run mesh adaptive simulations for the Tohoku problem.
 
@@ -30,7 +30,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     :param getError: generate error estimates?
     :param useAdjoint: run adjoint simulation?
     :param aposteriori: error estimator classification.
-    :param mode: test case or main script used.
     :param op: parameter values.
     :return: mean element count and relative error in objective functional value.
     """
@@ -46,7 +45,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     primalTimer = dualTimer = errorTimer = adaptTimer = False
 
     # Establish filenames
-    di = 'plots/'+mode+'/'
+    di = 'plots/'+op.mode+'/'
     if op.plotpvd:
         residualFile = File(di + "residual.pvd")
         implicitErrorFile = File(di + "implicitError.pvd")
@@ -54,7 +53,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         adjointFile = File(di + "adjoint.pvd")
 
     # Setup problem
-    mesh_H, u0, eta0, b, BCs, f = problemDomain(mode, startRes, op=op)
+    mesh_H, u0, eta0, b, BCs, f = problemDomain(startRes, op=op)
     V = op.mixedSpace(mesh_H)
     q = Function(V)
     uv_2d, elev_2d = q.split()  # Needed to load data into
@@ -65,7 +64,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         q_ = Function(V)        # Variable at previous timestep
         uv_2d_, elev_2d_ = q_.split()
     P0 = FunctionSpace(mesh_H, "DG", 0)
-    if mode == 'rossby-wave':
+    if op.mode == 'rossby-wave':
         peak_a, distance_a = peakAndDistance(solutionRW(V, t=op.Tend).split()[1])   # Analytic final-time state
 
     # Define Functions relating to a posteriori estimators
@@ -88,7 +87,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         elif op.refinedSpace:                   # Define variables on refined space
             mesh_h = isoP2(mesh_H)
             Ve = op.mixedSpace(mesh_h)
-            if mode == 'tohoku':
+            if op.mode == 'tohoku':
                 be = TohokuDomain(mesh=mesh_h)[2]
             else:
                 be = Function(FunctionSpace(mesh_h, "CG", 1)).assign(float(np.average(b.dat.data)))
@@ -156,7 +155,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         options.use_grad_depth_viscosity_term = False
         options.use_grad_div_viscosity_term = False
         options.use_lax_friedrichs_velocity = False     # TODO: This is a temporary fix
-        if mode == 'rossby-wave':
+        if op.mode == 'rossby-wave':
             options.coriolis_frequency = f
         options.simulation_export_time = dt * (op.rm-1) if aposteriori and approach != 'DWP' else dt * op.ndump
         options.simulation_end_time = T
@@ -173,10 +172,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         if op.wd:
             options.wetting_and_drying_alpha = alpha
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
-        if mode == 'rossby-wave':
+        if op.mode == 'rossby-wave':
             cb1 = RossbyWaveCallback(solver_obj)
             cb2 = ObjectiveRWCallback(solver_obj)
-        elif mode == 'shallow-water':
+        elif op.mode == 'shallow-water':
             cb1 = ShallowWaterCallback(solver_obj)
             cb2 = ObjectiveSWCallback(solver_obj)
         else:
@@ -204,7 +203,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         integrand = cb1.__call__()[1]
         if op.printStats:
             print('Primal run complete. Run time: %.3fs' % primalTimer)
-        if mode == 'tohoku' and approach == 'fixedMesh':
+        if op.mode == 'tohoku' and approach == 'fixedMesh':
             totalVarP02 = cb3.totalVariation()
             totalVarP06 = cb4.totalVariation()
 
@@ -437,7 +436,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                         M = metricIntersection(M, M_, bdy=True)
                         metricGradation(M, op=op)
                     if op.plotpvd:
-                        File('plots/'+mode+'/mesh.pvd').write(mesh_H.coordinates, time=float(cnt))
+                        File('plots/'+op.mode+'/mesh.pvd').write(mesh_H.coordinates, time=float(cnt))
 
                     # Adapt mesh and interpolate variables
                     if not (((approach in ('fieldBased', 'gradientBased', 'hessianBased') and op.adaptField != 'f')
@@ -445,9 +444,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                         mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
                         P1 = FunctionSpace(mesh_H, "CG", 1)
                         elev_2d, uv_2d = interp(mesh_H, elev_2d, uv_2d)
-                        if mode == 'tohoku':
+                        if op.mode == 'tohoku':
                             b = interp(mesh_H, b)
-                        elif mode == 'shallow-water':
+                        elif op.mode == 'shallow-water':
                             b = Function(P1).assign(0.1)
                         else:
                             b = Function(P1).assign(1.)
@@ -477,7 +476,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 adapOpt.use_wetting_and_drying = op.wd
                 if op.wd:
                     adapOpt.wetting_and_drying_alpha = alpha
-                if mode == 'rossby-wave':
+                if op.mode == 'rossby-wave':
                     adapOpt.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh_H)[1])
                 field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
                 e = exporter.ExportManager(di + 'hdf5',
@@ -494,9 +493,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     e.set_next_export_ix(adapSolver.i_export)
 
                 # Evaluate callbacks and iterate
-                if mode == 'rossby-wave':
+                if op.mode == 'rossby-wave':
                     cb1 = RossbyWaveCallback(adapSolver)
-                elif mode == 'shallow-water':
+                elif op.mode == 'shallow-water':
                     cb1 = ShallowWaterCallback(adapSolver)
                 else:
                     cb1 = TohokuCallback(adapSolver)
@@ -504,18 +503,18 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                     cb4 = P06Callback(adapSolver)
                 if cnt != 0:
                     cb1.objective_value = integrand
-                    if mode == 'tohoku':
+                    if op.mode == 'tohoku':
                         cb3.gauge_values = gP02
                         cb4.gauge_values = gP06
                 adapSolver.add_callback(cb1, 'timestep')
-                if mode == 'tohoku':
+                if op.mode == 'tohoku':
                     adapSolver.add_callback(cb3, 'timestep')
                     adapSolver.add_callback(cb4, 'timestep')
                 adapSolver.bnd_functions['shallow_water'] = BCs
                 adapSolver.iterate()
                 J_h = cb1.quadrature()
                 integrand = cb1.__call__()[1]
-                if mode == 'tohoku':
+                if op.mode == 'tohoku':
                     gP02 = cb3.__call__()[1]
                     gP06 = cb4.__call__()[1]
 
@@ -527,7 +526,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 av = op.printToScreen(int(cnt/op.rm+1), clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, cnt*dt, dt)
 
             adaptTimer = clock() - adaptTimer
-            if mode == 'tohoku':
+            if op.mode == 'tohoku':
                 totalVarP02 = cb3.totalVariation()
                 totalVarP06 = cb4.totalVariation()
             if op.printStats:
@@ -538,7 +537,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
     if op.printStats:
         printTimings(primalTimer, dualTimer, errorTimer, adaptTimer, fullTime)
 
-    if mode == 'rossby-wave':   # Measure error using metrics, using data from Huang et al.
+    if op.mode == 'rossby-wave':   # Measure error using metrics, using data from Huang et al.
         index = int(cntT/op.ndump) if approach == 'fixedMesh' else int((cnt-op.rm) / op.ndump)
         with DumbCheckpoint(di+'hdf5/Elevation2d_'+indexString(index), mode=FILE_READ) as loadElev:
             loadElev.load(elev_2d, name='elev_2d')
@@ -547,10 +546,10 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         print('Peak %.4f vs. %.4f, distance %.4f vs. %.4f' % (peak, peak_a, distance, distance_a))
 
     toc = clock() - tic
-    rel = np.abs(op.J(mode) - J_h) / np.abs(op.J(mode))
-    if mode == 'rossby-wave':
+    rel = np.abs(op.J - J_h) / np.abs(op.J)
+    if op.mode == 'rossby-wave':
         return av, rel, J_h, integrand, np.abs(peak/peak_a), distance, distance/distance_a, toc
-    elif mode == 'tohoku':
+    elif op.mode == 'tohoku':
         return av, rel, J_h, integrand, totalVarP02, totalVarP06, toc
     else:
         return av, rel, J_h, integrand, toc
@@ -619,7 +618,7 @@ if __name__ == "__main__":
     integrandFile = open(filename + 'Integrand.txt', 'w+')
 
     # Run simulations
-    resolutions = range(5)
+    resolutions = range(6)
     Jlist = np.zeros(len(resolutions))
     if mode == 'tohoku':
         g2list = np.zeros(len(resolutions))

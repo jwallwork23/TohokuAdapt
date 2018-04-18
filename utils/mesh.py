@@ -148,23 +148,21 @@ else:
     from scipy.io.netcdf import NetCDFFile
 
     from .conversion import vectorlonlat_to_utm, get_latitude
-    from .forms import solutionRW, indicator
+    from .forms import solutionRW
     from .options import Options
 
 
-def problemDomain(mode='tohoku', level=0, mesh=None, output=False, op=Options()):
+def problemDomain(level=0, mesh=None, output=False, op=Options(mode='tohoku')):
     """
     Set up problem domain.
     
-    :arg mode: problem considered.
     :arg level: refinement level, where 0 is coarsest.
     :param mesh: user specified mesh, if already generated.
     :param output: toggle plotting of bathymetry and initial surface.
     :param op: options parameter object.
     :return: associated mesh, initial conditions, bathymetry field, boundary conditions and Coriolis parameter. 
     """
-    assert(mode in ('tohoku', 'shallow-water', 'rossby-wave'))
-    if mode == 'tohoku':
+    if op.mode == 'tohoku':
         if mesh == None:
             ms = MeshSetup(level, op.wd)
             mesh = Mesh(ms.dirName + ms.meshName + '.msh')
@@ -208,7 +206,7 @@ def problemDomain(mode='tohoku', level=0, mesh=None, output=False, op=Options())
                 f.dat.data[i] = 2 * op.Omega * np.sin(np.radians(get_latitude(v[0], v[1], 54, northern=True)))
         else:
             f = None
-    elif mode == 'shallow-water':
+    elif op.mode == 'shallow-water':
         n = pow(2, level)
         lx = 2 * pi
         mesh = SquareMesh(n, n, lx, lx)
@@ -220,7 +218,7 @@ def problemDomain(mode='tohoku', level=0, mesh=None, output=False, op=Options())
         BCs = {}
         f = None
     else:
-        n = level + 1
+        n = pow(2, level-1)
         lx = 48
         ly = 24
         mesh = RectangleMesh(lx * n, ly * n, lx, ly)

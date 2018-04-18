@@ -1,5 +1,6 @@
 from thetis import *
 
+import numpy as np
 
 __all__ = ["Options"]
 
@@ -147,6 +148,7 @@ class Options:
         self.Tstart = Tstart
         self.Tend = Tend
         self.dt = dt
+        self.cntT = int(np.ceil(Tend / dt))
         for i in (ndump, rm, orderChange, nVerT, nAdapt):
             assert isinstance(i, int)
             try:
@@ -183,6 +185,7 @@ class Options:
             self.rm = 5
             self.dt = 0.05
             self.ndump = 5
+            self.J = 1.1184e-3,     # On mesh of 524,288 elements
         elif self.mode == 'rossby-wave':
             self.Tstart = 20.
             self.Tend = 45.60
@@ -192,8 +195,11 @@ class Options:
             self.rm = 24
             self.dt = 0.05
             self.ndump = 12
-            self.nonlinear = True       # TODO: Adjoint not working in nonlinear case
+            self.nonlinear = True
             self.g = 1.
+            self.J = 1.                                                 # TODO: establish this
+        elif self.mode in ('tohoku', 'model-verification'):
+            self.J = 1.240e+13          # On mesh of 681,666 elements     TODO: consider nonlinear/rotational case
 
         # Define FunctionSpaces
         self.degree1 = 2 if family == 'cg-cg' else 1
@@ -213,20 +219,6 @@ class Options:
                        self.labels[3]: 'implicit', self.labels[4]: 'DWF', self.labels[5]: 'DWR'}
 
         self.meshSizes = (5918, 7068, 8660, 10988, 14160, 19082, 27280, 41730, 72602, 160586, 681616)
-
-
-    def J(self, mode):
-        """
-        :param mode: test problem choice.
-        :return: 'exact' objective functional value, converged to 3 s.f.
-        """
-        dat = {'tohoku': 1.240e+13,             # On mesh of 681,666 elements   TODO: consider nonlinear/rotational case
-               'shallow-water': 1.1184e-3,      # On mesh of 524,288 elements
-               'rossby-wave': 1.}               # TODO: This is not true
-        if mode in dat.keys():
-            return dat[mode]
-        else:
-            raise NotImplementedError
 
 
     def gaugeCoord(self, gauge):
