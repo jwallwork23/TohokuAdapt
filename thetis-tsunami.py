@@ -167,14 +167,13 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, op=
         if op.wd:
             options.wetting_and_drying_alpha = alpha
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
+        cb1 = SWCallback(solver_obj)
+        cb1.op = op
         if op.mode == 'rossby-wave':
-            cb1 = RossbyWaveCallback(solver_obj)
             cb2 = ObjectiveRWCallback(solver_obj)
         elif op.mode == 'shallow-water':
-            cb1 = ShallowWaterCallback(solver_obj)
             cb2 = ObjectiveSWCallback(solver_obj)
         else:
-            cb1 = TohokuCallback(solver_obj)
             cb2 = ObjectiveTohokuCallback(solver_obj)
             if approach == 'fixedMesh':
                 cb3 = P02Callback(solver_obj)

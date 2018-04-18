@@ -25,7 +25,7 @@ def fixedMesh(startRes, op=Options()):
         except:
             physical_constants['g_grav'].assign(op.g)
         mesh, u0, eta0, b, BCs, f = problemDomain(startRes, op=op)
-        nEle = meshStats(mesh)
+        nEle = meshStats(mesh)[0]
         V = op.mixedSpace(mesh)
         uv_2d, elev_2d = Function(V).split()  # Needed to load data into
         if op.mode == 'rossby-wave':
@@ -56,21 +56,14 @@ def fixedMesh(startRes, op=Options()):
         # if op.wd:                                         TODO
         #     options.wetting_and_drying_alpha = alpha
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
-        if op.mode == 'rossby-wave':
-            cb1 = RossbyWaveCallback(solver_obj)
-            cb2 = ObjectiveRWCallback(solver_obj)
-        elif op.mode == 'shallow-water':
-            cb1 = ShallowWaterCallback(solver_obj)
-            cb2 = ObjectiveSWCallback(solver_obj)
-        else:
-            cb1 = TohokuCallback(solver_obj)
-            cb2 = ObjectiveTohokuCallback(solver_obj)
-            cb3 = P02Callback(solver_obj)
-            cb4 = P06Callback(solver_obj)
+        cb1 = SWCallback(solver_obj)
+        cb1.op = op
+        if op.mode == 'tohoku':
+            cb2 = P02Callback(solver_obj)
+            cb3 = P06Callback(solver_obj)
+            solver_obj.add_callback(cb2, 'timestep')
             solver_obj.add_callback(cb3, 'timestep')
-            solver_obj.add_callback(cb4, 'timestep')
         solver_obj.add_callback(cb1, 'timestep')
-        solver_obj.add_callback(cb2, 'timestep')
         solver_obj.bnd_functions['shallow_water'] = BCs
 
         # Solve and extract timeseries / functionals
@@ -80,14 +73,12 @@ def fixedMesh(startRes, op=Options()):
         J_h = cb1.quadrature()          # Evaluate objective functional
         integrand = cb1.__call__()[1]   # and get integrand timeseries
         if op.mode == 'tohoku':
-            totalVarP02 = cb3.totalVariation()
-            totalVarP06 = cb4.totalVariation()
-        if op.printStats:
-            print('Primal run complete. Run time: %.3fs' % primalTimer)
+            totalVarP02 = cb2.totalVariation()
+            totalVarP06 = cb3.totalVariation()
 
         # Measure error using metrics, as in Huang et al.
         if op.mode == 'rossby-wave':
-            index = int(op.cntT/op.ndump)
+            index = int(op.cntT/op.ndump)   # TODO: apparently this doesn't work
             with DumbCheckpoint(di+'hdf5/Elevation2d_'+indexString(index), mode=FILE_READ) as loadElev:
                 loadElev.load(elev_2d, name='elev_2d')
                 loadElev.close()
@@ -246,7 +237,7 @@ def hessianBased(startRes, op=Options()):
         adaptTimer = clock() - adaptTimer   # TODO: This is timing more than in fixedMesh case
 
         # Measure error using metrics, as in Huang et al.
-        if op.mode == 'rossby-wave':
+        if op.mode == 'rossby-wave':       # TODO: apparently this doesn't work
             index = int(op.cntT / op.ndump)
             with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexString(index), mode=FILE_READ) as loadElev:
                 loadElev.load(elev_2d, name='elev_2d')
@@ -284,7 +275,7 @@ if __name__ == "__main__":
     parser.add_argument("-w", help="Use wetting and drying")
     args = parser.parse_args()
     mode = args.mode
-    approach = args.mode
+    approach = args.approach
     if approach is None:
         approach = 'fixedMesh'
     else:

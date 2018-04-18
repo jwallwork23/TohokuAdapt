@@ -6,7 +6,7 @@ from .forms import indicator
 from .options import Options
 
 
-__all__ = ["FunctionalCallback", "TohokuCallback", "ShallowWaterCallback", "RossbyWaveCallback",
+__all__ = ["FunctionalCallback", "SWCallback",
            "GaugeCallback", "P02Callback", "P06Callback", "ObjectiveCallback", "ObjectiveTohokuCallback",
            "ObjectiveSWCallback", "ObjectiveRWCallback"]
 
@@ -50,7 +50,7 @@ class FunctionalCallback(DiagnosticCallback):
         return J
 
 
-class TohokuCallback(FunctionalCallback):
+class SWCallback(FunctionalCallback):
     """Integrates objective functional."""
     name = 'objective functional'
 
@@ -61,36 +61,7 @@ class TohokuCallback(FunctionalCallback):
         """
         from firedrake import assemble
 
-        def indicatorTohoku():
-            """
-            :param solver_obj: FlowSolver2d object.
-            :return: objective functional value for callbacks.
-            """
-            V = solver_obj.fields.solution_2d.function_space()
-            ks = Function(V)
-            k0, k1 = ks.split()
-            k1.assign(indicator(V.sub(1), op=Options(mode='tohoku')))   # TODO: These callbacks could be generalised
-            kt = Constant(0.)
-            dt = solver_obj.options.timestep
-            Tstart = solver_obj.options.period_of_interest_start
-            if solver_obj.simulation_time > Tstart - 0.5 * dt:      # Slightly smooth transition
-                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * dt else 0.5)
-
-            return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
-
-        super(TohokuCallback, self).__init__(indicatorTohoku, solver_obj, **kwargs)
-
-
-class ShallowWaterCallback(FunctionalCallback):
-    """Integrates objective functional."""
-    name = 'objective functional'
-
-    def __init__(self, solver_obj, **kwargs):
-        """
-        :arg solver_obj: Thetis solver object
-        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
-        """
-        from firedrake import assemble
+        self.op = Options()
 
         def indicatorSW():
             """
@@ -100,47 +71,14 @@ class ShallowWaterCallback(FunctionalCallback):
             V = solver_obj.fields.solution_2d.function_space()
             ks = Function(V)
             k0, k1 = ks.split()
-            k1.assign(indicator(V.sub(1), op=Options(mode='shallow-water')))
+            k1.assign(indicator(V.sub(1), op=self.op))
             kt = Constant(0.)
-            dt = solver_obj.options.timestep
-            Tstart = solver_obj.options.period_of_interest_start
-            if solver_obj.simulation_time > Tstart - 0.5 * dt:      # Slightly smooth transition
-                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * dt else 0.5)
+            if solver_obj.simulation_time > self.op.Tstart - 0.5 * self.op.dt:      # Slightly smooth transition
+                kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * self.op.dt else 0.5)
 
             return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
 
-        super(ShallowWaterCallback, self).__init__(indicatorSW, solver_obj, **kwargs)
-
-
-class RossbyWaveCallback(FunctionalCallback):
-    """Integrates objective functional."""
-    name = 'objective functional'
-
-    def __init__(self, solver_obj, **kwargs):
-        """
-        :arg solver_obj: Thetis solver object
-        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
-        """
-        from firedrake import assemble
-
-        def indicatorRW():
-            """
-            :param solver_obj: FlowSolver2d object.
-            :return: objective functional value for callbacks.
-            """
-            V = solver_obj.fields.solution_2d.function_space()
-            ks = Function(V)
-            k0, k1 = ks.split()
-            k1.assign(indicator(V.sub(1), op=Options(mode='rossby-wave')))
-            kt = Constant(0.)
-            dt = solver_obj.options.timestep
-            Tstart = solver_obj.options.period_of_interest_start
-            if solver_obj.simulation_time > Tstart - 0.5 * dt:      # Slightly smooth transition
-                kt.assign(1. if solver_obj.simulation_time > Tstart + 0.5 * dt else 0.5)
-
-            return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
-
-        super(RossbyWaveCallback, self).__init__(indicatorRW, solver_obj, **kwargs)
+        super(SWCallback, self).__init__(indicatorSW, solver_obj, **kwargs)
 
 
 class GaugeCallback(DiagnosticCallback):
