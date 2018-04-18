@@ -31,8 +31,11 @@ The following meshing strategies are implemented:
     * explicit and implicit a posteriori error estimators based on shallow water residuals;
     * a 'domain of dependence' type estimator as used in Davis and LeVeque 2016;
     * goal-oriented mesh adaptivity, weighting error estimates by adjoint solution data.
-* Timeseries may be plotted using ``quick-timeseries``. Total variations between timeseries may be calculated using
-``quick-difference``. Error curves and CPU timings may be plotted using  and ``quick-plot``.
+* Given data generated using the above methods, we may
+    * plot timeseries using ``quick-timeseries``;
+    * calculate total variations between timeseries using ``quick-difference``; 
+    * integrate timeseries using ``quick-integrate``; 
+    * plot error curves and CPU timings against element count using ``quick-plot``.
 
 For feedback, comments and questions, please email j.wallwork16@imperial.ac.uk.
 

@@ -9,7 +9,7 @@ from .options import Options
 
 
 __all__ = ["readErrors", "extractSpline", "extractData", "errorVsElements", "__main__", "plotTimeseries",
-           "compareTimeseries", "timeseriesDifference", "totalVariation", "gaugeTV"]
+           "compareTimeseries", "timeseriesDifference", "totalVariation", "gaugeTV", "integrateTimeseries"]
 
 
 plt.rc('text', usetex=True)
@@ -164,6 +164,21 @@ def timeseriesDifference(fileExt1, date1, fileExt2, date2, quantity='Integrand',
         except:
             pass
     return ['%.4e' % i for i in errs]
+
+
+def integrateTimeseries(fileExt, date, op=Options()):
+    filename = 'outdata/' + op.mode + '/' + fileExt + '_' + date + 'Integrand.txt'
+    f = open(filename, 'r')
+    integrals = []
+    for line in f:
+        separated = line.split(',')
+        dat = [float(d) for d in separated[:-1]]
+        I = 0
+        dt = op.Tend / len(dat)
+        for i in range(1, len(dat)):
+            I += 0.5 * (dat[i] + dat[i-1]) * dt
+        integrals.append(I)
+    return ['%.4e' % i for i in integrals]
 
 
 def compareTimeseries(date, run, quantity='Integrand', op=Options()):
