@@ -232,6 +232,8 @@ def hessianBased(startRes, op=Options()):
             if op.mode == 'tohoku':
                 gP02 = cb3.__call__()[1]
                 gP06 = cb4.__call__()[1]
+                totalVarP02 = cb3.totalVariation()
+                totalVarP06 = cb4.totalVariation()
 
             # Get mesh stats
             nEle = meshStats(mesh)[0]
@@ -239,30 +241,28 @@ def hessianBased(startRes, op=Options()):
             Sn += nEle
             cnt += op.rm
             av = op.printToScreen(int(cnt/op.rm+1), clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, cnt * op.dt)
+        adaptTimer = clock() - adaptTimer   # TODO: This is timing more than in fixedMesh case
 
-            adaptTimer = clock() - adaptTimer
-            if op.mode == 'tohoku':
-                totalVarP02 = cb3.totalVariation()
-                totalVarP06 = cb4.totalVariation()
-            if op.printStats:
-                print('Adaptive primal run complete. Run time: %.3fs' % adaptTimer)
+        # Measure error using metrics, as in Huang et al.
+        if op.mode == 'rossby-wave':
+            index = int(op.cntT / op.ndump)
+            with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexString(index), mode=FILE_READ) as loadElev:
+                loadElev.load(elev_2d, name='elev_2d')
+                loadElev.close()
+            peak, distance = peakAndDistance(elev_2d, op=op)
+            print('Peak %.4f vs. %.4f, distance %.4f vs. %.4f' % (peak, peak_a, distance, distance_a))
 
-            # Measure error using metrics, as in Huang et al.
-            if op.mode == 'rossby-wave':
-                index = int(op.cntT / op.ndump)
-                with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexString(index), mode=FILE_READ) as loadElev:
-                    loadElev.load(elev_2d, name='elev_2d')
-                    loadElev.close()
-                peak, distance = peakAndDistance(elev_2d, op=op)
-                print('Peak %.4f vs. %.4f, distance %.4f vs. %.4f' % (peak, peak_a, distance, distance_a))
+        rel = np.abs(op.J - J_h) / np.abs(op.J)
+        if op.mode == 'rossby-wave':
+            return av, rel, J_h, integrand, np.abs(peak / peak_a), distance, distance / distance_a, adaptTimer
+        elif op.mode == 'tohoku':
+            return av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, adaptTimer
+        else:
+            return av, rel, J_h, integrand, adaptTimer
 
-            rel = np.abs(op.J - J_h) / np.abs(op.J)
-            if op.mode == 'rossby-wave':
-                return av, rel, J_h, integrand, np.abs(peak / peak_a), distance, distance / distance_a, adaptTimer
-            elif op.mode == 'tohoku':
-                return av, rel, J_h, integrand, totalVarP02, totalVarP06, adaptTimer
-            else:
-                return av, rel, J_h, integrand, adaptTimer
+
+def DWR(startRes, op=Options()):
+    raise NotImplementedError
 
 
 if __name__ == "__main__":
@@ -275,13 +275,20 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", help="Choose problem from {'tohoku', 'shallow-water', 'rossby-wave'}")
+    parser.add_argument("-approach", help="Choose adaptive approach from {'hessianBased', 'DWR'}")
     parser.add_argument("-low", help="Lower bound for index range")
     parser.add_argument("-high", help="Upper bound for index range")
     parser.add_argument("-o", help="Output data")
     parser.add_argument("-w", help="Use wetting and drying")
     args = parser.parse_args()
     mode = args.mode
-    print("Mode: ", mode)
+    approach = args.mode
+    if approach is None:
+        approach = 'fixedMesh'
+    else:
+        assert approach in ('hessianBased', 'DWR')
+    solver = {'fixedMesh': fixedMesh, 'hessianBased': hessianBased, 'DWR': DWR}[approach]
+    print("Mode: %s, approach: %s" % (mode, approach))
 
     # Choose mode and set parameter values
     op = Options(mode=mode,
@@ -296,7 +303,7 @@ if __name__ == "__main__":
     if args.w:
         filename += '_w'
     filename += '_' + date
-    textfile = open(filename + '.txt', 'w+')
+    errorfile = open(filename + '.txt', 'w+')
     integrandFile = open(filename + 'Integrand.txt', 'w+')
 
     # Run simulations
@@ -305,24 +312,30 @@ if __name__ == "__main__":
     if mode == 'tohoku':
         g2list = np.zeros(len(resolutions))
         g6list = np.zeros(len(resolutions))
+        gaugeFileP02 = open(filename + 'P02.txt', 'w+')
+        gaugeFileP06 = open(filename + 'P06.txt', 'w+')
     for i in resolutions:
         # Get data and save to disk
         if mode == 'rossby-wave':
-            av, rel, J_h, integrand, relativePeak, distance, phaseSpd, tim = fixedMesh(i, op=op)
+            av, rel, J_h, integrand, relativePeak, distance, phaseSpd, tim = solver(i, op=op)
             print("""Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs
         OF error: %.4e  Height error: %.4f  Distance: %.4fm  Speed error: %.4fm"""
                   % (i, av, J_h, tim, rel, relativePeak, distance, phaseSpd))
-            textfile.write('%d, %.4e, %.4f, %.4f, %.4f, %.1f, %.4e\n'
+            errorfile.write('%d, %.4e, %.4f, %.4f, %.4f, %.1f, %.4e\n'
                            % (av, rel, relativePeak, distance, phaseSpd, tim, J_h))
         elif mode == 'tohoku':
-            av, rel, J_h, integrand, totalVarP02, totalVarP06, tim = fixedMesh(i, op=op)
+            av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, tim = solver(i, op=op)
             print("""Run %d: Mean element count: %6d Objective %.4e Timing %.1fs 
         OF error: %.4e P02: %.3f P06: %.3f""" % (i, av, J_h, tim, rel, totalVarP02, totalVarP06))
-            textfile.write('%d, %.4e, %.3f, %.3f, %.1f, %.4e\n' % (av, rel, totalVarP02, totalVarP06, tim, J_h))
+            errorfile.write('%d, %.4e, %.3f, %.3f, %.1f, %.4e\n' % (av, rel, totalVarP02, totalVarP06, tim, J_h))
+            gaugeFileP02.writelines(["%s," % val for val in gP02])
+            gaugeFileP02.write("\n")
+            gaugeFileP06.writelines(["%s," % val for val in gP06])
+            gaugeFileP06.write("\n")
         else:
-            av, rel, J_h, integrand, tim = fixedMesh(i, op=op)
+            av, rel, J_h, integrand, tim = solver(i, op=op)
             print('Run %d: Mean element count: %6d Objective: %.4e OF error %.4e Timing %.1fs' % (i, av, J_h, rel, tim))
-            textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, tim, J_h))
+            errorfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, tim, J_h))
         integrandFile.writelines(["%s," % val for val in integrand])
         integrandFile.write("\n")
 
@@ -339,5 +352,8 @@ if __name__ == "__main__":
                 print("Orders of convergence... J: %.4f, P02: %.4f, P06: %.4f" % (Jconv, g2conv, g6conv))
             else:
                 print("Order of convergence: %.4f" % Jconv)
-    textfile.close()
+    errorfile.close()
+    if mode == 'tohoku':
+        gaugeFileP02.close()
+        gaugeFileP06.close()
     integrandFile.close()
