@@ -102,6 +102,7 @@ if __name__ == "__main__":
     import argparse
     import datetime
 
+
     now = datetime.datetime.now()
     date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 

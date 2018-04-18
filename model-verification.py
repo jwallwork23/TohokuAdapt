@@ -1,16 +1,10 @@
 from thetis import *
 
 from time import clock
-import datetime
-import numpy as np
 
 from utils.callbacks import TohokuCallback, P02Callback, P06Callback
 from utils.mesh import problemDomain
 from utils.options import Options
-
-
-now = datetime.datetime.now()
-date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
 
 def solverSW(startRes, di, op=Options()):
@@ -62,6 +56,12 @@ def solverSW(startRes, di, op=Options()):
 
 if __name__ == '__main__':
     import argparse
+    import datetime
+    import numpy as np
+
+
+    now = datetime.datetime.now()
+    date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-r", help="Use rotational equations")

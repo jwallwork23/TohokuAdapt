@@ -6,7 +6,6 @@ from fenics_adjoint.solving import SolveBlock
 
 import numpy as np
 from time import clock
-import datetime
 
 from utils.adaptivity import isoP2, constructGradient, isotropicMetric, steadyMetric, metricIntersection, metricGradation
 from utils.callbacks import *
@@ -15,9 +14,6 @@ from utils.interpolation import *
 from utils.mesh import problemDomain, meshStats
 from utils.misc import *
 from utils.options import *
-
-now = datetime.datetime.now()
-date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
 
 def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, op=Options(mode='tohoku')):
@@ -557,6 +553,11 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, op=
 
 if __name__ == "__main__":
     import argparse
+    import datetime
+
+
+    now = datetime.datetime.now()
+    date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", help="Choose problem from {'tohoku', 'shallow-water', 'rossby-wave'}")
