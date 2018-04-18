@@ -624,34 +624,33 @@ if __name__ == "__main__":
     if mode == 'tohoku':
         g2list = np.zeros(len(resolutions))
         g6list = np.zeros(len(resolutions))
-    for i in resolutions:       # TODO: Can't currently do multiple adjoint runs
+    for i in resolutions:
         # Get data and save to disk
         if mode == 'rossby-wave':
             av, rel, J_h, integrand, relativePeak, distance, phaseSpd, tim = \
                 solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode, op=op)
-            print('Run %d: <#Elements>: %6d Obj. error: %.4e  Height error: %.4f  Distance: %.4fm  Speed error: %.4fm  Timing %.1fs'
-                  % (i, av, rel, relativePeak, distance, phaseSpd, tim))
+            print("""Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs
+    OF error: %.4e  Height error: %.4f  Distance: %.4fm  Speed error: %.4fm"""
+                  % (i, av, J_h, tim, rel, relativePeak, distance, phaseSpd))
             textfile.write('%d, %.4e, %.4f, %.4f, %.4f, %.1f, %.4e\n'
                            % (av, rel, relativePeak, distance, phaseSpd, tim, J_h))
         elif mode == 'tohoku':
             av, rel, J_h, integrand, totalVarP02, totalVarP06, tim = solverSW(i, approach, getData, getError,
                                                                               useAdjoint, aposteriori, mode=mode, op=op)
-            print('Run %d: Mean element count %6d Relative error %.4e P02: %.3f P06: %.3f Timing %.1fs'
-                  % (i, av, rel, totalVarP02, totalVarP06, tim))
+            print("""Run %d: Mean element count: %6d Objective %.4e Timing %.1fs 
+    OF error: %.4e P02: %.3f P06: %.3f""" % (i, av, J_h, tim, rel, totalVarP02, totalVarP06))
             textfile.write('%d, %.4e, %.3f, %.3f, %.1f, %.4e\n' % (av, rel, totalVarP02, totalVarP06, tim, J_h))
         else:
             av, rel, J_h, integrand, tim = solverSW(i, approach, getData, getError, useAdjoint, aposteriori, mode=mode,
                                                     op=op)
-            print('Run %d: Mean element count %6d Relative error %.4e Timing %.1fs'
-                  % (i, av, rel, tim))
+            print('Run %d: Mean element count: %6d Objective: %.4e OF error %.4e Timing %.1fs' % (i, av, J_h, rel, tim))
             textfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, tim, J_h))
         integrandFile.writelines(["%s," % val for val in integrand])
         integrandFile.write("\n")
 
         # Calculate orders of convergence
-        if not useAdjoint:                              # TODO: Get around this
+        if not useAdjoint:                              # TODO: Can't currently do multiple adjoint runs
             Jlist[i] = J_h
-            convList = np.zeros(len(resolutions) - 2)   # TODO
             if mode == 'tohoku':
                 g2list[i] = totalVarP02
                 g6list[i] = totalVarP06
