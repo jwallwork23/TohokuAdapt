@@ -1,7 +1,7 @@
 from thetis_adjoint import *
 from thetis.callback import DiagnosticCallback
 
-from .error import gaugeTV
+from .timeseries import gaugeTV
 from .forms import indicator
 from .options import Options
 

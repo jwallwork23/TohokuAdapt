@@ -155,6 +155,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
         options.use_nonlinear_equations = True if op.nonlinear else False
         options.use_grad_depth_viscosity_term = False
         options.use_grad_div_viscosity_term = False
+        options.use_lax_friedrichs_velocity = False     # TODO: This is a temporary fix
         if mode == 'rossby-wave':
             options.coriolis_frequency = f
         options.simulation_export_time = dt * (op.rm-1) if aposteriori and approach != 'DWP' else dt * op.ndump
@@ -460,6 +461,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, mod
                 adapOpt.use_nonlinear_equations = True if op.nonlinear else False
                 adapOpt.use_grad_depth_viscosity_term = False
                 adapOpt.use_grad_div_viscosity_term = False
+                adapOpt.use_lax_friedrichs_velocity = False     # TODO: This is a temporary fix
                 adapOpt.simulation_export_time = dt * op.ndump
                 startT = endT
                 endT += dt * op.rm
@@ -598,7 +600,6 @@ if __name__ == "__main__":
         op.rm = 10 if useAdjoint else 5
     elif mode == 'rossby-wave':
         op.rm = 48 if useAdjoint else 24
-    op.nonlinear = False        # TODO: This is only temporary, while pyadjoint and nonlinear are incompatible
 
     # Establish filename
     filename = 'outdata/' + mode + '/' + approach
@@ -618,7 +619,7 @@ if __name__ == "__main__":
     integrandFile = open(filename + 'Integrand.txt', 'w+')
 
     # Run simulations
-    resolutions = range(1, 2)
+    resolutions = range(5)
     Jlist = np.zeros(len(resolutions))
     if mode == 'tohoku':
         g2list = np.zeros(len(resolutions))
