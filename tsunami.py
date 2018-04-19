@@ -35,16 +35,14 @@ def fixedMesh(startRes, op=Options()):
         solver_obj = solver2d.FlowSolver2d(mesh, b)
         options = solver_obj.options
         options.element_family = op.family
-        options.use_nonlinear_equations = True if op.nonlinear else False
+        options.use_nonlinear_equations = True if op.nonlinear else False   # TODO: Go nonlinear everywhere?
         options.use_grad_depth_viscosity_term = False
         options.use_grad_div_viscosity_term = False
-        options.use_lax_friedrichs_velocity = False  # TODO: This is a temporary fix
+        options.use_lax_friedrichs_velocity = False                         # TODO: This is a temporary fix
         if op.mode == 'rossby-wave':
             options.coriolis_frequency = f
         options.simulation_export_time = op.dt * op.ndump
         options.simulation_end_time = op.Tend
-        options.period_of_interest_start = op.Tstart
-        options.period_of_interest_end = op.Tend
         options.timestepper_type = op.timestepper
         options.timestep = op.dt
         options.timesteps_per_remesh = op.rm
@@ -53,7 +51,7 @@ def fixedMesh(startRes, op=Options()):
         options.log_output = op.printStats
         options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
         options.use_wetting_and_drying = op.wd
-        # if op.wd:                                         TODO
+        # if op.wd:                                                         # TODO: Calculate w&d alpha
         #     options.wetting_and_drying_alpha = alpha
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         cb1 = SWCallback(solver_obj)
@@ -67,9 +65,9 @@ def fixedMesh(startRes, op=Options()):
         solver_obj.bnd_functions['shallow_water'] = BCs
 
         # Solve and extract timeseries / functionals
-        primalTimer = clock()
+        solverTimer = clock()
         solver_obj.iterate()
-        primalTimer = clock() - primalTimer
+        solverTimer = clock() - solverTimer
         J_h = cb1.quadrature()          # Evaluate objective functional
         integrand = cb1.__call__()[1]   # and get integrand timeseries
         if op.mode == 'tohoku':
@@ -78,7 +76,7 @@ def fixedMesh(startRes, op=Options()):
 
         # Measure error using metrics, as in Huang et al.
         if op.mode == 'rossby-wave':
-            index = int(op.cntT/op.ndump)   # TODO: apparently this doesn't work
+            index = int(op.cntT/op.ndump)                                   # TODO: fix indexing error
             with DumbCheckpoint(di+'hdf5/Elevation2d_'+indexString(index), mode=FILE_READ) as loadElev:
                 loadElev.load(elev_2d, name='elev_2d')
                 loadElev.close()
@@ -87,16 +85,16 @@ def fixedMesh(startRes, op=Options()):
 
         rel = np.abs(op.J - J_h) / np.abs(op.J)
         if op.mode == 'rossby-wave':
-            return nEle, rel, J_h, integrand, np.abs(peak/peak_a), distance, distance/distance_a, primalTimer
+            return nEle, rel, J_h, integrand, np.abs(peak/peak_a), distance, distance/distance_a, solverTimer, 0.
         elif op.mode == 'tohoku':
-            return nEle, rel, J_h, integrand, totalVarP02, totalVarP06, primalTimer
+            return nEle, rel, J_h, integrand, totalVarP02, totalVarP06, solverTimer, 0.
         else:
-            return nEle, rel, J_h, integrand, primalTimer
+            return nEle, rel, J_h, integrand, solverTimer, 0.
 
 
 def hessianBased(startRes, op=Options()):
     with pyadjoint.stop_annotating():
-        di = 'plots/' + op.mode + '/fixedMesh/'
+        di = 'plots/' + op.mode + '/hessianBased/'
 
         # Initialise domain and physical parameters
         try:
@@ -119,9 +117,7 @@ def hessianBased(startRes, op=Options()):
         cnt = 0
         endT = 0.
 
-        adaptTimer = clock()
         while cnt < op.cntT:
-            stepTimer = clock()
             indexStr = indexString(int(cnt / op.ndump))
 
             # Load variables from disk
@@ -136,7 +132,8 @@ def hessianBased(startRes, op=Options()):
                     loadVel.load(uv_2d, name='uv_2d')
                     loadVel.close()
 
-            for l in range(op.nAdapt):  # TODO: Test this functionality
+            adaptTimer = clock()
+            for l in range(op.nAdapt):                                          # TODO: Test this functionality
 
                 # Construct metric
                 if op.adaptField != 's':
@@ -148,7 +145,7 @@ def hessianBased(startRes, op=Options()):
                         M = metricIntersection(M, M2) if op.adaptField == 'b' else M2
 
                 # Adapt mesh and interpolate variables
-                if cnt != 0 or op.adaptField == 's':
+                if cnt != 0 or op.adaptField == 'f':
                     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
                     P1 = FunctionSpace(mesh, "CG", 1)
                     elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
@@ -160,21 +157,20 @@ def hessianBased(startRes, op=Options()):
                         b = Function(P1).assign(1.)
                     uv_2d.rename('uv_2d')
                     elev_2d.rename('elev_2d')
+            adaptTimer = clock() - adaptTimer
 
             # Solver object and equations
             adapSolver = solver2d.FlowSolver2d(mesh, b)
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
-            adapOpt.use_nonlinear_equations = True if op.nonlinear else False
+            adapOpt.use_nonlinear_equations = True if op.nonlinear else False   # TODO: Go nonlinear everywhere?
             adapOpt.use_grad_depth_viscosity_term = False
             adapOpt.use_grad_div_viscosity_term = False
-            adapOpt.use_lax_friedrichs_velocity = False  # TODO: This is a temporary fix
+            adapOpt.use_lax_friedrichs_velocity = False                         # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump
             startT = endT
             endT += op.dt * op.rm
             adapOpt.simulation_end_time = endT
-            adapOpt.period_of_interest_start = op.Tstart
-            adapOpt.period_of_interest_end = op.Tend
             adapOpt.timestepper_type = op.timestepper
             adapOpt.timestep = op.dt
             adapOpt.output_directory = di
@@ -182,7 +178,7 @@ def hessianBased(startRes, op=Options()):
             adapOpt.log_output = op.printStats
             adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
             adapOpt.use_wetting_and_drying = op.wd
-            # if op.wd:                                             TODO
+            # if op.wd:                                             #           # TODO: Calculate w&d alpha
             #     adapOpt.wetting_and_drying_alpha = alpha
             if op.mode == 'rossby-wave':
                 adapOpt.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
@@ -200,44 +196,43 @@ def hessianBased(startRes, op=Options()):
             for e in adapSolver.exporters.values():
                 e.set_next_export_ix(adapSolver.i_export)
 
-            # Evaluate callbacks and iterate
-            if op.mode == 'rossby-wave':
-                cb1 = RossbyWaveCallback(adapSolver)
-            elif op.mode == 'shallow-water':
-                cb1 = ShallowWaterCallback(adapSolver)
-            else:
-                cb1 = TohokuCallback(adapSolver)
-                cb3 = P02Callback(adapSolver)
-                cb4 = P06Callback(adapSolver)
+            # Establish callbacks and iterate
+            cb1 = SWCallback(adapSolver)
+            cb1.op = op
+            if op.mode == 'tohoku':
+                cb2 = P02Callback(adapSolver)
+                cb3 = P06Callback(adapSolver)
+            adapSolver.add_callback(cb1, 'timestep')
             if cnt != 0:
                 cb1.objective_value = integrand
                 if op.mode == 'tohoku':
-                    cb3.gauge_values = gP02
-                    cb4.gauge_values = gP06
+                    cb2.gauge_values = gP02
+                    cb3.gauge_values = gP06
             adapSolver.add_callback(cb1, 'timestep')
             if op.mode == 'tohoku':
+                adapSolver.add_callback(cb2, 'timestep')
                 adapSolver.add_callback(cb3, 'timestep')
-                adapSolver.add_callback(cb4, 'timestep')
             adapSolver.bnd_functions['shallow_water'] = BCs
+            solverTimer = clock()
             adapSolver.iterate()
+            solverTimer = clock() - solverTimer
             J_h = cb1.quadrature()
             integrand = cb1.__call__()[1]
             if op.mode == 'tohoku':
-                gP02 = cb3.__call__()[1]
-                gP06 = cb4.__call__()[1]
-                totalVarP02 = cb3.totalVariation()
-                totalVarP06 = cb4.totalVariation()
+                gP02 = cb2.__call__()[1]
+                gP06 = cb3.__call__()[1]
+                totalVarP02 = cb2.totalVariation()
+                totalVarP06 = cb3.totalVariation()
 
             # Get mesh stats
             nEle = meshStats(mesh)[0]
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
             cnt += op.rm
-            av = op.printToScreen(int(cnt/op.rm+1), clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, cnt * op.dt)
-        adaptTimer = clock() - adaptTimer   # TODO: This is timing more than in fixedMesh case
+            av = op.printToScreen(int(cnt/op.rm+1), clock()-adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.dt)
 
         # Measure error using metrics, as in Huang et al.
-        if op.mode == 'rossby-wave':       # TODO: apparently this doesn't work
+        if op.mode == 'rossby-wave':                                            # TODO: fix indexing error
             index = int(op.cntT / op.ndump)
             with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexString(index), mode=FILE_READ) as loadElev:
                 loadElev.load(elev_2d, name='elev_2d')
@@ -247,11 +242,11 @@ def hessianBased(startRes, op=Options()):
 
         rel = np.abs(op.J - J_h) / np.abs(op.J)
         if op.mode == 'rossby-wave':
-            return av, rel, J_h, integrand, np.abs(peak / peak_a), distance, distance / distance_a, adaptTimer
+            return av, rel, J_h, integrand, np.abs(peak/peak_a), distance, distance/distance_a, solverTimer, adaptTimer
         elif op.mode == 'tohoku':
-            return av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, adaptTimer
+            return av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, solverTimer, adaptTimer
         else:
-            return av, rel, J_h, integrand, adaptTimer
+            return av, rel, J_h, integrand, solverTimer, adaptTimer
 
 
 def DWR(startRes, op=Options()):
@@ -267,15 +262,22 @@ if __name__ == "__main__":
     date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", help="Choose problem from {'tohoku', 'shallow-water', 'rossby-wave'}")
-    parser.add_argument("-approach", help="Choose adaptive approach from {'hessianBased', 'DWR'}")
+    parser.add_argument("-a", help="Choose adaptive approach from {'hessianBased', 'DWR'} (default fixedMesh)")
+    parser.add_argument("-t", help="Choose test problem from {'shallow-water', 'rossby-wave'} (default Tohoku)")
     parser.add_argument("-low", help="Lower bound for index range")
     parser.add_argument("-high", help="Upper bound for index range")
     parser.add_argument("-o", help="Output data")
     parser.add_argument("-w", help="Use wetting and drying")
     args = parser.parse_args()
-    mode = args.mode
-    approach = args.approach
+    approach = args.a
+    if args.t is None:
+        mode = 'tohoku'
+    else:
+        mode = args.t
+        try:
+            assert args.w is None
+        except:
+            raise ValueError("Wetting and drying not available for test cases.")
     if approach is None:
         approach = 'fixedMesh'
     else:
@@ -310,25 +312,27 @@ if __name__ == "__main__":
     for i in resolutions:
         # Get data and save to disk
         if mode == 'rossby-wave':
-            av, rel, J_h, integrand, relativePeak, distance, phaseSpd, tim = solver(i, op=op)
+            av, rel, J_h, integrand, relativePeak, distance, phaseSpd, solverTime, adaptTime = solver(i, op=op)
             print("""Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs
         OF error: %.4e  Height error: %.4f  Distance: %.4fm  Speed error: %.4fm"""
-                  % (i, av, J_h, tim, rel, relativePeak, distance, phaseSpd))
+                  % (i, av, J_h, solverTime+adaptTime, rel, relativePeak, distance, phaseSpd))
             errorfile.write('%d, %.4e, %.4f, %.4f, %.4f, %.1f, %.4e\n'
-                           % (av, rel, relativePeak, distance, phaseSpd, tim, J_h))
+                           % (av, rel, relativePeak, distance, phaseSpd, solverTime+adaptTime, J_h))
         elif mode == 'tohoku':
-            av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, tim = solver(i, op=op)
+            av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, solverTime, adaptTime = solver(i, op=op)
             print("""Run %d: Mean element count: %6d Objective %.4e Timing %.1fs 
-        OF error: %.4e P02: %.3f P06: %.3f""" % (i, av, J_h, tim, rel, totalVarP02, totalVarP06))
-            errorfile.write('%d, %.4e, %.3f, %.3f, %.1f, %.4e\n' % (av, rel, totalVarP02, totalVarP06, tim, J_h))
+        OF error: %.4e P02: %.3f P06: %.3f""" % (i, av, J_h, solverTime+adaptTime, rel, totalVarP02, totalVarP06))
+            errorfile.write('%d, %.4e, %.3f, %.3f, %.1f, %.4e\n'
+                            % (av, rel, totalVarP02, totalVarP06, solverTime+adaptTime, J_h))
             gaugeFileP02.writelines(["%s," % val for val in gP02])
             gaugeFileP02.write("\n")
             gaugeFileP06.writelines(["%s," % val for val in gP06])
             gaugeFileP06.write("\n")
         else:
-            av, rel, J_h, integrand, tim = solver(i, op=op)
-            print('Run %d: Mean element count: %6d Objective: %.4e OF error %.4e Timing %.1fs' % (i, av, J_h, rel, tim))
-            errorfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, tim, J_h))
+            av, rel, J_h, integrand, solverTime, adaptTime = solver(i, op=op)
+            print('Run %d: Mean element count: %6d Objective: %.4e OF error %.4e Timing %.1fs'
+                  % (i, av, J_h, rel, solverTime+adaptTime))
+            errorfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, solverTime+adaptTime, J_h))
         integrandFile.writelines(["%s," % val for val in integrand])
         integrandFile.write("\n")
 

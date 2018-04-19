@@ -257,7 +257,7 @@ class Options:
         av = Sn / mn
         if self.printStats:
             print("""\n************************** Adaption step %d ****************************
-Percent complete  : %4.1f%%    Elapsed time : %4.2fs (This step : %4.2fs)     
+Percent complete  : %4.1f%%    Adapt time : %4.2fs Solver time : %4.2fs     
 #Elements... Current : %d  Mean : %d  Minimum : %s  Maximum : %s
 Current timestep : %4.3fs\n""" %
                   (mn, 100 * t / self.Tend, outerTime, innerTime, nEle, av, mM[0], mM[1], self.dt))
