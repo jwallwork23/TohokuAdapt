@@ -37,7 +37,6 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, op=
         assert (float(physical_constants['g_grav'].dat.data) == op.g)
     except:
         physical_constants['g_grav'].assign(op.g)
-    primalTimer = dualTimer = errorTimer = adaptTimer = False
 
     # Establish filenames
     di = 'plots/'+op.mode+'/'
@@ -367,12 +366,11 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, op=
                 epsilon = Function(P0, name="Error indicator")
             if op.printStats:
                 print('\nStarting adaptive mesh primal run (forwards in time)')
-            adaptTimer = clock()
             while cnt < int(T / dt):
-                stepTimer = clock()
                 indexStr = indexString(int(cnt/op.ndump))
 
                 # Load variables from disk
+                adaptTimer = clock()
                 if cnt != 0:
                     V = op.mixedSpace(mesh_H)
                     q = Function(V)
@@ -442,6 +440,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, op=
                             b = Function(P1).assign(1.)
                         uv_2d.rename('uv_2d')
                         elev_2d.rename('elev_2d')
+                adaptTimer = clock() - adaptTimer
 
                 # Solver object and equations
                 adapSolver = solver2d.FlowSolver2d(mesh_H, b)
@@ -498,7 +497,9 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, op=
                     adapSolver.add_callback(cb3, 'timestep')
                     adapSolver.add_callback(cb4, 'timestep')
                 adapSolver.bnd_functions['shallow_water'] = BCs
+                solverTimer = clock()
                 adapSolver.iterate()
+                solverTimer = clock() - solverTimer
                 J_h = cb1.quadrature()
                 integrand = cb1.__call__()[1]
                 if op.mode == 'tohoku':
@@ -510,19 +511,13 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, op=
                 mM = [min(nEle, mM[0]), max(nEle, mM[1])]
                 Sn += nEle
                 cnt += op.rm
-                av = op.printToScreen(int(cnt/op.rm+1), clock()-adaptTimer, clock()-stepTimer, nEle, Sn, mM, cnt*dt)
-
-            adaptTimer = clock() - adaptTimer
+                av = op.printToScreen(int(cnt/op.rm+1), adaptTimer, solverTimer, nEle, Sn, mM, cnt*dt)
             if op.mode == 'tohoku':
                 totalVarP02 = cb3.totalVariation()
                 totalVarP06 = cb4.totalVariation()
-            if op.printStats:
-                print('Adaptive primal run complete. Run time: %.3fs' % adaptTimer)
     else:
         av = nEle
     fullTime = clock() - fullTime
-    if op.printStats:
-        printTimings(primalTimer, dualTimer, errorTimer, adaptTimer, fullTime)
 
     if op.mode == 'rossby-wave':   # Measure error using metrics, using data from Huang et al.
         index = int(cntT/op.ndump) if approach == 'fixedMesh' else int((cnt-op.rm) / op.ndump)

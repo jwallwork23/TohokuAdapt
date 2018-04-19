@@ -5,7 +5,7 @@ import numpy as np
 from .options import Options
 
 
-__all__ = ["indexString", "cheatCodes", "printTimings", "getMax", "peakAndDistance"]
+__all__ = ["indexString", "cheatCodes", "getMax", "peakAndDistance"]
 
 
 def indexString(index):
@@ -49,30 +49,6 @@ def cheatCodes(approach, default='DWR'):
         aposteriori = False
 
     return approach, getData, getError, useAdjoint, aposteriori
-
-
-def printTimings(primal, dual=False, error=False, adapt=False, full=False):
-    """
-    Print timings for the various sections of code.
-    
-    :arg primal: primal solver.
-    :arg dual: dual solver.
-    :arg error: error estimation phase.
-    :arg adapt: adaptive primal solver.
-    :arg full: total time to solution.
-    """
-    print("TIMINGS:")
-    if bool(primal):
-        print("Forward run   %5.3fs" % primal)
-    if bool(dual):
-        print("Adjoint run   %5.3fs" % dual)
-    if bool(error):
-        print("Error run     %5.3fs" % error)
-    if bool(adapt):
-        print("Adaptive run  %5.3fs" % adapt)
-    if bool(full):
-        print("Setups        %5.3fs" % (float(full) - (primal + float(dual) + float(error) + float(adapt))))
-        print("Total         %5.3fs\n" % full)
 
 
 def getMax(array):
