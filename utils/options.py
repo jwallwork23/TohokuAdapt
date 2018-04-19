@@ -22,6 +22,7 @@ class Options:
                  rotational=False,
                  printStats=True,           # TODO: This will become redundant
                  bAdapt=False,
+                 regen=False,
                  hessMeth='dL2',
                  maxGrowth=1.4,
                  g=9.81,
@@ -53,6 +54,7 @@ class Options:
         :param rotational: Toggle rotational / non-rotational equations.
         :param printStats: print to screen during simulation.
         :param bAdapt: intersect metrics with Hessian w.r.t. bathymetry.
+        :param regen: regenerate error estimates based on saved data.
         :param hessMeth: Method of Hessian reconstruction: 'dL2' or 'parts'.
         :param maxGrowth: metric gradation scaling parameter.
         :param g: gravitational acceleration.
@@ -113,13 +115,14 @@ class Options:
             self.adaptField = adaptField
         except:
             raise ValueError('Field for adaption ``%s`` not recognised.' % adaptField)
-        for i in (gradate, rotational, iso, printStats, plotpvd, wd, refinedSpace, bAdapt):
+        for i in (gradate, rotational, iso, printStats, plotpvd, wd, refinedSpace, bAdapt, regen):
             assert(isinstance(i, bool))
         self.iso = iso
         self.gradate = gradate
         self.rotational = rotational
         self.printStats = printStats
         self.bAdapt = bAdapt
+        self.regen = regen
         self.plotpvd = plotpvd
         self.wd = wd
         self.refinedSpace = refinedSpace
@@ -156,8 +159,8 @@ class Options:
             except:
                 raise ValueError("`rm` should be an integer multiple of `ndump`.")
         self.ndump = ndump
-        self.iStart = Tstart / (ndump * dt)
-        self.iEnd = self.cntT / ndump
+        self.iStart = int(Tstart / (ndump * dt))
+        self.iEnd = int(self.cntT / ndump)
         self.rm = rm
         self.nAdapt = nAdapt
         self.orderChange = orderChange

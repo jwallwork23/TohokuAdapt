@@ -36,7 +36,7 @@ def fixedMesh(startRes, op=Options()):
         options = solver_obj.options
         options.element_family = op.family
         options.use_nonlinear_equations = True
-        options.use_grad_depth_viscosity_term = False
+        options.use_grad_depth_viscosity_term = False                       # TODO: Might as well include these
         options.use_grad_div_viscosity_term = False
         options.use_lax_friedrichs_velocity = False                         # TODO: This is a temporary fix
         if op.mode == 'rossby-wave':
@@ -49,9 +49,6 @@ def fixedMesh(startRes, op=Options()):
         options.output_directory = di
         options.export_diagnostics = True
         options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-        options.use_wetting_and_drying = op.wd
-        # if op.wd:                                                         # TODO: Calculate w&d alpha
-        #     options.wetting_and_drying_alpha = alpha
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         cb1 = SWCallback(solver_obj)
         cb1.op = op
@@ -144,10 +141,10 @@ def hessianBased(startRes, op=Options()):
                         M = metricIntersection(M, M2) if op.adaptField == 'b' else M2
                 if op.bAdapt:
                     M2 = steadyMetric(b, op=op)
-                    M = metricIntersection(M, M2)
+                    M = M2 if op.adaptField != 'f' and cnt == 0. else metricIntersection(M, M2)
 
                 # Adapt mesh and interpolate variables
-                if cnt != 0 or op.adaptField == 'f':
+                if op.bAdapt or cnt != 0 or op.adaptField == 'f':
                     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
                     P1 = FunctionSpace(mesh, "CG", 1)
                     elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
@@ -161,7 +158,7 @@ def hessianBased(startRes, op=Options()):
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = True
-            adapOpt.use_grad_depth_viscosity_term = False
+            adapOpt.use_grad_depth_viscosity_term = False                       # TODO: Might as well include these
             adapOpt.use_grad_div_viscosity_term = False
             adapOpt.use_lax_friedrichs_velocity = False                         # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump
@@ -173,9 +170,6 @@ def hessianBased(startRes, op=Options()):
             adapOpt.output_directory = di
             adapOpt.export_diagnostics = True
             adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-            adapOpt.use_wetting_and_drying = op.wd
-            # if op.wd:                                             #           # TODO: Calculate w&d alpha
-            #     adapOpt.wetting_and_drying_alpha = alpha
             if op.mode == 'rossby-wave':
                 adapOpt.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
             field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
@@ -282,9 +276,7 @@ def DWR(startRes, op=Options()):
     if op.orderChange:                      # Define variables on higher/lower order space
         Ve = op.mixedSpace(mesh_H, orderChange=op.orderChange)
         qe = Function(Ve)
-        ue, ee = qe.split()
         qe_ = Function(Ve)
-        ue_, ee_ = qe_.split()
         duale = Function(Ve)
         duale_u, duale_e = duale.split()
         be = b                              # TODO: Is this a valid thing to do?
@@ -313,84 +305,74 @@ def DWR(startRes, op=Options()):
     Dt = Constant(op.dt)
     cntT = int(np.ceil(op.Tend / op.dt))
 
-    # Get initial boundary metric and TODO wetting and drying parameter
-    if op.gradate or op.wd:
+    # Get initial boundary metric
+    if op.gradate:
         H0 = Function(P1).interpolate(CellSize(mesh_H))
-    if op.wd:
-        g = constructGradient(elev_2d)
-        spd = assemble(v * sqrt(inner(g, g)) * dx)
-        gs = np.min(np.abs(spd.dat.data))
-        print('#### gradient = ', gs)
-        ls = np.min([H0.dat.data[i] for i in DirichletBC(P1, 0, 'on_boundary').nodes])
-        print('#### ls = ', ls)
-        alpha = Constant(gs * ls)
-        print('#### alpha = ', alpha.dat.data)
 
-    # Solve fixed mesh primal problem to get residuals and adjoint solutions
-    solver_obj = solver2d.FlowSolver2d(mesh_H, b)
-    options = solver_obj.options
-    options.element_family = op.family
-    options.use_nonlinear_equations = True
-    options.use_grad_depth_viscosity_term = False
-    options.use_grad_div_viscosity_term = False
-    options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
-    if op.mode == 'rossby-wave':
-        options.coriolis_frequency = f
-    options.simulation_export_time = op.dt * (op.rm - 1)
-    options.simulation_end_time = op.Tend
-    options.timestepper_type = op.timestepper
-    options.timestep = op.dt
-    options.timesteps_per_remesh = op.rm
-    options.output_directory = di
-    options.export_diagnostics = True
-    options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-    # options.use_wetting_and_drying = op.wd                        # TODO: Establish w&d alpha
-    # if op.wd:
-    #     options.wetting_and_drying_alpha = alpha
-    solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
-    cb1 = ObjectiveSWCallback(solver_obj)
-    cb1.op = op
-    solver_obj.add_callback(cb1, 'timestep')
-    solver_obj.bnd_functions['shallow_water'] = BCs
-    def selector():
-        rm = options.timesteps_per_remesh
-        dt = options.timestep
-        options.simulation_export_time = dt if int(solver_obj.simulation_time / dt) % rm == 0 else (rm - 1) * dt
-    initTimer = clock() - initTimer
-    print('Problem initialised. Setup time: %.3fs' % initTimer)
-    primalTimer = clock()
-    solver_obj.iterate(export_func=selector)
-    primalTimer = clock() - primalTimer
-    J = cb1.assembleOF()                        # Assemble objective functional for adjoint computation
-    print('Primal run complete. Solver time: %.3fs' % primalTimer)
+    if not op.regen:
 
-    # Compute gradient
-    gradientTimer = clock()
-    dJdb = compute_gradient(J, Control(b))      # TODO: Rewrite pyadjoint to avoid computing this
-    gradientTimer = clock() - gradientTimer
-    # File(di + 'gradient.pvd').write(dJdb)     # Too memory intensive in Tohoku case
-    print("Norm of gradient: %.3e. Computation time: %.1fs" % (dJdb.dat.norm, gradientTimer))
+        # Solve fixed mesh primal problem to get residuals and adjoint solutions
+        solver_obj = solver2d.FlowSolver2d(mesh_H, b)
+        options = solver_obj.options
+        options.element_family = op.family
+        options.use_nonlinear_equations = True
+        options.use_grad_depth_viscosity_term = False                   # TODO: Might as well include these
+        options.use_grad_div_viscosity_term = False
+        options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
+        if op.mode == 'rossby-wave':
+            options.coriolis_frequency = f
+        options.simulation_export_time = op.dt * (op.rm - 1)
+        options.simulation_end_time = op.Tend
+        options.timestepper_type = op.timestepper
+        options.timestep = op.dt
+        options.timesteps_per_remesh = op.rm
+        options.output_directory = di
+        options.export_diagnostics = True
+        options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+        solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
+        cb1 = ObjectiveSWCallback(solver_obj)
+        cb1.op = op
+        solver_obj.add_callback(cb1, 'timestep')
+        solver_obj.bnd_functions['shallow_water'] = BCs
+        def selector():
+            rm = options.timesteps_per_remesh
+            dt = options.timestep
+            options.simulation_export_time = dt if int(solver_obj.simulation_time / dt) % rm == 0 else (rm - 1) * dt
+        initTimer = clock() - initTimer
+        print('Problem initialised. Setup time: %.3fs' % initTimer)
+        primalTimer = clock()
+        solver_obj.iterate(export_func=selector)
+        primalTimer = clock() - primalTimer
+        J = cb1.assembleOF()                        # Assemble objective functional for adjoint computation
+        print('Primal run complete. Solver time: %.3fs' % primalTimer)
 
-    # Extract adjoint solutions
-    dualTimer = clock()
-    tape = get_working_tape()
-    solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
-    N = len(solve_blocks)
-    r = N % op.rm                               # Number of extra tape annotations in setup
-    for i in range(N - 1, r - 2, -op.rm):
-        dual.assign(solve_blocks[i].adj_sol)
-        dual_u, dual_e = dual.split()
-        dual_u.rename('Adjoint velocity')
-        dual_e.rename('Adjoint elevation')
-        with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexString(int((i - r + 1) / op.rm)), mode=FILE_CREATE) as saveAdj:
-            saveAdj.store(dual_u)
-            saveAdj.store(dual_e)
-            saveAdj.close()
-        if op.plotpvd:
-            adjointFile.write(dual_u, dual_e, time=op.dt * (i - r + 1))
-        print('Adjoint simulation %.2f%% complete' % ((N - i + r - 1) / N * 100))
-    dualTimer = clock() - dualTimer
-    print('Dual run complete. Run time: %.3fs' % dualTimer)
+        # Compute gradient
+        gradientTimer = clock()
+        dJdb = compute_gradient(J, Control(b))      # TODO: Rewrite pyadjoint to avoid computing this
+        gradientTimer = clock() - gradientTimer
+        # File(di + 'gradient.pvd').write(dJdb)     # Too memory intensive in Tohoku case
+        print("Norm of gradient: %.3e. Computation time: %.1fs" % (dJdb.dat.norm, gradientTimer))
+
+        # Extract adjoint solutions
+        dualTimer = clock()
+        tape = get_working_tape()
+        solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
+        N = len(solve_blocks)
+        r = N % op.rm                               # Number of extra tape annotations in setup
+        for i in range(N - 1, r - 2, -op.rm):
+            dual.assign(solve_blocks[i].adj_sol)
+            dual_u, dual_e = dual.split()
+            dual_u.rename('Adjoint velocity')
+            dual_e.rename('Adjoint elevation')
+            with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexString(int((i - r + 1) / op.rm)), mode=FILE_CREATE) as saveAdj:
+                saveAdj.store(dual_u)
+                saveAdj.store(dual_e)
+                saveAdj.close()
+            if op.plotpvd:
+                adjointFile.write(dual_u, dual_e, time=op.dt * (i - r + 1))
+            print('Adjoint simulation %.2f%% complete' % ((N - i + r - 1) / N * 100))
+        dualTimer = clock() - dualTimer
+        print('Dual run complete. Run time: %.3fs' % dualTimer)
 
     with pyadjoint.stop_annotating():
 
@@ -398,7 +380,7 @@ def DWR(startRes, op=Options()):
         for k in range(0, op.iEnd): # Loop back over times to generate error estimators
             print('Generating error estimate %d / %d' % (k + 1, op.iEnd))
             i1 = 0 if k == 0 else 2 * k - 1
-            i2 = 2 * k
+            i2 = 2 * k              # TODO: There is a load error here in regen case
             with DumbCheckpoint(di + 'hdf5/Velocity2d_' + indexString(i1), mode=FILE_READ) as loadVel:
                 loadVel.load(uv_2d)
                 loadVel.close()
@@ -493,7 +475,7 @@ def DWR(startRes, op=Options()):
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = True
-            adapOpt.use_grad_depth_viscosity_term = False
+            adapOpt.use_grad_depth_viscosity_term = False                       # TODO: Might as well include these
             adapOpt.use_grad_div_viscosity_term = False
             adapOpt.use_lax_friedrichs_velocity = False                         # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump
@@ -505,9 +487,6 @@ def DWR(startRes, op=Options()):
             adapOpt.output_directory = di
             adapOpt.export_diagnostics = True
             adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-            adapOpt.use_wetting_and_drying = op.wd
-            # if op.wd:                                                         # TODO: Establish w&d alpha
-            #     adapOpt.wetting_and_drying_alpha = alpha
             if op.mode == 'rossby-wave':
                 adapOpt.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh_H)[1])
             field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
@@ -601,12 +580,12 @@ if __name__ == "__main__":
     parser.add_argument("-low", help="Lower bound for index range")
     parser.add_argument("-high", help="Upper bound for index range")
     parser.add_argument("-o", help="Output data")
-    parser.add_argument("-w", help="Use wetting and drying")
     parser.add_argument("-ho", help="Compute errors and residuals in a higher order space")
     parser.add_argument("-lo", help="Compute errors and residuals in a lower order space")
     parser.add_argument("-r", help="Compute errors and residuals in a refined space")
     parser.add_argument("-f", help="Field for adaption")
     parser.add_argument("-b", help="Intersect metrics with bathymetry")
+    parser.add_argument("-regen", help="Regenerate error estimates based on saved data")
     args = parser.parse_args()
     approach = args.a
     if args.t is None:
@@ -640,11 +619,11 @@ if __name__ == "__main__":
                  # gradate=True if approach in ('DWP', 'DWR') and mode == 'tohoku' else False,
                  gradate=False,  # TODO: Fix this for tohoku case
                  plotpvd=True if args.o else False,
-                 wd=bool(args.w) if args.w is not None else False,
                  adaptField=args.f if args.f is not None else 's',
                  orderChange=orderChange,
                  refinedSpace=True if args.r else False,
-                 bAdapt=bool(args.b) if args.b is not None else False)
+                 bAdapt=bool(args.b) if args.b is not None else False,
+                 regen=bool(args.regen) if args.regen is not None else False)
 
     # Establish filename
     filename = 'outdata/' + mode + '/' + approach
@@ -657,8 +636,8 @@ if __name__ == "__main__":
     elif args.r:
         op.refinedSpace = True
         filename += '_r'
-    if args.w:
-        filename += '_w'
+    if args.b:
+        filename += '_b'
     filename += '_' + date
     errorfile = open(filename + '.txt', 'w+')
     integrandFile = open(filename + 'Integrand.txt', 'w+')

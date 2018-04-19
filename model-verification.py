@@ -27,9 +27,6 @@ def solverSW(startRes, di, op=Options()):
         options.output_directory = di
     else:
         options.no_exports = True
-    # options.use_wetting_and_drying = op.wd        # TODO: Make this work
-    # if op.wd:
-    #     options.wetting_and_drying_alpha = alpha
     solver_obj.bnd_functions['shallow_water'] = BCs
     solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
     cb1 = SWCallback(solver_obj)        # Objective functional computation error
@@ -59,18 +56,14 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-r", help="Use rotational equations")
-    parser.add_argument("-w", help="Use wetting and drying")
     parser.add_argument("-o", help="Output data")
     parser.add_argument("-s", help="Print solver statistics")
     args = parser.parse_args()
     op = Options(family='dg-dg',
                  plotpvd=True if args.o else False,
-                 printStats=True if args.s else False,
-                 wd=True if args.w else False)
+                 printStats=True if args.s else False)
     op.rotational = True if args.r else False
     tag = 'rotational=' + str(op.rotational)
-    if args.w:
-        tag += '_w'
     filename = 'outdata/model-verification/' + tag + '_' + date
     errorfile = open(filename + '.txt', 'w+')
     gaugeFileP02 = open(filename + 'P02.txt', 'w+')
