@@ -8,8 +8,8 @@ from time import clock
 
 from utils.adaptivity import isoP2, metricIntersection, steadyMetric
 from utils.callbacks import *
-from utils.forms import solutionRW
-from utils.interpolation import interp
+from utils.forms import solutionRW, strongResidualSW
+from utils.interpolation import interp, mixedPairInterp
 from utils.mesh import meshStats, problemDomain
 from utils.misc import indexString, peakAndDistance
 from utils.options import Options
@@ -250,6 +250,7 @@ def hessianBased(startRes, op=Options()):
 
 
 def DWR(startRes, op=Options()):
+    initTimer = clock()
     di = 'plots/' + op.mode + '/DWR/'
     if op.plotpvd:
         residualFile = File(di + "residual.pvd")
@@ -355,18 +356,20 @@ def DWR(startRes, op=Options()):
         rm = options.timesteps_per_remesh
         dt = options.timestep
         options.simulation_export_time = dt if int(solver_obj.simulation_time / dt) % rm == 0 else (rm - 1) * dt
+    initTimer = clock() - initTimer
+    print('Problem initialised. Setup time: %.3fs' % initTimer)
     primalTimer = clock()
     solver_obj.iterate(export_func=selector)
     primalTimer = clock() - primalTimer
     J = cb1.assembleOF()                    # Assemble objective functional
-    print('Primal run complete. Run time: %.3fs' % primalTimer)
+    print('Primal run complete. Solver time: %.3fs' % primalTimer)
 
     # Compute gradient
     gradientTimer = clock()
     dJdb = compute_gradient(J, Control(b))                          # TODO: Rewrite pyadjoint to avoid computing this
     gradientTimer = clock() - gradientTimer
     # File(di + 'gradient.pvd').write(dJdb)     # Too memory intensive in Tohoku case
-    print("Norm of gradient: %.3e. Time for computation: %.1fs" % (dJdb.dat.norm, gradientTimer))
+    print("Norm of gradient: %.3e. Computation time: %.1fs" % (dJdb.dat.norm, gradientTimer))
 
     # Extract adjoint solutions
     dualTimer = clock()
@@ -379,7 +382,7 @@ def DWR(startRes, op=Options()):
         dual_u, dual_e = dual.split()
         dual_u.rename('Adjoint velocity')
         dual_e.rename('Adjoint elevation')
-        with DumbCheckpoint(di + 'hdf5/adjoint_' + indexString(int((i - r + 1) / op.rm)), mode=FILE_CREATE) as saveAdj:
+        with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexString(int((i - r + 1) / op.rm)), mode=FILE_CREATE) as saveAdj:
             saveAdj.store(dual_u)
             saveAdj.store(dual_e)
             saveAdj.close()
@@ -389,7 +392,63 @@ def DWR(startRes, op=Options()):
             print('Adjoint simulation %.2f%% complete' % ((N - i + r - 1) / N * 100))
     dualTimer = clock() - dualTimer
     print('Dual run complete. Run time: %.3fs' % dualTimer)
-    cnt = 0
+
+    with pyadjoint.stop_annotating():
+
+        # Loop back over times to generate error estimators
+        errorTimer = clock()
+        for k in range(0, op.iEnd):
+            if op.printStats:
+                print('Generating error estimate %d / %d' % (k + 1, op.iEnd))
+            i1 = 0 if k == 0 else 2 * k - 1
+            i2 = 2 * k
+            with DumbCheckpoint(di + 'hdf5/Velocity2d_' + indexString(i1), mode=FILE_READ) as loadVel:
+                loadVel.load(uv_2d)
+                loadVel.close()
+            with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexString(i1), mode=FILE_READ) as loadElev:
+                loadElev.load(elev_2d)
+                loadElev.close()
+            uv_2d_.assign(uv_2d)
+            elev_2d_.assign(elev_2d)
+            with DumbCheckpoint(di + 'hdf5/Velocity2d_' + indexString(i2), mode=FILE_READ) as loadVel:
+                loadVel.load(uv_2d)
+                loadVel.close()
+            with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexString(i2), mode=FILE_READ) as loadElev:
+                loadElev.load(elev_2d)
+                loadElev.close()
+
+            # Approximate residuals, load adjoint data and form residuals
+            if op.refinedSpace:
+                qe, qe_ = mixedPairInterp(mesh_h, Ve, q, q_)
+            Au, Ae = strongResidualSW(qe, qe_, be, coriolisFreq=None, op=op)        # TODO: This needs re-doing
+            rho_u.interpolate(Au)
+            rho_e.interpolate(Ae)
+            if op.plotpvd:
+                residualFile.write(rho_u, rho_e, time=float(k))
+            with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexString(k), mode=FILE_READ) as loadAdj:
+                loadAdj.load(dual_u)
+                loadAdj.load(dual_e)
+                loadAdj.close()
+            if op.orderChange:
+                duale_u.interpolate(dual_u)
+                duale_e.interpolate(dual_e)
+                epsilon = assemble(v * inner(rho, duale) * dx)
+            elif op.refinedSpace:
+                duale = mixedPairInterp(mesh_h, dual)
+                epsilon = assemble(v * inner(rho, duale) * dx)
+            else:
+                epsilon = assemble(v * inner(rho, dual) * dx)
+            epsilon.rename("Error indicator")
+            with DumbCheckpoint(di + 'hdf5/' + approach + 'Error' + indexString(k), mode=FILE_CREATE) as saveErr:
+                saveErr.store(epsilon)
+                saveErr.close()
+            if op.plotpvd:
+                errorFile.write(epsilon, time=float(k))
+        errorTimer = clock() - errorTimer
+        if op.printStats:
+            print('Errors estimated. Run time: %.3fs' % errorTimer)
+
+        cnt = 0
 
 
 if __name__ == "__main__":
@@ -433,7 +492,7 @@ if __name__ == "__main__":
                  wd=True if args.w else False)
 
     # Establish filename
-    filename = 'outdata/' + mode + '/fixedMesh'
+    filename = 'outdata/' + mode + '/' + approach
     if args.w:
         filename += '_w'
     filename += '_' + date

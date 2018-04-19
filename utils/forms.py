@@ -11,18 +11,18 @@ __all__ = ["strongResidualSW", "formsSW", "adjointSW", "weakResidualSW", "intere
            "explicitErrorEstimator", "fluxJumpError"]
 
 
-def strongResidualSW(q, q_, b, Dt, coriolisFreq=None, op=Options()):
+def strongResidualSW(q, q_, b, coriolisFreq=None, op=Options()):
     """
     Construct the strong residual for the semi-discrete linear shallow water equations at the current timestep.
 
     :arg q: solution tuple for linear shallow water equations.
     :arg q_: solution tuple for linear shallow water equations at previous timestep.
     :arg b: bathymetry profile.
-    :param Dt: timestep expressed as a FiredrakeConstant.
     :param coriolisFreq: Coriolis parameter for rotational equations.
     :param op: parameter holding class.
     :return: strong residual for shallow water equations at current timestep.
     """
+    Dt = Constant(op.dt)
     (u, eta) = (as_vector((q[0], q[1])), q[2])
     (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
     um = timestepScheme(u, u_, op.timestepper)
@@ -39,19 +39,19 @@ def strongResidualSW(q, q_, b, Dt, coriolisFreq=None, op=Options()):
     return Au, Ae
 
 
-def formsSW(q, q_, b, Dt, coriolisFreq=None, impermeable=True, op=Options()):
+def formsSW(q, q_, b, coriolisFreq=None, impermeable=True, op=Options()):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
 
     :arg q: solution tuple for linear shallow water equations.
     :arg q_: solution tuple for linear shallow water equations at previous timestep.
     :arg b: bathymetry profile.
-    :param Dt: timestep expressed as a FiredrakeConstant.
     :param coriolisFreq: Coriolis parameter for rotational equations.
     :param impermeable: impose Neumann BCs.
     :param op: parameter holding class.
     :return: weak residual for shallow water equations at current timestep.
     """
+    Dt = Constant(op.dt)
     V = q_.function_space()
     (u, eta) = (as_vector((q[0], q[1])), q[2])
     (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
@@ -79,42 +79,38 @@ def formsSW(q, q_, b, Dt, coriolisFreq=None, impermeable=True, op=Options()):
     return B, L
 
 
-def adjointSW(l, l_, b, Dt, mode='shallow-water', switch=Constant(1.), op=Options()):
+def adjointSW(l, l_, b, switch=Constant(1.), op=Options()): # TODO: This only works in linear case. What about BCs?
     """
     Semi-discrete (time-discretised) weak form adjoint shallow water equations with no normal flow boundary conditions.
 
     :arg l: solution tuple for adjoint linear shallow water equations.
     :arg l_: solution tuple for adjoint linear shallow water equations at previous timestep.
     :arg b: bathymetry profile.
-    :param Dt: timestep expressed as a FiredrakeConstant.
     :param op: parameter-holding class.
     :return: weak residual for shallow water equations at current timestep.
     """
+    Dt = Constant(op.dt)
     (lu, le) = (as_vector((l[0], l[1])), l[2])
     (lu_, le_) = (as_vector((l_[0], l_[1])), l_[2])
     lt = TestFunction(l.function_space())
     (w, xi) = (as_vector((lt[0], lt[1])), lt[2])
     a1, a2 = timestepCoeffs(op.timestepper)
-    iA = indicator(l.function_space().sub(1), mode=mode)
+    iA = indicator(l.function_space().sub(1), op=op)
 
     B = ((inner(lu, w) + le * xi) / Dt + a1 * b * inner(grad(le), w) - a1 * op.g * inner(lu, grad(xi))) * dx
     L = ((inner(lu_, w) + le_ * xi) / Dt - a2 * b * inner(grad(le_), w) + a2 * op.g * inner(lu_, grad(xi))) * dx
     L -= switch * iA * xi * dx
 
-    # TODO: Boundary conditions?
-
     return B, L
 
 
-def weakResidualSW(q, q_, b, Dt, coriolisFreq=None, impermeable=True, adjoint=False,
-                   mode='shallow-water', switch=Constant(0.), op=Options()):
+def weakResidualSW(q, q_, b, coriolisFreq=None, impermeable=True, adjoint=False, switch=Constant(0.), op=Options()):
     """
     Semi-discrete (time-discretised) weak form shallow water equations with no normal flow boundary conditions.
 
     :arg q: solution tuple for linear shallow water equations.
     :arg q_: solution tuple for linear shallow water equations at previous timestep.
     :arg b: bathymetry profile.
-    :param Dt: timestep expressed as a FiredrakeConstant.
     :param nu: coefficient for stress term.
     :param coriolisFreq: Coriolis parameter for rotational equations.
     :param impermeable: impose impermeable BCs.
@@ -122,9 +118,9 @@ def weakResidualSW(q, q_, b, Dt, coriolisFreq=None, impermeable=True, adjoint=Fa
     :return: weak residual for shallow water equations at current timestep.
     """
     if adjoint:
-        B, L = adjointSW(q, q_, b, Dt, mode=mode, switch=switch, op=op)
+        B, L = adjointSW(q, q_, b, switch=switch, op=op)
     else:
-        B, L = formsSW(q, q_, b, Dt, coriolisFreq=coriolisFreq, impermeable=impermeable, op=op)
+        B, L = formsSW(q, q_, b, coriolisFreq=coriolisFreq, impermeable=impermeable, op=op)
     return B - L
 
 

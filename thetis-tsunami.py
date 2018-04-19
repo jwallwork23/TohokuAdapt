@@ -246,8 +246,8 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, op=
 
         # Define implicit error problem
         if approach in ('implicit', 'DWE'): # TODO: Check out situation with nonlinear option
-            B_, L = formsSW(qe, qe_, b, Dt, impermeable=False, coriolisFreq=f, op=op)
-            B = formsSW(e, e_, b, Dt, impermeable=False, coriolisFreq=f, op=op)[0]
+            B_, L = formsSW(qe, qe_, b, impermeable=False, coriolisFreq=f, op=op)
+            B = formsSW(e, e_, b, impermeable=False, coriolisFreq=f, op=op)[0]
             I = interelementTerm(et1 * ue, n=normal) * dS
             errorProblem = NonlinearVariationalProblem(B - L + B_ - I, e)
             errorSolver = NonlinearVariationalSolver(errorProblem, solver_parameters=op.params)
@@ -299,7 +299,7 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, op=
             if approach in ('explicit', 'residual', 'DWR'):
                 if op.refinedSpace:
                     qe, qe_ = mixedPairInterp(mesh_h, Ve, q, q_)
-                Au, Ae = strongResidualSW(qe, qe_, be, Dt, coriolisFreq=None, op=op)
+                Au, Ae = strongResidualSW(qe, qe_, be, coriolisFreq=None, op=op)
                 rho_u.interpolate(Au)
                 rho_e.interpolate(Ae)
                 if op.plotpvd:
