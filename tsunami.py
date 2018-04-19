@@ -198,13 +198,16 @@ def hessianBased(startRes, op=Options()):
                 cb2 = P02Callback(adapSolver)
                 cb3 = P06Callback(adapSolver)
             adapSolver.add_callback(cb1, 'timestep')
-            if cnt != 0:
+            if cnt == 0:
+                initP02 = cb2.init_value
+                initP06 = cb3.init_value
+            else:
                 cb1.objective_value = integrand
                 if op.mode == 'tohoku':
                     cb2.gauge_values = gP02
-                    cb2.init_value = gP02[0]
+                    cb2.init_value = initP02
                     cb3.gauge_values = gP06
-                    cb3.init_value = gP06[0]
+                    cb3.init_value = initP06
             adapSolver.add_callback(cb1, 'timestep')
             if op.mode == 'tohoku':
                 adapSolver.add_callback(cb2, 'timestep')
@@ -226,7 +229,7 @@ def hessianBased(startRes, op=Options()):
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
             cnt += op.rm
-            av = op.printToScreen(int(cnt/op.rm+1), clock()-adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.dt)
+            av = op.printToScreen(int(cnt/op.rm+1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.dt)
 
         # Measure error using metrics, as in Huang et al.
         if op.mode == 'rossby-wave':                                            # TODO: fix indexing error
@@ -531,13 +534,16 @@ def DWR(startRes, op=Options()):
             if op.mode == 'tohoku':
                 cb3 = P02Callback(adapSolver)
                 cb4 = P06Callback(adapSolver)
-            if cnt != 0:
+            if cnt == 0:
+                initP02 = cb2.init_value
+                initP06 = cb3.init_value
+            else:
                 cb2.objective_value = integrand
                 if op.mode == 'tohoku':
                     cb3.gauge_values = gP02
-                    cb3.init_value = gP02[0]
+                    cb3.init_value = initP02
                     cb4.gauge_values = gP06
-                    cb4.init_value = gP06[0]
+                    cb4.init_value = initP06
             adapSolver.add_callback(cb2, 'timestep')
             if op.mode == 'tohoku':
                 adapSolver.add_callback(cb3, 'timestep')
@@ -625,6 +631,8 @@ if __name__ == "__main__":
         orderChange = -1
     if args.r:
         assert (not args.ho) and (not args.lo)
+    if args.f is not None:
+        assert approach == 'hessianBased'
 
     # Choose mode and set parameter values
     op = Options(mode=mode,
@@ -658,8 +666,6 @@ if __name__ == "__main__":
     resolutions = range(0 if args.low is None else int(args.low), 6 if args.high is None else int(args.high))
     Jlist = np.zeros(len(resolutions))
     if mode == 'tohoku':
-        g2list = np.zeros(len(resolutions))
-        g6list = np.zeros(len(resolutions))
         gaugeFileP02 = open(filename + 'P02.txt', 'w+')
         gaugeFileP06 = open(filename + 'P06.txt', 'w+')
     for i in resolutions:
@@ -688,20 +694,6 @@ if __name__ == "__main__":
             errorfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, solverTime+adaptTime, J_h))
         integrandFile.writelines(["%s," % val for val in integrand])
         integrandFile.write("\n")
-
-        # Calculate orders of convergence
-        Jlist[i] = J_h
-        if mode == 'tohoku':
-            g2list[i] = totalVarP02
-            g6list[i] = totalVarP06
-        if i > 1:
-            Jconv = (Jlist[i] - Jlist[i - 1]) / (Jlist[i - 1] - Jlist[i - 2])
-            if mode == 'tohoku':
-                g2conv = (g2list[i] - g2list[i - 1]) / (g2list[i - 1] - g2list[i - 2])
-                g6conv = (g6list[i] - g6list[i - 1]) / (g6list[i - 1] - g6list[i - 2])
-                print("Orders of convergence... J: %.4f, P02: %.4f, P06: %.4f" % (Jconv, g2conv, g6conv))
-            else:
-                print("Order of convergence: %.4f" % Jconv)
     errorfile.close()
     if mode == 'tohoku':
         gaugeFileP02.close()

@@ -487,11 +487,14 @@ def solverSW(startRes, approach, getData, getError, useAdjoint, aposteriori, op=
                 if op.mode == 'tohoku':
                     cb3 = P02Callback(adapSolver)
                     cb4 = P06Callback(adapSolver)
-                if cnt != 0:
+                if cnt == 0:
+                    initP02 = cb2.init_value
+                    initP06 = cb3.init_value
+                else:
                     cb1.objective_value = integrand
                     if op.mode == 'tohoku':
-                        cb3.gauge_values = gP02
-                        cb4.gauge_values = gP06
+                        cb3.gauge_values = initP02
+                        cb4.gauge_values = initP06
                 adapSolver.add_callback(cb1, 'timestep')
                 if op.mode == 'tohoku':
                     adapSolver.add_callback(cb3, 'timestep')
@@ -581,7 +584,7 @@ if __name__ == "__main__":
                  plotpvd=True if args.o else False,
                  printStats=True,
                  wd=True if args.w else False,
-                 adaptField=f)
+                 adaptField=f)      # TODO: ho, lo, r are not actually incorporated here. See ``tsunami``.
     if mode == 'shallow-water':
         op.rm = 10 if useAdjoint else 5
     elif mode == 'rossby-wave':
