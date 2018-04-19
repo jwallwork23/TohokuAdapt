@@ -202,7 +202,9 @@ def hessianBased(startRes, op=Options()):
                 cb1.objective_value = integrand
                 if op.mode == 'tohoku':
                     cb2.gauge_values = gP02
+                    cb2.init_value = gP02[0]
                     cb3.gauge_values = gP06
+                    cb3.init_value = gP06[0]
             adapSolver.add_callback(cb1, 'timestep')
             if op.mode == 'tohoku':
                 adapSolver.add_callback(cb2, 'timestep')
@@ -533,7 +535,9 @@ def DWR(startRes, op=Options()):
                 cb2.objective_value = integrand
                 if op.mode == 'tohoku':
                     cb3.gauge_values = gP02
+                    cb3.init_value = gP02[0]
                     cb4.gauge_values = gP06
+                    cb4.init_value = gP06[0]
             adapSolver.add_callback(cb2, 'timestep')
             if op.mode == 'tohoku':
                 adapSolver.add_callback(cb3, 'timestep')

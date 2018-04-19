@@ -206,15 +206,16 @@ class Options:
             self.J = 1.240e+13          # On mesh of 681,666 elements     TODO: consider nonlinear/rotational case
             self.xy = [490e3, 640e3, 4160e3, 4360e3]
 
-        # Define FunctionSpaces
+            # Gauge locations in latitude-longitude coordinates
+            self.glatlon = {"P02": (38.5002, 142.5016), "P06": (38.6340, 142.5838), "801": (38.2, 141.7),
+                            "802": (39.3, 142.1), "803": (38.9, 141.8), "804": (39.7, 142.2), "806": (37.0, 141.2)}
+            self.meshSizes = (5918, 7068, 8660, 10988, 14160, 19082, 27280, 41730, 72602, 160586, 681616)
+
+        # Specify FunctionSpaces
         self.degree1 = 2 if family == 'cg-cg' else 1
         self.degree2 = 2 if family == 'dg-cg' else 1
         self.space1 = "CG" if family == 'cg-cg' else "DG"
         self.space2 = "DG" if family == 'dg-dg' else "CG"
-
-        # Gauge locations in latitude-longitude coordinates
-        self.glatlon = {"P02": (38.5002, 142.5016), "P06": (38.6340, 142.5838), "801": (38.2, 141.7),
-                        "802": (39.3, 142.1), "803": (38.9, 141.8), "804": (39.7, 142.2), "806": (37.0, 141.2)}
 
         # Plotting dictionaries
         self.labels = ("Fixed mesh", "Hessian based", "Explicit", "Implicit", "Adjoint based", "Goal based")
@@ -222,8 +223,6 @@ class Options:
                        self.labels[4]: '*', self.labels[5]: 'h'}
         self.stamps = {self.labels[0]: 'fixedMesh', self.labels[1]: 'hessianBased', self.labels[2]: 'explicit',
                        self.labels[3]: 'implicit', self.labels[4]: 'DWF', self.labels[5]: 'DWR'}
-
-        self.meshSizes = (5918, 7068, 8660, 10988, 14160, 19082, 27280, 41730, 72602, 160586, 681616)
 
 
     def gaugeCoord(self, gauge):

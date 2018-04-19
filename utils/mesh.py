@@ -218,7 +218,7 @@ def problemDomain(level=0, mesh=None, output=False, op=Options(mode='tohoku')):
         b = Function(P1).assign(0.1)
         BCs = {}
         f = None
-    else:
+    elif op.mode == 'rossby-wave':
         n = pow(2, level-1)
         lx = 48
         ly = 24
@@ -233,6 +233,8 @@ def problemDomain(level=0, mesh=None, output=False, op=Options(mode='tohoku')):
         u0, eta0 = q.split()
         BCs = {1: {'uv': Constant(0.)}, 2: {'uv': Constant(0.)}, 3: {'uv': Constant(0.)}, 4: {'uv': Constant(0.)}}
         f = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
+    else:
+        raise NotImplementedError
 
     if output:
         File('plots/initialisation/surf.pvd').write(eta0)
