@@ -596,6 +596,10 @@ if __name__ == "__main__":
     parser.add_argument("-high", help="Upper bound for index range")
     parser.add_argument("-o", help="Output data")
     parser.add_argument("-w", help="Use wetting and drying")
+    parser.add_argument("-ho", help="Compute errors and residuals in a higher order space")
+    parser.add_argument("-lo", help="Compute errors and residuals in a lower order space")
+    parser.add_argument("-r", help="Compute errors and residuals in a refined space")
+    parser.add_argument("-f", help="Field for adaption")
     args = parser.parse_args()
     approach = args.a
     if args.t is None:
@@ -612,6 +616,15 @@ if __name__ == "__main__":
         assert approach in ('hessianBased', 'DWR')
     solver = {'fixedMesh': fixedMesh, 'hessianBased': hessianBased, 'DWR': DWR}[approach]
     print("Mode: %s, approach: %s" % (mode, approach))
+    orderChange = 0
+    if args.ho:
+        assert (not args.r) and (not args.lo)
+        orderChange = 1
+    if args.lo:
+        assert (not args.r) and (not args.ho)
+        orderChange = -1
+    if args.r:
+        assert (not args.ho) and (not args.lo)
 
     # Choose mode and set parameter values
     op = Options(mode=mode,
@@ -619,10 +632,22 @@ if __name__ == "__main__":
                  gradate=False,  # TODO: Fix this for tohoku case
                  plotpvd=True if args.o else False,
                  printStats=True,
-                 wd=True if args.w else False)
+                 wd=True if args.w else False,
+                 adaptField=args.f if args.f is not None else 's',
+                 orderChange=orderChange,
+                 refinedSpace=True if args.r else False)
 
     # Establish filename
     filename = 'outdata/' + mode + '/' + approach
+    if args.ho:
+        op.orderChange = 1
+        filename += '_ho'
+    elif args.lo:
+        op.orderChange = -1
+        filename += '_lo'
+    elif args.r:
+        op.refinedSpace = True
+        filename += '_r'
     if args.w:
         filename += '_w'
     filename += '_' + date

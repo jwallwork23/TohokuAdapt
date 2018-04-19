@@ -203,7 +203,7 @@ class Options:
             self.J = 1.                                                 # TODO: establish this
             self.xy = [-24., -20., -2., 2.]
         elif self.mode in ('tohoku', 'model-verification'):
-            self.J = 1.240e+13          # On mesh of 681,666 elements     TODO: consider nonlinear/rotational case
+            self.J = 1.240e+13          # On mesh of 681,666 elements     TODO: Check this
             self.xy = [490e3, 640e3, 4160e3, 4360e3]
 
             # Gauge locations in latitude-longitude coordinates
@@ -242,11 +242,11 @@ class Options:
         return VectorFunctionSpace(mesh, self.space1, deg1) * FunctionSpace(mesh, self.space2, deg2)
 
 
-    def printToScreen(self, mn, outerTime, innerTime, nEle, Sn, mM, t):
+    def printToScreen(self, mn, adaptTimer, solverTime, nEle, Sn, mM, t):
         """
         :arg mn: mesh number.
-        :arg outerTime: time taken so far.
-        :arg innerTime: time taken for this step.
+        :arg adaptTimer: time taken for mesh adaption.
+        :arg solverTime: time taken for solver.
         :arg nEle: current number of elements.
         :arg Sn: sum over #Elements.
         :arg mM: tuple of min and max #Elements.
@@ -257,7 +257,6 @@ class Options:
         if self.printStats:
             print("""\n************************** Adaption step %d ****************************
 Percent complete  : %4.1f%%    Adapt time : %4.2fs Solver time : %4.2fs     
-#Elements... Current : %d  Mean : %d  Minimum : %s  Maximum : %s
-Current timestep : %4.3fs\n""" %
-                  (mn, 100 * t / self.Tend, outerTime, innerTime, nEle, av, mM[0], mM[1], self.dt))
+#Elements... Current : %d  Mean : %d  Minimum : %s  Maximum : %s\n""" %
+                  (mn, 100 * t / self.Tend, adaptTimer, solverTime, nEle, av, mM[0], mM[1]))
         return av
