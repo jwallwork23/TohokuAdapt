@@ -11,7 +11,7 @@ __all__ = ["strongResidualSW", "formsSW", "adjointSW", "weakResidualSW", "intere
            "explicitErrorEstimator", "fluxJumpError"]
 
 
-def strongResidualSW(q, q_, b, coriolisFreq=None, op=Options()):
+def strongResidualSW(q, q_, b, coriolisFreq=None, op=Options()):    # TODO: Some minor adjustments to get Thetis forms
     """
     Construct the strong residual for the semi-discrete linear shallow water equations at the current timestep.
 
@@ -28,13 +28,10 @@ def strongResidualSW(q, q_, b, coriolisFreq=None, op=Options()):
     um = timestepScheme(u, u_, op.timestepper)
     em = timestepScheme(eta, eta_, op.timestepper)
 
-    Au = (u - u_) / Dt + op.g * grad(em)
-    Ae = (eta - eta_) / Dt + div(b * um)
+    Au = (u - u_) / Dt + op.g * grad(em) + dot(u, nabla_grad(u))
+    Ae = (eta - eta_) / Dt + div(b * um) + div(em * um)
     if coriolisFreq:
         Au += coriolisFreq * as_vector((-u[1], u[0]))
-    if op.nonlinear:
-        Au += dot(u, nabla_grad(u))
-        Ae += div(em * um)
 
     return Au, Ae
 
@@ -61,8 +58,10 @@ def formsSW(q, q_, b, coriolisFreq=None, impermeable=True, op=Options()):
     g = op.g
 
     B = (inner(q, qt)) / Dt * dx + a1 * g * inner(grad(eta), w) * dx        # LHS bilinear form
+    B += a1 * (inner(dot(u, nabla_grad(u)), w) + div(eta * u)) * dx
     L = (inner(q_, qt)) / Dt * dx - a2 * g * inner(grad(eta_), w) * dx      # RHS linear functional
     L -= a2 * div(b * u_) * xi * dx                                     # Note: Don't "apply BCs" to linear functional
+    L -= a2 * (inner(dot(u_, nabla_grad(u_)), w) + div(eta_ * u_)) * dx
     if impermeable:
         B -= a1 * inner(b * u, grad(xi)) * dx
         if V.sub(0).ufl_element().family() != 'Lagrange':
@@ -72,9 +71,6 @@ def formsSW(q, q_, b, coriolisFreq=None, impermeable=True, op=Options()):
     if coriolisFreq:
         B += a1 * coriolisFreq * inner(as_vector((-u[1], u[0])), w) * dx
         L -= a2 * coriolisFreq * inner(as_vector((-u_[1], u_[0])), w) * dx
-    if op.nonlinear:
-        B += a1 * (inner(dot(u, nabla_grad(u)), w) + div(eta * u)) * dx
-        L -= a2 * (inner(dot(u_, nabla_grad(u_)), w)  + div(eta_ * u_)) * dx
 
     return B, L
 

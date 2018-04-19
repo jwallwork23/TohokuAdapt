@@ -2,7 +2,7 @@ from thetis import *
 
 from time import clock
 
-from utils.callbacks import TohokuCallback, P02Callback, P06Callback
+from utils.callbacks import SWCallback, P02Callback, P06Callback
 from utils.mesh import problemDomain
 from utils.options import Options
 
@@ -14,7 +14,7 @@ def solverSW(startRes, di, op=Options()):
     solver_obj = solver2d.FlowSolver2d(mesh, b)
     options = solver_obj.options
     options.element_family = op.family
-    options.use_nonlinear_equations = True if op.nonlinear else False
+    options.use_nonlinear_equations = True
     options.use_grad_depth_viscosity_term = False
     options.use_grad_div_viscosity_term = False
     options.coriolis_frequency = f
@@ -27,19 +27,13 @@ def solverSW(startRes, di, op=Options()):
         options.output_directory = di
     else:
         options.no_exports = True
-    if op.printStats:
-        options.timestepper_options.solver_parameters = {# TODO: Why is linear solver still taking 2 iterations?
-                                                         # 'snes_monitor': True,
-                                                         # 'snes_view': True,
-                                                         'snes_converged_reason': True,
-                                                         'ksp_converged_reason': True,
-                                                        }
     # options.use_wetting_and_drying = op.wd        # TODO: Make this work
     # if op.wd:
     #     options.wetting_and_drying_alpha = alpha
     solver_obj.bnd_functions['shallow_water'] = BCs
     solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
-    cb1 = TohokuCallback(solver_obj)        # Objective functional computation error
+    cb1 = SWCallback(solver_obj)        # Objective functional computation error
+    cb1.op = op
     solver_obj.add_callback(cb1, 'timestep')
     cb2 = P02Callback(solver_obj)           # Gauge timeseries error P02
     solver_obj.add_callback(cb2, 'timestep')
@@ -65,7 +59,6 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-r", help="Use rotational equations")
-    parser.add_argument("-l", help="Use linearised equations")
     parser.add_argument("-w", help="Use wetting and drying")
     parser.add_argument("-o", help="Output data")
     parser.add_argument("-s", help="Print solver statistics")
@@ -74,9 +67,8 @@ if __name__ == '__main__':
                  plotpvd=True if args.o else False,
                  printStats=True if args.s else False,
                  wd=True if args.w else False)
-    op.nonlinear = False if args.l else True
     op.rotational = True if args.r else False
-    tag = 'nonlinear=' + str(op.nonlinear) + '_' + 'rotational=' + str(op.rotational)
+    tag = 'rotational=' + str(op.rotational)
     if args.w:
         tag += '_w'
     filename = 'outdata/model-verification/' + tag + '_' + date
@@ -91,7 +83,7 @@ if __name__ == '__main__':
     g2list = np.zeros(len(resolutions))
     g6list = np.zeros(len(resolutions))
     for k, i in zip(resolutions, range(len(resolutions))):
-        print("\nStarting run %d... Nonlinear = %s, Rotational = %s\n" % (k, op.nonlinear, op.rotational))
+        print("\nStarting run %d... Rotational = %s\n" % (k, op.rotational))
         J_h, integrand, gP02, totalVarP02, gP06, totalVarP06, timing = solverSW(k, di, op=op)
 
         # Save to disk

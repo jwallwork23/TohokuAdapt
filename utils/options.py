@@ -19,9 +19,8 @@ class Options:
                  adaptField='s',            # Best approach for tsunami modelling
                  iso=False,
                  gradate=False,
-                 nonlinear=True,            # TODO: This will become redundant
                  rotational=False,
-                 printStats=True,
+                 printStats=True,           # TODO: This will become redundant
                  bAdapt=False,
                  hessMeth='dL2',
                  maxGrowth=1.4,
@@ -51,7 +50,6 @@ class Options:
         :param adaptField: Adapt w.r.t 's'peed, 'f'ree surface or 'b'oth.
         :param iso: Toggle isotropic / anisotropic algorithm.
         :param gradate: Toggle metric gradation.
-        :param nonlinear: Toggle nonlinear / linear equations.
         :param rotational: Toggle rotational / non-rotational equations.
         :param printStats: print to screen during simulation.
         :param bAdapt: intersect metrics with Hessian w.r.t. bathymetry.
@@ -115,11 +113,10 @@ class Options:
             self.adaptField = adaptField
         except:
             raise ValueError('Field for adaption ``%s`` not recognised.' % adaptField)
-        for i in (gradate, nonlinear, rotational, iso, printStats, plotpvd, wd, refinedSpace, bAdapt):
+        for i in (gradate, rotational, iso, printStats, plotpvd, wd, refinedSpace, bAdapt):
             assert(isinstance(i, bool))
         self.iso = iso
         self.gradate = gradate
-        self.nonlinear = nonlinear
         self.rotational = rotational
         self.printStats = printStats
         self.bAdapt = bAdapt

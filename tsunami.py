@@ -48,7 +48,6 @@ def fixedMesh(startRes, op=Options()):
         options.timesteps_per_remesh = op.rm
         options.output_directory = di
         options.export_diagnostics = True
-        options.log_output = op.printStats
         options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
         options.use_wetting_and_drying = op.wd
         # if op.wd:                                                         # TODO: Calculate w&d alpha
@@ -173,7 +172,6 @@ def hessianBased(startRes, op=Options()):
             adapOpt.timestep = op.dt
             adapOpt.output_directory = di
             adapOpt.export_diagnostics = True
-            adapOpt.log_output = op.printStats
             adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
             adapOpt.use_wetting_and_drying = op.wd
             # if op.wd:                                             #           # TODO: Calculate w&d alpha
@@ -345,7 +343,6 @@ def DWR(startRes, op=Options()):
     options.timesteps_per_remesh = op.rm
     options.output_directory = di
     options.export_diagnostics = True
-    options.log_output = op.printStats
     options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
     # options.use_wetting_and_drying = op.wd                        # TODO: Establish w&d alpha
     # if op.wd:
@@ -391,8 +388,7 @@ def DWR(startRes, op=Options()):
             saveAdj.close()
         if op.plotpvd:
             adjointFile.write(dual_u, dual_e, time=op.dt * (i - r + 1))
-        if op.printStats:
-            print('Adjoint simulation %.2f%% complete' % ((N - i + r - 1) / N * 100))
+        print('Adjoint simulation %.2f%% complete' % ((N - i + r - 1) / N * 100))
     dualTimer = clock() - dualTimer
     print('Dual run complete. Run time: %.3fs' % dualTimer)
 
@@ -400,8 +396,7 @@ def DWR(startRes, op=Options()):
 
         errorTimer = clock()
         for k in range(0, op.iEnd): # Loop back over times to generate error estimators
-            if op.printStats:
-                print('Generating error estimate %d / %d' % (k + 1, op.iEnd))
+            print('Generating error estimate %d / %d' % (k + 1, op.iEnd))
             i1 = 0 if k == 0 else 2 * k - 1
             i2 = 2 * k
             with DumbCheckpoint(di + 'hdf5/Velocity2d_' + indexString(i1), mode=FILE_READ) as loadVel:
@@ -447,8 +442,7 @@ def DWR(startRes, op=Options()):
             if op.plotpvd:
                 errorFile.write(epsilon, time=float(k))
         errorTimer = clock() - errorTimer
-        if op.printStats:
-            print('Errors estimated. Run time: %.3fs' % errorTimer)
+        print('Errors estimated. Run time: %.3fs' % errorTimer)
 
         # Run adaptive primal run
         cnt = 0
@@ -510,7 +504,6 @@ def DWR(startRes, op=Options()):
             adapOpt.timestep = op.dt
             adapOpt.output_directory = di
             adapOpt.export_diagnostics = True
-            adapOpt.log_output = op.printStats
             adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
             adapOpt.use_wetting_and_drying = op.wd
             # if op.wd:                                                         # TODO: Establish w&d alpha
@@ -647,7 +640,6 @@ if __name__ == "__main__":
                  # gradate=True if approach in ('DWP', 'DWR') and mode == 'tohoku' else False,
                  gradate=False,  # TODO: Fix this for tohoku case
                  plotpvd=True if args.o else False,
-                 printStats=True,
                  wd=bool(args.w) if args.w is not None else False,
                  adaptField=args.f if args.f is not None else 's',
                  orderChange=orderChange,
