@@ -99,6 +99,7 @@ class ObjectiveCallback(DiagnosticCallback):
         self.objective_functional = [scalar_callback()]
         self.append_to_hdf5 = False
         self.append_to_log = False
+        self.dt = solver_obj.options.timestep
 
     def __call__(self):
         value = self.scalar_callback()
@@ -109,6 +110,13 @@ class ObjectiveCallback(DiagnosticCallback):
     def message_str(self, *args):
         line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
         return line
+
+    def assembleOF(self):
+        func = self.objective_functional
+        J = 0
+        for i in range(1, len(func)):
+            J += 0.5 * (func[i - 1] + func[i]) * self.dt
+        return J
 
 
 class ObjectiveSWCallback(ObjectiveCallback):

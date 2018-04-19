@@ -6,7 +6,7 @@ from fenics_adjoint.solving import SolveBlock
 import numpy as np
 from time import clock
 
-from utils.adaptivity import metricIntersection, steadyMetric
+from utils.adaptivity import isoP2, metricIntersection, steadyMetric
 from utils.callbacks import *
 from utils.forms import solutionRW
 from utils.interpolation import interp
@@ -250,7 +250,146 @@ def hessianBased(startRes, op=Options()):
 
 
 def DWR(startRes, op=Options()):
-    raise NotImplementedError
+    di = 'plots/' + op.mode + '/DWR/'
+    if op.plotpvd:
+        residualFile = File(di + "residual.pvd")
+        errorFile = File(di + "errorIndicator.pvd")
+        adjointFile = File(di + "adjoint.pvd")
+
+    # Initialise domain and physical parameters
+    try:
+        assert (float(physical_constants['g_grav'].dat.data) == op.g)
+    except:
+        physical_constants['g_grav'].assign(op.g)
+    mesh_H, u0, eta0, b, BCs, f = problemDomain(startRes, op=op)
+    V = op.mixedSpace(mesh_H)
+    q = Function(V)
+    uv_2d, elev_2d = q.split()    # Needed to load data into
+    P1 = FunctionSpace(mesh_H, "CG", 1)
+    q_ = Function(V)                        # Variable at previous timestep
+    uv_2d_, elev_2d_ = q_.split()
+    P0 = FunctionSpace(mesh_H, "DG", 0)
+    if op.mode == 'rossby-wave':
+        peak_a, distance_a = peakAndDistance(solutionRW(V, t=op.Tend).split()[1])  # Analytic final-time state
+
+    # Define Functions relating to a posteriori DWR error estimator
+    dual = Function(V)
+    dual_u, dual_e = dual.split()
+    dual_u.rename("Adjoint velocity")
+    dual_e.rename("Adjoint elevation")
+    if op.orderChange:                      # Define variables on higher/lower order space
+        Ve = op.mixedSpace(mesh_H, orderChange=op.orderChange)
+        qe = Function(Ve)
+        ue, ee = qe.split()
+        qe_ = Function(Ve)
+        ue_, ee_ = qe_.split()
+        duale = Function(Ve)
+        duale_u, duale_e = duale.split()
+        be = b                              # TODO: Is this a valid thing to do?
+    elif op.refinedSpace:                   # Define variables on an iso-P2 refined space
+        mesh_h = isoP2(mesh_H)
+        Ve = op.mixedSpace(mesh_h)
+        be = problemDomain(mesh=mesh_h, op=op)[3]
+        qe = Function(Ve)
+        P0 = FunctionSpace(mesh_h, "DG", 0)
+    else:                                   # Copy standard variables to mimic enriched space labels
+        Ve = V
+        qe = q
+        be = b
+    rho = Function(Ve)
+    rho_u, rho_e = rho.split()
+    rho_u.rename("Velocity residual")
+    rho_e.rename("Elevation residual")
+    v = TestFunction(P0)                    # For extracting elementwise error indicators
+
+    # Initialise parameters and counters
+    nEle, op.nVerT = meshStats(mesh_H)
+    op.nVerT *= op.rescaling  # Target #Vertices
+    mM = [nEle, nEle]  # Min/max #Elements
+    Sn = nEle
+    endT = 0.
+    Dt = Constant(op.dt)
+    cntT = int(np.ceil(op.Tend / op.dt))
+
+    # Get initial boundary metric and TODO wetting and drying parameter
+    if op.gradate or op.wd:
+        H0 = Function(P1).interpolate(CellSize(mesh_H))
+    if op.wd:
+        g = constructGradient(elev_2d)
+        spd = assemble(v * sqrt(inner(g, g)) * dx)
+        gs = np.min(np.abs(spd.dat.data))
+        print('#### gradient = ', gs)
+        ls = np.min([H0.dat.data[i] for i in DirichletBC(P1, 0, 'on_boundary').nodes])
+        print('#### ls = ', ls)
+        alpha = Constant(gs * ls)
+        print('#### alpha = ', alpha.dat.data)
+
+    # Solve fixed mesh primal problem to get residuals and adjoint solutions
+    solver_obj = solver2d.FlowSolver2d(mesh_H, b)
+    options = solver_obj.options
+    options.element_family = op.family
+    options.use_nonlinear_equations = True if op.nonlinear else False
+    options.use_grad_depth_viscosity_term = False
+    options.use_grad_div_viscosity_term = False
+    options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
+    if op.mode == 'rossby-wave':
+        options.coriolis_frequency = f
+    options.simulation_export_time = op.dt * (op.rm - 1)
+    options.simulation_end_time = op.Tend
+    options.timestepper_type = op.timestepper
+    options.timestep = op.dt
+    options.timesteps_per_remesh = op.rm
+    options.output_directory = di
+    options.export_diagnostics = True
+    options.log_output = op.printStats
+    options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+    # options.use_wetting_and_drying = op.wd                        # TODO: Establish w&d alpha
+    # if op.wd:
+    #     options.wetting_and_drying_alpha = alpha
+    solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
+    cb1 = ObjectiveSWCallback(solver_obj)
+    cb1.op = op
+    solver_obj.add_callback(cb1, 'timestep')
+    solver_obj.bnd_functions['shallow_water'] = BCs
+    def selector():
+        rm = options.timesteps_per_remesh
+        dt = options.timestep
+        options.simulation_export_time = dt if int(solver_obj.simulation_time / dt) % rm == 0 else (rm - 1) * dt
+    primalTimer = clock()
+    solver_obj.iterate(export_func=selector)
+    primalTimer = clock() - primalTimer
+    J = cb1.assembleOF()                    # Assemble objective functional
+    print('Primal run complete. Run time: %.3fs' % primalTimer)
+
+    # Compute gradient
+    gradientTimer = clock()
+    dJdb = compute_gradient(J, Control(b))                          # TODO: Rewrite pyadjoint to avoid computing this
+    gradientTimer = clock() - gradientTimer
+    # File(di + 'gradient.pvd').write(dJdb)     # Too memory intensive in Tohoku case
+    print("Norm of gradient: %.3e. Time for computation: %.1fs" % (dJdb.dat.norm, gradientTimer))
+
+    # Extract adjoint solutions
+    dualTimer = clock()
+    tape = get_working_tape()
+    solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
+    N = len(solve_blocks)
+    r = N % op.rm  # Number of extra tape annotations in setup
+    for i in range(N - 1, r - 2, -op.rm):
+        dual.assign(solve_blocks[i].adj_sol)
+        dual_u, dual_e = dual.split()
+        dual_u.rename('Adjoint velocity')
+        dual_e.rename('Adjoint elevation')
+        with DumbCheckpoint(di + 'hdf5/adjoint_' + indexString(int((i - r + 1) / op.rm)), mode=FILE_CREATE) as saveAdj:
+            saveAdj.store(dual_u)
+            saveAdj.store(dual_e)
+            saveAdj.close()
+        if op.plotpvd:
+            adjointFile.write(dual_u, dual_e, time=op.dt * (i - r + 1))
+        if op.printStats:
+            print('Adjoint simulation %.2f%% complete' % ((N - i + r - 1) / N * 100))
+    dualTimer = clock() - dualTimer
+    print('Dual run complete. Run time: %.3fs' % dualTimer)
+    cnt = 0
 
 
 if __name__ == "__main__":

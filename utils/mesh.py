@@ -209,7 +209,8 @@ def problemDomain(level=0, mesh=None, output=False, op=Options(mode='tohoku')):
     elif op.mode == 'shallow-water':
         n = pow(2, level)
         lx = 2 * pi
-        mesh = SquareMesh(n, n, lx, lx)
+        if mesh is None:
+            mesh = SquareMesh(n, n, lx, lx)
         P1 = FunctionSpace(mesh, "CG", 1)
         x, y = SpatialCoordinate(mesh)
         eta0 = Function(P1).interpolate(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))))
@@ -221,7 +222,8 @@ def problemDomain(level=0, mesh=None, output=False, op=Options(mode='tohoku')):
         n = pow(2, level-1)
         lx = 48
         ly = 24
-        mesh = RectangleMesh(lx * n, ly * n, lx, ly)
+        if mesh is None:
+            mesh = RectangleMesh(lx * n, ly * n, lx, ly)
         xy = Function(mesh.coordinates)
         xy.dat.data[:, :] -= [lx / 2, ly / 2]       # TODO: This could be the problem for adjoint
         mesh.coordinates.assign(xy)
