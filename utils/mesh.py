@@ -152,13 +152,12 @@ else:
     from .options import Options
 
 
-def problemDomain(level=0, mesh=None, output=False, op=Options(mode='tohoku')):
+def problemDomain(level=0, mesh=None, op=Options(mode='tohoku')):
     """
     Set up problem domain.
     
     :arg level: refinement level, where 0 is coarsest.
     :param mesh: user specified mesh, if already generated.
-    :param output: toggle plotting of bathymetry and initial surface.
     :param op: options parameter object.
     :return: associated mesh, initial conditions, bathymetry field, boundary conditions and Coriolis parameter. 
     """
@@ -200,7 +199,7 @@ def problemDomain(level=0, mesh=None, output=False, op=Options(mode='tohoku')):
 
         # Post-process the bathymetry to have a minimum depth of 30m and if no wetting-and-drying
         BCs = {}
-        if op.rotational:
+        if op.rotational:           # TODO: Try f- or beta-plane approximation
             f = Function(FunctionSpace(mesh, 'CG', 1))
             for i, v in zip(range(len(mesh.coordinates.dat.data)), mesh.coordinates.dat.data):
                 f.dat.data[i] = 2 * op.Omega * np.sin(np.radians(get_latitude(v[0], v[1], 54, northern=True)))
@@ -225,7 +224,7 @@ def problemDomain(level=0, mesh=None, output=False, op=Options(mode='tohoku')):
         if mesh is None:
             mesh = RectangleMesh(lx * n, ly * n, lx, ly)
         xy = Function(mesh.coordinates)
-        xy.dat.data[:, :] -= [lx / 2, ly / 2]       # TODO: This could be the problem for adjoint
+        xy.dat.data[:, :] -= [lx / 2, ly / 2]
         mesh.coordinates.assign(xy)
         P1 = FunctionSpace(mesh, "CG", 1)
         b = Function(P1).assign(1.)
@@ -235,10 +234,6 @@ def problemDomain(level=0, mesh=None, output=False, op=Options(mode='tohoku')):
         f = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
     else:
         raise NotImplementedError
-
-    if output:
-        File('plots/initialisation/surf.pvd').write(eta0)
-        File('plots/initialisation/bathymetry.pvd').write(b)
 
     return mesh, u0, eta0, b, BCs, f
 

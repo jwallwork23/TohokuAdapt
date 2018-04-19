@@ -16,12 +16,13 @@ class Options:
                  maxAnisotropy=100,
                  normalisation='lp',
                  normOrder=2,
-                 adaptField='s',                 # Best approach for tsunami modelling
+                 adaptField='s',            # Best approach for tsunami modelling
                  iso=False,
                  gradate=False,
-                 nonlinear=False,
+                 nonlinear=True,            # TODO: This will become redundant
                  rotational=False,
                  printStats=True,
+                 bAdapt=False,
                  hessMeth='dL2',
                  maxGrowth=1.4,
                  g=9.81,
@@ -53,6 +54,7 @@ class Options:
         :param nonlinear: Toggle nonlinear / linear equations.
         :param rotational: Toggle rotational / non-rotational equations.
         :param printStats: print to screen during simulation.
+        :param bAdapt: intersect metrics with Hessian w.r.t. bathymetry.
         :param hessMeth: Method of Hessian reconstruction: 'dL2' or 'parts'.
         :param maxGrowth: metric gradation scaling parameter.
         :param g: gravitational acceleration.
@@ -113,13 +115,14 @@ class Options:
             self.adaptField = adaptField
         except:
             raise ValueError('Field for adaption ``%s`` not recognised.' % adaptField)
-        for i in (gradate, nonlinear, rotational, iso, printStats, plotpvd, wd, refinedSpace):
+        for i in (gradate, nonlinear, rotational, iso, printStats, plotpvd, wd, refinedSpace, bAdapt):
             assert(isinstance(i, bool))
         self.iso = iso
         self.gradate = gradate
         self.nonlinear = nonlinear
         self.rotational = rotational
         self.printStats = printStats
+        self.bAdapt = bAdapt
         self.plotpvd = plotpvd
         self.wd = wd
         self.refinedSpace = refinedSpace
@@ -187,7 +190,7 @@ class Options:
             self.rm = 5
             self.dt = 0.05
             self.ndump = 5
-            self.J = 1.1184e-3,     # On mesh of 524,288 elements
+            self.J = 1.1184e-3,                                         # On mesh of 524,288 elements
             self.xy = [0., 0.5 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
         elif self.mode == 'rossby-wave':
             self.Tstart = 20.
@@ -198,12 +201,11 @@ class Options:
             self.rm = 24
             self.dt = 0.05
             self.ndump = 12
-            self.nonlinear = True
             self.g = 1.
             self.J = 1.                                                 # TODO: establish this
             self.xy = [-24., -20., -2., 2.]
         elif self.mode in ('tohoku', 'model-verification'):
-            self.J = 1.240e+13          # On mesh of 681,666 elements     TODO: Check this
+            self.J = 1.240e+13                                          # On mesh of 681,666 elements     TODO: Check
             self.xy = [490e3, 640e3, 4160e3, 4360e3]
 
             # Gauge locations in latitude-longitude coordinates

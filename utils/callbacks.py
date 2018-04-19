@@ -141,7 +141,7 @@ class ObjectiveSWCallback(ObjectiveCallback):
             V = solver_obj.fields.solution_2d.function_space()
             ks = Function(V)
             k0, k1 = ks.split()
-            k1.assign(indicator(V.sub(1), mode=self.op))
+            k1.assign(indicator(V.sub(1), op=self.op))
             kt = Constant(0.)
             if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:
                 kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * dt else 0.5)

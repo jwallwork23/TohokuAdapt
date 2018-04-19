@@ -35,7 +35,7 @@ def fixedMesh(startRes, op=Options()):
         solver_obj = solver2d.FlowSolver2d(mesh, b)
         options = solver_obj.options
         options.element_family = op.family
-        options.use_nonlinear_equations = True if op.nonlinear else False   # TODO: Go nonlinear everywhere?
+        options.use_nonlinear_equations = True
         options.use_grad_depth_viscosity_term = False
         options.use_grad_div_viscosity_term = False
         options.use_lax_friedrichs_velocity = False                         # TODO: This is a temporary fix
@@ -143,6 +143,9 @@ def hessianBased(startRes, op=Options()):
                         spd = Function(FunctionSpace(mesh, "DG", 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
                         M2 = steadyMetric(spd, op=op)
                         M = metricIntersection(M, M2) if op.adaptField == 'b' else M2
+                if op.bAdapt:
+                    M2 = steadyMetric(b, op=op)
+                    M = metricIntersection(M, M2)
 
                 # Adapt mesh and interpolate variables
                 if cnt != 0 or op.adaptField == 'f':
@@ -158,7 +161,7 @@ def hessianBased(startRes, op=Options()):
             adapSolver = solver2d.FlowSolver2d(mesh, b)
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
-            adapOpt.use_nonlinear_equations = True if op.nonlinear else False   # TODO: Go nonlinear everywhere?
+            adapOpt.use_nonlinear_equations = True
             adapOpt.use_grad_depth_viscosity_term = False
             adapOpt.use_grad_div_viscosity_term = False
             adapOpt.use_lax_friedrichs_velocity = False                         # TODO: This is a temporary fix
@@ -329,7 +332,7 @@ def DWR(startRes, op=Options()):
     solver_obj = solver2d.FlowSolver2d(mesh_H, b)
     options = solver_obj.options
     options.element_family = op.family
-    options.use_nonlinear_equations = True if op.nonlinear else False
+    options.use_nonlinear_equations = True
     options.use_grad_depth_viscosity_term = False
     options.use_grad_div_viscosity_term = False
     options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
@@ -495,7 +498,7 @@ def DWR(startRes, op=Options()):
             adapSolver = solver2d.FlowSolver2d(mesh_H, b)
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
-            adapOpt.use_nonlinear_equations = True if op.nonlinear else False   # TODO: Use nonlinear case everywhere?
+            adapOpt.use_nonlinear_equations = True
             adapOpt.use_grad_depth_viscosity_term = False
             adapOpt.use_grad_div_viscosity_term = False
             adapOpt.use_lax_friedrichs_velocity = False                         # TODO: This is a temporary fix
@@ -587,6 +590,10 @@ def DWR(startRes, op=Options()):
             return av, rel, J_h, integrand, solverTimer, adaptTimer
 
 
+def DWP(startRes, op=Options()):
+    raise NotImplementedError
+
+
 if __name__ == "__main__":
     import argparse
     import datetime
@@ -596,7 +603,7 @@ if __name__ == "__main__":
     date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-a", help="Choose adaptive approach from {'hessianBased', 'DWR'} (default fixedMesh)")
+    parser.add_argument("-a", help="Choose adaptive approach from {'hessianBased', 'DWP', 'DWR'} (default fixedMesh)")
     parser.add_argument("-t", help="Choose test problem from {'shallow-water', 'rossby-wave'} (default Tohoku)")
     parser.add_argument("-low", help="Lower bound for index range")
     parser.add_argument("-high", help="Upper bound for index range")
@@ -606,6 +613,7 @@ if __name__ == "__main__":
     parser.add_argument("-lo", help="Compute errors and residuals in a lower order space")
     parser.add_argument("-r", help="Compute errors and residuals in a refined space")
     parser.add_argument("-f", help="Field for adaption")
+    parser.add_argument("-b", help="Intersect metrics with bathymetry")
     args = parser.parse_args()
     approach = args.a
     if args.t is None:
@@ -620,7 +628,7 @@ if __name__ == "__main__":
         approach = 'fixedMesh'
     else:
         assert approach in ('hessianBased', 'DWR')
-    solver = {'fixedMesh': fixedMesh, 'hessianBased': hessianBased, 'DWR': DWR}[approach]
+    solver = {'fixedMesh': fixedMesh, 'hessianBased': hessianBased, 'DWP': DWP, 'DWR': DWR}[approach]
     print("Mode: %s, approach: %s" % (mode, approach))
     orderChange = 0
     if args.ho:
@@ -631,19 +639,20 @@ if __name__ == "__main__":
         orderChange = -1
     if args.r:
         assert (not args.ho) and (not args.lo)
-    if args.f is not None:
+    if args.f is not None or args.b is not None:
         assert approach == 'hessianBased'
 
     # Choose mode and set parameter values
     op = Options(mode=mode,
-                 # gradate=True if aposteriori and mode == 'tohoku' else False,
+                 # gradate=True if approach in ('DWP', 'DWR') and mode == 'tohoku' else False,
                  gradate=False,  # TODO: Fix this for tohoku case
                  plotpvd=True if args.o else False,
                  printStats=True,
-                 wd=True if args.w else False,
+                 wd=bool(args.w) if args.w is not None else False,
                  adaptField=args.f if args.f is not None else 's',
                  orderChange=orderChange,
-                 refinedSpace=True if args.r else False)
+                 refinedSpace=True if args.r else False,
+                 bAdapt=bool(args.b) if args.b is not None else False)
 
     # Establish filename
     filename = 'outdata/' + mode + '/' + approach
