@@ -302,8 +302,6 @@ def DWR(startRes, op=Options()):
     mM = [nEle, nEle]  # Min/max #Elements
     Sn = nEle
     endT = 0.
-    Dt = Constant(op.dt)
-    cntT = int(np.ceil(op.Tend / op.dt))
 
     # Get initial boundary metric
     if op.gradate:
@@ -563,7 +561,269 @@ def DWR(startRes, op=Options()):
 
 
 def DWP(startRes, op=Options()):
-    raise NotImplementedError
+    initTimer = clock()
+    di = 'plots/' + op.mode + '/DWP/'
+    if op.plotpvd:
+        errorFile = File(di + "errorIndicator.pvd")
+        adjointFile = File(di + "adjoint.pvd")
+
+    # Initialise domain and physical parameters
+    try:
+        assert (float(physical_constants['g_grav'].dat.data) == op.g)
+    except:
+        physical_constants['g_grav'].assign(op.g)
+    mesh_H, u0, eta0, b, BCs, f = problemDomain(startRes, op=op)
+    V = op.mixedSpace(mesh_H)
+    q = Function(V)
+    uv_2d, elev_2d = q.split()  # Needed to load data into
+    if op.mode == 'rossby-wave':
+        peak_a, distance_a = peakAndDistance(solutionRW(V, t=op.Tend).split()[1])  # Analytic final-time state
+
+    # Define Functions relating to a posteriori DWR error estimator
+    dual = Function(V)
+    dual_u, dual_e = dual.split()
+    dual_u.rename("Adjoint velocity")
+    dual_e.rename("Adjoint elevation")
+    v = TestFunction(FunctionSpace(mesh_H, "DG", 0))  # For extracting elementwise error indicators
+
+    # Initialise parameters and counters
+    nEle, op.nVerT = meshStats(mesh_H)
+    op.nVerT *= op.rescaling  # Target #Vertices
+    mM = [nEle, nEle]  # Min/max #Elements
+    Sn = nEle
+    endT = 0.
+
+    # Get initial boundary metric
+    if op.gradate:
+        H0 = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(CellSize(mesh_H))
+
+    if not op.regen:
+
+        # Solve fixed mesh primal problem to get residuals and adjoint solutions
+        solver_obj = solver2d.FlowSolver2d(mesh_H, b)
+        options = solver_obj.options
+        options.element_family = op.family
+        options.use_nonlinear_equations = True
+        options.use_grad_depth_viscosity_term = False                   # TODO: Might as well include these
+        options.use_grad_div_viscosity_term = False
+        options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
+        if op.mode == 'rossby-wave':
+            options.coriolis_frequency = f
+        options.simulation_export_time = op.dt * op.ndump
+        options.simulation_end_time = op.Tend
+        options.timestepper_type = op.timestepper
+        options.timestep = op.dt
+        options.timesteps_per_remesh = op.rm
+        options.output_directory = di
+        options.export_diagnostics = True
+        options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+        solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
+        cb1 = ObjectiveSWCallback(solver_obj)
+        cb1.op = op
+        solver_obj.add_callback(cb1, 'timestep')
+        solver_obj.bnd_functions['shallow_water'] = BCs
+        initTimer = clock() - initTimer
+        print('Problem initialised. Setup time: %.3fs' % initTimer)
+        primalTimer = clock()
+        solver_obj.iterate()
+        primalTimer = clock() - primalTimer
+        J = cb1.assembleOF()                        # Assemble objective functional for adjoint computation
+        print('Primal run complete. Solver time: %.3fs' % primalTimer)
+
+        # Compute gradient
+        gradientTimer = clock()
+        dJdb = compute_gradient(J, Control(b))      # TODO: Rewrite pyadjoint to avoid computing this
+        gradientTimer = clock() - gradientTimer
+        # File(di + 'gradient.pvd').write(dJdb)     # Too memory intensive in Tohoku case
+        print("Norm of gradient: %.3e. Computation time: %.1fs" % (dJdb.dat.norm, gradientTimer))
+
+        # Extract adjoint solutions
+        dualTimer = clock()
+        tape = get_working_tape()
+        solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
+        N = len(solve_blocks)
+        r = N % op.ndump                               # Number of extra tape annotations in setup
+        for i in range(N - 1, r - 2, -op.ndump):
+            dual.assign(solve_blocks[i].adj_sol)
+            dual_u, dual_e = dual.split()
+            dual_u.rename('Adjoint velocity')
+            dual_e.rename('Adjoint elevation')
+            with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexString(int((i - r + 1) / op.ndump)), mode=FILE_CREATE) as saveAdj:
+                saveAdj.store(dual_u)
+                saveAdj.store(dual_e)
+                saveAdj.close()
+            if op.plotpvd:
+                adjointFile.write(dual_u, dual_e, time=op.dt * (i - r + 1))
+            print('Adjoint simulation %.2f%% complete' % ((N - i + r - 1) / N * 100))
+        dualTimer = clock() - dualTimer
+        print('Dual run complete. Run time: %.3fs' % dualTimer)
+
+    with pyadjoint.stop_annotating():
+
+        errorTimer = clock()
+        for k in range(0, op.iEnd):  # Loop back over times to generate error estimators
+            print('Generating error estimate %d / %d' % (k + 1, op.iEnd))
+            with DumbCheckpoint(di + 'hdf5/Velocity2d_' + indexString(k), mode=FILE_READ) as loadVel:
+                loadVel.load(uv_2d)
+                loadVel.close()
+            with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexString(k), mode=FILE_READ) as loadElev:
+                loadElev.load(elev_2d)
+                loadElev.close()
+
+            # Load adjoint data and form indicators
+            epsilon = assemble(v * inner(q, dual) * dx)
+            for i in range(k, min(k + op.iEnd - op.iStart, op.iEnd)):
+                with DumbCheckpoint(di + 'hdf5/adjoint_' + indexString(i), mode=FILE_READ) as loadAdj:
+                    loadAdj.load(dual_u)
+                    loadAdj.load(dual_e)
+                    loadAdj.close()
+                epsilon_ = assemble(v * inner(q, dual) * dx)
+                for j in range(len(epsilon.dat.data)):
+                    epsilon.dat.data[j] = max(epsilon.dat.data[j], epsilon_.dat.data[j])
+            epsilon.rename("Error indicator")
+            with DumbCheckpoint(di + 'hdf5/Error2d_' + indexString(k), mode=FILE_CREATE) as saveErr:
+                saveErr.store(epsilon)
+                saveErr.close()
+            if op.plotpvd:
+                errorFile.write(epsilon, time=float(k))
+        errorTimer = clock() - errorTimer
+        print('Errors estimated. Run time: %.3fs' % errorTimer)
+
+        # Run adaptive primal run
+        cnt = 0
+        q = Function(V)
+        uv_2d, elev_2d = q.split()
+        elev_2d.interpolate(eta0)
+        uv_2d.interpolate(u0)
+        while cnt < op.cntT:
+            indexStr = indexString(int(cnt / op.ndump))
+
+            # Load variables from solver session on previous mesh
+            adaptTimer = clock()
+            if cnt != 0:
+                V = op.mixedSpace(mesh_H)
+                q = Function(V)
+                uv_2d, elev_2d = q.split()
+                with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as loadElev:
+                    loadElev.load(elev_2d, name='elev_2d')
+                    loadElev.close()
+                with DumbCheckpoint(di + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as loadVel:
+                    loadVel.load(uv_2d, name='uv_2d')
+                    loadVel.close()
+
+            for l in range(op.nAdapt):  # TODO: Test this functionality
+
+                # Construct metric
+                with DumbCheckpoint(di + 'hdf5/Error2d_' + indexString(int(cnt / op.rm)),
+                                    mode=FILE_READ) as loadErr:
+                    loadErr.load(epsilon)
+                    loadErr.close()
+                errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(interp(mesh_H, epsilon))
+                M = isotropicMetric(errEst, invert=False, op=op)  # TODO: Not sure normalisation is working
+                if op.gradate:
+                    M_ = isotropicMetric(interp(mesh_H, H0), bdy=True, op=op)  # Initial boundary metric
+                    M = metricIntersection(M, M_, bdy=True)
+                    metricGradation(M, op=op)
+
+                # Adapt mesh and interpolate variables
+                mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
+                P1 = FunctionSpace(mesh_H, "CG", 1)
+                elev_2d, uv_2d = interp(mesh_H, elev_2d, uv_2d)
+                b = problemDomain(mesh=mesh_H, op=op)[3]  # Reset bathymetry on new mesh
+                uv_2d.rename('uv_2d')
+                elev_2d.rename('elev_2d')
+            adaptTimer = clock() - adaptTimer
+
+            # Solver object and equations
+            adapSolver = solver2d.FlowSolver2d(mesh_H, b)
+            adapOpt = adapSolver.options
+            adapOpt.element_family = op.family
+            adapOpt.use_nonlinear_equations = True
+            adapOpt.use_grad_depth_viscosity_term = False   # TODO: Might as well include these
+            adapOpt.use_grad_div_viscosity_term = False
+            adapOpt.use_lax_friedrichs_velocity = False     # TODO: This is a temporary fix
+            adapOpt.simulation_export_time = op.dt * op.ndump
+            startT = endT
+            endT += op.dt * op.rm
+            adapOpt.simulation_end_time = endT
+            adapOpt.timestepper_type = op.timestepper
+            adapOpt.timestep = op.dt
+            adapOpt.output_directory = di
+            adapOpt.export_diagnostics = True
+            adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+            if op.mode == 'rossby-wave':
+                adapOpt.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh_H)[1])
+            field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
+            e = exporter.ExportManager(di + 'hdf5',
+                                       ['elev_2d', 'uv_2d'],
+                                       field_dict,
+                                       field_metadata,
+                                       export_type='hdf5')
+            adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
+            adapSolver.i_export = int(cnt / op.ndump)
+            adapSolver.iteration = cnt
+            adapSolver.simulation_time = startT
+            adapSolver.next_export_t = startT + adapOpt.simulation_export_time  # For next export
+            for e in adapSolver.exporters.values():
+                e.set_next_export_ix(adapSolver.i_export)
+
+            # Evaluate callbacks and iterate
+            cb2 = SWCallback(adapSolver)
+            cb2.op = op
+            if op.mode == 'tohoku':
+                cb3 = P02Callback(adapSolver)
+                cb4 = P06Callback(adapSolver)
+            if cnt == 0:
+                initP02 = cb2.init_value
+                initP06 = cb3.init_value
+            else:
+                cb2.objective_value = integrand
+                if op.mode == 'tohoku':
+                    cb3.gauge_values = gP02
+                    cb3.init_value = initP02
+                    cb4.gauge_values = gP06
+                    cb4.init_value = initP06
+            adapSolver.add_callback(cb2, 'timestep')
+            if op.mode == 'tohoku':
+                adapSolver.add_callback(cb3, 'timestep')
+                adapSolver.add_callback(cb4, 'timestep')
+            adapSolver.bnd_functions['shallow_water'] = BCs
+            solverTimer = clock()
+            adapSolver.iterate()
+            solverTimer = clock() - solverTimer
+            J_h = cb2.quadrature()
+            integrand = cb2.__call__()[1]
+            if op.mode == 'tohoku':
+                gP02 = cb3.__call__()[1]
+                gP06 = cb4.__call__()[1]
+
+            # Get mesh stats
+            nEle = meshStats(mesh_H)[0]
+            mM = [min(nEle, mM[0]), max(nEle, mM[1])]
+            Sn += nEle
+            cnt += op.rm
+            av = op.printToScreen(int(cnt / op.rm + 1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.dt)
+        if op.mode == 'tohoku':
+            totalVarP02 = cb3.totalVariation()
+            totalVarP06 = cb4.totalVariation()
+
+        # Measure error using metrics, as in Huang et al.
+        if op.mode == 'rossby-wave':  # TODO: fix indexing error
+            index = int(op.cntT / op.ndump)
+            with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexString(index), mode=FILE_READ) as loadElev:
+                loadElev.load(elev_2d, name='elev_2d')
+                loadElev.close()
+            peak, distance = peakAndDistance(elev_2d, op=op)
+            print('Peak %.4f vs. %.4f, distance %.4f vs. %.4f' % (peak, peak_a, distance, distance_a))
+
+        rel = np.abs(op.J - J_h) / np.abs(op.J)
+        if op.mode == 'rossby-wave':
+            return av, rel, J_h, integrand, np.abs(
+                peak / peak_a), distance, distance / distance_a, solverTimer, adaptTimer
+        elif op.mode == 'tohoku':
+            return av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, solverTimer, adaptTimer
+        else:
+            return av, rel, J_h, integrand, solverTimer, adaptTimer
 
 
 if __name__ == "__main__":
