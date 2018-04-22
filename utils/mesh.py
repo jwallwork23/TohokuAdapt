@@ -223,9 +223,9 @@ def problemDomain(level=0, mesh=None, op=Options(mode='tohoku')):
         ly = 24
         if mesh is None:
             mesh = RectangleMesh(lx * n, ly * n, lx, ly)
-        xy = Function(mesh.coordinates)
-        xy.dat.data[:, :] -= [lx / 2, ly / 2]
-        mesh.coordinates.assign(xy)
+            xy = Function(mesh.coordinates)
+            xy.dat.data[:, :] -= [lx / 2, ly / 2]
+            mesh.coordinates.assign(xy)
         P1 = FunctionSpace(mesh, "CG", 1)
         b = Function(P1).assign(1.)
         q = solutionRW(op.mixedSpace(mesh))

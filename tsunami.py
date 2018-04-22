@@ -675,7 +675,7 @@ def DWP(startRes, op=Options()):
             # Load adjoint data and form indicators
             epsilon = assemble(v * inner(q, dual) * dx)
             for i in range(k, min(k + op.iEnd - op.iStart, op.iEnd)):
-                with DumbCheckpoint(di + 'hdf5/adjoint_' + indexString(i), mode=FILE_READ) as loadAdj:
+                with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexString(i), mode=FILE_READ) as loadAdj:
                     loadAdj.load(dual_u)
                     loadAdj.load(dual_e)
                     loadAdj.close()
