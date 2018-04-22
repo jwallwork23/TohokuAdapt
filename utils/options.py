@@ -25,10 +25,7 @@ class Options:
                  regen=False,
                  hessMeth='dL2',
                  maxGrowth=1.4,
-                 g=9.81,
                  plotpvd=True,
-                 Tstart=300.,
-                 Tend=1500.,
                  dt=0.5,
                  ndump=50,
                  rm=50,
@@ -57,10 +54,7 @@ class Options:
         :param regen: regenerate error estimates based on saved data.
         :param hessMeth: Method of Hessian reconstruction: 'dL2' or 'parts'.
         :param maxGrowth: metric gradation scaling parameter.
-        :param g: gravitational acceleration.
         :param plotpvd: toggle saving solution fields to .pvd.
-        :param Tstart: Lower time range limit (s), before which we can assume the wave won't reach the shore.
-        :param Tend: Simulation duration (s).
         :param dt: Timestep (s).
         :param ndump: Timesteps per data dump.
         :param rm: Timesteps per remesh. (Should be an integer multiple of ndump.)
@@ -137,21 +131,10 @@ class Options:
         except:
             raise ValueError('Invalid value for growth parameter.')
 
-        # Physical parameters
         self.Omega = 7.291e-5   # Planetary rotation rate
-        try:
-            assert g > 0
-            self.g = g          # Gravitational acceleration
-        except:
-            raise ValueError('Unphysical physical parameters!')
 
         # Timestepping parameters
-        for i in (Tstart, Tend, dt):
-            assert isinstance(i, float)
-        self.Tstart = Tstart
-        self.Tend = Tend
         self.dt = dt
-        self.cntT = int(np.ceil(Tend / dt))
         for i in (ndump, rm, orderChange, nVerT, nAdapt):
             assert isinstance(i, int)
             try:
@@ -159,8 +142,6 @@ class Options:
             except:
                 raise ValueError("`rm` should be an integer multiple of `ndump`.")
         self.ndump = ndump
-        self.iStart = int(Tstart / (ndump * dt))
-        self.iEnd = int(self.cntT / ndump)
         self.rm = rm
         self.nAdapt = nAdapt
         self.orderChange = orderChange
@@ -192,6 +173,7 @@ class Options:
             self.ndump = 5
             self.J = 1.1184e-3,                                         # On mesh of 524,288 elements
             self.xy = [0., 0.5 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
+            self.g = 9.81
         elif self.mode == 'rossby-wave':
             self.Tstart = 20.
             self.Tend = 45.60
@@ -205,19 +187,26 @@ class Options:
             self.J = 1.                                                 # TODO: establish this
             self.xy = [-24., -20., -2., 2.]
         elif self.mode in ('tohoku', 'model-verification'):
+            self.Tstart = 300.
+            self.Tend = 1500.
             self.J = 1.240e+13                                          # On mesh of 681,666 elements     TODO: Check
             self.xy = [490e3, 640e3, 4160e3, 4360e3]
+            self.g = 9.81
 
             # Gauge locations in latitude-longitude coordinates
             self.glatlon = {"P02": (38.5002, 142.5016), "P06": (38.6340, 142.5838), "801": (38.2, 141.7),
                             "802": (39.3, 142.1), "803": (38.9, 141.8), "804": (39.7, 142.2), "806": (37.0, 141.2)}
             self.meshSizes = (5918, 7068, 8660, 10988, 14160, 19082, 27280, 41730, 72602, 160586, 681616)
 
+        self.cntT = int(np.ceil(self.Tend / self.dt))
+        self.iStart = int(self.Tstart / (self.ndump * self.dt))
+        self.iEnd = int(self.cntT / self.ndump)
+
         # Specify FunctionSpaces
-        self.degree1 = 2 if family == 'cg-cg' else 1
-        self.degree2 = 2 if family == 'dg-cg' else 1
-        self.space1 = "CG" if family == 'cg-cg' else "DG"
-        self.space2 = "DG" if family == 'dg-dg' else "CG"
+        self.degree1 = 2 if self.family == 'cg-cg' else 1
+        self.degree2 = 2 if self.family == 'dg-cg' else 1
+        self.space1 = "CG" if self.family == 'cg-cg' else "DG"
+        self.space2 = "DG" if self.family == 'dg-dg' else "CG"
 
         # Plotting dictionaries
         self.labels = ("Fixed mesh", "Hessian based", "Explicit", "Implicit", "Adjoint based", "Goal based")
@@ -238,9 +227,9 @@ class Options:
         return E, N
 
 
-    def mixedSpace(self, mesh, orderChange=0):
-        deg1 = self.degree1 + orderChange
-        deg2 = self.degree2 + orderChange
+    def mixedSpace(self, mesh):
+        deg1 = self.degree1 + self.orderChange
+        deg2 = self.degree2 + self.orderChange
         return VectorFunctionSpace(mesh, self.space1, deg1) * FunctionSpace(mesh, self.space2, deg2)
 
 

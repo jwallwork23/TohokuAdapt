@@ -261,6 +261,8 @@ def DWR(startRes, op=Options()):
     V = op.mixedSpace(mesh_H)
     q = Function(V)
     uv_2d, elev_2d = q.split()    # Needed to load data into
+    uv_2d.rename('uv_2d')
+    elev_2d.rename('elev_2d')
     P1 = FunctionSpace(mesh_H, "CG", 1)
     q_ = Function(V)                        # Variable at previous timestep
     uv_2d_, elev_2d_ = q_.split()
@@ -274,22 +276,20 @@ def DWR(startRes, op=Options()):
     dual_u.rename("Adjoint velocity")
     dual_e.rename("Adjoint elevation")
     if op.orderChange:                      # Define variables on higher/lower order space
-        Ve = op.mixedSpace(mesh_H, orderChange=op.orderChange)
-        qe = Function(Ve)
-        qe_ = Function(Ve)
+        Ve = op.mixedSpace(mesh_H)          # Automatically generates a higher/lower order space
         duale = Function(Ve)
         duale_u, duale_e = duale.split()
-        be = b                              # TODO: Is this a valid thing to do?
+        be = b
     elif op.refinedSpace:                   # Define variables on an iso-P2 refined space
         mesh_h = isoP2(mesh_H)
         Ve = op.mixedSpace(mesh_h)
         be = problemDomain(mesh=mesh_h, op=op)[3]
-        qe = Function(Ve)
         P0 = FunctionSpace(mesh_h, "DG", 0)
     else:                                   # Copy standard variables to mimic enriched space labels
         Ve = V
-        qe = q
         be = b
+    qe = Function(Ve)
+    qe_ = Function(Ve)
     rho = Function(Ve)
     rho_u, rho_e = rho.split()
     rho_u.rename("Velocity residual")
@@ -375,10 +375,10 @@ def DWR(startRes, op=Options()):
     with pyadjoint.stop_annotating():
 
         errorTimer = clock()
-        for k in range(0, op.iEnd): # Loop back over times to generate error estimators
-            print('Generating error estimate %d / %d' % (k + 1, op.iEnd))
+        for k in range(0, int(op.cntT / op.rm)): # Loop back over times to generate error estimators
+            print('Generating error estimate %d / %d' % (k + 1, int(op.cntT / op.rm)))
             i1 = 0 if k == 0 else 2 * k - 1
-            i2 = 2 * k              # TODO: There is a load error here in regen case
+            i2 = 2 * k              # TODO: There is a load error here
             with DumbCheckpoint(di + 'hdf5/Velocity2d_' + indexString(i1), mode=FILE_READ) as loadVel:
                 loadVel.load(uv_2d)
                 loadVel.close()
@@ -507,10 +507,10 @@ def DWR(startRes, op=Options()):
             if op.mode == 'tohoku':
                 cb3 = P02Callback(adapSolver)
                 cb4 = P06Callback(adapSolver)
-            if cnt == 0:
-                initP02 = cb2.init_value
-                initP06 = cb3.init_value
-            else:
+                if cnt == 0:
+                    initP02 = cb3.init_value
+                    initP06 = cb4.init_value
+            if cnt != 0:
                 cb2.objective_value = integrand
                 if op.mode == 'tohoku':
                     cb3.gauge_values = gP02
@@ -576,6 +576,8 @@ def DWP(startRes, op=Options()):
     V = op.mixedSpace(mesh_H)
     q = Function(V)
     uv_2d, elev_2d = q.split()  # Needed to load data into
+    uv_2d.rename('uv_2d')
+    elev_2d.rename('elev_2d')
     if op.mode == 'rossby-wave':
         peak_a, distance_a = peakAndDistance(solutionRW(V, t=op.Tend).split()[1])  # Analytic final-time state
 
@@ -773,10 +775,10 @@ def DWP(startRes, op=Options()):
             if op.mode == 'tohoku':
                 cb3 = P02Callback(adapSolver)
                 cb4 = P06Callback(adapSolver)
-            if cnt == 0:
-                initP02 = cb2.init_value
-                initP06 = cb3.init_value
-            else:
+                if cnt == 0:
+                    initP02 = cb2.init_value
+                    initP06 = cb3.init_value
+            if cnt != 0:
                 cb2.objective_value = integrand
                 if op.mode == 'tohoku':
                     cb3.gauge_values = gP02
@@ -847,20 +849,18 @@ if __name__ == "__main__":
     parser.add_argument("-b", help="Intersect metrics with bathymetry")
     parser.add_argument("-regen", help="Regenerate error estimates based on saved data")
     args = parser.parse_args()
+
+    solvers = {'fixedMesh': fixedMesh, 'hessianBased': hessianBased, 'DWP': DWP, 'DWR': DWR}
     approach = args.a
+    if approach is None:
+        approach = 'fixedMesh'
+    else:
+        assert approach in solvers.keys()
+    solver = solvers[approach]
     if args.t is None:
         mode = 'tohoku'
     else:
         mode = args.t
-        try:
-            assert args.w is None
-        except:
-            raise ValueError("Wetting and drying not available for test cases.")
-    if approach is None:
-        approach = 'fixedMesh'
-    else:
-        assert approach in ('hessianBased', 'DWR')
-    solver = {'fixedMesh': fixedMesh, 'hessianBased': hessianBased, 'DWP': DWP, 'DWR': DWR}[approach]
     print("Mode: %s, approach: %s" % (mode, approach))
     orderChange = 0
     if args.ho:
