@@ -13,8 +13,8 @@ parser.add_argument("-d", help="Specify a date")
 parser.add_argument("-c", help="Compare timeseries")
 parser.add_argument("-g", help="Include actual gauge data")
 args = parser.parse_args()
-op = Options(mode=args.mode)
 approach = args.a
+op = Options(mode=args.mode, approach=approach)
 if op.mode == 'model-verification':
     assert approach is None
 if approach is None and op.mode != 'model-verification':

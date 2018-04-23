@@ -10,7 +10,7 @@ class Options:
                  mode='tohoku',
                  family='dg-dg',
                  timestepper='CrankNicolson',
-                 approach='tohoku',
+                 approach='fixedMesh',
                  rescaling=0.85,
                  hmin=500.,
                  hmax=1e5,

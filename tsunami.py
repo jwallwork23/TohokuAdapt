@@ -395,7 +395,7 @@ def DWR(startRes, op=Options()):
             rho_u.interpolate(Au)
             rho_e.interpolate(Ae)
 
-            # # Updated approach  # TODO: Replace the above with this, when complete. First two lines can come out of loop
+            # # Updated approach  # TODO: Replace the above with this, when complete. First 3 lines can come out of loop
             # v, xi = TestFunction(Ve)
             # swe_mom = ShallowWaterMomentumEquation(v, Ve.sub(0), xi, Ve.sub(1), be)
             # swe_con = FreeSurfaceEquation(xi, Ve.sub(1), Ve.sub(0), be)
