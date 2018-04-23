@@ -22,13 +22,12 @@ adaptivity:
 * Some basic tests for the mesh adaptivity functionalities above are provided in ``basic-tests.py``.
 * A ``resources`` directory, containing bathymetry and coastline data for the ocean domain surrounding Fukushima. Mesh
 files have been removed for copyright reasons, but may be generated in [QMESH][6] using the script ``utils/mesh``.
-* Shallow water models ``firedrake-tsunami`` and ``thetis-tsunami`` for (1) a realistic domain, applied to the 2011 
+* Shallow water model ``tsunami`` for (1) a realistic domain, applied to the 2011 
 Tohoku tsunami, which notably struck the Japanese coast at Fukushima; and (2) test scripts on quadrilateral model 
-domains. Testing of linear vs. nonlinear and rotational vs. nonrotational models is achieved by ``model-verification``.
-The following meshing strategies are implemented:
+domains with flat bathymetry. Testing of rotational vs. non-rotational models is achieved by ``model-verification``.
+The following meshing strategies are implemented, with a number of other approaches in progress:
     * fixed meshes of various levels of refinement;
-    * field, gradient and hessian based error estimates;
-    * explicit and implicit a posteriori error estimators based on shallow water residuals;
+    * Hessian based error estimates;
     * a 'domain of dependence' type estimator as used in Davis and LeVeque 2016;
     * goal-oriented mesh adaptivity, weighting error estimates by adjoint solution data.
 * Given data generated using the above methods, we may
