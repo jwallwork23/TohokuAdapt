@@ -1,7 +1,8 @@
 from thetis_adjoint import *
 from thetis.field_defs import field_metadata
+from thetis.shallowwater_eq import ShallowWaterMomentumEquation, FreeSurfaceEquation    # For residual computation
 import pyadjoint
-from fenics_adjoint.solving import SolveBlock
+from fenics_adjoint.solving import SolveBlock                                       # For extracting adjoint solutions
 
 import numpy as np
 from time import clock
@@ -362,6 +363,11 @@ def DWR(startRes, op=Options()):
 
     with pyadjoint.stop_annotating():
 
+        # # TODO: For updated residual computation
+        # v, xi = TestFunctions(Ve)
+        # swe_mom = ShallowWaterMomentumEquation(v, Ve.sub(0), Ve.sub(1), be, solver_obj.options)
+        # swe_con = FreeSurfaceEquation(xi, Ve.sub(1), Ve.sub(0), be, solver_obj.options)
+
         errorTimer = clock()
         for i, k in zip(range(r-1, N-1, op.rm), range(0, int(op.cntT / op.rm))):
             print('Generating error estimate %d / %d' % (k + 1, int(op.cntT / op.rm)))
@@ -390,29 +396,25 @@ def DWR(startRes, op=Options()):
             if op.refinedSpace:
                 qe, qe_ = mixedPairInterp(mesh_h, Ve, q, q_)
 
-            # Initial approach  # TODO: Replace with method below, when complete
+            # Initial approach  # TODO: Replace with actual Thetis forms
             Au, Ae = strongResidualSW(qe, qe_, be, coriolisFreq=None, op=op)
             rho_u.interpolate(Au)
             rho_e.interpolate(Ae)
 
-            # # Updated approach  # TODO: Replace the above with this, when complete. First 3 lines can come out of loop
-            # v, xi = TestFunction(Ve)
-            # swe_mom = ShallowWaterMomentumEquation(v, Ve.sub(0), xi, Ve.sub(1), be)
-            # swe_con = FreeSurfaceEquation(xi, Ve.sub(1), Ve.sub(0), be)
-            #
-            # uv_2d_e, elev_2d_e = qe.split()
+            # # Attempt at updated approach. Although residuals here are weak
+            # uv_2d_e, elev_2d_e = qe.split()     # TODO: Replace older version, when complete. Currently not local
             # uv_2d_e_, elev_2d_e_ = qe_.split()
-            # rho_u = swe_mom.residual('all',     # Terms to be summed, from {'all', 'source', 'implicit', 'explicit', 'nonlinear'}
+            # rho_u = swe_mom.residual('all',     # Terms used, from {'all', 'source', 'implicit', 'explicit', 'nonlinear'}
             #                          uv_2d_e,
             #                          uv_2d_e_,
-            #                          {'elev_2d': elev_2d_e, 'uv_2d': uv_2d_e},
-            #                          {'elev_2d': elev_2d_e_, 'uv_2d': uv_2d_e_},
-            #                          BCs)       # TODO: This might need modifying
+            #                          {'eta': elev_2d_e, 'uv': uv_2d_e},
+            #                          {'eta': elev_2d_e_, 'uv': uv_2d_e_},
+            #                          BCs)
             # rho_e = swe_con.residual('all',
             #                          elev_2d_e,
             #                          elev_2d_e_,
-            #                          {'elev_2d': elev_2d_e, 'uv_2d': uv_2d_e},
-            #                          {'elev_2d': elev_2d_e_, 'uv_2d': uv_2d_e_},
+            #                          {'eta': elev_2d_e, 'uv': uv_2d_e},
+            #                          {'eta': elev_2d_e_, 'uv': uv_2d_e_},
             #                          BCs)
 
             if op.plotpvd:
@@ -425,7 +427,8 @@ def DWR(startRes, op=Options()):
                 duale = mixedPairInterp(mesh_h, dual)
                 epsilon = assemble(v * inner(rho, duale) * dx)
             else:
-                epsilon = assemble(v * inner(rho, dual) * dx)
+                # epsilon = assemble(v * inner(rho, dual) * dx)
+                epsilon = assemble(v * (inner(rho_u, dual_u) + inner(rho_e, dual_e)) * dx)
             epsilon.rename("Error indicator")
             with DumbCheckpoint(di + 'hdf5/Error2d_' + indexString(k), mode=FILE_CREATE) as saveErr:
                 saveErr.store(epsilon)
@@ -917,7 +920,7 @@ if __name__ == "__main__":
         gaugeFileP06 = open(filename + 'P06.txt', 'w+')
     for i in resolutions:
         # Get data and save to disk
-        if mode == 'rossby-wave':
+        if mode == 'rossby-wave':   # TODO: Timing output does not work in adjoint cases
             av, rel, J_h, integrand, relativePeak, distance, phaseSpd, solverTime, adaptTime = solver(i, op=op)
             print("""Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs
         OF error: %.4e  Height error: %.4f  Distance: %.4fm  Speed error: %.4fm"""
