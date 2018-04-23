@@ -356,29 +356,17 @@ def DWR(startRes, op=Options()):
         tape = get_working_tape()
         solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
         N = len(solve_blocks)
-        r = N % op.rm                               # Number of extra tape annotations in setup
-        for i in range(N - 1, r - 2, -op.rm):
-            dual.assign(solve_blocks[i].adj_sol)    # TODO: in error estimation, can just extract later.
-            dual_u, dual_e = dual.split()
-            dual_u.rename('Adjoint velocity')
-            dual_e.rename('Adjoint elevation')
-            with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexString(int((i - r + 1) / op.rm)), mode=FILE_CREATE) as saveAdj:
-                saveAdj.store(dual_u)
-                saveAdj.store(dual_e)
-                saveAdj.close()
-            if op.plotpvd:
-                adjointFile.write(dual_u, dual_e, time=op.dt * (i - r + 1))
-            print('Adjoint simulation %.2f%% complete' % ((N - i + r - 1) / N * 100))
         dualTimer = clock() - dualTimer
+        r = N % op.rm  # Number of extra tape annotations in setup
         print('Dual run complete. Run time: %.3fs' % dualTimer)
 
     with pyadjoint.stop_annotating():
 
         errorTimer = clock()
-        for k in range(0, int(op.cntT / op.rm)): # Loop back over times to generate error estimators
+        for i, k in zip(range(r-2, N-1, op.rm), range(0, int(op.cntT / op.rm))):
             print('Generating error estimate %d / %d' % (k + 1, int(op.cntT / op.rm)))
             i1 = 0 if k == 0 else 2 * k - 1
-            i2 = 2 * k              # TODO: There is a load error here
+            i2 = 2 * k
             with DumbCheckpoint(di + 'hdf5/Velocity2d_' + indexString(i1), mode=FILE_READ) as loadVel:
                 loadVel.load(uv_2d)
                 loadVel.close()
@@ -393,6 +381,10 @@ def DWR(startRes, op=Options()):
             with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexString(i2), mode=FILE_READ) as loadElev:
                 loadElev.load(elev_2d)
                 loadElev.close()
+            dual.assign(solve_blocks[i].adj_sol)
+            dual_u, dual_e = dual.split()
+            if op.plotpvd:
+                adjointFile.write(dual_u, dual_e, time=float(op.dt * op.rm * k))
 
             # Approximate residuals, load adjoint data and form residuals
             if op.refinedSpace:
@@ -401,11 +393,7 @@ def DWR(startRes, op=Options()):
             rho_u.interpolate(Au)
             rho_e.interpolate(Ae)
             if op.plotpvd:
-                residualFile.write(rho_u, rho_e, time=float(k))
-            with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexString(k), mode=FILE_READ) as loadAdj:
-                loadAdj.load(dual_u)
-                loadAdj.load(dual_e)
-                loadAdj.close()
+                residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * k))
             if op.orderChange:
                 duale_u.interpolate(dual_u)
                 duale_e.interpolate(dual_e)
