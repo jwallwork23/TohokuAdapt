@@ -4,11 +4,42 @@ from firedrake import Expression
 
 from .interpolation import mixedPairInterp
 from .options import Options
-from .timestepping import timestepScheme, timestepCoeffs
 
 
 __all__ = ["strongResidualSW", "formsSW", "interelementTerm", "solutionRW", "indicator", "explicitErrorEstimator",
-           "fluxJumpError"]
+           "fluxJumpError", "timestepCoeffs", "timestepScheme"]
+
+
+def timestepCoeffs(timestepper):    # TODO: Make this format more conventional / delete it eventually
+    """
+    :arg timestepper: scheme of choice.
+    :return: coefficients for use in scheme.
+    """
+    if timestepper == 'ExplicitEuler':
+        a1 = Constant(0.)
+        a2 = Constant(1.)
+    elif timestepper == 'ImplicitEuler':
+        a1 = Constant(1.)
+        a2 = Constant(0.)
+    elif timestepper == 'CrankNicolson':
+        a1 = Constant(0.5)
+        a2 = Constant(0.5)
+    else:
+        raise NotImplementedError("Timestepping scheme %s not yet considered." % timestepper)
+
+    return a1, a2
+
+
+def timestepScheme(u, u_, timestepper):
+    """
+    :arg u: prognostic variable at current timestep. 
+    :arg u_: prognostic variable at previous timestep. 
+    :arg timestepper: scheme of choice.
+    :return: expression for prognostic variable to be used in scheme.
+    """
+    a1, a2 = timestepCoeffs(timestepper)
+
+    return a1 * u + a2 * u_
 
 
 def strongResidualSW(q, q_, b, coriolisFreq=None, op=Options()):    # TODO: Some minor adjustments to get Thetis forms

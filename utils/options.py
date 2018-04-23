@@ -20,7 +20,6 @@ class Options:
                  iso=False,
                  gradate=False,
                  rotational=False,
-                 printStats=True,           # TODO: This will become redundant
                  bAdapt=False,
                  regen=False,
                  hessMeth='dL2',
@@ -49,7 +48,6 @@ class Options:
         :param iso: Toggle isotropic / anisotropic algorithm.
         :param gradate: Toggle metric gradation.
         :param rotational: Toggle rotational / non-rotational equations.
-        :param printStats: print to screen during simulation.
         :param bAdapt: intersect metrics with Hessian w.r.t. bathymetry.
         :param regen: regenerate error estimates based on saved data.
         :param hessMeth: Method of Hessian reconstruction: 'dL2' or 'parts'.
@@ -109,12 +107,11 @@ class Options:
             self.adaptField = adaptField
         except:
             raise ValueError('Field for adaption ``%s`` not recognised.' % adaptField)
-        for i in (gradate, rotational, iso, printStats, plotpvd, wd, refinedSpace, bAdapt, regen):
+        for i in (gradate, rotational, iso, plotpvd, wd, refinedSpace, bAdapt, regen):
             assert(isinstance(i, bool))
         self.iso = iso
         self.gradate = gradate
         self.rotational = rotational
-        self.printStats = printStats
         self.bAdapt = bAdapt
         self.regen = regen
         self.plotpvd = plotpvd
@@ -245,8 +242,7 @@ class Options:
         :returns: mean element count.
         """
         av = Sn / mn
-        if self.printStats:
-            print("""\n************************** Adaption step %d ****************************
+        print("""\n************************** Adaption step %d ****************************
 Percent complete  : %4.1f%%    Adapt time : %4.2fs Solver time : %4.2fs     
 #Elements... Current : %d  Mean : %d  Minimum : %s  Maximum : %s\n""" %
                   (mn, 100 * t / self.Tend, adaptTimer, solverTime, nEle, av, mM[0], mM[1]))
