@@ -163,7 +163,8 @@ def problemDomain(level=0, mesh=None, op=Options(mode='tohoku')):
     """
     if op.mode == 'tohoku':
         if mesh == None:
-            ms = MeshSetup(level, op.wd)
+            # ms = MeshSetup(level, op.wd)
+            ms = MeshSetup(level, False)
             mesh = Mesh(ms.dirName + ms.meshName + '.msh')
         meshCoords = mesh.coordinates.dat.data
         P1 = FunctionSpace(mesh, 'CG', 1)
@@ -195,7 +196,8 @@ def problemDomain(level=0, mesh=None, op=Options(mode='tohoku')):
         for i, p in enumerate(meshCoords):
             eta0vec[i] = interpolatorSurf(p[1], p[0])
             depth = - eta0vec[i] - interpolatorBath(p[1], p[0])
-            b_vec[i] = depth if op.wd else max(depth, 30)
+            # b_vec[i] = depth if op.wd else max(depth, 30)
+            b_vec[i] = max(depth, 30)
 
         # Post-process the bathymetry to have a minimum depth of 30m and if no wetting-and-drying
         BCs = {}

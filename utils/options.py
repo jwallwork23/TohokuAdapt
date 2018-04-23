@@ -10,6 +10,7 @@ class Options:
                  mode='tohoku',
                  family='dg-dg',
                  timestepper='CrankNicolson',
+                 approach='tohoku',
                  rescaling=0.85,
                  hmin=500.,
                  hmax=1e5,
@@ -19,11 +20,11 @@ class Options:
                  rotational=False,
                  bAdapt=False,
                  regen=False,
-                 plotpvd=True,
+                 plotpvd=False,
                  maxGrowth=1.4,
                  dt=0.5,
                  ndump=50,
-                 rm=50,
+                 rm=50,         # TODO: Given that dt is now small, experiment with increasing this number
                  nAdapt=1,
                  nVerT=1000,
                  orderChange=0,
@@ -32,6 +33,7 @@ class Options:
         :param mode: problem considered.
         :param family: mixed function space family, from {'dg-dg', 'dg-cg'}.
         :param timestepper: timestepping scheme, from {'ForwardEuler', 'BackwardEuler', 'CrankNicolson'}.
+        :param approach: meshing strategy, from {'fixedMesh', 'hessianBased', 'DWP', 'DWR'}.
         :param rescaling: Scaling parameter for target number of vertices.
         :param hmin: Minimal tolerated element size (m).
         :param hmax: Maximal tolerated element size (m).
@@ -52,17 +54,22 @@ class Options:
         :param refinedSpace: refine space too compute errors and residuals.
         """
         try:
+            assert approach in ('fixedMesh', 'hessianBased', 'DWP', 'DWR')
+            self.approach = approach
+        except:
+            raise ValueError('Meshing strategy %s not recognised' % approach)
+        try:
             assert mode in ('tohoku', 'shallow-water', 'rossby-wave', 'model-verification')
             self.mode = mode
         except:
-            raise ValueError('Test problem not recognised.')
+            raise ValueError('Test problem %s not recognised.' % mode)
 
         # Solver parameters
         try:
             assert family in ('dg-dg', 'dg-cg', 'cg-cg')
             self.family = family
         except:
-            raise ValueError('Mixed function space not recognised.')
+            raise ValueError('Mixed function space %s not recognised.' % family)
         try:
             assert timestepper in ('ForwardEuler', 'BackwardEuler', 'CrankNicolson')
             self.timestepper = timestepper
@@ -77,7 +84,7 @@ class Options:
                        'snes_lag_preconditioner_persists': True}
 
         # Adaptivity parameters
-        if self.mode == 'hessianBased':
+        if self.approach == 'hessianBased':
             self.adaptField = 's'       # Adapt w.r.t 's'peed, 'f'ree surface or 'b'oth.
             self.normalisation = 'lp'   # Metric normalisation using Lp norm. 'manual' also available.
             self.normOrder = 2
@@ -87,7 +94,7 @@ class Options:
             assert rescaling > 0
             self.rescaling = rescaling
         except:
-            raise ValueError('Invalid value for scaling parameter. rescaling > 0 is required.')
+            raise ValueError('Invalid value of %.3f for scaling parameter. rescaling > 0 is required.' % rescaling)
         try:
             assert (hmin > 0) and (hmax > hmin) and (minNorm > 0)
             self.hmin = hmin
@@ -99,7 +106,7 @@ class Options:
             assert maxAnisotropy > 0
             self.maxAnisotropy = maxAnisotropy
         except:
-            raise ValueError('Invalid anisotropy value. a > 0 is required.')
+            raise ValueError('Invalid anisotropy value %.1f. a > 0 is required.' % maxAnisotropy)
 
         # Misc options
         for i in (gradate, rotational, plotpvd, refinedSpace, bAdapt, regen):

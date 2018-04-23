@@ -389,9 +389,26 @@ def DWR(startRes, op=Options()):
             # Approximate residuals, load adjoint data and form residuals
             if op.refinedSpace:
                 qe, qe_ = mixedPairInterp(mesh_h, Ve, q, q_)
-            Au, Ae = strongResidualSW(qe, qe_, be, coriolisFreq=None, op=op)        # TODO: This needs re-doing
+
+            # Initial approach  # TODO: Replace with method below, when complete
+            Au, Ae = strongResidualSW(qe, qe_, be, coriolisFreq=None, op=op)
             rho_u.interpolate(Au)
             rho_e.interpolate(Ae)
+
+            # # Updated approach  # TODO: Replace the above with this, when complete. First two lines can come out of loop
+            # v, xi = TestFunction(Ve)
+            # swe_mom = ShallowWaterMomentumEquation(v, Ve.sub(0), xi, Ve.sub(1), be)
+            #
+            # uv_2d_e, elev_2d_e = qe.split()
+            # uv_2d_e_, elev_2d_e_ = qe_.split()
+            # rho_u = swe_mom.residual(label,     # TODO
+            #                          uv_2d_e,
+            #                          uv_2d_e_,
+            #                          {'elev_2d': elev_2d_e, 'uv_2d': uv_2d_e},
+            #                          {'elev_2d': elev_2d_e_, 'uv_2d': uv_2d_e_},
+            #                          BCs)       # TODO
+            # # TODO: Also for continuity
+
             if op.plotpvd:
                 residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * k))
             if op.orderChange:
@@ -475,10 +492,9 @@ def DWR(startRes, op=Options()):
             adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
             if op.mode == 'rossby-wave':
                 adapOpt.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh_H)[1])
-            field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
             e = exporter.ExportManager(di + 'hdf5',
                                        ['elev_2d', 'uv_2d'],
-                                       field_dict,
+                                       {'elev_2d': elev_2d, 'uv_2d': uv_2d},
                                        field_metadata,
                                        export_type='hdf5')
             adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
@@ -823,15 +839,14 @@ if __name__ == "__main__":
     date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-a", help="Choose adaptive approach from {'hessianBased', 'DWP', 'DWR'} (default fixedMesh)")
-    parser.add_argument("-t", help="Choose test problem from {'shallow-water', 'rossby-wave'} (default Tohoku)")
+    parser.add_argument("-a", help="Choose adaptive approach from {'hessianBased', 'DWP', 'DWR'} (default 'fixedMesh')")
+    parser.add_argument("-t", help="Choose test problem from {'shallow-water', 'rossby-wave'} (default 'tohoku')")
     parser.add_argument("-low", help="Lower bound for index range")
     parser.add_argument("-high", help="Upper bound for index range")
     parser.add_argument("-o", help="Output data")
     parser.add_argument("-ho", help="Compute errors and residuals in a higher order space")
     parser.add_argument("-lo", help="Compute errors and residuals in a lower order space")
     parser.add_argument("-r", help="Compute errors and residuals in a refined space")
-    parser.add_argument("-f", help="Field for adaption")
     parser.add_argument("-b", help="Intersect metrics with bathymetry")
     parser.add_argument("-regen", help="Regenerate error estimates based on saved data")
     args = parser.parse_args()
@@ -857,15 +872,15 @@ if __name__ == "__main__":
         orderChange = -1
     if args.r:
         assert (not args.ho) and (not args.lo)
-    if args.f is not None or args.b is not None:
+    if args.b is not None:
         assert approach == 'hessianBased'
 
     # Choose mode and set parameter values
     op = Options(mode=mode,
+                 approach=approach,
                  # gradate=True if approach in ('DWP', 'DWR') and mode == 'tohoku' else False,
                  gradate=False,  # TODO: Fix this for tohoku case
                  plotpvd=True if args.o else False,
-                 adaptField=args.f if args.f is not None else 's',
                  orderChange=orderChange,
                  refinedSpace=True if args.r else False,
                  bAdapt=bool(args.b) if args.b is not None else False,
