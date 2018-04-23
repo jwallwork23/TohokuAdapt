@@ -9,50 +9,40 @@ class Options:
     def __init__(self,
                  mode='tohoku',
                  family='dg-dg',
+                 timestepper='CrankNicolson',
                  rescaling=0.85,
                  hmin=500.,
                  hmax=1e5,
                  minNorm=1.,
                  maxAnisotropy=100,
-                 normalisation='lp',
-                 normOrder=2,
-                 adaptField='s',            # Best approach for tsunami modelling
-                 iso=False,
                  gradate=False,
                  rotational=False,
                  bAdapt=False,
                  regen=False,
-                 hessMeth='dL2',
-                 maxGrowth=1.4,
                  plotpvd=True,
+                 maxGrowth=1.4,
                  dt=0.5,
                  ndump=50,
                  rm=50,
                  nAdapt=1,
                  nVerT=1000,
                  orderChange=0,
-                 refinedSpace=False,
-                 timestepper='CrankNicolson',
-                 wd=False):
+                 refinedSpace=False):
         """
         :param mode: problem considered.
         :param family: mixed function space family, from {'dg-dg', 'dg-cg'}.
+        :param timestepper: timestepping scheme, from {'ForwardEuler', 'BackwardEuler', 'CrankNicolson'}.
         :param rescaling: Scaling parameter for target number of vertices.
         :param hmin: Minimal tolerated element size (m).
         :param hmax: Maximal tolerated element size (m).
         :param minNorm: Minimal tolerated norm for error estimates.
         :param maxAnisotropy: maximum tolerated aspect ratio.
-        :param normalisation: Normalisation approach: 'lp' or 'manual'.
-        :param normOrder: norm order in the Lp normalisation approach, where ``p => 1`` and ``p = infty`` is an option.
-        :param adaptField: Adapt w.r.t 's'peed, 'f'ree surface or 'b'oth.
-        :param iso: Toggle isotropic / anisotropic algorithm.
         :param gradate: Toggle metric gradation.
         :param rotational: Toggle rotational / non-rotational equations.
         :param bAdapt: intersect metrics with Hessian w.r.t. bathymetry.
         :param regen: regenerate error estimates based on saved data.
-        :param hessMeth: Method of Hessian reconstruction: 'dL2' or 'parts'.
-        :param maxGrowth: metric gradation scaling parameter.
         :param plotpvd: toggle saving solution fields to .pvd.
+        :param maxGrowth: metric gradation scaling parameter.
         :param dt: Timestep (s).
         :param ndump: Timesteps per data dump.
         :param rm: Timesteps per remesh. (Should be an integer multiple of ndump.)
@@ -60,19 +50,39 @@ class Options:
         :param nVerT: target number of vertices.
         :param orderChange: change in polynomial degree for residual approximation.
         :param refinedSpace: refine space too compute errors and residuals.
-        :param timestepper: timestepping scheme.
-        :param wd: toggle wetting and drying.
         """
         try:
             assert mode in ('tohoku', 'shallow-water', 'rossby-wave', 'model-verification')
             self.mode = mode
         except:
             raise ValueError('Test problem not recognised.')
+
+        # Solver parameters
         try:
             assert family in ('dg-dg', 'dg-cg', 'cg-cg')
             self.family = family
         except:
             raise ValueError('Mixed function space not recognised.')
+        try:
+            assert timestepper in ('ForwardEuler', 'BackwardEuler', 'CrankNicolson')
+            self.timestepper = timestepper
+        except:
+            raise NotImplementedError
+        self.params = {'mat_type': 'matfree',
+                       'snes_type': 'ksponly',
+                       'pc_type': 'python',
+                       'pc_python_type': 'firedrake.AssembledPC',
+                       'assembled_pc_type': 'lu',
+                       'snes_lag_preconditioner': -1,
+                       'snes_lag_preconditioner_persists': True}
+
+        # Adaptivity parameters
+        if self.mode == 'hessianBased':
+            self.adaptField = 's'       # Adapt w.r.t 's'peed, 'f'ree surface or 'b'oth.
+            self.normalisation = 'lp'   # Metric normalisation using Lp norm. 'manual' also available.
+            self.normOrder = 2
+            self.targetError = 1e-3
+            self.hessMeth = 'dL2'       # Hessian recovery by double L2 projection. 'parts' also available
         try:
             assert rescaling > 0
             self.rescaling = rescaling
@@ -90,47 +100,23 @@ class Options:
             self.maxAnisotropy = maxAnisotropy
         except:
             raise ValueError('Invalid anisotropy value. a > 0 is required.')
-        try:
-            assert normalisation in ('lp', 'manual')
-            self.normalisation = normalisation
-        except:
-            raise ValueError('Normalisation approach ``%s`` not recognised.' % normalisation)
-        if normalisation == 'manual':
-            self.targetError = 1e-3
-        try:
-            assert normOrder > 0
-            self.normOrder = normOrder
-        except:
-            raise ValueError('Invalid value for p. p > 0 is required.')
-        try:
-            assert adaptField in ('f', 's', 'b')
-            self.adaptField = adaptField
-        except:
-            raise ValueError('Field for adaption ``%s`` not recognised.' % adaptField)
-        for i in (gradate, rotational, iso, plotpvd, wd, refinedSpace, bAdapt, regen):
+
+        # Misc options
+        for i in (gradate, rotational, plotpvd, refinedSpace, bAdapt, regen):
             assert(isinstance(i, bool))
-        self.iso = iso
         self.gradate = gradate
         self.rotational = rotational
         self.bAdapt = bAdapt
         self.regen = regen
         self.plotpvd = plotpvd
-        self.wd = wd
         self.refinedSpace = refinedSpace
-        try:
-            assert hessMeth in ('dL2', 'parts')
-            self.hessMeth = hessMeth
-        except:
-            raise ValueError('Hessian reconstruction method ``%s`` not recognised.' % hessMeth)
         try:
             assert (maxGrowth > 1)
             self.maxGrowth = maxGrowth
         except:
             raise ValueError('Invalid value for growth parameter.')
 
-        self.Omega = 7.291e-5   # Planetary rotation rate
-
-        # Timestepping parameters
+        # Timestepping and (more) adaptivity parameters
         self.dt = dt
         for i in (ndump, rm, orderChange, nVerT, nAdapt):
             assert isinstance(i, int)
@@ -143,20 +129,9 @@ class Options:
         self.nAdapt = nAdapt
         self.orderChange = orderChange
         self.nVerT = nVerT
-        try:
-            assert timestepper in ('CrankNicolson', 'ImplicitEuler', 'ExplicitEuler')
-            self.timestepper = timestepper
-        except:
-            raise NotImplementedError
 
-        # Solver parameters for ``firedrake-tsunami`` case
-        self.params = {'mat_type': 'matfree',
-                       'snes_type': 'ksponly',
-                       'pc_type': 'python',
-                       'pc_python_type': 'firedrake.AssembledPC',
-                       'assembled_pc_type': 'lu',
-                       'snes_lag_preconditioner': -1,
-                       'snes_lag_preconditioner_persists': True}
+        # Physical parameters
+        self.Omega = 7.291e-5  # Planetary rotation rate
 
         # Override default parameter choices for SW and RW cases:
         if self.mode == 'shallow-water':
@@ -190,14 +165,15 @@ class Options:
             self.xy = [490e3, 640e3, 4160e3, 4360e3]
             self.g = 9.81
 
-            # Gauge locations in latitude-longitude coordinates
+            # Gauge locations in latitude-longitude coordinates and mesh element counts
             self.glatlon = {"P02": (38.5002, 142.5016), "P06": (38.6340, 142.5838), "801": (38.2, 141.7),
                             "802": (39.3, 142.1), "803": (38.9, 141.8), "804": (39.7, 142.2), "806": (37.0, 141.2)}
             self.meshSizes = (5918, 7068, 8660, 10988, 14160, 19082, 27280, 41730, 72602, 160586, 681616)
 
-        self.cntT = int(np.ceil(self.Tend / self.dt))
-        self.iStart = int(self.Tstart / (self.ndump * self.dt))
-        self.iEnd = int(self.cntT / self.ndump)
+        # Derived timestep indices
+        self.cntT = int(np.ceil(self.Tend / self.dt))               # Final timestep index
+        self.iStart = int(self.Tstart / (self.ndump * self.dt))     # First exported timestep of period of interest
+        self.iEnd = int(self.cntT / self.ndump)                     # Final exported timestep of period of interest
 
         # Specify FunctionSpaces
         self.degree1 = 2 if self.family == 'cg-cg' else 1
@@ -205,7 +181,7 @@ class Options:
         self.space1 = "CG" if self.family == 'cg-cg' else "DG"
         self.space2 = "DG" if self.family == 'dg-dg' else "CG"
 
-        # Plotting dictionaries
+        # Plotting dictionaries     TODO: Remove explicit and implicit options, change 'adjoint based'
         self.labels = ("Fixed mesh", "Hessian based", "Explicit", "Implicit", "Adjoint based", "Goal based")
         self.styles = {self.labels[0]: 's', self.labels[1]: '^', self.labels[2]: 'x', self.labels[3]: 'o',
                        self.labels[4]: '*', self.labels[5]: 'h'}
@@ -225,6 +201,10 @@ class Options:
 
 
     def mixedSpace(self, mesh):
+        """
+        :param mesh: mesh upon which to build mixed space.
+        :return: mixed VectorFunctionSpace x FunctionSpace as specified by ``self.family``.
+        """
         deg1 = self.degree1 + self.orderChange
         deg2 = self.degree2 + self.orderChange
         return VectorFunctionSpace(mesh, self.space1, deg1) * FunctionSpace(mesh, self.space2, deg2)
@@ -239,7 +219,7 @@ class Options:
         :arg Sn: sum over #Elements.
         :arg mM: tuple of min and max #Elements.
         :arg t: current simuation time.
-        :returns: mean element count.
+        :return: mean element count.
         """
         av = Sn / mn
         print("""\n************************** Adaption step %d ****************************
