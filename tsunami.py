@@ -6,7 +6,7 @@ from fenics_adjoint.solving import SolveBlock
 import numpy as np
 from time import clock
 
-from utils.adaptivity import isoP2, isotropicMetric, metricIntersection, metricGradation, steadyMetric
+from utils.adaptivity import isoP2, isotropicMetric, metricIntersection, metricGradation, pointwiseMax, steadyMetric
 from utils.callbacks import *
 from utils.forms import solutionRW, strongResidualSW
 from utils.interpolation import interp, mixedPairInterp
@@ -36,7 +36,7 @@ def fixedMesh(startRes, op=Options()):
         options = solver_obj.options
         options.element_family = op.family
         options.use_nonlinear_equations = True
-        options.use_grad_depth_viscosity_term = False                       # TODO: Might as well include these
+        options.use_grad_depth_viscosity_term = False                       # TODO: Might as well include these?
         options.use_grad_div_viscosity_term = False
         options.use_lax_friedrichs_velocity = False                         # TODO: This is a temporary fix
         if op.mode == 'rossby-wave':
@@ -72,7 +72,7 @@ def fixedMesh(startRes, op=Options()):
 
         # Measure error using metrics, as in Huang et al.
         if op.mode == 'rossby-wave':
-            index = int(op.cntT/op.ndump)                                   # TODO: fix indexing error
+            index = int(op.cntT/op.ndump)
             with DumbCheckpoint(di+'hdf5/Elevation2d_'+indexString(index), mode=FILE_READ) as loadElev:
                 loadElev.load(elev_2d, name='elev_2d')
                 loadElev.close()
@@ -158,7 +158,7 @@ def hessianBased(startRes, op=Options()):
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = True
-            adapOpt.use_grad_depth_viscosity_term = False                       # TODO: Might as well include these
+            adapOpt.use_grad_depth_viscosity_term = False                       # TODO: Might as well include these?
             adapOpt.use_grad_div_viscosity_term = False
             adapOpt.use_lax_friedrichs_velocity = False                         # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump
@@ -227,7 +227,7 @@ def hessianBased(startRes, op=Options()):
             av = op.printToScreen(int(cnt/op.rm+1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.dt)
 
         # Measure error using metrics, as in Huang et al.
-        if op.mode == 'rossby-wave':                                            # TODO: fix indexing error
+        if op.mode == 'rossby-wave':
             index = int(op.cntT / op.ndump)
             with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexString(index), mode=FILE_READ) as loadElev:
                 loadElev.load(elev_2d, name='elev_2d')
@@ -314,7 +314,7 @@ def DWR(startRes, op=Options()):
         options = solver_obj.options
         options.element_family = op.family
         options.use_nonlinear_equations = True
-        options.use_grad_depth_viscosity_term = False                   # TODO: Might as well include these
+        options.use_grad_depth_viscosity_term = False                   # TODO: Might as well include these?
         options.use_grad_div_viscosity_term = False
         options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
         if op.mode == 'rossby-wave':
@@ -461,7 +461,7 @@ def DWR(startRes, op=Options()):
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = True
-            adapOpt.use_grad_depth_viscosity_term = False                       # TODO: Might as well include these
+            adapOpt.use_grad_depth_viscosity_term = False                       # TODO: Might as well include these?
             adapOpt.use_grad_div_viscosity_term = False
             adapOpt.use_lax_friedrichs_velocity = False                         # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump
@@ -530,7 +530,7 @@ def DWR(startRes, op=Options()):
             totalVarP06 = cb4.totalVariation()
 
         # Measure error using metrics, as in Huang et al.
-        if op.mode == 'rossby-wave':                # TODO: fix indexing error
+        if op.mode == 'rossby-wave':
             index = int(op.cntT / op.ndump)
             with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexString(index), mode=FILE_READ) as loadElev:
                 loadElev.load(elev_2d, name='elev_2d')
@@ -594,7 +594,7 @@ def DWP(startRes, op=Options()):
         options = solver_obj.options
         options.element_family = op.family
         options.use_nonlinear_equations = True
-        options.use_grad_depth_viscosity_term = False                   # TODO: Might as well include these
+        options.use_grad_depth_viscosity_term = False                   # TODO: Might as well include these?
         options.use_grad_div_viscosity_term = False
         options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
         if op.mode == 'rossby-wave':
@@ -634,7 +634,7 @@ def DWP(startRes, op=Options()):
         N = len(solve_blocks)
         r = N % op.ndump                            # Number of extra tape annotations in setup
         for i in range(N - 1, r - 2, -op.ndump):
-            dual.assign(solve_blocks[i].adj_sol)    # TODO: in error estimation, can just extract later.
+            dual.assign(solve_blocks[i].adj_sol)    # TODO: Could this be combined with error estimation step?
             dual_u, dual_e = dual.split()
             dual_u.rename('Adjoint velocity')
             dual_e.rename('Adjoint elevation')
@@ -667,9 +667,7 @@ def DWP(startRes, op=Options()):
                     loadAdj.load(dual_u)
                     loadAdj.load(dual_e)
                     loadAdj.close()
-                epsilon_ = assemble(v * inner(q, dual) * dx)
-                for j in range(len(epsilon.dat.data)):
-                    epsilon.dat.data[j] = max(epsilon.dat.data[j], epsilon_.dat.data[j])
+                epsilon = pointwiseMax(epsilon, assemble(v * inner(q, dual) * dx))
             epsilon.rename("Error indicator")
             with DumbCheckpoint(di + 'hdf5/Error2d_' + indexString(k), mode=FILE_CREATE) as saveErr:
                 saveErr.store(epsilon)
@@ -701,7 +699,7 @@ def DWP(startRes, op=Options()):
                     loadVel.load(uv_2d, name='uv_2d')
                     loadVel.close()
 
-            for l in range(op.nAdapt):  # TODO: Test this functionality
+            for l in range(op.nAdapt):                                  # TODO: Test this functionality
 
                 # Construct metric
                 with DumbCheckpoint(di + 'hdf5/Error2d_' + indexString(int(cnt / op.rm)),
@@ -709,7 +707,7 @@ def DWP(startRes, op=Options()):
                     loadErr.load(epsilon)
                     loadErr.close()
                 errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(interp(mesh_H, epsilon))
-                M = isotropicMetric(errEst, invert=False, op=op)  # TODO: Not sure normalisation is working
+                M = isotropicMetric(errEst, invert=False, op=op)        # TODO: Not sure normalisation is working
                 if op.gradate:
                     M_ = isotropicMetric(interp(mesh_H, H0), bdy=True, op=op)  # Initial boundary metric
                     M = metricIntersection(M, M_, bdy=True)
@@ -729,9 +727,9 @@ def DWP(startRes, op=Options()):
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = True
-            adapOpt.use_grad_depth_viscosity_term = False   # TODO: Might as well include these
+            adapOpt.use_grad_depth_viscosity_term = False               # TODO: Might as well include these?
             adapOpt.use_grad_div_viscosity_term = False
-            adapOpt.use_lax_friedrichs_velocity = False     # TODO: This is a temporary fix
+            adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump
             startT = endT
             endT += op.dt * op.rm
