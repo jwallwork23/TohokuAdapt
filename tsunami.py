@@ -398,16 +398,22 @@ def DWR(startRes, op=Options()):
             # # Updated approach  # TODO: Replace the above with this, when complete. First two lines can come out of loop
             # v, xi = TestFunction(Ve)
             # swe_mom = ShallowWaterMomentumEquation(v, Ve.sub(0), xi, Ve.sub(1), be)
+            # swe_con = FreeSurfaceEquation(xi, Ve.sub(1), Ve.sub(0), be)
             #
             # uv_2d_e, elev_2d_e = qe.split()
             # uv_2d_e_, elev_2d_e_ = qe_.split()
-            # rho_u = swe_mom.residual(label,     # TODO
+            # rho_u = swe_mom.residual('all',     # Terms to be summed, from {'all', 'source', 'implicit', 'explicit', 'nonlinear'}
             #                          uv_2d_e,
             #                          uv_2d_e_,
             #                          {'elev_2d': elev_2d_e, 'uv_2d': uv_2d_e},
             #                          {'elev_2d': elev_2d_e_, 'uv_2d': uv_2d_e_},
-            #                          BCs)       # TODO
-            # # TODO: Also for continuity
+            #                          BCs)       # TODO: This might need modifying
+            # rho_e = swe_con.residual('all',
+            #                          elev_2d_e,
+            #                          elev_2d_e_,
+            #                          {'elev_2d': elev_2d_e, 'uv_2d': uv_2d_e},
+            #                          {'elev_2d': elev_2d_e_, 'uv_2d': uv_2d_e_},
+            #                          BCs)
 
             if op.plotpvd:
                 residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * k))
