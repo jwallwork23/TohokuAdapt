@@ -363,7 +363,7 @@ def DWR(startRes, op=Options()):
     with pyadjoint.stop_annotating():
 
         errorTimer = clock()
-        for i, k in zip(range(r-2, N-1, op.rm), range(0, int(op.cntT / op.rm))):
+        for i, k in zip(range(r-1, N-1, op.rm), range(0, int(op.cntT / op.rm))):
             print('Generating error estimate %d / %d' % (k + 1, int(op.cntT / op.rm)))
             i1 = 0 if k == 0 else 2 * k - 1
             i2 = 2 * k
