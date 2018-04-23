@@ -39,6 +39,8 @@ pyadjoint-test-firedrake.py
 pyadjoint-test-burgers.py
 pyadjoint-test-thetis.py
 rossby-test-firedrake.py
+firedrake-tsunami.py
+thetis-tsunami.py
 
 # Patches
 adapt_attrs.patch

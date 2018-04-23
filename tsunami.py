@@ -358,7 +358,7 @@ def DWR(startRes, op=Options()):
         N = len(solve_blocks)
         r = N % op.rm                               # Number of extra tape annotations in setup
         for i in range(N - 1, r - 2, -op.rm):
-            dual.assign(solve_blocks[i].adj_sol)
+            dual.assign(solve_blocks[i].adj_sol)    # TODO: in error estimation, can just extract later.
             dual_u, dual_e = dual.split()
             dual_u.rename('Adjoint velocity')
             dual_e.rename('Adjoint elevation')
@@ -644,9 +644,9 @@ def DWP(startRes, op=Options()):
         tape = get_working_tape()
         solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
         N = len(solve_blocks)
-        r = N % op.ndump                               # Number of extra tape annotations in setup
+        r = N % op.ndump                            # Number of extra tape annotations in setup
         for i in range(N - 1, r - 2, -op.ndump):
-            dual.assign(solve_blocks[i].adj_sol)
+            dual.assign(solve_blocks[i].adj_sol)    # TODO: in error estimation, can just extract later.
             dual_u, dual_e = dual.split()
             dual_u.rename('Adjoint velocity')
             dual_e.rename('Adjoint elevation')
@@ -810,7 +810,7 @@ def DWP(startRes, op=Options()):
             totalVarP06 = cb4.totalVariation()
 
         # Measure error using metrics, as in Huang et al.
-        if op.mode == 'rossby-wave':  # TODO: fix indexing error
+        if op.mode == 'rossby-wave':
             index = int(op.cntT / op.ndump)
             with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexString(index), mode=FILE_READ) as loadElev:
                 loadElev.load(elev_2d, name='elev_2d')
