@@ -11,13 +11,13 @@ class Options:
                  family='dg-dg',
                  timestepper='CrankNicolson',
                  approach='fixedMesh',
+                 coriolis='off',
                  rescaling=0.85,
                  hmin=500.,
                  hmax=1e5,
                  minNorm=1.,
                  maxAnisotropy=100,
                  gradate=False,
-                 rotational=False,
                  bAdapt=False,
                  regen=False,
                  plotpvd=False,
@@ -34,13 +34,13 @@ class Options:
         :param family: mixed function space family, from {'dg-dg', 'dg-cg'}.
         :param timestepper: timestepping scheme, from {'ForwardEuler', 'BackwardEuler', 'CrankNicolson'}.
         :param approach: meshing strategy, from {'fixedMesh', 'hessianBased', 'DWP', 'DWR'}.
+        :param coriolis: Type of Coriolis term, from {'off', 'f', 'beta', 'sin'}.
         :param rescaling: Scaling parameter for target number of vertices.
         :param hmin: Minimal tolerated element size (m).
         :param hmax: Maximal tolerated element size (m).
         :param minNorm: Minimal tolerated norm for error estimates.
         :param maxAnisotropy: maximum tolerated aspect ratio.
         :param gradate: Toggle metric gradation.
-        :param rotational: Toggle rotational / non-rotational equations.
         :param bAdapt: intersect metrics with Hessian w.r.t. bathymetry.
         :param regen: regenerate error estimates based on saved data.
         :param plotpvd: toggle saving solution fields to .pvd.
@@ -53,6 +53,8 @@ class Options:
         :param orderChange: change in polynomial degree for residual approximation.
         :param refinedSpace: refine space too compute errors and residuals.
         """
+
+        # Model parameters
         try:
             assert approach in ('fixedMesh', 'hessianBased', 'DWP', 'DWR')
             self.approach = approach
@@ -63,6 +65,11 @@ class Options:
             self.mode = mode
         except:
             raise ValueError('Test problem %s not recognised.' % mode)
+        try:
+            assert coriolis in ('off', 'f', 'beta', 'sin')
+            self.coriolis = coriolis
+        except:
+            raise ValueError('Coriolis term type %s not recognised' % coriolis)
 
         # Solver parameters
         try:
@@ -109,10 +116,9 @@ class Options:
             raise ValueError('Invalid anisotropy value %.1f. a > 0 is required.' % maxAnisotropy)
 
         # Misc options
-        for i in (gradate, rotational, plotpvd, refinedSpace, bAdapt, regen):
+        for i in (gradate, plotpvd, refinedSpace, bAdapt, regen):
             assert(isinstance(i, bool))
         self.gradate = gradate
-        self.rotational = rotational
         self.bAdapt = bAdapt
         self.regen = regen
         self.plotpvd = plotpvd
@@ -137,9 +143,6 @@ class Options:
         self.orderChange = orderChange
         self.nVerT = nVerT
 
-        # Physical parameters
-        self.Omega = 7.291e-5  # Planetary rotation rate
-
         # Override default parameter choices for SW and RW cases:
         if self.mode == 'shallow-water':
             self.Tstart = 0.1
@@ -154,6 +157,7 @@ class Options:
             self.xy = [0., 0.5 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
             self.g = 9.81
         elif self.mode == 'rossby-wave':
+            self.coriolis = 'beta'
             self.Tstart = 20.
             self.Tend = 45.60
             self.hmin = 5e-3
@@ -176,6 +180,8 @@ class Options:
             self.glatlon = {"P02": (38.5002, 142.5016), "P06": (38.6340, 142.5838), "801": (38.2, 141.7),
                             "802": (39.3, 142.1), "803": (38.9, 141.8), "804": (39.7, 142.2), "806": (37.0, 141.2)}
             self.meshSizes = (5918, 7068, 8660, 10988, 14160, 19082, 27280, 41730, 72602, 160586, 681616)
+            self.latFukushima = 37.050419   # Latitude of Fukushima
+            self.Omega = 7.291e-5           # Planetary rotation rate
 
         # Derived timestep indices
         self.cntT = int(np.ceil(self.Tend / self.dt))               # Final timestep index

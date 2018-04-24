@@ -55,15 +55,15 @@ if __name__ == '__main__':
     date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-r", help="Use rotational equations")
+    parser.add_argument("-r", help="Choose Coriolis parameter from {'off', 'f', 'beta', 'sin'}")      # TODO
     parser.add_argument("-o", help="Output data")
     parser.add_argument("-s", help="Print solver statistics")
     args = parser.parse_args()
     op = Options(family='dg-dg',
                  plotpvd=True if args.o else False,
-                 printStats=True if args.s else False)
-    op.rotational = True if args.r else False
-    tag = 'rotational=' + str(op.rotational)
+                 printStats=True if args.s else False,
+                 coriolis=args.r)
+    tag = 'rotational=' + op.coriolis
     filename = 'outdata/model-verification/' + tag + '_' + date
     errorfile = open(filename + '.txt', 'w+')
     gaugeFileP02 = open(filename + 'P02.txt', 'w+')
@@ -76,7 +76,7 @@ if __name__ == '__main__':
     g2list = np.zeros(len(resolutions))
     g6list = np.zeros(len(resolutions))
     for k, i in zip(resolutions, range(len(resolutions))):
-        print("\nStarting run %d... Rotational = %s\n" % (k, op.rotational))
+        print("\nStarting run %d... Rotational = %s\n" % (k, op.coriolis))
         J_h, integrand, gP02, totalVarP02, gP06, totalVarP06, timing = solverSW(k, di, op=op)
 
         # Save to disk

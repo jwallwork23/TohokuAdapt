@@ -147,7 +147,7 @@ else:
     import scipy.interpolate as si
     from scipy.io.netcdf import NetCDFFile
 
-    from .conversion import vectorlonlat_to_utm, get_latitude
+    from .conversion import earth_radius, get_latitude, vectorlonlat_to_utm
     from .forms import indicator
     from .options import Options
 
@@ -197,14 +197,23 @@ def problemDomain(level=0, mesh=None, op=Options(mode='tohoku')):
             eta0vec[i] = interpolatorSurf(p[1], p[0])
             depth = - eta0vec[i] - interpolatorBath(p[1], p[0])
             # b_vec[i] = depth if op.wd else max(depth, 30)
-            b_vec[i] = max(depth, 30)
-
-        # Post-process the bathymetry to have a minimum depth of 30m and if no wetting-and-drying
+            b_vec[i] = max(depth, 30)   # Post-process the bathymetry to have a minimum depth of 30m
         BCs = {}
+
+        # Establish Coriolis parameter
         f = Function(P1)
-        if op.rotational:           # TODO: Try f- or beta-plane approximation
+        if op.coriolis == 'sin':
             for i, v in zip(range(len(mesh.coordinates.dat.data)), mesh.coordinates.dat.data):
                 f.dat.data[i] = 2 * op.Omega * np.sin(np.radians(get_latitude(v[0], v[1], 54, northern=True)))
+        elif op.coriolis in ('beta', 'f'):
+            f0 = 2 * op.Omega * np.sin(np.radians(op.latFukushima))
+            if op.coriolis == 'f':
+                f.assign(f0)
+            else:
+                beta = 2 * op.Omega * np.cos(np.radians(op.latFukushima)) / earth_radius(op.latFukushima)
+                for i, v in zip(range(len(mesh.coordinates.dat.data)), mesh.coordinates.dat.data):
+                    f.dat.data[i] = f0 + beta * v[1]
+
     elif op.mode == 'shallow-water':
         n = pow(2, level)
         lx = 2 * pi
