@@ -312,7 +312,7 @@ def DWR(startRes, op=Options()):
     if op.gradate:
         H0 = Function(P1).interpolate(CellSize(mesh_H))
 
-    if not op.regen:
+    if not op.regen:    # TODO: regen won't work in general as HDF5 files get overwritten in adaptive stage
 
         # Solve fixed mesh primal problem to get residuals and adjoint solutions
         solver_obj = solver2d.FlowSolver2d(mesh_H, b)
@@ -400,7 +400,7 @@ def DWR(startRes, op=Options()):
             if op.refinedSpace:
                 qe, qe_ = mixedPairInterp(mesh_h, Ve, q, q_)
 
-            # Initial approach  # TODO: Replace with actual Thetis forms
+            # Initial approach  # TODO: Replace with actual Thetis forms: see other TODOs
             Au, Ae = strongResidualSW(qe, qe_, be, coriolisFreq=None, op=op)
             rho_u.interpolate(Au)
             rho_e.interpolate(Ae)
@@ -620,7 +620,7 @@ def DWP(startRes, op=Options()):
     if op.gradate:
         H0 = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(CellSize(mesh_H))
 
-    if not op.regen:
+    if not op.regen:    # TODO: regen won't work in general as HDF5 files get overwritten in adaptive stage
 
         # Solve fixed mesh primal problem to get residuals and adjoint solutions
         solver_obj = solver2d.FlowSolver2d(mesh_H, b)
@@ -954,3 +954,6 @@ if __name__ == "__main__":
             print('Run %d: Mean element count: %6d Objective: %.4e OF error %.4e Timing %.1fs'
                   % (i, av, J_h, rel, solverTime))
             errorfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, solverTime, J_h))
+        integrandFile.writelines(["%s," % val for val in integrand])
+        integrandFile.write("\n")
+    integrandFile.close()

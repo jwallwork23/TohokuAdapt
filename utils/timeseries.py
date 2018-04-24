@@ -200,7 +200,7 @@ def integrateTimeseries(fileExt, date, op=Options()):
 
 def compareTimeseries(date, run, quantity='Integrand', op=Options()):
     assert quantity in ('Integrand', 'P02', 'P06')
-    approaches = ("fixedMesh", "hessianBased", "DWR")
+    approaches = ("fixedMesh", "hessianBased", "DWP", "DWR")
 
     # Get dates (if necessary)
     dates = {}
