@@ -11,8 +11,8 @@ from utils.adaptivity import isoP2, isotropicMetric, metricIntersection, metricG
 from utils.callbacks import *
 from utils.forms import strongResidualSW
 from utils.interpolation import interp, mixedPairInterp
-from utils.setup import meshStats, problemDomain, solutionRW
-from utils.misc import indexString, peakAndDistance
+from utils.setup import problemDomain, solutionRW
+from utils.misc import indexString, peakAndDistance, meshStats
 from utils.options import Options
 
 
@@ -943,10 +943,3 @@ if __name__ == "__main__":
             print('Run %d: Mean element count: %6d Objective: %.4e OF error %.4e Timing %.1fs'
                   % (i, av, J_h, rel, solverTime+adaptTime))
             errorfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, solverTime+adaptTime, J_h))
-        integrandFile.writelines(["%s," % val for val in integrand])
-        integrandFile.write("\n")
-    errorfile.close()
-    if mode == 'tohoku':
-        gaugeFileP02.close()
-        gaugeFileP06.close()
-    integrandFile.close()

@@ -114,14 +114,23 @@ def extractSpline(gauge):
 
 
 def extractData(gauge):
-    measuredFile = open('resources/gauges/' + gauge + 'data_25mins.txt', 'r')
-    x = []
-    y = []
-    for line in measuredFile:
-        xy = line.split()
-        x.append(float(xy[0]))
-        y.append(float(xy[1]))
-    return x, y
+    if gauge in ("P02", "P06"):
+        measuredFile = open('resources/gauges/' + gauge + 'data_25mins.txt', 'r')
+        x = []
+        y = []
+        for line in measuredFile:
+            xy = line.split()
+            x.append(float(xy[0]))
+            y.append(float(xy[1]))
+
+        return x, y
+    elif gauge == "Integrand":
+        measuredFile = open('outdata/rossby-wave/analytic_Integrand.txt', 'r')
+        dat = measuredFile.readline()
+        xy = dat.split(",")
+        measuredFile.close()
+
+        return range(len(xy)-1), [float(i) for i in xy[:-1]]
 
 
 def plotTimeseries(fileExt, date, quantity='Integrand', realData=False, op=Options()):
@@ -136,9 +145,11 @@ def plotTimeseries(fileExt, date, quantity='Integrand', realData=False, op=Optio
         tim = np.linspace(0, op.Tend, len(dat))
         plt.plot(tim[::5], dat[::5], label=str(i))
         i += 1
-    if realData and quantity in ('P02', 'P06'):
-        x, y = extractData(quantity)
-        plt.plot(np.linspace(0, op.Tend, len(x)), y, label='Gauge data', marker='*', color='black')
+    if realData:
+        if (op.mode == 'tohoku' and quantity in ('P02', 'P06')) or op.mode == 'rossby-wave':
+            x, y = extractData(quantity)
+            me = 10 if op.mode == 'rossby-wave' else 1
+            plt.plot(np.linspace(0, op.Tend, len(x)), y, label='Gauge data', marker='*', markevery=me, color='black')
     plt.xlabel('Time (s)')
     plt.ylabel(quantity+' value')
     plt.legend(loc=2, bbox_to_anchor=(1.05, 1))

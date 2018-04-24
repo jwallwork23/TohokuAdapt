@@ -1,7 +1,7 @@
 import numpy as np
 
 
-__all__ = ["MeshSetup", "problemDomain", "solutionRW", "__main__"]
+__all__ = ["MeshSetup", "problemDomain", "solutionRW", "integrateRW", "__main__"]
 
 
 class MeshSetup:
@@ -148,7 +148,7 @@ else:
     from scipy.io.netcdf import NetCDFFile
 
     from .conversion import vectorlonlat_to_utm, get_latitude
-    from .forms import solutionRW
+    from .forms import indicator
     from .options import Options
 
 
@@ -270,3 +270,20 @@ def solutionRW(V, t=0., B=0.395):
                     * exp(-0.5 * y * y))
 
     return q
+
+
+def integrateRW(V, op=Options()):
+    t = 0.
+    vals = []
+    ks = Function(V)
+    k0, k1 = ks.split()
+    k1.assign(indicator(V.sub(1), op=op))
+    kt = Constant(0.)
+    while t < op.Tend - 0.5 * op.dt:
+        q = solutionRW(V, t=t)
+        if t > op.Tstart - 0.5 * op.dt:  # Slightly smooth transition
+            kt.assign(1. if t > op.Tstart + 0.5 * op.dt else 0.5)
+        vals.append(assemble(kt * inner(ks, q) * dx))
+        print("t = %.2fs" % t)
+        t += op.dt
+    return vals

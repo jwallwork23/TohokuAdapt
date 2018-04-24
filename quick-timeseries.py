@@ -1,6 +1,9 @@
+from firedrake import *
+
 import argparse
 
 from utils.options import Options
+from utils.setup import integrateRW, problemDomain
 from utils.timeseries import plotTimeseries, compareTimeseries
 
 
@@ -12,6 +15,7 @@ parser.add_argument("-l", help="Use linearised equations")
 parser.add_argument("-d", help="Specify a date")
 parser.add_argument("-c", help="Compare timeseries")
 parser.add_argument("-g", help="Include actual gauge data")
+parser.add_argument("-s", help="Consider rossby-wave analytic solution")
 args = parser.parse_args()
 approach = args.a
 op = Options(mode=args.mode, approach=approach)
@@ -20,14 +24,23 @@ if op.mode == 'model-verification':
 if approach is None and op.mode != 'model-verification':
     approach = 'fixedMesh'
 quantities = ['Integrand', 'P02', 'P06'] if op.mode in ('tohoku', 'model-verification') else ['Integrand']
+# if args.s is not None:
+#     assert op.mode == 'rossby-wave'
+#     integrand = integrateRW(op.mixedSpace(problemDomain(level=5, op=op)[0]), op=op)
+#     integrandFile = open('outdata/' + op.mode + '/analytic_Integrand.txt', 'w+')
+#     integrandFile.writelines(["%s," % val for val in integrand])
+#     integrandFile.write("\n")
+#     integrandFile.close()
+if op.mode == 'model-verification':
+    fileExt = 'nonlinear='
+    fileExt += 'False' if args.l else 'True'
+    fileExt += '_rotational='
+    fileExt += 'True' if args.r else 'False'
+elif args.s is not None:
+    fileExt = 'analytic'
+else:
+    fileExt = approach
 for quantity in quantities:
-    if op.mode == 'model-verification':
-        fileExt = 'nonlinear='
-        fileExt += 'False' if args.l else 'True'
-        fileExt += '_rotational='
-        fileExt += 'True' if args.r else 'False'
-    else:
-        fileExt = approach
     if args.c:
         for i in range(6):
             compareTimeseries(args.d, i, quantity=quantity, op=op)
