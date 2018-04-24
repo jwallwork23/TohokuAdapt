@@ -178,6 +178,8 @@ def timeseriesDifference(fileExt1, date1, fileExt2, date2, quantity='Integrand',
 
 
 def integrateTimeseries(fileExt, date, op=Options()):
+    if date is None:
+        date = ''
     filename = 'outdata/' + op.mode + '/' + fileExt + '_' + date + 'Integrand.txt'
     f = open(filename, 'r')
     integrals = []

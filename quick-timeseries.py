@@ -18,6 +18,7 @@ parser.add_argument("-g", help="Include actual gauge data")
 parser.add_argument("-s", help="Consider rossby-wave analytic solution")
 args = parser.parse_args()
 approach = args.a
+date = args.d
 op = Options(mode=args.mode, approach=approach)
 if op.mode == 'model-verification':
     assert approach is None
@@ -37,12 +38,13 @@ if op.mode == 'model-verification':
     fileExt += '_rotational='
     fileExt += 'True' if args.r else 'False'
 elif args.s is not None:
+    assert op.mode == 'rossby-wave'
     fileExt = 'analytic'
 else:
     fileExt = approach
 for quantity in quantities:
     if args.c:
         for i in range(6):
-            compareTimeseries(args.d, i, quantity=quantity, op=op)
+            compareTimeseries(date, i, quantity=quantity, op=op)
     else:
-        plotTimeseries(fileExt, date=args.d, quantity=quantity, realData=bool(args.g), op=op)
+        plotTimeseries(fileExt, date=date, quantity=quantity, realData=bool(args.g), op=op)
