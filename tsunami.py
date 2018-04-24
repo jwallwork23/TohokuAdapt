@@ -82,11 +82,11 @@ def fixedMesh(startRes, op=Options()):
 
         rel = np.abs(op.J - J_h) / np.abs(op.J)
         if op.mode == 'rossby-wave':
-            return nEle, rel, J_h, integrand, np.abs(peak/peak_a), distance, distance/distance_a, solverTimer, 0.
+            return nEle, rel, J_h, integrand, np.abs(peak/peak_a), distance, distance/distance_a, solverTimer
         elif op.mode == 'tohoku':
-            return nEle, rel, J_h, integrand, totalVarP02, totalVarP06, solverTimer, 0.
+            return nEle, rel, J_h, integrand, totalVarP02, totalVarP06, solverTimer
         else:
-            return nEle, rel, J_h, integrand, solverTimer, 0.
+            return nEle, rel, J_h, integrand, solverTimer
 
 
 def hessianBased(startRes, op=Options()):
@@ -115,6 +115,7 @@ def hessianBased(startRes, op=Options()):
         cnt = 0
         endT = 0.
 
+        adaptSolveTimer = 0.
         while cnt < op.cntT:
             indexStr = indexString(int(cnt / op.ndump))
 
@@ -228,6 +229,8 @@ def hessianBased(startRes, op=Options()):
             cnt += op.rm
             av = op.printToScreen(int(cnt/op.rm+1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.dt)
 
+            adaptSolveTimer += adaptTimer + solverTimer
+
         # Measure error using metrics, as in Huang et al.
         if op.mode == 'rossby-wave':
             index = int(op.cntT / op.ndump)
@@ -239,11 +242,11 @@ def hessianBased(startRes, op=Options()):
 
         rel = np.abs(op.J - J_h) / np.abs(op.J)
         if op.mode == 'rossby-wave':
-            return av, rel, J_h, integrand, np.abs(peak/peak_a), distance, distance/distance_a, solverTimer, adaptTimer
+            return av, rel, J_h, integrand, np.abs(peak/peak_a), distance, distance/distance_a, adaptSolveTimer
         elif op.mode == 'tohoku':
-            return av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, solverTimer, adaptTimer
+            return av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, adaptSolveTimer
         else:
-            return av, rel, J_h, integrand, solverTimer, adaptTimer
+            return av, rel, J_h, integrand, adaptSolveTimer
 
 
 def DWR(startRes, op=Options()):
@@ -441,6 +444,7 @@ def DWR(startRes, op=Options()):
 
         # Run adaptive primal run
         cnt = 0
+        adaptSolveTimer = 0.
         q = Function(V)
         uv_2d, elev_2d = q.split()
         elev_2d.interpolate(eta0)
@@ -551,6 +555,9 @@ def DWR(startRes, op=Options()):
             Sn += nEle
             cnt += op.rm
             av = op.printToScreen(int(cnt / op.rm + 1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.dt)
+
+            adaptSolveTimer += adaptTimer + solverTimer
+
         if op.mode == 'tohoku':
             totalVarP02 = cb3.totalVariation()
             totalVarP06 = cb4.totalVariation()
@@ -567,11 +574,11 @@ def DWR(startRes, op=Options()):
         rel = np.abs(op.J - J_h) / np.abs(op.J)
         if op.mode == 'rossby-wave':
             return av, rel, J_h, integrand, np.abs(
-                peak / peak_a), distance, distance / distance_a, solverTimer, adaptTimer
+                peak / peak_a), distance, distance / distance_a, adaptSolveTimer
         elif op.mode == 'tohoku':
-            return av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, solverTimer, adaptTimer
+            return av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, adaptSolveTimer
         else:
-            return av, rel, J_h, integrand, solverTimer, adaptTimer
+            return av, rel, J_h, integrand, adaptSolveTimer
 
 
 def DWP(startRes, op=Options()):
@@ -705,6 +712,7 @@ def DWP(startRes, op=Options()):
 
         # Run adaptive primal run
         cnt = 0
+        adaptSolveTimer = 0.
         q = Function(V)
         uv_2d, elev_2d = q.split()
         elev_2d.interpolate(eta0)
@@ -817,6 +825,9 @@ def DWP(startRes, op=Options()):
             Sn += nEle
             cnt += op.rm
             av = op.printToScreen(int(cnt / op.rm + 1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.dt)
+
+            adaptSolveTimer += adaptTimer + solverTimer
+
         if op.mode == 'tohoku':
             totalVarP02 = cb3.totalVariation()
             totalVarP06 = cb4.totalVariation()
@@ -833,11 +844,11 @@ def DWP(startRes, op=Options()):
         rel = np.abs(op.J - J_h) / np.abs(op.J)
         if op.mode == 'rossby-wave':
             return av, rel, J_h, integrand, np.abs(
-                peak / peak_a), distance, distance / distance_a, solverTimer, adaptTimer
+                peak / peak_a), distance, distance / distance_a, adaptSolveTimer
         elif op.mode == 'tohoku':
-            return av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, solverTimer, adaptTimer
+            return av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, adaptSolveTimer
         else:
-            return av, rel, J_h, integrand, solverTimer, adaptTimer
+            return av, rel, J_h, integrand, adaptSolveTimer
 
 
 if __name__ == "__main__":
@@ -922,24 +933,24 @@ if __name__ == "__main__":
     for i in resolutions:
         # Get data and save to disk
         if mode == 'rossby-wave':   # TODO: Timing output does not work in adjoint cases
-            av, rel, J_h, integrand, relativePeak, distance, phaseSpd, solverTime, adaptTime = solver(i, op=op)
+            av, rel, J_h, integrand, relativePeak, distance, phaseSpd, solverTime = solver(i, op=op)
             print("""Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs
         OF error: %.4e  Height error: %.4f  Distance: %.4fm  Speed error: %.4fm"""
-                  % (i, av, J_h, solverTime+adaptTime, rel, relativePeak, distance, phaseSpd))
+                  % (i, av, J_h, solverTime, rel, relativePeak, distance, phaseSpd))
             errorfile.write('%d, %.4e, %.4f, %.4f, %.4f, %.1f, %.4e\n'
-                           % (av, rel, relativePeak, distance, phaseSpd, solverTime+adaptTime, J_h))
+                           % (av, rel, relativePeak, distance, phaseSpd, solverTime, J_h))
         elif mode == 'tohoku':
-            av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, solverTime, adaptTime = solver(i, op=op)
+            av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, solverTime = solver(i, op=op)
             print("""Run %d: Mean element count: %6d Objective %.4e Timing %.1fs 
-        OF error: %.4e P02: %.3f P06: %.3f""" % (i, av, J_h, solverTime+adaptTime, rel, totalVarP02, totalVarP06))
+        OF error: %.4e P02: %.3f P06: %.3f""" % (i, av, J_h, solverTime, rel, totalVarP02, totalVarP06))
             errorfile.write('%d, %.4e, %.3f, %.3f, %.1f, %.4e\n'
-                            % (av, rel, totalVarP02, totalVarP06, solverTime+adaptTime, J_h))
+                            % (av, rel, totalVarP02, totalVarP06, solverTime, J_h))
             gaugeFileP02.writelines(["%s," % val for val in gP02])
             gaugeFileP02.write("\n")
             gaugeFileP06.writelines(["%s," % val for val in gP06])
             gaugeFileP06.write("\n")
         else:
-            av, rel, J_h, integrand, solverTime, adaptTime = solver(i, op=op)
+            av, rel, J_h, integrand, solverTime = solver(i, op=op)
             print('Run %d: Mean element count: %6d Objective: %.4e OF error %.4e Timing %.1fs'
-                  % (i, av, J_h, rel, solverTime+adaptTime))
-            errorfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, solverTime+adaptTime, J_h))
+                  % (i, av, J_h, rel, solverTime))
+            errorfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, solverTime, J_h))

@@ -136,15 +136,19 @@ def extractData(gauge):
 def plotTimeseries(fileExt, date, quantity='Integrand', realData=False, op=Options()):
     assert quantity in ('Integrand', 'P02', 'P06')
     filename = 'outdata/' + op.mode + '/' + fileExt + '_' + date + quantity + '.txt'
+    filename2 = 'outdata/' + op.mode + '/' + fileExt + '_' + date + '.txt'
     f = open(filename, 'r')
+    g = open(filename2, 'r')
     plt.gcf()
     i = 0
     for line in f:
         separated = line.split(',')
         dat = [float(d) for d in separated[:-1]]    # Ignore carriage return
         tim = np.linspace(0, op.Tend, len(dat))
-        plt.plot(tim[::5], dat[::5], label=str(i))
+        plt.plot(tim[::5], dat[::5], label=g.readline().split(',')[0])
         i += 1
+    f.close()
+    g.close()
     if realData:
         if (op.mode == 'tohoku' and quantity in ('P02', 'P06')) or op.mode == 'rossby-wave':
             x, y = extractData(quantity)

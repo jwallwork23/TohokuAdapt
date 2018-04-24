@@ -25,13 +25,13 @@ if op.mode == 'model-verification':
 if approach is None and op.mode != 'model-verification':
     approach = 'fixedMesh'
 quantities = ['Integrand', 'P02', 'P06'] if op.mode in ('tohoku', 'model-verification') else ['Integrand']
-# if args.s is not None:
-#     assert op.mode == 'rossby-wave'
-#     integrand = integrateRW(op.mixedSpace(problemDomain(level=5, op=op)[0]), op=op)
-#     integrandFile = open('outdata/' + op.mode + '/analytic_Integrand.txt', 'w+')
-#     integrandFile.writelines(["%s," % val for val in integrand])
-#     integrandFile.write("\n")
-#     integrandFile.close()
+if args.s is not None:
+    assert op.mode == 'rossby-wave'
+    integrandFile = open('outdata/' + op.mode + '/analytic_Integrand.txt', 'w+')
+    integrand = integrateRW(op.mixedSpace(problemDomain(level=5, op=op)[0]), op=op)
+    integrandFile.writelines(["%s," % val for val in integrand])
+    integrandFile.write("\n")
+    integrandFile.close()
 if op.mode == 'model-verification':
     fileExt = 'nonlinear='
     fileExt += 'False' if args.l else 'True'
