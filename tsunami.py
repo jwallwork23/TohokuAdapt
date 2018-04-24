@@ -40,8 +40,7 @@ def fixedMesh(startRes, op=Options()):
         options.use_grad_depth_viscosity_term = False                       # TODO: Might as well include these?
         options.use_grad_div_viscosity_term = False
         options.use_lax_friedrichs_velocity = False                         # TODO: This is a temporary fix
-        if op.mode == 'rossby-wave':
-            options.coriolis_frequency = f
+        options.coriolis_frequency = f
         options.simulation_export_time = op.dt * op.ndump
         options.simulation_end_time = op.Tend
         options.timestepper_type = op.timestepper
@@ -173,8 +172,7 @@ def hessianBased(startRes, op=Options()):
             adapOpt.output_directory = di
             adapOpt.export_diagnostics = True
             adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-            if op.mode == 'rossby-wave':
-                adapOpt.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
+            adapOpt.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
             field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
             e = exporter.ExportManager(di + 'hdf5',
                                        ['elev_2d', 'uv_2d'],
@@ -322,8 +320,7 @@ def DWR(startRes, op=Options()):
         options.use_grad_depth_viscosity_term = False                   # TODO: Might as well include these?
         options.use_grad_div_viscosity_term = False
         options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
-        if op.mode == 'rossby-wave':
-            options.coriolis_frequency = f
+        options.coriolis_frequency = f
         options.simulation_export_time = op.dt * (op.rm - 1)
         options.simulation_end_time = op.Tend
         options.timestepper_type = op.timestepper
@@ -504,8 +501,7 @@ def DWR(startRes, op=Options()):
             adapOpt.output_directory = di
             adapOpt.export_diagnostics = True
             adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-            if op.mode == 'rossby-wave':
-                adapOpt.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh_H)[1])
+            adapOpt.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh_H)[1])
             e = exporter.ExportManager(di + 'hdf5',
                                        ['elev_2d', 'uv_2d'],
                                        {'elev_2d': elev_2d, 'uv_2d': uv_2d},
@@ -630,8 +626,7 @@ def DWP(startRes, op=Options()):
         options.use_grad_depth_viscosity_term = False                   # TODO: Might as well include these?
         options.use_grad_div_viscosity_term = False
         options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
-        if op.mode == 'rossby-wave':
-            options.coriolis_frequency = f
+        options.coriolis_frequency = f
         options.simulation_export_time = op.dt * op.ndump
         options.simulation_end_time = op.Tend
         options.timestepper_type = op.timestepper
@@ -773,8 +768,7 @@ def DWP(startRes, op=Options()):
             adapOpt.output_directory = di
             adapOpt.export_diagnostics = True
             adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-            if op.mode == 'rossby-wave':
-                adapOpt.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh_H)[1])
+            adapOpt.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh_H)[1])
             field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
             e = exporter.ExportManager(di + 'hdf5',
                                        ['elev_2d', 'uv_2d'],

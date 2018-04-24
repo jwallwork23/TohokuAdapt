@@ -201,12 +201,10 @@ def problemDomain(level=0, mesh=None, op=Options(mode='tohoku')):
 
         # Post-process the bathymetry to have a minimum depth of 30m and if no wetting-and-drying
         BCs = {}
+        f = Function(P1)
         if op.rotational:           # TODO: Try f- or beta-plane approximation
-            f = Function(FunctionSpace(mesh, 'CG', 1))
             for i, v in zip(range(len(mesh.coordinates.dat.data)), mesh.coordinates.dat.data):
                 f.dat.data[i] = 2 * op.Omega * np.sin(np.radians(get_latitude(v[0], v[1], 54, northern=True)))
-        else:
-            f = None
     elif op.mode == 'shallow-water':
         n = pow(2, level)
         lx = 2 * pi
@@ -218,7 +216,7 @@ def problemDomain(level=0, mesh=None, op=Options(mode='tohoku')):
         u0 = Function(VectorFunctionSpace(mesh, "CG", 1))
         b = Function(P1).assign(0.1)
         BCs = {}
-        f = None
+        f = Function(P1)
     elif op.mode == 'rossby-wave':
         n = pow(2, level-1)
         lx = 48
