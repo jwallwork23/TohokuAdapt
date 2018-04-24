@@ -5,7 +5,7 @@ import numpy as np
 from .options import Options
 
 
-__all__ = ["indexString", "cheatCodes", "getMax", "peakAndDistance"]
+__all__ = ["indexString", "cheatCodes", "getMax", "peakAndDistance", "meshStats"]
 
 
 def indexString(index):
@@ -72,3 +72,14 @@ def peakAndDistance(f, op=Options()):
     dgCoords = Function(VectorFunctionSpace(mesh, op.space2, op.degree2)).interpolate(mesh.coordinates)
 
     return peak, np.abs(dgCoords.dat.data[peak_i][0])
+
+
+def meshStats(mesh):
+    """
+    :arg mesh: current mesh.
+    :return: number of cells and vertices on the mesh.
+    """
+    plex = mesh._plex
+    cStart, cEnd = plex.getHeightStratum(0)
+    vStart, vEnd = plex.getDepthStratum(0)
+    return cEnd - cStart, vEnd - vStart

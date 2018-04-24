@@ -1,7 +1,7 @@
 import numpy as np
 
 
-__all__ = ["MeshSetup", "problemDomain", "meshStats", "__main__"]
+__all__ = ["MeshSetup", "problemDomain", "solutionRW", "__main__"]
 
 
 class MeshSetup:
@@ -240,12 +240,33 @@ def problemDomain(level=0, mesh=None, op=Options(mode='tohoku')):
     return mesh, u0, eta0, b, BCs, f
 
 
-def meshStats(mesh):
+def solutionRW(V, t=0., B=0.395):
     """
-    :arg mesh: current mesh.
-    :return: number of cells and vertices on the mesh.
+    Analytic solution for equatorial Rossby wave test problem, as given by Huang.
+
+    :arg V: Mixed function space upon which to define solutions.
+    :arg t: current time.
+    :param B: Parameter controlling amplitude of soliton.
+    :return: Analytic solution for rossby-wave test problem of Huang.
     """
-    plex = mesh._plex
-    cStart, cEnd = plex.getHeightStratum(0)
-    vStart, vEnd = plex.getDepthStratum(0)
-    return cEnd - cStart, vEnd - vStart
+    x, y = SpatialCoordinate(V.mesh())
+    q = Function(V)
+    u, eta = q.split()
+
+    A = 0.771 * B * B
+    W = FunctionSpace(V.mesh(), V.sub(0).ufl_element().family(), V.sub(0).ufl_element().degree())
+    u0 = Function(W).interpolate(
+        A * (1 / (cosh(B * (x + 0.4 * t)) ** 2))
+        * 0.25 * (-9 + 6 * y * y)
+        * exp(-0.5 * y * y))
+    u1 = Function(W).interpolate(
+        -2 * B * tanh(B * (x + 0.4 * t)) *
+        A * (1 / (cosh(B * (x + 0.4 * t)) ** 2))
+        * 2 * y * exp(-0.5 * y * y))
+    u.dat.data[:, 0] = u0.dat.data      # TODO: Shouldn't really do this in adjointland
+    u.dat.data[:, 1] = u1.dat.data
+    eta.interpolate(A * (1 / (cosh(B * (x + 0.4 * t)) ** 2))
+                    * 0.25 * (3 + 6 * y * y)
+                    * exp(-0.5 * y * y))
+
+    return q

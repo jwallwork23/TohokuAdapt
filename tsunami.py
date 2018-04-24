@@ -9,9 +9,9 @@ from time import clock
 
 from utils.adaptivity import isoP2, isotropicMetric, metricIntersection, metricGradation, pointwiseMax, steadyMetric
 from utils.callbacks import *
-from utils.forms import solutionRW, strongResidualSW
+from utils.forms import strongResidualSW
 from utils.interpolation import interp, mixedPairInterp
-from utils.mesh import meshStats, problemDomain
+from utils.setup import meshStats, problemDomain, solutionRW
 from utils.misc import indexString, peakAndDistance
 from utils.options import Options
 
@@ -100,6 +100,7 @@ def hessianBased(startRes, op=Options()):
             physical_constants['g_grav'].assign(op.g)
         mesh, u0, eta0, b, BCs, f = problemDomain(startRes, op=op)
         V = op.mixedSpace(mesh)
+        P1 = FunctionSpace(mesh, "CG", 1)
         uv_2d, elev_2d = Function(V).split()  # Needed to load data into
         if op.mode == 'rossby-wave':
             peak_a, distance_a = peakAndDistance(solutionRW(V, t=op.Tend).split()[1])  # Analytic final-time state
@@ -193,11 +194,11 @@ def hessianBased(startRes, op=Options()):
             if op.mode == 'tohoku':
                 cb2 = P02Callback(adapSolver)
                 cb3 = P06Callback(adapSolver)
+                if cnt == 0:
+                    initP02 = cb2.init_value
+                    initP06 = cb3.init_value
             adapSolver.add_callback(cb1, 'timestep')
-            if cnt == 0:
-                initP02 = cb2.init_value
-                initP06 = cb3.init_value
-            else:
+            if cnt != 0:
                 cb1.objective_value = integrand
                 if op.mode == 'tohoku':
                     cb2.gauge_values = gP02

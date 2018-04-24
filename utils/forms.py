@@ -6,7 +6,7 @@ from .interpolation import mixedPairInterp
 from .options import Options
 
 
-__all__ = ["strongResidualSW", "formsSW", "interelementTerm", "solutionRW", "indicator", "explicitErrorEstimator",
+__all__ = ["strongResidualSW", "formsSW", "interelementTerm", "indicator", "explicitErrorEstimator",
            "fluxJumpError", "timestepCoeffs", "timestepScheme"]
 
 
@@ -142,38 +142,6 @@ def indicator(V, op=Options()):
     iA = Function(V, name="Region of interest").interpolate(Expression(ind))
 
     return iA
-
-
-def solutionRW(V, t=0., B=0.395):
-    """
-    Analytic solution for equatorial Rossby wave test problem, as given by Huang.
-
-    :arg V: Mixed function space upon which to define solutions.
-    :arg t: current time.
-    :param B: Parameter controlling amplitude of soliton.
-    :return: Analytic solution for rossby-wave test problem of Huang.
-    """
-    x, y = SpatialCoordinate(V.mesh())
-    q = Function(V)
-    u, eta = q.split()
-
-    A = 0.771 * B * B
-    W = FunctionSpace(V.mesh(), V.sub(0).ufl_element().family(), V.sub(0).ufl_element().degree())
-    u0 = Function(W).interpolate(
-        A * (1 / (cosh(B * (x + 0.4 * t)) ** 2))
-        * 0.25 * (-9 + 6 * y * y)
-        * exp(-0.5 * y * y))
-    u1 = Function(W).interpolate(
-        -2 * B * tanh(B * (x + 0.4 * t)) *
-        A * (1 / (cosh(B * (x + 0.4 * t)) ** 2))
-        * 2 * y * exp(-0.5 * y * y))
-    u.dat.data[:, 0] = u0.dat.data      # TODO: Shouldn't really do this in adjointland
-    u.dat.data[:, 1] = u1.dat.data
-    eta.interpolate(A * (1 / (cosh(B * (x + 0.4 * t)) ** 2))
-                    * 0.25 * (3 + 6 * y * y)
-                    * exp(-0.5 * y * y))
-
-    return q
 
 
 def explicitErrorEstimator(q, residual, b, v, maxBathy=False):
