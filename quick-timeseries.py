@@ -10,8 +10,7 @@ from utils.timeseries import plotTimeseries, compareTimeseries
 parser = argparse.ArgumentParser()
 parser.add_argument("mode", help="Choose problem from {'tohoku', 'shallow-water', 'rossby-wave', 'model-verification'}.")
 parser.add_argument("-a", help="Choose from {'fixedMesh', 'hessianBased', 'implicit', 'explicit', 'DWP', 'DWR'}.")
-parser.add_argument("-r", help="Use rotational equations")
-parser.add_argument("-l", help="Use linearised equations")
+parser.add_argument("-r", help="Choose Coriolis parameter from {'off', 'f', 'beta', 'sin'}")
 parser.add_argument("-d", help="Specify a date")
 parser.add_argument("-c", help="Compare timeseries")
 parser.add_argument("-g", help="Include actual gauge data")
@@ -33,10 +32,8 @@ if args.s is not None:
     integrandFile.write("\n")
     integrandFile.close()
 if op.mode == 'model-verification':
-    fileExt = 'nonlinear='
-    fileExt += 'False' if args.l else 'True'
-    fileExt += '_rotational='
-    fileExt += 'True' if args.r else 'False'
+    fileExt = '_rotational='
+    fileExt += 'off' if args.r is None else args.r
 elif args.s is not None:
     assert op.mode == 'rossby-wave'
     fileExt = 'analytic'

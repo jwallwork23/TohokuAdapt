@@ -3,8 +3,8 @@ from thetis import *
 from time import clock
 
 from utils.callbacks import SWCallback, P02Callback, P06Callback
-from utils.mesh import problemDomain
 from utils.options import Options
+from utils.setup import problemDomain
 
 
 def solverSW(startRes, di, op=Options()):
@@ -19,7 +19,6 @@ def solverSW(startRes, di, op=Options()):
     options.use_grad_div_viscosity_term = False
     options.coriolis_frequency = f
     options.simulation_export_time = 50. if op.plotpvd else 100.
-    options.period_of_interest_start = op.Tstart
     options.simulation_end_time = op.Tend
     options.timestepper_type = op.timestepper
     options.timestep = op.dt
@@ -55,13 +54,11 @@ if __name__ == '__main__':
     date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-r", help="Choose Coriolis parameter from {'off', 'f', 'beta', 'sin'}")      # TODO
+    parser.add_argument("-r", help="Choose Coriolis parameter from {'off', 'f', 'beta', 'sin'}")
     parser.add_argument("-o", help="Output data")
-    parser.add_argument("-s", help="Print solver statistics")
     args = parser.parse_args()
     op = Options(family='dg-dg',
                  plotpvd=True if args.o else False,
-                 printStats=True if args.s else False,
                  coriolis=args.r)
     tag = 'rotational=' + op.coriolis
     filename = 'outdata/model-verification/' + tag + '_' + date

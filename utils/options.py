@@ -167,7 +167,7 @@ class Options:
             self.dt = 0.05
             self.ndump = 12
             self.g = 1.
-            self.J = 1.                                                 # TODO: establish this
+            self.J = 1.8003                                             # On mesh level 5
             self.xy = [-24., -20., -2., 2.]
         elif self.mode in ('tohoku', 'model-verification'):
             self.Tstart = 300.
@@ -194,12 +194,11 @@ class Options:
         self.space1 = "CG" if self.family == 'cg-cg' else "DG"
         self.space2 = "DG" if self.family == 'dg-dg' else "CG"
 
-        # Plotting dictionaries     TODO: Remove explicit and implicit options, change 'adjoint based'
-        self.labels = ("Fixed mesh", "Hessian based", "Explicit", "Implicit", "Adjoint based", "Goal based")
-        self.styles = {self.labels[0]: 's', self.labels[1]: '^', self.labels[2]: 'x', self.labels[3]: 'o',
-                       self.labels[4]: '*', self.labels[5]: 'h'}
-        self.stamps = {self.labels[0]: 'fixedMesh', self.labels[1]: 'hessianBased', self.labels[2]: 'explicit',
-                       self.labels[3]: 'implicit', self.labels[4]: 'DWF', self.labels[5]: 'DWR'}
+        # Plotting dictionaries
+        self.labels = ("Fixed mesh", "Hessian based", "DWP", "DWR")
+        self.styles = {self.labels[0]: 's', self.labels[1]: '^', self.labels[2]: 'x', self.labels[3]: 'o'}
+        self.stamps = {self.labels[0]: 'fixedMesh', self.labels[1]: 'hessianBased', self.labels[2]: 'DWF',
+                       self.labels[3]: 'DWR'}
 
 
     def gaugeCoord(self, gauge):
