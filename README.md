@@ -34,6 +34,13 @@ The following meshing strategies are implemented, with a number of other approac
     * calculate total variations between timeseries using ``quick-difference``; 
     * integrate timeseries using ``quick-integrate``; 
     * plot error curves and CPU timings against element count using ``quick-plot``.
+    
+### User instructions
+
+Download the [Firedrake][1] install script, set ``export PETSC_CONFIGURE_OPTIONS=“download-pragmatic=1"`` and install 
+with option parameters ``--install pyadjoint`` and ``--install thetis``. Fetch and checkout the remote branches 
+* ``https://github.com/taupalosaurus/firedrake.git`` for firedrake;
+* ``https://bitbucket.org/dolfin-adjoint/pyadjoint/branch/linear-solver`` for pyadjoint.
 
 For feedback, comments and questions, please email j.wallwork16@imperial.ac.uk.
 
