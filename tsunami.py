@@ -340,7 +340,7 @@ def DWR(startRes, op=Options()):
         primalTimer = clock()
         solver_obj.iterate(export_func=selector)
         primalTimer = clock() - primalTimer
-        J = cb1.assembleOF()                        # Assemble objective functional for adjoint computation
+        J = cb1.quadrature()                        # Assemble objective functional for adjoint computation
         print('Primal run complete. Solver time: %.3fs' % primalTimer)
 
         # Compute gradient
@@ -640,7 +640,7 @@ def DWP(startRes, op=Options()):
         primalTimer = clock()
         solver_obj.iterate()
         primalTimer = clock() - primalTimer
-        J = cb1.assembleOF()                        # Assemble objective functional for adjoint computation
+        J = cb1.quadrature()                        # Assemble objective functional for adjoint computation
         print('Primal run complete. Solver time: %.3fs' % primalTimer)
 
         # Compute gradient
