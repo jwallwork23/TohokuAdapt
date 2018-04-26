@@ -42,7 +42,7 @@ def timestepScheme(u, u_, timestepper):
     return a1 * u + a2 * u_
 
 
-def strongResidualSW(q, q_, b, coriolisFreq=None, op=Options()):    # TODO: Some minor adjustments to get Thetis forms
+def strongResidualSW(q, q_, b, coriolisFreq=None, op=Options()):
     """
     Construct the strong residual for the semi-discrete linear shallow water equations at the current timestep.
 
@@ -56,13 +56,52 @@ def strongResidualSW(q, q_, b, coriolisFreq=None, op=Options()):    # TODO: Some
     Dt = Constant(op.dt)
     (u, eta) = (as_vector((q[0], q[1])), q[2])
     (u_, eta_) = (as_vector((q_[0], q_[1])), q_[2])
-    um = timestepScheme(u, u_, op.timestepper)
-    em = timestepScheme(eta, eta_, op.timestepper)
 
-    Au = (u - u_) / Dt + op.g * grad(em) + dot(u, nabla_grad(u))
-    Ae = (eta - eta_) / Dt + div(b * um) + div(em * um)
+    Au = (u - u_) / Dt + op.g * grad(eta) + dot(u, nabla_grad(u))
+    Ae = (eta - eta_) / Dt + div((b + eta) * u)
     if coriolisFreq:
         Au += coriolisFreq * as_vector((-u[1], u[0]))
+
+    return Au, Ae
+
+
+def strongResidual(Ve, solution_old, solver_obj, op=Options()):
+    """
+    Construct the strong residual for the semi-discrete linear shallow water equations at the current timestep.
+
+    :arg Ve: enriched finite element space in which to compute strong residual.
+    :arg solution_old: solution tuple for linear shallow water equations at previous timestep.
+    :arg solver_obj: thetis solver object containing parameters and fields.
+    :param op: parameter holding class.
+    :return: strong residual for shallow water equations at current timestep.
+    """
+
+    # Collect fields and parameters
+    q = Function(Ve).interpolate(solver_obj.fields.solution_2d)
+    q_ = Function(Ve).interpolate(solution_old)
+    b = Function(FunctionSpace(Ve.mesh(), "CG", 2)).interpolate(solver_obj.fields.bathymetry_2d)
+    nu = solver_obj.fields.get('viscosity_h')
+    Dt = Constant(solver_obj.options.timestep)
+    uv_2d, elev_2d = q.split()
+    uv_2d_, elev_2d_ = q_.split()
+    H = b * elev_2d
+
+    # Momentum equation
+    Au = (uv_2d - uv_2d_) / Dt + Constant(op.g) * grad(elev_2d) # TODO: Other terms to include
+    if solver_obj.options.use_nonlinear_equations:
+        Au += dot(uv_2d, nabla_grad(uv_2d))
+    if solver_obj.options.coriolis_frequency is not None:
+        Au += solver_obj.options.coriolis_frequency * as_vector((-uv_2d[1], uv_2d[0]))
+    if nu is not None:
+        if solver_obj.options.use_grad_depth_viscosity_term:
+            Au -= dot(nu * grad(H), (grad(uv_2d) + sym(grad(uv_2d))))
+        if solver_obj.options.use_grad_div_viscosity_term:
+            Au -= div(nu * (grad(uv_2d) + sym(grad(uv_2d))))
+        else:
+            Au -= div(nu * grad(uv_2d))
+
+    # Continuity equation
+    Ae = (elev_2d - elev_2d_) / Dt + div((b + elev_2d) * uv_2d)
 
     return Au, Ae
 

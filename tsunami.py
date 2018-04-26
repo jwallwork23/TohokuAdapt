@@ -37,7 +37,7 @@ def fixedMesh(startRes, op=Options()):
         options = solver_obj.options
         options.element_family = op.family
         options.use_nonlinear_equations = True
-        options.use_grad_depth_viscosity_term = False           # TODO: Might as well include this for Tohoku?
+        options.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
         options.use_lax_friedrichs_velocity = False             # TODO: This is a temporary fix
         options.coriolis_frequency = f
         options.simulation_export_time = op.dt * op.ndump
@@ -159,7 +159,7 @@ def hessianBased(startRes, op=Options()):
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = True
-            adapOpt.use_grad_depth_viscosity_term = False               # TODO: Might as well include this for Tohoku?
+            adapOpt.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
             adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump
             startT = endT
@@ -315,7 +315,7 @@ def DWR(startRes, op=Options()):
         options = solver_obj.options
         options.element_family = op.family
         options.use_nonlinear_equations = True
-        options.use_grad_depth_viscosity_term = False                   # TODO: Might as well include this for Tohoku?
+        options.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
         options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
         options.coriolis_frequency = f
         options.simulation_export_time = op.dt * (op.rm - 1)
@@ -401,6 +401,12 @@ def DWR(startRes, op=Options()):
             # Approximate residuals, load adjoint data and form residuals
             if op.refinedSpace:
                 qe, qe_ = mixedPairInterp(mesh_h, Ve, q, q_)
+            elif op.orderChange:
+                qe.interpolate(q)
+                qe_.interpolate(q_)
+            else:
+                qe = q
+                qe_ = q_
 
             # Initial approach  # TODO: Replace with actual Thetis forms: see other TODOs
             Au, Ae = strongResidualSW(qe, qe_, be, coriolisFreq=None, op=op)
@@ -492,7 +498,7 @@ def DWR(startRes, op=Options()):
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = True
-            adapOpt.use_grad_depth_viscosity_term = False               # TODO: Might as well include this for Tohoku?
+            adapOpt.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
             adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump
             startT = endT
@@ -625,7 +631,7 @@ def DWP(startRes, op=Options()):
         options = solver_obj.options
         options.element_family = op.family
         options.use_nonlinear_equations = True
-        options.use_grad_depth_viscosity_term = False                   # TODO: Might as well include this for Tohoku?
+        options.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
         options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
         options.coriolis_frequency = f
         options.simulation_export_time = op.dt * op.ndump
@@ -757,7 +763,7 @@ def DWP(startRes, op=Options()):
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = True
-            adapOpt.use_grad_depth_viscosity_term = False               # TODO: Might as well include this for Tohoku?
+            adapOpt.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
             adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump
             startT = endT
