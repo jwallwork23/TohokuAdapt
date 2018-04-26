@@ -57,8 +57,7 @@ if __name__ == '__main__':
     parser.add_argument("-r", help="Choose Coriolis parameter from {'off', 'f', 'beta', 'sin'}")
     parser.add_argument("-o", help="Output data")
     args = parser.parse_args()
-    op = Options(family='dg-dg',
-                 plotpvd=True if args.o else False,
+    op = Options(plotpvd=True if args.o else False,
                  coriolis=args.r)
     tag = 'rotational=' + op.coriolis
     filename = 'outdata/model-verification/' + tag + '_' + date

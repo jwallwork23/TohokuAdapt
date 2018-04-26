@@ -167,7 +167,7 @@ class Options:
             self.dt = 0.05
             self.ndump = 12
             self.g = 1.
-            self.J = 1.8199                                             # On mesh level 6
+            self.J = 1.8199                                             # On mesh of 2,359,296 elements
             self.xy = [-24., -20., -2., 2.]
         elif self.mode in ('tohoku', 'model-verification'):
             self.Tstart = 300.

@@ -334,7 +334,12 @@ def DWR(startRes, op=Options()):
         def selector():
             rm = options.timesteps_per_remesh
             dt = options.timestep
-            options.simulation_export_time = dt if int(solver_obj.simulation_time / dt) % rm == 0 else (rm - 1) * dt
+            if options.simulation_export_time == dt:
+                options.simulation_export_time = (rm -1) * dt
+            elif options.simulation_export_time == (rm - 1) * dt:
+                options.simulation_export_time = dt
+            else:
+                raise ValueError("Export time is out of sync, current value %.3f" % options.simulation_export_time)
         initTimer = clock() - initTimer
         print('Problem initialised. Setup time: %.3fs' % initTimer)
         primalTimer = clock()
@@ -357,11 +362,14 @@ def DWR(startRes, op=Options()):
         N = len(solve_blocks)
         dualTimer = clock() - dualTimer
         r = N % op.rm  # Number of extra tape annotations in setup
+        print("#### DEBUG: N = %d, r = %d, rm = %d" % (N, r, op.rm))
+        print("#### DEBUG: Span = %d" % int(np.ceil(op.cntT / op.rm)))
+        print("range1 = ", list(range(r-1, N-1, op.rm)), "range2 = ", range(0, int(np.ceil(op.cntT / op.rm))))
         print('Dual run complete. Run time: %.3fs' % dualTimer)
 
     with pyadjoint.stop_annotating():
 
-        # # TODO: For updated residual computation
+        # # # TODO: For updated residual computation
         # v, xi = TestFunctions(Ve)
         # swe_mom = ShallowWaterMomentumEquation(v, Ve.sub(0), Ve.sub(1), be, solver_obj.options)
         # swe_con = FreeSurfaceEquation(xi, Ve.sub(1), Ve.sub(0), be, solver_obj.options)
@@ -401,19 +409,17 @@ def DWR(startRes, op=Options()):
 
             # # Attempt at updated approach. Although residuals here are weak
             # uv_2d_e, elev_2d_e = qe.split()     # TODO: Replace older version, when complete. Currently not local
-            # uv_2d_e_, elev_2d_e_ = qe_.split()
-            # rho_u = swe_mom.residual('all',     # Terms used, from {'all', 'source', 'implicit', 'explicit', 'nonlinear'}
+            # uv_2d_e_, elev_2d_e_ = qe_.split()    # TODO: When complete, build residual functionality into solver_obj
+            # rho_u = swe_mom.strong_residual('all',     # Terms used, from {'all', 'source', 'implicit', 'explicit', 'nonlinear'}
             #                          uv_2d_e,
             #                          uv_2d_e_,
             #                          {'eta': elev_2d_e, 'uv': uv_2d_e},
-            #                          {'eta': elev_2d_e_, 'uv': uv_2d_e_},
-            #                          BCs)
-            # rho_e = swe_con.residual('all',
+            #                          {'eta': elev_2d_e_, 'uv': uv_2d_e_})
+            # rho_e = swe_con.strong_residual('all',
             #                          elev_2d_e,
             #                          elev_2d_e_,
             #                          {'eta': elev_2d_e, 'uv': uv_2d_e},
-            #                          {'eta': elev_2d_e_, 'uv': uv_2d_e_},
-            #                          BCs)
+            #                          {'eta': elev_2d_e_, 'uv': uv_2d_e_})
 
             if op.plotpvd:
                 residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * k))
@@ -848,8 +854,8 @@ if __name__ == "__main__":
     date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-a", help="Choose adaptive approach from {'hessianBased', 'DWP', 'DWR'} (default 'fixedMesh')")
     parser.add_argument("-t", help="Choose test problem from {'shallow-water', 'rossby-wave'} (default 'tohoku')")
+    parser.add_argument("-a", help="Choose adaptive approach from {'hessianBased', 'DWP', 'DWR'} (default 'fixedMesh')")
     parser.add_argument("-low", help="Lower bound for index range")
     parser.add_argument("-high", help="Upper bound for index range")
     parser.add_argument("-o", help="Output data")
