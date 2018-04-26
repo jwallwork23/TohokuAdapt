@@ -39,8 +39,9 @@ The following meshing strategies are implemented, with a number of other approac
 
 Download the [Firedrake][1] install script, set ``export PETSC_CONFIGURE_OPTIONS=“download-pragmatic=1"`` and install 
 with option parameters ``--install pyadjoint`` and ``--install thetis``. Fetch and checkout the remote branches 
-* ``https://github.com/taupalosaurus/firedrake.git`` for firedrake;
-* ``https://bitbucket.org/dolfin-adjoint/pyadjoint/branch/linear-solver`` for pyadjoint.
+* ``https://github.com/taupalosaurus/firedrake`` for firedrake;
+* ``https://bitbucket.org/dolfin-adjoint/pyadjoint/branch/linear-solver`` for pyadjoint;
+* ``https://github.com/thetisproject/thetis/tree/goal-based-adaptation`` for thetis.
 
 For feedback, comments and questions, please email j.wallwork16@imperial.ac.uk.
 
