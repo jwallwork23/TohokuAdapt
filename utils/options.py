@@ -150,10 +150,10 @@ class Options:
             self.hmin = 1e-4
             self.hmax = 1.
             self.minNorm = 1e-6
-            self.rm = 5
+            self.rm = 10 if self.approach in ("DWP", "DWR") else 5
             self.dt = 0.05
-            self.ndump = 5
-            self.J = 1.1184e-3,                                         # On mesh of 524,288 elements
+            self.ndump = 10
+            self.J = 1.12e-3,   # On mesh of 524,288 elements, rounded to 3.s.f. from 1.1184e-3
             self.xy = [0., 0.5 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
             self.g = 9.81
         elif self.mode == 'rossby-wave':
@@ -163,18 +163,20 @@ class Options:
             self.hmin = 5e-3
             self.hmax = 10.
             self.minNorm = 1e-4
-            self.rm = 24
+            self.rm = 48 if self.approach in ("DWP", "DWR") else 24
             self.dt = 0.05
             self.ndump = 12
             self.g = 1.
-            self.J = 1.8199                                             # On mesh of 2,359,296 elements
+            self.J = 1.82       # On mesh of 2,359,296 elements, rounded to 3.s.f. from 1.8199
             self.xy = [-24., -20., -2., 2.]
         elif self.mode in ('tohoku', 'model-verification'):
             self.Tstart = 300.
             self.Tend = 1500.
-            self.J = 1.240e+13                                          # On mesh of 681,666 elements     TODO: Check
+            self.J = 1.240e+13  #  On mesh of 681,666 elements, rounded to 3.s.f. from 1.240e+13     TODO: Check
             self.xy = [490e3, 640e3, 4160e3, 4360e3]
             self.g = 9.81
+            if self.approach in ("DWP", "DWR"):
+                self.rm *= 2
 
             # Gauge locations in latitude-longitude coordinates and mesh element counts
             self.glatlon = {"P02": (38.5002, 142.5016), "P06": (38.6340, 142.5838), "801": (38.2, 141.7),

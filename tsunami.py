@@ -362,9 +362,6 @@ def DWR(startRes, op=Options()):
         N = len(solve_blocks)
         dualTimer = clock() - dualTimer
         r = N % op.rm  # Number of extra tape annotations in setup
-        print("#### DEBUG: N = %d, r = %d, rm = %d" % (N, r, op.rm))
-        print("#### DEBUG: Span = %d" % int(np.ceil(op.cntT / op.rm)))
-        print("range1 = ", list(range(r-1, N-1, op.rm)), "range2 = ", range(0, int(np.ceil(op.cntT / op.rm))))
         print('Dual run complete. Run time: %.3fs' % dualTimer)
 
     with pyadjoint.stop_annotating():
