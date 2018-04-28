@@ -30,10 +30,7 @@ outdata/
 # Old form compilers
 utils/forms.py
 
-# Old test script
-shallow-water-test.py
-
-# Testing
+# Test scripts
 wdTest.py
 heat_eqn.py
 helmholtz.py
@@ -44,6 +41,8 @@ pyadjoint-test-thetis.py
 rossby-test-firedrake.py
 firedrake-tsunami.py
 thetis-tsunami.py
+residual-callback-test.py
+shallow-water-test.py
 
 # Patches
 adapt_attrs.patch

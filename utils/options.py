@@ -167,7 +167,7 @@ class Options:
             self.dt = 0.05
             self.ndump = 12
             self.g = 1.
-            self.J = 1.82       # On mesh of 2,359,296 elements, rounded to 3.s.f. from 1.8199
+            self.J = 2.46       # On mesh of 2,359,296 elements, rounded to 3.s.f. from 2.4646
             self.xy = [-20., -16., -3., 3.]
         elif self.mode in ('tohoku', 'model-verification'):
             self.Tstart = 300.

@@ -296,7 +296,7 @@ def DWR(startRes, op=Options()):
     if op.gradate:
         H0 = Function(P1).interpolate(CellSize(mesh_H))
 
-    if not op.regen:    # TODO: regen won't work in general as HDF5 files get overwritten in adaptive stage
+    if not op.regen:
 
         # Solve fixed mesh primal problem to get residuals and adjoint solutions
         solver_obj = solver2d.FlowSolver2d(mesh_H, b)
