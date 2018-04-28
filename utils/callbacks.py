@@ -1,9 +1,9 @@
 from thetis_adjoint import *
 from thetis.callback import FunctionalCallback, GaugeCallback
 
-from .timeseries import gaugeTV
-from .forms import indicator
+from .misc import indicator
 from .options import Options
+from .timeseries import gaugeTV
 
 
 __all__ = ["SWCallback", "ObjectiveSWCallback", "P02Callback", "P06Callback"]

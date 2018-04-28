@@ -145,14 +145,14 @@ class Options:
 
         # Override default parameter choices for SW and RW cases:
         if self.mode == 'shallow-water':
-            self.Tstart = 0.1
-            self.Tend = 2.5
+            self.Tstart = 0.0
+            self.Tend = 3.
             self.hmin = 1e-4
             self.hmax = 1.
             self.minNorm = 1e-6
             self.rm = 10 if self.approach in ("DWP", "DWR") else 5
             self.dt = 0.05
-            self.ndump = 10
+            self.ndump = 2
             self.J = 1.12e-3,   # On mesh of 524,288 elements, rounded to 3.s.f. from 1.1184e-3
             self.xy = [0., 0.5 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
             self.g = 9.81

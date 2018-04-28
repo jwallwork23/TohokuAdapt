@@ -12,7 +12,6 @@ adaptivity:
     * Hessians and metrics are approximated using ``adaptivity``.
     * Callbacks for assembling objective functionals and extracting timeseries are provided in ``callbacks``.
     * Coordinate transformations are achieved using ``conversion``.
-    * PDE strong and weak forms, (local) error indicators and analytic solutions are available in ``forms``.
     * Interpolation of functions from an old mesh to a newly adapted mesh is achieved using ``interpolation``.
     * Meshes of the physical domain can be generated using ``mesh``.
     * Some generic functions may be found in ``misc``.

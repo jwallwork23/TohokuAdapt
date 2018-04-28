@@ -148,7 +148,7 @@ else:
     from scipy.io.netcdf import NetCDFFile
 
     from .conversion import earth_radius, get_latitude, vectorlonlat_to_utm
-    from .forms import indicator
+    from .misc import indicator
     from .options import Options
 
 

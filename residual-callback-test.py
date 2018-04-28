@@ -1,7 +1,8 @@
 from thetis import *
-from thetis.callback import ResidualSWCallback
+from thetis.callback import MomentumResidualCallback, ContinuityResidualCallback
 
 from utils.setup import problemDomain, solutionRW
+from utils.misc import indexString
 from utils.options import Options
 
 
@@ -37,13 +38,29 @@ def DWR(startRes, op=Options()):
     options.export_diagnostics = True
     options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
     solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
-    cb1 = ResidualSWCallback(solver_obj)
+    cb1 = MomentumResidualCallback(solver_obj)
     solver_obj.add_callback(cb1, 'export')
+    cb2 = ContinuityResidualCallback(solver_obj)
+    solver_obj.add_callback(cb2, 'export')
     solver_obj.bnd_functions['shallow_water'] = BCs
     solver_obj.iterate()
-    R = cb1.__call__()[0]
-    R0, R1 = R.split()
-    File("plots/test.pvd").write(R0, R1)
+    R0 = cb1.__call__()[0]
+    R1 = cb2.__call__()[0]
+    File("plots/test1.pvd").write(R0)
+    File("plots/test2.pvd").write(R1)
+
+    rho = Function(V)
+    rho_u, rho_e = rho.split()
+    residualFile = File(di+"residual.pvd")
+    for i in range(int(op.cntT/op.rm)):
+        indexStr = indexString(i)
+        with DumbCheckpoint(di + 'hdf5/MomentumResidual2d_' + indexStr, mode=FILE_READ) as loadRes:
+            loadRes.load(rho_u, name="Momentum error")
+            loadRes.close()
+        with DumbCheckpoint(di + 'hdf5/ContinuityResidual2d_' + indexStr, mode=FILE_READ) as loadRes:
+            loadRes.load(rho_e, name="Continuity error")
+            loadRes.close()
+        residualFile.write(rho_u, rho_e, time=float(i))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 from thetis_adjoint import *
 from thetis.field_defs import field_metadata
-from thetis.shallowwater_eq import ShallowWaterMomentumEquation, FreeSurfaceEquation    # For residual computation
+from thetis.callback import MomentumResidualCallback, ContinuityResidualCallback
 import pyadjoint
 from fenics_adjoint.solving import SolveBlock                                       # For extracting adjoint solutions
 
@@ -9,7 +9,6 @@ from time import clock
 
 from utils.adaptivity import isoP2, isotropicMetric, metricIntersection, metricGradation, pointwiseMax, steadyMetric
 from utils.callbacks import *
-from utils.forms import strongResidualSW
 from utils.interpolation import interp, mixedPairInterp
 from utils.setup import problemDomain, solutionRW
 from utils.misc import indexString, peakAndDistance, meshStats
@@ -247,9 +246,9 @@ def DWR(startRes, op=Options()):
     initTimer = clock()
     di = 'plots/' + op.mode + '/DWR/'
     if op.plotpvd:
-        residualFile = File(di + "residual.pvd")
-        errorFile = File(di + "errorIndicator.pvd")
-        adjointFile = File(di + "adjoint.pvd")
+        residualFile = File(di + "Residual2d.pvd")
+        errorFile = File(di + "ErrorIndicator2d.pvd")
+        adjointFile = File(di + "Adjoint2d.pvd")
 
     # Initialise domain and physical parameters
     try:
@@ -263,8 +262,6 @@ def DWR(startRes, op=Options()):
     uv_2d.rename('uv_2d')
     elev_2d.rename('elev_2d')
     P1 = FunctionSpace(mesh_H, "CG", 1)
-    q_ = Function(V)                        # Variable at previous timestep
-    uv_2d_, elev_2d_ = q_.split()
     P0 = FunctionSpace(mesh_H, "DG", 0)
     if op.mode == 'rossby-wave':
         peak_a, distance_a = peakAndDistance(solutionRW(V, t=op.Tend).split()[1])  # Analytic final-time state
@@ -278,21 +275,14 @@ def DWR(startRes, op=Options()):
         Ve = op.mixedSpace(mesh_H)          # Automatically generates a higher/lower order space
         duale = Function(Ve)
         duale_u, duale_e = duale.split()
-        be = b
     elif op.refinedSpace:                   # Define variables on an iso-P2 refined space
         mesh_h = isoP2(mesh_H)
         Ve = op.mixedSpace(mesh_h)
-        be = problemDomain(mesh=mesh_h, op=op)[3]
         P0 = FunctionSpace(mesh_h, "DG", 0)
     else:                                   # Copy standard variables to mimic enriched space labels
         Ve = V
-        be = b
-    qe = Function(Ve)
-    qe_ = Function(Ve)
     rho = Function(Ve)
     rho_u, rho_e = rho.split()
-    rho_u.rename("Velocity residual")
-    rho_e.rename("Elevation residual")
     v = TestFunction(P0)                    # For extracting elementwise error indicators
 
     # Initialise parameters and counters
@@ -316,7 +306,7 @@ def DWR(startRes, op=Options()):
         options.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
         options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
         options.coriolis_frequency = f
-        options.simulation_export_time = op.dt * (op.rm - 1)
+        options.simulation_export_time = op.dt * op.rm
         options.simulation_end_time = op.Tend
         options.timestepper_type = op.timestepper
         options.timestep = op.dt
@@ -327,21 +317,16 @@ def DWR(startRes, op=Options()):
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         cb1 = ObjectiveSWCallback(solver_obj)
         cb1.op = op
+        cb2 = MomentumResidualCallback(solver_obj)
+        cb3 = ContinuityResidualCallback(solver_obj)
         solver_obj.add_callback(cb1, 'timestep')
+        solver_obj.add_callback(cb2, 'export')
+        solver_obj.add_callback(cb3, 'export')
         solver_obj.bnd_functions['shallow_water'] = BCs
-        def selector():
-            rm = options.timesteps_per_remesh
-            dt = options.timestep
-            if options.simulation_export_time == dt:
-                options.simulation_export_time = (rm -1) * dt
-            elif options.simulation_export_time == (rm - 1) * dt:
-                options.simulation_export_time = dt
-            else:
-                raise ValueError("Export time is out of sync, current value %.3f" % options.simulation_export_time)
         initTimer = clock() - initTimer
         print('Problem initialised. Setup time: %.3fs' % initTimer)
         primalTimer = clock()
-        solver_obj.iterate(export_func=selector)
+        solver_obj.iterate()
         primalTimer = clock() - primalTimer
         J = cb1.quadrature()                        # Assemble objective functional for adjoint computation
         print('Primal run complete. Solver time: %.3fs' % primalTimer)
@@ -364,66 +349,23 @@ def DWR(startRes, op=Options()):
 
     with pyadjoint.stop_annotating():
 
-        # # # TODO: For updated residual computation
-        # v, xi = TestFunctions(Ve)
-        # swe_mom = ShallowWaterMomentumEquation(v, Ve.sub(0), Ve.sub(1), be, solver_obj.options)
-        # swe_con = FreeSurfaceEquation(xi, Ve.sub(1), Ve.sub(0), be, solver_obj.options)
-
         errorTimer = clock()
         for i, k in zip(range(r-1, N-1, op.rm), range(0, int(op.cntT / op.rm))):
             print('Generating error estimate %d / %d' % (k + 1, int(op.cntT / op.rm)))
-            i1 = 0 if k == 0 else 2 * k - 1
-            i2 = 2 * k
-            with DumbCheckpoint(di + 'hdf5/Velocity2d_' + indexString(i1), mode=FILE_READ) as loadVel:
-                loadVel.load(uv_2d)
-                loadVel.close()
-            with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexString(i1), mode=FILE_READ) as loadElev:
-                loadElev.load(elev_2d)
-                loadElev.close()
-            uv_2d_.assign(uv_2d)
-            elev_2d_.assign(elev_2d)
-            with DumbCheckpoint(di + 'hdf5/Velocity2d_' + indexString(i2), mode=FILE_READ) as loadVel:
-                loadVel.load(uv_2d)
-                loadVel.close()
-            with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexString(i2), mode=FILE_READ) as loadElev:
-                loadElev.load(elev_2d)
-                loadElev.close()
+            with DumbCheckpoint(di + 'hdf5/MomentumResidual2d_' + indexString(k), mode=FILE_READ) as loadRes:
+                loadRes.load(rho_u, name="Momentum error")
+                loadRes.close()
+            with DumbCheckpoint(di + 'hdf5/ContinuityResidual2d_' + indexString(k), mode=FILE_READ) as loadRes:
+                loadRes.load(rho_e, name="Continuity error")
+                loadRes.close()
             dual.assign(solve_blocks[i].adj_sol)
             dual_u, dual_e = dual.split()
             if op.plotpvd:
                 adjointFile.write(dual_u, dual_e, time=float(op.dt * op.rm * k))
-
-            # Approximate residuals, load adjoint data and form residuals
-            if op.refinedSpace:
-                qe, qe_ = mixedPairInterp(mesh_h, Ve, q, q_)
-            elif op.orderChange:
-                qe.interpolate(q)
-                qe_.interpolate(q_)
-            else:
-                qe = q
-                qe_ = q_
-
-            # Initial approach  # TODO: Replace with actual Thetis forms: see other TODOs
-            Au, Ae = strongResidualSW(qe, qe_, be, coriolisFreq=None, op=op)
-            rho_u.interpolate(Au)
-            rho_e.interpolate(Ae)
-
-            # # Attempt at updated approach. Although residuals here are weak
-            # uv_2d_e, elev_2d_e = qe.split()     # TODO: Replace older version, when complete. Currently not local
-            # uv_2d_e_, elev_2d_e_ = qe_.split()    # TODO: When complete, build residual functionality into solver_obj
-            # rho_u = swe_mom.strong_residual('all',     # Terms used, from {'all', 'source', 'implicit', 'explicit', 'nonlinear'}
-            #                          uv_2d_e,
-            #                          uv_2d_e_,
-            #                          {'eta': elev_2d_e, 'uv': uv_2d_e},
-            #                          {'eta': elev_2d_e_, 'uv': uv_2d_e_})
-            # rho_e = swe_con.strong_residual('all',
-            #                          elev_2d_e,
-            #                          elev_2d_e_,
-            #                          {'eta': elev_2d_e, 'uv': uv_2d_e},
-            #                          {'eta': elev_2d_e_, 'uv': uv_2d_e_})
-
-            if op.plotpvd:
                 residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * k))
+
+            # TODO: Include option to enrich space in residual computation
+
             if op.orderChange:
                 duale_u.interpolate(dual_u)
                 duale_e.interpolate(dual_e)
@@ -583,8 +525,8 @@ def DWP(startRes, op=Options()):
     initTimer = clock()
     di = 'plots/' + op.mode + '/DWP/'
     if op.plotpvd:
-        errorFile = File(di + "errorIndicator.pvd")
-        adjointFile = File(di + "adjoint.pvd")
+        errorFile = File(di + "ErrorIndicator2d.pvd")
+        adjointFile = File(di + "Adjoint2d.pvd")
 
     # Initialise domain and physical parameters
     try:
@@ -665,8 +607,6 @@ def DWP(startRes, op=Options()):
         for i in range(N - 1, r - 2, -op.ndump):
             dual.assign(solve_blocks[i].adj_sol)    # TODO: Could this be combined with error estimation step?
             dual_u, dual_e = dual.split()
-            dual_u.rename('Adjoint velocity')
-            dual_e.rename('Adjoint elevation')
             with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexString(int((i - r + 1) / op.ndump)), mode=FILE_CREATE) as saveAdj:
                 saveAdj.store(dual_u)
                 saveAdj.store(dual_e)

@@ -27,6 +27,9 @@ outdata/
 
 .README.md.swp
 
+# Old form compilers
+utils/forms.py
+
 # Old test script
 shallow-water-test.py
 
