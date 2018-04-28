@@ -158,8 +158,8 @@ class Options:
             self.g = 9.81
         elif self.mode == 'rossby-wave':
             self.coriolis = 'beta'
-            self.Tstart = 20.
-            self.Tend = 45.60
+            self.Tstart = 10.
+            self.Tend = 36.
             self.hmin = 5e-3
             self.hmax = 10.
             self.minNorm = 1e-4
@@ -168,7 +168,7 @@ class Options:
             self.ndump = 12
             self.g = 1.
             self.J = 1.82       # On mesh of 2,359,296 elements, rounded to 3.s.f. from 1.8199
-            self.xy = [-24., -20., -2., 2.]
+            self.xy = [-20., -16., -3., 3.]
         elif self.mode in ('tohoku', 'model-verification'):
             self.Tstart = 300.
             self.Tend = 1500.

@@ -76,7 +76,6 @@ def fixedMesh(startRes, op=Options()):
                 loadElev.load(elev_2d, name='elev_2d')
                 loadElev.close()
             peak, distance = peakAndDistance(elev_2d, op=op)
-            print('Peak %.4f vs. %.4f, distance %.4f vs. %.4f' % (peak, peak_a, distance, distance_a))
 
         rel = np.abs(op.J - J_h) / np.abs(op.J)
         if op.mode == 'rossby-wave':
@@ -234,7 +233,6 @@ def hessianBased(startRes, op=Options()):
                 loadElev.load(elev_2d, name='elev_2d')
                 loadElev.close()
             peak, distance = peakAndDistance(elev_2d, op=op)
-            print('Peak %.4f vs. %.4f, distance %.4f vs. %.4f' % (peak, peak_a, distance, distance_a))
 
         rel = np.abs(op.J - J_h) / np.abs(op.J)
         if op.mode == 'rossby-wave':
@@ -570,7 +568,6 @@ def DWR(startRes, op=Options()):
                 loadElev.load(elev_2d, name='elev_2d')
                 loadElev.close()
             peak, distance = peakAndDistance(elev_2d, op=op)
-            print('Peak %.4f vs. %.4f, distance %.4f vs. %.4f' % (peak, peak_a, distance, distance_a))
 
         rel = np.abs(op.J - J_h) / np.abs(op.J)
         if op.mode == 'rossby-wave':
@@ -836,7 +833,6 @@ def DWP(startRes, op=Options()):
                 loadElev.load(elev_2d, name='elev_2d')
                 loadElev.close()
             peak, distance = peakAndDistance(elev_2d, op=op)
-            print('Peak %.4f vs. %.4f, distance %.4f vs. %.4f' % (peak, peak_a, distance, distance_a))
 
         rel = np.abs(op.J - J_h) / np.abs(op.J)
         if op.mode == 'rossby-wave':
