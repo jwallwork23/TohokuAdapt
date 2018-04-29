@@ -43,7 +43,6 @@ def fixedMesh(startRes, op=Options()):
         options.simulation_end_time = op.Tend
         options.timestepper_type = op.timestepper
         options.timestep = op.dt
-        options.timesteps_per_remesh = op.rm
         options.output_directory = di
         options.export_diagnostics = True
         options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
@@ -310,7 +309,6 @@ def DWR(startRes, op=Options()):
         options.simulation_end_time = op.Tend
         options.timestepper_type = op.timestepper
         options.timestep = op.dt
-        options.timesteps_per_remesh = op.rm
         options.output_directory = di
         options.export_diagnostics = True
         options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
@@ -574,7 +572,6 @@ def DWP(startRes, op=Options()):
         options.simulation_end_time = op.Tend
         options.timestepper_type = op.timestepper
         options.timestep = op.dt
-        options.timesteps_per_remesh = op.rm
         options.output_directory = di
         options.export_diagnostics = True
         options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
@@ -607,7 +604,8 @@ def DWP(startRes, op=Options()):
         for i in range(N - 1, r - 2, -op.ndump):
             dual.assign(solve_blocks[i].adj_sol)    # TODO: Could this be combined with error estimation step?
             dual_u, dual_e = dual.split()
-            with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexString(int((i - r + 1) / op.ndump)), mode=FILE_CREATE) as saveAdj:
+            indexStr = indexString(int((i - r + 1) / op.ndump))
+            with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexStr, mode=FILE_CREATE) as saveAdj:
                 saveAdj.store(dual_u)
                 saveAdj.store(dual_e)
                 saveAdj.close()
@@ -619,9 +617,10 @@ def DWP(startRes, op=Options()):
 
     with pyadjoint.stop_annotating():
 
+        rmEnd = int(op.cntT / op.rm)
         errorTimer = clock()
-        for k in range(0, op.iEnd):  # Loop back over times to generate error estimators
-            print('Generating error estimate %d / %d' % (k + 1, op.iEnd))
+        for k in range(0, rmEnd):  # Loop back over times to generate error estimators
+            print('Generating error estimate %d / %d' % (k + 1, rmEnd))
             with DumbCheckpoint(di + 'hdf5/Velocity2d_' + indexString(k), mode=FILE_READ) as loadVel:
                 loadVel.load(uv_2d)
                 loadVel.close()
