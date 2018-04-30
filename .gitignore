@@ -43,6 +43,7 @@ firedrake-tsunami.py
 thetis-tsunami.py
 residual-callback-test.py
 shallow-water-test.py
+rossby-wave-plots.py
 
 # Patches
 adapt_attrs.patch

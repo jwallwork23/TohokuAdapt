@@ -261,7 +261,7 @@ def DWR(startRes, op=Options()):
     uv_2d.rename('uv_2d')
     elev_2d.rename('elev_2d')
     P1 = FunctionSpace(mesh_H, "CG", 1)
-    P0 = FunctionSpace(mesh_H, "DG", 0)
+    epsilon = Function(P1, name="Error indicator")
     if op.mode == 'rossby-wave':
         peak_a, distance_a = peakAndDistance(solutionRW(V, t=op.Tend).split()[1])  # Analytic final-time state
 
@@ -277,12 +277,10 @@ def DWR(startRes, op=Options()):
     elif op.refinedSpace:                   # Define variables on an iso-P2 refined space
         mesh_h = isoP2(mesh_H)
         Ve = op.mixedSpace(mesh_h)
-        P0 = FunctionSpace(mesh_h, "DG", 0)
     else:                                   # Copy standard variables to mimic enriched space labels
         Ve = V
     rho = Function(Ve)
     rho_u, rho_e = rho.split()
-    v = TestFunction(P0)                    # For extracting elementwise error indicators
 
     # Initialise parameters and counters
     nEle, op.nVerT = meshStats(mesh_H)
@@ -295,55 +293,53 @@ def DWR(startRes, op=Options()):
     if op.gradate:
         H0 = Function(P1).interpolate(CellSize(mesh_H))
 
-    if not op.regen:
+    # Solve fixed mesh primal problem to get residuals and adjoint solutions
+    solver_obj = solver2d.FlowSolver2d(mesh_H, b)
+    options = solver_obj.options
+    options.element_family = op.family
+    options.use_nonlinear_equations = True
+    options.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
+    options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
+    options.coriolis_frequency = f
+    options.simulation_export_time = op.dt * op.rm
+    options.simulation_end_time = op.Tend
+    options.timestepper_type = op.timestepper
+    options.timestep = op.dt
+    options.output_directory = di
+    options.export_diagnostics = True
+    options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+    solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
+    cb1 = ObjectiveSWCallback(solver_obj)
+    cb1.op = op
+    cb2 = MomentumResidualCallback(solver_obj)
+    cb3 = ContinuityResidualCallback(solver_obj)
+    solver_obj.add_callback(cb1, 'timestep')
+    solver_obj.add_callback(cb2, 'export')
+    solver_obj.add_callback(cb3, 'export')
+    solver_obj.bnd_functions['shallow_water'] = BCs
+    initTimer = clock() - initTimer
+    print('Problem initialised. Setup time: %.3fs' % initTimer)
+    primalTimer = clock()
+    solver_obj.iterate()
+    primalTimer = clock() - primalTimer
+    J = cb1.quadrature()                        # Assemble objective functional for adjoint computation
+    print('Primal run complete. Solver time: %.3fs' % primalTimer)
 
-        # Solve fixed mesh primal problem to get residuals and adjoint solutions
-        solver_obj = solver2d.FlowSolver2d(mesh_H, b)
-        options = solver_obj.options
-        options.element_family = op.family
-        options.use_nonlinear_equations = True
-        options.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
-        options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
-        options.coriolis_frequency = f
-        options.simulation_export_time = op.dt * op.rm
-        options.simulation_end_time = op.Tend
-        options.timestepper_type = op.timestepper
-        options.timestep = op.dt
-        options.output_directory = di
-        options.export_diagnostics = True
-        options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-        solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
-        cb1 = ObjectiveSWCallback(solver_obj)
-        cb1.op = op
-        cb2 = MomentumResidualCallback(solver_obj)
-        cb3 = ContinuityResidualCallback(solver_obj)
-        solver_obj.add_callback(cb1, 'timestep')
-        solver_obj.add_callback(cb2, 'export')
-        solver_obj.add_callback(cb3, 'export')
-        solver_obj.bnd_functions['shallow_water'] = BCs
-        initTimer = clock() - initTimer
-        print('Problem initialised. Setup time: %.3fs' % initTimer)
-        primalTimer = clock()
-        solver_obj.iterate()
-        primalTimer = clock() - primalTimer
-        J = cb1.quadrature()                        # Assemble objective functional for adjoint computation
-        print('Primal run complete. Solver time: %.3fs' % primalTimer)
+    # Compute gradient
+    gradientTimer = clock()
+    dJdb = compute_gradient(J, Control(b))      # TODO: Rewrite pyadjoint to avoid computing this
+    gradientTimer = clock() - gradientTimer
+    # File(di + 'gradient.pvd').write(dJdb)     # Too memory intensive in Tohoku case
+    print("Norm of gradient: %.3e. Computation time: %.1fs" % (dJdb.dat.norm, gradientTimer))
 
-        # Compute gradient
-        gradientTimer = clock()
-        dJdb = compute_gradient(J, Control(b))      # TODO: Rewrite pyadjoint to avoid computing this
-        gradientTimer = clock() - gradientTimer
-        # File(di + 'gradient.pvd').write(dJdb)     # Too memory intensive in Tohoku case
-        print("Norm of gradient: %.3e. Computation time: %.1fs" % (dJdb.dat.norm, gradientTimer))
-
-        # Extract adjoint solutions
-        dualTimer = clock()
-        tape = get_working_tape()
-        solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
-        N = len(solve_blocks)
-        dualTimer = clock() - dualTimer
-        r = N % op.rm  # Number of extra tape annotations in setup
-        print('Dual run complete. Run time: %.3fs' % dualTimer)
+    # Extract adjoint solutions
+    dualTimer = clock()
+    tape = get_working_tape()
+    solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
+    N = len(solve_blocks)
+    dualTimer = clock() - dualTimer
+    r = N % op.rm  # Number of extra tape annotations in setup
+    print('Dual run complete. Run time: %.3fs' % dualTimer)
 
     with pyadjoint.stop_annotating():
 
@@ -362,19 +358,15 @@ def DWR(startRes, op=Options()):
                 adjointFile.write(dual_u, dual_e, time=float(op.dt * op.rm * k))
                 residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * k))
 
-            # TODO: Include option to enrich space in residual computation
-
-            if op.orderChange:
+            if op.orderChange:  # TODO: Include option to enrich space in residual computation
                 duale_u.interpolate(dual_u)
                 duale_e.interpolate(dual_e)
-                epsilon = assemble(v * inner(rho, duale) * dx)
+                epsilon.interpolate(inner(rho, duale))
             elif op.refinedSpace:
                 duale = mixedPairInterp(mesh_h, dual)
-                epsilon = assemble(v * inner(rho, duale) * dx)
+                epsilon.interpolate(inner(rho, duale))
             else:
-                # epsilon = assemble(v * inner(rho, dual) * dx)
-                epsilon = assemble(v * (inner(rho_u, dual_u) + inner(rho_e, dual_e)) * dx)
-            epsilon.rename("Error indicator")
+                epsilon.interpolate((inner(rho, dual)))
             with DumbCheckpoint(di + 'hdf5/Error2d_' + indexString(k), mode=FILE_CREATE) as saveErr:
                 saveErr.store(epsilon)
                 saveErr.close()
@@ -412,7 +404,7 @@ def DWR(startRes, op=Options()):
                 with DumbCheckpoint(di + 'hdf5/Error2d_' + indexString(int(cnt / op.rm)), mode=FILE_READ) as loadErr:
                     loadErr.load(epsilon)
                     loadErr.close()
-                errEst = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(interp(mesh_H, epsilon))
+                errEst = Function(FunctionSpace(mesh_H, "CG", 1)).assign(interp(mesh_H, epsilon))
                 M = isotropicMetric(errEst, invert=False, op=op)                # TODO: Not sure normalisation is working
                 if op.gradate:
                     M_ = isotropicMetric(interp(mesh_H, H0), bdy=True, op=op)   # Initial boundary metric
@@ -832,7 +824,8 @@ if __name__ == "__main__":
     op = Options(mode=mode,
                  approach=approach,
                  # gradate=True if approach in ('DWP', 'DWR') and mode == 'tohoku' else False,
-                 gradate=False,  # TODO: Fix this for tohoku case
+                 # gradate=False,  # TODO: Fix this for tohoku case
+                 gradate=True,
                  plotpvd=True if args.o else False,
                  orderChange=orderChange,
                  refinedSpace=True if args.r else False,
