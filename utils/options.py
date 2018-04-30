@@ -19,7 +19,6 @@ class Options:
                  maxAnisotropy=100,
                  gradate=False,
                  bAdapt=False,
-                 regen=False,
                  plotpvd=False,
                  maxGrowth=1.4,
                  dt=0.5,
@@ -42,7 +41,6 @@ class Options:
         :param maxAnisotropy: maximum tolerated aspect ratio.
         :param gradate: Toggle metric gradation.
         :param bAdapt: intersect metrics with Hessian w.r.t. bathymetry.
-        :param regen: regenerate error estimates based on saved data.
         :param plotpvd: toggle saving solution fields to .pvd.
         :param maxGrowth: metric gradation scaling parameter.
         :param dt: Timestep (s).
@@ -116,11 +114,10 @@ class Options:
             raise ValueError('Invalid anisotropy value %.1f. a > 0 is required.' % maxAnisotropy)
 
         # Misc options
-        for i in (gradate, plotpvd, refinedSpace, bAdapt, regen):
+        for i in (gradate, plotpvd, refinedSpace, bAdapt):
             assert(isinstance(i, bool))
         self.gradate = gradate
         self.bAdapt = bAdapt
-        self.regen = regen
         self.plotpvd = plotpvd
         self.refinedSpace = refinedSpace
         try:
@@ -150,7 +147,7 @@ class Options:
             self.hmin = 1e-4
             self.hmax = 1.
             self.minNorm = 1e-6
-            self.rm = 5
+            self.rm = 6
             self.dt = 0.05
             self.ndump = 2
             self.J = 1.1184e-3,   # On mesh of 524,288 elements
@@ -189,6 +186,7 @@ class Options:
         self.cntT = int(np.ceil(self.Tend / self.dt))               # Final timestep index
         self.iStart = int(self.Tstart / (self.ndump * self.dt))     # First exported timestep of period of interest
         self.iEnd = int(self.cntT / self.ndump)                     # Final exported timestep of period of interest
+        self.rmEnd = int(self.cntT / self.rm)                       # Final mesh index
 
         # Specify FunctionSpaces
         self.degree1 = 2 if self.family == 'cg-cg' else 1

@@ -259,6 +259,8 @@ def solutionRW(V, t=0., B=0.395):
     x, y = SpatialCoordinate(V.mesh())
     q = Function(V)
     u, eta = q.split()
+    u.rename("Depth averaged velocity")
+    eta.rename("Elevation")
 
     A = 0.771 * B * B
     W = FunctionSpace(V.mesh(), V.sub(0).ufl_element().family(), V.sub(0).ufl_element().degree())
