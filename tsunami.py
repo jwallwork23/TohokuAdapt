@@ -639,7 +639,8 @@ def DWR(startRes, op=Options()):
                 duale = mixedPairInterp(mesh_h, dual)
                 epsilon.interpolate(inner(rho, duale))
             else:
-                epsilon.interpolate((inner(rho, dual)))
+                epsilon.interpolate((inner(rho, dual)))     # TODO: Perhaps go back to indicator approach here
+                                                            # TODO: Try scaling by H0 as in Rannacher 08
             with DumbCheckpoint(di + 'hdf5/ErrorIndicator2d_' + indexString(k), mode=FILE_CREATE) as saveErr:
                 saveErr.store(epsilon)
                 saveErr.close()
