@@ -572,7 +572,7 @@ def DWR(startRes, op=Options()):
     solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
     cb1 = ObjectiveSWCallback(solver_obj)
     cb1.op = op
-    cb2 = ResidualCallback(solver_obj)
+    cb2 = HigherOrderResidualCallback(solver_obj) if op.orderChange else ResidualCallback(solver_obj)
     solver_obj.add_callback(cb1, 'timestep')
     solver_obj.add_callback(cb2, 'export')
     solver_obj.bnd_functions['shallow_water'] = BCs
@@ -596,6 +596,7 @@ def DWR(startRes, op=Options()):
     tape = get_working_tape()
     solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
     N = len(solve_blocks)
+    print("N = ", N)
     dualTimer = clock() - dualTimer
     r = N % op.rm  # Number of extra tape annotations in setup
     print('Dual run complete. Run time: %.3fs' % dualTimer)
@@ -609,13 +610,14 @@ def DWR(startRes, op=Options()):
                 loadRes.load(rho_u, name="Momentum error")
                 loadRes.load(rho_e, name="Continuity error")
                 loadRes.close()
+            if op.plotpvd:
+                residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * k))
             dual.assign(solve_blocks[i].adj_sol)
             dual_u, dual_e = dual.split()
             if op.plotpvd:
                 adjointFile.write(dual_u, dual_e, time=float(op.dt * op.rm * k))
-                residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * k))
 
-            if op.orderChange:  # TODO: Include option to enrich space in residual computation
+            if op.orderChange:  # TODO: Fix space enrichment functionality
                 duale_u.interpolate(dual_u)
                 duale_e.interpolate(dual_e)
                 epsilon.interpolate(inner(rho, duale))
@@ -783,7 +785,6 @@ if __name__ == "__main__":
     parser.add_argument("-high", help="Upper bound for index range")
     parser.add_argument("-o", help="Output data")
     parser.add_argument("-ho", help="Compute errors and residuals in a higher order space")
-    parser.add_argument("-lo", help="Compute errors and residuals in a lower order space")
     parser.add_argument("-r", help="Compute errors and residuals in a refined space")
     parser.add_argument("-b", help="Intersect metrics with bathymetry")
     args = parser.parse_args()
@@ -802,13 +803,11 @@ if __name__ == "__main__":
     print("Mode: %s, approach: %s" % (mode, approach))
     orderChange = 0
     if args.ho:
-        assert (not args.r) and (not args.lo)
+        assert not args.r
         orderChange = 1
-    if args.lo:
-        assert (not args.r) and (not args.ho)
-        orderChange = -1
     if args.r:
-        assert (not args.ho) and (not args.lo)
+        assert not args.ho
+        raise NotImplementedError
     if args.b is not None:
         assert approach == 'hessianBased'
 
@@ -828,9 +827,6 @@ if __name__ == "__main__":
     if args.ho:
         op.orderChange = 1
         filename += '_ho'
-    elif args.lo:
-        op.orderChange = -1
-        filename += '_lo'
     elif args.r:
         op.refinedSpace = True
         filename += '_r'

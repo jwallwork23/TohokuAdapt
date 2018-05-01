@@ -1,12 +1,14 @@
 from thetis_adjoint import *
-from thetis.callback import FunctionalCallback, GaugeCallback
+from thetis.callback import DiagnosticCallback, FunctionalCallback, GaugeCallback
+import pyadjoint
 
 from .misc import indicator
 from .options import Options
 from .timeseries import gaugeTV
 
 
-__all__ = ["SWCallback", "ObjectiveSWCallback", "P02Callback", "P06Callback"]
+__all__ = ["SWCallback", "ObjectiveSWCallback", "P02Callback", "P06Callback", "EnrichedErrorCallback",
+           "HigherOrderResidualCallback"]
 
 
 class SWCallback(FunctionalCallback):
@@ -122,3 +124,105 @@ class P06Callback(GaugeCallback):
 
     def totalVariation(self):
         return gaugeTV(self.gauge_values, gauge="P06")
+
+
+class EnrichedErrorCallback(DiagnosticCallback):
+    """Base class for callbacks that evaluate an error quantity (such as the strong residual) related to the prognostic
+    equation in an enriched finite element space of higher order."""
+    variable_names = ['error', 'normed error']
+
+    def __init__(self, tuple_callback, solver_obj, **kwargs):
+        """
+        Creates error callback object
+
+        :arg scalar_or_vector_callback: Python function that takes the solver object as an argument and
+            returns the equation residual at the current timestep.
+        :arg solver_obj: Thetis solver object
+        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+        """
+        kwargs.setdefault('export_to_hdf5', False)  # Needs a different functionality as output is a Function
+        kwargs.setdefault('append_to_log', True)
+        super(EnrichedErrorCallback, self).__init__(solver_obj, **kwargs)
+        self.tuple_callback = tuple_callback        # Error quantifier with 2 components: momentum and continuity
+        V = solver_obj.fields.solution_2d.function_space()
+        V0 = VectorFunctionSpace(V.mesh(), V.sub(0).ufl_element().family(), V.sub(0).ufl_element().degree() + 1)
+        V1 = FunctionSpace(V.mesh(), V.sub(1).ufl_element().family(), V.sub(1).ufl_element().degree() + 1)
+        self.error = Function(V0 * V1)
+        self.normed_error = 0.
+        self.index = 0
+        self.di = solver_obj.options.output_directory
+
+    def __call__(self):
+        t0, t1 = self.tuple_callback()
+        err_u, err_e = self.error.split()
+        err_u.interpolate(t0)
+        err_e.interpolate(t1)
+        err_u.rename("Momentum error")
+        err_e.rename("Continuity error")
+
+        self.normed_error = self.error.dat.norm
+        indexStr = (5 - len(str(self.index))) * '0' + str(self.index)
+        with DumbCheckpoint(self.di + 'hdf5/Error2d_' + indexStr, mode=FILE_CREATE) as saveRes:
+            saveRes.store(err_u)
+            saveRes.store(err_e)
+            saveRes.close()
+        self.index += 1
+        return self.error, self.normed_error
+
+    def message_str(self, *args):
+        line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
+        return line
+
+
+class HigherOrderResidualCallback(EnrichedErrorCallback):
+    """Computes strong residual in an enriched finite element space of higher degree for the shallow water case."""
+    name = 'strong residual'
+
+    def __init__(self, solver_obj, **kwargs):
+        """
+        :arg solver_obj: Thetis solver object
+        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+        """
+
+        def residualSW():   # TODO: More terms to include
+            """
+            Construct the strong residual for the semi-discrete shallow water equations at the current timestep.
+
+            :return: strong residual for shallow water equations at current timestep.
+            """
+            UV_old, ELEV_old = solver_obj.timestepper.solution_old.split()
+            UV_2d, ELEV_2d = solver_obj.fields.solution_2d.split()
+
+            # Enrich finite element space
+            uv_old, elev_old = Function(self.error.function_space()).split()
+            uv_old.interpolate(UV_old)
+            elev_old.interpolate(ELEV_old)
+            uv_2d, elev_2d = Function(self.error.function_space()).split()
+            uv_2d.interpolate(UV_2d)
+            elev_2d.interpolate(ELEV_2d)
+
+            # Collect fields and parameters
+            nu = solver_obj.fields.get('viscosity_h')
+            Dt = Constant(solver_obj.options.timestep)
+            H = solver_obj.fields.bathymetry_2d + elev_2d
+            g = physical_constants['g_grav']
+
+            # Construct residual
+            res_u = (uv_2d - uv_old) / Dt + g * grad(elev_2d)
+            if solver_obj.options.use_nonlinear_equations:
+                res_u += dot(uv_2d, nabla_grad(uv_2d))
+            if solver_obj.options.coriolis_frequency is not None:
+                res_u += solver_obj.options.coriolis_frequency * as_vector((-uv_2d[1], uv_2d[0]))
+            if nu is not None:
+                if solver_obj.options.use_grad_depth_viscosity_term:
+                    res_u -= dot(nu * grad(H), (grad(uv_2d) + sym(grad(uv_2d))))
+                if solver_obj.options.use_grad_div_viscosity_term:
+                    res_u -= div(nu * (grad(uv_2d) + sym(grad(uv_2d))))
+                else:
+                    res_u -= div(nu * grad(uv_2d))
+
+            res_e = (elev_2d - elev_old) / Dt + div((solver_obj.fields.bathymetry_2d + elev_2d) * uv_2d)
+
+            return res_u, res_e
+
+        super(HigherOrderResidualCallback, self).__init__(residualSW, solver_obj, **kwargs)
