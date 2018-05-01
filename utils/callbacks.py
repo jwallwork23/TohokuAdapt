@@ -1,7 +1,7 @@
 from thetis_adjoint import *
 from thetis.callback import DiagnosticCallback, FunctionalCallback, GaugeCallback
-import pyadjoint
 
+from .interpolation import interp
 from .misc import indicator
 from .options import Options
 from .timeseries import gaugeTV
@@ -223,3 +223,53 @@ class HigherOrderResidualCallback(EnrichedErrorCallback):   # TODO: When fixed, 
             return res_u, res_e
 
         super(HigherOrderResidualCallback, self).__init__(residualSW, solver_obj, enriched_space, **kwargs)
+
+
+class RefinedResidualCallback(EnrichedErrorCallback):
+    """Computes strong residual in an enriched finite element space (with refined mesh) for the shallow water case."""
+    name = 'strong residual'
+
+    def __init__(self, solver_obj, enriched_space, **kwargs):
+        """
+        :arg solver_obj: Thetis solver object
+        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+        """
+
+        def residualSW():   # TODO: More terms to include
+            """
+            Construct the strong residual for the semi-discrete shallow water equations at the current timestep.
+
+            :return: strong residual for shallow water equations at current timestep.
+            """
+            UV_old, ELEV_old = solver_obj.timestepper.solution_old.split()
+            UV_2d, ELEV_2d = solver_obj.fields.solution_2d.split()
+
+            # Enrich finite element space
+            uv_old, elev_old = interp(enriched_space.mesh(), UV_old, ELEV_old)
+            uv_2d, elev_2d = interp(enriched_space.mesh(), UV_2d, ELEV_2d)
+
+            # Collect fields and parameters
+            nu = solver_obj.fields.get('viscosity_h')
+            Dt = Constant(solver_obj.options.timestep)
+            H = solver_obj.fields.bathymetry_2d + elev_2d
+            g = physical_constants['g_grav']
+
+            # Construct residual
+            res_u = (uv_2d - uv_old) / Dt + g * grad(elev_2d)
+            if solver_obj.options.use_nonlinear_equations:
+                res_u += dot(uv_2d, nabla_grad(uv_2d))
+            if solver_obj.options.coriolis_frequency is not None:
+                res_u += solver_obj.options.coriolis_frequency * as_vector((-uv_2d[1], uv_2d[0]))
+            if nu is not None:
+                if solver_obj.options.use_grad_depth_viscosity_term:
+                    res_u -= dot(nu * grad(H), (grad(uv_2d) + sym(grad(uv_2d))))
+                if solver_obj.options.use_grad_div_viscosity_term:
+                    res_u -= div(nu * (grad(uv_2d) + sym(grad(uv_2d))))
+                else:
+                    res_u -= div(nu * grad(uv_2d))
+
+            res_e = (elev_2d - elev_old) / Dt + div((solver_obj.fields.bathymetry_2d + elev_2d) * uv_2d)
+
+            return res_u, res_e
+
+        super(RefinedResidualCallback, self).__init__(residualSW, solver_obj, enriched_space, **kwargs)

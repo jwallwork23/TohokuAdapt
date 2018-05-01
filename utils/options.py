@@ -95,11 +95,14 @@ class Options:
             self.normOrder = 2
             self.targetError = 1e-3
             self.hessMeth = 'dL2'       # Hessian recovery by double L2 projection. 'parts' also available
-        try:
-            assert rescaling > 0
-            self.rescaling = rescaling
-        except:
-            raise ValueError('Invalid value of %.3f for scaling parameter. rescaling > 0 is required.' % rescaling)
+        if self.approach == "DWR":
+            self.rescaling = 0.6        # TODO: This is just a test
+        else:
+            try:
+                assert rescaling > 0
+                self.rescaling = rescaling
+            except:
+                raise ValueError('Invalid value of %.3f for scaling parameter. rescaling > 0 is required.' % rescaling)
         try:
             assert (hmin > 0) and (hmax > hmin) and (minNorm > 0)
             self.hmin = hmin

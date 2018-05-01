@@ -532,16 +532,18 @@ def DWR(startRes, op=Options()):
     dual_u, dual_e = dual.split()
     dual_u.rename("Adjoint velocity")
     dual_e.rename("Adjoint elevation")
-    epsilon = Function(P1, name="Error indicator")
     if op.orderChange:                      # Define variables on higher/lower order space
         Ve = op.mixedSpace(mesh_H)          # Automatically generates a higher/lower order space
         duale = Function(Ve)
         duale_u, duale_e = duale.split()
+        epsilon = Function(P1, name="Error indicator")
     elif op.refinedSpace:                   # Define variables on an iso-P2 refined space
         mesh_h = isoP2(mesh_H)
         Ve = op.mixedSpace(mesh_h)
+        epsilon = Function(FunctionSpace(mesh_h, "CG", 1), name="Error indicator")
     else:                                   # Copy standard variables to mimic enriched space labels
         Ve = V
+        epsilon = Function(P1, name="Error indicator")
     rho = Function(Ve)
     rho_u, rho_e = rho.split()
 
@@ -603,7 +605,7 @@ def DWR(startRes, op=Options()):
         dual.assign(solve_blocks[i].adj_sol)
         dual_u, dual_e = dual.split()
         with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexString(int((i - r + 1) / op.rm)),  mode=FILE_CREATE) as saveAdj:
-            saveAdj.store(dual_u)
+            saveAdj.store(dual_u)                   # TODO: Why not just save ^^^ using same index as timestep?
             saveAdj.store(dual_e)
             saveAdj.close()
         if op.plotpvd:
