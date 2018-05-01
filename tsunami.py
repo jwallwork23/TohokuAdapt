@@ -77,11 +77,11 @@ def fixedMesh(startRes, op=Options()):
 
         rel = np.abs(op.J - J_h) / np.abs(op.J)
         if op.mode == 'rossby-wave':
-            return nEle, rel, J_h, integrand, np.abs(peak/peak_a), distance, distance/distance_a, solverTimer
+            return nEle, rel, J_h, integrand, np.abs(peak/peak_a), distance, distance/distance_a, solverTimer, 0.
         elif op.mode == 'tohoku':
-            return nEle, rel, J_h, integrand, totalVarP02, totalVarP06, solverTimer
+            return nEle, rel, J_h, integrand, totalVarP02, totalVarP06, solverTimer, 0.
         else:
-            return nEle, rel, J_h, integrand, solverTimer
+            return nEle, rel, J_h, integrand, solverTimer, 0.
 
 
 def hessianBased(startRes, op=Options()):
@@ -234,11 +234,11 @@ def hessianBased(startRes, op=Options()):
 
         rel = np.abs(op.J - J_h) / np.abs(op.J)
         if op.mode == 'rossby-wave':
-            return av, rel, J_h, integrand, np.abs(peak/peak_a), distance, distance/distance_a, adaptSolveTimer
+            return av, rel, J_h, integrand, np.abs(peak/peak_a), distance, distance/distance_a, adaptSolveTimer, 0.
         elif op.mode == 'tohoku':
-            return av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, adaptSolveTimer
+            return av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, adaptSolveTimer, 0.
         else:
-            return av, rel, J_h, integrand, adaptSolveTimer
+            return av, rel, J_h, integrand, adaptSolveTimer, 0.
 
 
 def DWP(startRes, op=Options()):
@@ -480,6 +480,8 @@ def DWP(startRes, op=Options()):
 
             adaptSolveTimer += adaptTimer + solverTimer
 
+        totalTimer = primalTimer + gradientTimer + dualTimer + errorTimer + adaptSolveTimer
+
         if op.mode == 'tohoku':
             totalVarP02 = cb3.totalVariation()
             totalVarP06 = cb4.totalVariation()
@@ -495,11 +497,11 @@ def DWP(startRes, op=Options()):
         rel = np.abs(op.J - J_h) / np.abs(op.J)
         if op.mode == 'rossby-wave':
             return av, rel, J_h, integrand, np.abs(
-                peak / peak_a), distance, distance / distance_a, adaptSolveTimer
+                peak / peak_a), distance, distance / distance_a, totalTimer, adaptSolveTimer
         elif op.mode == 'tohoku':
-            return av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, adaptSolveTimer
+            return av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, totalTimer, adaptSolveTimer
         else:
-            return av, rel, J_h, integrand, adaptSolveTimer
+            return av, rel, J_h, integrand, totalTimer, adaptSolveTimer
 
 
 def DWR(startRes, op=Options()):
@@ -572,7 +574,7 @@ def DWR(startRes, op=Options()):
     solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
     cb1 = ObjectiveSWCallback(solver_obj)
     cb1.op = op
-    cb2 = HigherOrderResidualCallback(solver_obj) if op.orderChange else ResidualCallback(solver_obj)
+    cb2 = HigherOrderResidualCallback(solver_obj, Ve) if op.orderChange else ResidualCallback(solver_obj)
     solver_obj.add_callback(cb1, 'timestep')
     solver_obj.add_callback(cb2, 'export')
     solver_obj.bnd_functions['shallow_water'] = BCs
@@ -596,7 +598,6 @@ def DWR(startRes, op=Options()):
     tape = get_working_tape()
     solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
     N = len(solve_blocks)
-    print("N = ", N)
     dualTimer = clock() - dualTimer
     r = N % op.rm  # Number of extra tape annotations in setup
     print('Dual run complete. Run time: %.3fs' % dualTimer)
@@ -748,6 +749,7 @@ def DWR(startRes, op=Options()):
 
             adaptSolveTimer += adaptTimer + solverTimer
 
+        totalTimer = primalTimer + gradientTimer + dualTimer + errorTimer + adaptSolveTimer
         if op.mode == 'tohoku':
             totalVarP02 = cb3.totalVariation()
             totalVarP06 = cb4.totalVariation()
@@ -763,11 +765,11 @@ def DWR(startRes, op=Options()):
         rel = np.abs(op.J - J_h) / np.abs(op.J)
         if op.mode == 'rossby-wave':
             return av, rel, J_h, integrand, np.abs(
-                peak / peak_a), distance, distance / distance_a, adaptSolveTimer
+                peak / peak_a), distance, distance / distance_a, totalTimer, adaptSolveTimer
         elif op.mode == 'tohoku':
-            return av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, adaptSolveTimer
+            return av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, totalTimer, adaptSolveTimer
         else:
-            return av, rel, J_h, integrand, adaptSolveTimer
+            return av, rel, J_h, integrand, totalTimer, adaptSolveTimer
 
 
 if __name__ == "__main__":
@@ -845,14 +847,14 @@ if __name__ == "__main__":
     for i in resolutions:
         # Get data and save to disk
         if mode == 'rossby-wave':   # TODO: Timing output undercalculates in adjoint cases
-            av, rel, J_h, integrand, relativePeak, distance, phaseSpd, solverTime = solver(i, op=op)
+            av, rel, J_h, integrand, relativePeak, distance, phaseSpd, solverTime, adaptSolveTime = solver(i, op=op)
             print("""Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs
         OF error: %.4e  Height error: %.4f  Distance: %.4fm  Speed error: %.4fm"""
                   % (i, av, J_h, solverTime, rel, relativePeak, distance, phaseSpd))
             errorfile.write('%d, %.4e, %.4f, %.4f, %.4f, %.1f, %.4e\n'
                            % (av, rel, relativePeak, distance, phaseSpd, solverTime, J_h))
         elif mode == 'tohoku':
-            av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, solverTime = solver(i, op=op)
+            av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, solverTime, adaptSolveTime = solver(i, op=op)
             print("""Run %d: Mean element count: %6d Objective %.4e Timing %.1fs 
         OF error: %.4e P02: %.3f P06: %.3f""" % (i, av, J_h, solverTime, rel, totalVarP02, totalVarP06))
             errorfile.write('%d, %.4e, %.3f, %.3f, %.1f, %.4e\n'
@@ -862,9 +864,11 @@ if __name__ == "__main__":
             gaugeFileP06.writelines(["%s," % val for val in gP06])
             gaugeFileP06.write("\n")
         else:
-            av, rel, J_h, integrand, solverTime = solver(i, op=op)
+            av, rel, J_h, integrand, solverTime, adaptSolveTime = solver(i, op=op)
             print('Run %d: Mean element count: %6d Objective: %.4e OF error %.4e Timing %.1fs'
                   % (i, av, J_h, rel, solverTime))
+        if approach in ("DWP", "DWR"):
+            print("Time for final run: %.1fs" % adaptSolveTime)
             errorfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, solverTime, J_h))
         integrandFile.writelines(["%s," % val for val in integrand])
         integrandFile.write("\n")

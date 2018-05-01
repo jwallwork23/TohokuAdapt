@@ -126,12 +126,12 @@ class P06Callback(GaugeCallback):
         return gaugeTV(self.gauge_values, gauge="P06")
 
 
-class EnrichedErrorCallback(DiagnosticCallback):
+class EnrichedErrorCallback(DiagnosticCallback):    # TODO: When fixed, move to Thetis branch
     """Base class for callbacks that evaluate an error quantity (such as the strong residual) related to the prognostic
     equation in an enriched finite element space of higher order."""
     variable_names = ['error', 'normed error']
 
-    def __init__(self, tuple_callback, solver_obj, **kwargs):
+    def __init__(self, tuple_callback, solver_obj, enriched_space, **kwargs):
         """
         Creates error callback object
 
@@ -144,10 +144,7 @@ class EnrichedErrorCallback(DiagnosticCallback):
         kwargs.setdefault('append_to_log', True)
         super(EnrichedErrorCallback, self).__init__(solver_obj, **kwargs)
         self.tuple_callback = tuple_callback        # Error quantifier with 2 components: momentum and continuity
-        V = solver_obj.fields.solution_2d.function_space()
-        V0 = VectorFunctionSpace(V.mesh(), V.sub(0).ufl_element().family(), V.sub(0).ufl_element().degree() + 1)
-        V1 = FunctionSpace(V.mesh(), V.sub(1).ufl_element().family(), V.sub(1).ufl_element().degree() + 1)
-        self.error = Function(V0 * V1)
+        self.error = Function(enriched_space)
         self.normed_error = 0.
         self.index = 0
         self.di = solver_obj.options.output_directory
@@ -174,11 +171,11 @@ class EnrichedErrorCallback(DiagnosticCallback):
         return line
 
 
-class HigherOrderResidualCallback(EnrichedErrorCallback):
+class HigherOrderResidualCallback(EnrichedErrorCallback):   # TODO: When fixed, move to Thetis branch
     """Computes strong residual in an enriched finite element space of higher degree for the shallow water case."""
     name = 'strong residual'
 
-    def __init__(self, solver_obj, **kwargs):
+    def __init__(self, solver_obj, enriched_space, **kwargs):
         """
         :arg solver_obj: Thetis solver object
         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
@@ -194,10 +191,10 @@ class HigherOrderResidualCallback(EnrichedErrorCallback):
             UV_2d, ELEV_2d = solver_obj.fields.solution_2d.split()
 
             # Enrich finite element space
-            uv_old, elev_old = Function(self.error.function_space()).split()
+            uv_old, elev_old = Function(enriched_space).split()
             uv_old.interpolate(UV_old)
             elev_old.interpolate(ELEV_old)
-            uv_2d, elev_2d = Function(self.error.function_space()).split()
+            uv_2d, elev_2d = Function(enriched_space).split()
             uv_2d.interpolate(UV_2d)
             elev_2d.interpolate(ELEV_2d)
 
@@ -225,4 +222,4 @@ class HigherOrderResidualCallback(EnrichedErrorCallback):
 
             return res_u, res_e
 
-        super(HigherOrderResidualCallback, self).__init__(residualSW, solver_obj, **kwargs)
+        super(HigherOrderResidualCallback, self).__init__(residualSW, solver_obj, enriched_space, **kwargs)
