@@ -324,7 +324,7 @@ def DWP(startRes, op=Options()):
     N = len(solve_blocks)
     r = N % op.ndump                            # Number of extra tape annotations in setup
     for i in range(N - 1, r - 2, -op.ndump):
-        dual.assign(solve_blocks[i].adj_sol)    # TODO: Could this be combined with error estimation step?
+        dual.assign(solve_blocks[i].adj_sol)
         dual_u, dual_e = dual.split()
         with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexString(int((i - r + 1) / op.ndump)), mode=FILE_CREATE) as saveAdj:
             saveAdj.store(dual_u)
@@ -598,14 +598,24 @@ def DWR(startRes, op=Options()):
     tape = get_working_tape()
     solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
     N = len(solve_blocks)
+    r = N % op.rm   # Number of extra tape annotations in setup
+    for i in range(N - 1, r - 2, -op.rm):
+        dual.assign(solve_blocks[i].adj_sol)
+        dual_u, dual_e = dual.split()
+        with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexString(int((i - r + 1) / op.rm)),  mode=FILE_CREATE) as saveAdj:
+            saveAdj.store(dual_u)
+            saveAdj.store(dual_e)
+            saveAdj.close()
+        if op.plotpvd:
+            adjointFile.write(dual_u, dual_e, time=op.dt * (i - r + 1))
+        print('Adjoint simulation %.2f%% complete' % ((N - i + r - 1) / N * 100))
     dualTimer = clock() - dualTimer
-    r = N % op.rm  # Number of extra tape annotations in setup
     print('Dual run complete. Run time: %.3fs' % dualTimer)
 
     with pyadjoint.stop_annotating():
 
         errorTimer = clock()
-        for i, k in zip(range(r-1, N-1, op.rm), range(0, int(op.cntT / op.rm))):
+        for k in range(0, int(op.cntT / op.rm)):
             print('Generating error estimate %d / %d' % (k + 1, int(op.cntT / op.rm)))
             with DumbCheckpoint(di + 'hdf5/Error2d_' + indexString(k), mode=FILE_READ) as loadRes:
                 loadRes.load(rho_u, name="Momentum error")
@@ -613,12 +623,13 @@ def DWR(startRes, op=Options()):
                 loadRes.close()
             if op.plotpvd:
                 residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * k))
-            dual.assign(solve_blocks[i].adj_sol)
-            dual_u, dual_e = dual.split()
-            if op.plotpvd:
-                adjointFile.write(dual_u, dual_e, time=float(op.dt * op.rm * k))
 
-            if op.orderChange:  # TODO: Fix space enrichment functionality
+            # Load adjoint data and form indicators
+            with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexString(k), mode=FILE_READ) as loadAdj:
+                loadAdj.load(dual_u)
+                loadAdj.load(dual_e)
+                loadAdj.close()
+            if op.orderChange:          # TODO: Fix space enrichment functionality
                 duale_u.interpolate(dual_u)
                 duale_e.interpolate(dual_e)
                 epsilon.interpolate(inner(rho, duale))
@@ -661,11 +672,12 @@ def DWR(startRes, op=Options()):
             for l in range(op.nAdapt):                                          # TODO: Test this functionality
 
                 # Construct metric
-                with DumbCheckpoint(di + 'hdf5/ErrorIndicator2d_' + indexString(int(cnt / op.rm)), mode=FILE_READ) as loadErr:
+                indexStr = indexString(int(cnt / op.rm))
+                with DumbCheckpoint(di + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_READ) as loadErr:
                     loadErr.load(epsilon)
                     loadErr.close()
                 errEst = Function(FunctionSpace(mesh_H, "CG", 1)).assign(interp(mesh_H, epsilon))
-                M = isotropicMetric(errEst, invert=False, op=op)                # TODO: Not sure normalisation is working
+                M = isotropicMetric(errEst, invert=False, op=op)        # TODO: Not sure normalisation is working
                 if op.gradate:
                     M_ = isotropicMetric(interp(mesh_H, H0), bdy=True, op=op)   # Initial boundary metric
                     M = metricIntersection(M, M_, bdy=True)
@@ -867,9 +879,9 @@ if __name__ == "__main__":
             av, rel, J_h, integrand, solverTime, adaptSolveTime = solver(i, op=op)
             print('Run %d: Mean element count: %6d Objective: %.4e OF error %.4e Timing %.1fs'
                   % (i, av, J_h, rel, solverTime))
+            errorfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, solverTime, J_h))
         if approach in ("DWP", "DWR"):
             print("Time for final run: %.1fs" % adaptSolveTime)
-            errorfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, solverTime, J_h))
         integrandFile.writelines(["%s," % val for val in integrand])
         integrandFile.write("\n")
     integrandFile.close()
