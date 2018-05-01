@@ -544,6 +544,7 @@ def DWR(startRes, op=Options()):
     else:                                   # Copy standard variables to mimic enriched space labels
         Ve = V
         epsilon = Function(P1, name="Error indicator")
+    v = TestFunction(FunctionSpace(mesh_h if op.refinedSpace else mesh_H, "DG", 0)) # For forming error indicators
     rho = Function(Ve)
     rho_u, rho_e = rho.split()
 
@@ -634,13 +635,16 @@ def DWR(startRes, op=Options()):
             if op.orderChange:          # TODO: Fix space enrichment functionality
                 duale_u.interpolate(dual_u)
                 duale_e.interpolate(dual_e)
-                epsilon.interpolate(inner(rho, duale))
+                # epsilon.interpolate(inner(rho, duale))
+                epsilon.interpolate(assemble(v * inner(rho, duale) * dx))
             elif op.refinedSpace:
                 duale = mixedPairInterp(mesh_h, dual)
-                epsilon.interpolate(inner(rho, duale))
+                # epsilon.interpolate(inner(rho, duale))
+                epsilon.interpolate(assemble(v * inner(rho, duale) * dx))
             else:
-                epsilon.interpolate((inner(rho, dual)))     # TODO: Perhaps go back to indicator approach here
-                                                            # TODO: Try scaling by H0 as in Rannacher 08
+                # epsilon.interpolate((inner(rho, dual)))
+                epsilon.interpolate(assemble(v * inner(rho, dual) * dx))
+            epsilon.rename("Error indicator")   # TODO: Try scaling by H0 as in Rannacher 08
             with DumbCheckpoint(di + 'hdf5/ErrorIndicator2d_' + indexString(k), mode=FILE_CREATE) as saveErr:
                 saveErr.store(epsilon)
                 saveErr.close()
