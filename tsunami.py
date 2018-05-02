@@ -15,7 +15,9 @@ from utils.misc import indexString, peakAndDistance, meshStats
 from utils.options import Options
 
 
-def fixedMesh(startRes, op=Options()):
+def fixedMesh(startRes, **kwargs):
+    op = kwargs.get('op')
+
     with pyadjoint.stop_annotating():
         di = 'plots/' + op.mode + '/fixedMesh/'
 
@@ -84,7 +86,9 @@ def fixedMesh(startRes, op=Options()):
             return nEle, rel, J_h, integrand, solverTimer, 0.
 
 
-def hessianBased(startRes, op=Options()):
+def hessianBased(startRes, **kwargs):
+    op = kwargs.get('op')
+
     with pyadjoint.stop_annotating():
         di = 'plots/' + op.mode + '/hessianBased/'
 
@@ -241,7 +245,10 @@ def hessianBased(startRes, op=Options()):
             return av, rel, J_h, integrand, adaptSolveTimer, 0.
 
 
-def DWP(startRes, op=Options()):
+def DWP(startRes, **kwargs):
+    op = kwargs.get('op')
+    regen = kwargs.get('regen')
+
     initTimer = clock()
     di = 'plots/' + op.mode + '/DWP/'
     if op.plotpvd:
@@ -282,59 +289,61 @@ def DWP(startRes, op=Options()):
     if op.gradate:
         H0 = Function(P1).interpolate(CellSize(mesh))
 
-    # Solve fixed mesh primal problem to get residuals and adjoint solutions
-    solver_obj = solver2d.FlowSolver2d(mesh, b)
-    options = solver_obj.options
-    options.element_family = op.family
-    options.use_nonlinear_equations = True
-    options.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
-    options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
-    options.coriolis_frequency = f
-    options.simulation_export_time = op.dt * op.rm
-    options.simulation_end_time = op.Tend
-    options.timestepper_type = op.timestepper
-    options.timestep = op.dt
-    options.output_directory = di
-    options.export_diagnostics = True
-    options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-    solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
-    cb1 = ObjectiveSWCallback(solver_obj)
-    cb1.op = op
-    solver_obj.add_callback(cb1, 'timestep')
-    solver_obj.bnd_functions['shallow_water'] = BCs
-    initTimer = clock() - initTimer
-    print('Problem initialised. Setup time: %.3fs' % initTimer)
-    primalTimer = clock()
-    solver_obj.iterate()
-    primalTimer = clock() - primalTimer
-    J = cb1.quadrature()                        # Assemble objective functional for adjoint computation
-    print('Primal run complete. Solver time: %.3fs' % primalTimer)
+    if not regen:
 
-    # Compute gradient
-    gradientTimer = clock()
-    dJdb = compute_gradient(J, Control(b))      # TODO: Rewrite pyadjoint to avoid computing this
-    gradientTimer = clock() - gradientTimer
-    # File(di + 'gradient.pvd').write(dJdb)     # Too memory intensive in Tohoku case
-    print("Norm of gradient: %.3e. Computation time: %.1fs" % (dJdb.dat.norm, gradientTimer))
+        # Solve fixed mesh primal problem to get residuals and adjoint solutions
+        solver_obj = solver2d.FlowSolver2d(mesh, b)
+        options = solver_obj.options
+        options.element_family = op.family
+        options.use_nonlinear_equations = True
+        options.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
+        options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
+        options.coriolis_frequency = f
+        options.simulation_export_time = op.dt * op.rm
+        options.simulation_end_time = op.Tend
+        options.timestepper_type = op.timestepper
+        options.timestep = op.dt
+        options.output_directory = di
+        options.export_diagnostics = True
+        options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+        solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
+        cb1 = ObjectiveSWCallback(solver_obj)
+        cb1.op = op
+        solver_obj.add_callback(cb1, 'timestep')
+        solver_obj.bnd_functions['shallow_water'] = BCs
+        initTimer = clock() - initTimer
+        print('Problem initialised. Setup time: %.3fs' % initTimer)
+        primalTimer = clock()
+        solver_obj.iterate()
+        primalTimer = clock() - primalTimer
+        J = cb1.quadrature()                        # Assemble objective functional for adjoint computation
+        print('Primal run complete. Solver time: %.3fs' % primalTimer)
 
-    # Extract adjoint solutions
-    dualTimer = clock()
-    tape = get_working_tape()
-    solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
-    N = len(solve_blocks)
-    r = N % op.ndump                            # Number of extra tape annotations in setup
-    for i in range(N - 1, r - 2, -op.ndump):
-        dual.assign(solve_blocks[i].adj_sol)
-        dual_u, dual_e = dual.split()
-        with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexString(int((i - r + 1) / op.ndump)), mode=FILE_CREATE) as saveAdj:
-            saveAdj.store(dual_u)
-            saveAdj.store(dual_e)
-            saveAdj.close()
-        if op.plotpvd:
-            adjointFile.write(dual_u, dual_e, time=op.dt * (i - r + 1))
-        print('Adjoint simulation %.2f%% complete' % ((N - i + r - 1) / N * 100))
-    dualTimer = clock() - dualTimer
-    print('Dual run complete. Run time: %.3fs' % dualTimer)
+        # Compute gradient
+        gradientTimer = clock()
+        dJdb = compute_gradient(J, Control(b))      # TODO: Rewrite pyadjoint to avoid computing this
+        gradientTimer = clock() - gradientTimer
+        # File(di + 'gradient.pvd').write(dJdb)     # Too memory intensive in Tohoku case
+        print("Norm of gradient: %.3e. Computation time: %.1fs" % (dJdb.dat.norm, gradientTimer))
+
+        # Extract adjoint solutions
+        dualTimer = clock()
+        tape = get_working_tape()
+        solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
+        N = len(solve_blocks)
+        r = N % op.ndump                            # Number of extra tape annotations in setup
+        for i in range(N - 1, r - 2, -op.ndump):
+            dual.assign(solve_blocks[i].adj_sol)
+            dual_u, dual_e = dual.split()
+            with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexString(int((i - r + 1) / op.ndump)), mode=FILE_CREATE) as saveAdj:
+                saveAdj.store(dual_u)
+                saveAdj.store(dual_e)
+                saveAdj.close()
+            if op.plotpvd:
+                adjointFile.write(dual_u, dual_e, time=op.dt * (i - r + 1))
+            print('Adjoint simulation %.2f%% complete' % ((N - i + r - 1) / N * 100))
+        dualTimer = clock() - dualTimer
+        print('Dual run complete. Run time: %.3fs' % dualTimer)
 
     with pyadjoint.stop_annotating():
 
@@ -504,7 +513,10 @@ def DWP(startRes, op=Options()):
             return av, rel, J_h, integrand, totalTimer, adaptSolveTimer
 
 
-def DWR(startRes, op=Options()):
+def DWR(startRes, **kwargs):
+    op = kwargs.get('op')
+    regen = kwargs.get('regen')
+
     initTimer = clock()
     di = 'plots/' + op.mode + '/DWR/'
     if op.plotpvd:
@@ -559,61 +571,68 @@ def DWR(startRes, op=Options()):
     if op.gradate:
         H0 = Function(P1).interpolate(CellSize(mesh_H))
 
-    # Solve fixed mesh primal problem to get residuals and adjoint solutions
-    solver_obj = solver2d.FlowSolver2d(mesh_H, b)
-    options = solver_obj.options
-    options.element_family = op.family
-    options.use_nonlinear_equations = True
-    options.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
-    options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
-    options.coriolis_frequency = f
-    options.simulation_export_time = op.dt * op.rm
-    options.simulation_end_time = op.Tend
-    options.timestepper_type = op.timestepper
-    options.timestep = op.dt
-    options.output_directory = di
-    options.export_diagnostics = True
-    options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-    solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
-    cb1 = ObjectiveSWCallback(solver_obj)
-    cb1.op = op
-    cb2 = HigherOrderResidualCallback(solver_obj, Ve) if op.orderChange else ResidualCallback(solver_obj)
-    solver_obj.add_callback(cb1, 'timestep')
-    solver_obj.add_callback(cb2, 'export')
-    solver_obj.bnd_functions['shallow_water'] = BCs
-    initTimer = clock() - initTimer
-    print('Problem initialised. Setup time: %.3fs' % initTimer)
-    primalTimer = clock()
-    solver_obj.iterate()
-    primalTimer = clock() - primalTimer
-    J = cb1.quadrature()                        # Assemble objective functional for adjoint computation
-    print('Primal run complete. Solver time: %.3fs' % primalTimer)
+    if not regen:
 
-    # Compute gradient
-    gradientTimer = clock()
-    dJdb = compute_gradient(J, Control(b))      # TODO: Rewrite pyadjoint to avoid computing this
-    gradientTimer = clock() - gradientTimer
-    # File(di + 'gradient.pvd').write(dJdb)     # Too memory intensive in Tohoku case
-    print("Norm of gradient: %.3e. Computation time: %.1fs" % (dJdb.dat.norm, gradientTimer))
+        # Solve fixed mesh primal problem to get residuals and adjoint solutions
+        solver_obj = solver2d.FlowSolver2d(mesh_H, b)
+        options = solver_obj.options
+        options.element_family = op.family
+        options.use_nonlinear_equations = True
+        options.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
+        options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
+        options.coriolis_frequency = f
+        options.simulation_export_time = op.dt * op.rm
+        options.simulation_end_time = op.Tend
+        options.timestepper_type = op.timestepper
+        options.timestep = op.dt
+        options.output_directory = di
+        options.export_diagnostics = True
+        options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+        solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
+        cb1 = ObjectiveSWCallback(solver_obj)
+        cb1.op = op
+        if op.orderChange:
+            cb2 = HigherOrderResidualCallback(solver_obj, Ve)
+        elif op.refinedSpace:
+            cb2 = RefinedResidualCallback(solver_obj, Ve)
+        else:
+            cb2 = ResidualCallback(solver_obj)
+        solver_obj.add_callback(cb1, 'timestep')
+        solver_obj.add_callback(cb2, 'export')
+        solver_obj.bnd_functions['shallow_water'] = BCs
+        initTimer = clock() - initTimer
+        print('Problem initialised. Setup time: %.3fs' % initTimer)
+        primalTimer = clock()
+        solver_obj.iterate()
+        primalTimer = clock() - primalTimer
+        J = cb1.quadrature()                        # Assemble objective functional for adjoint computation
+        print('Primal run complete. Solver time: %.3fs' % primalTimer)
 
-    # Extract adjoint solutions
-    dualTimer = clock()
-    tape = get_working_tape()
-    solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
-    N = len(solve_blocks)
-    r = N % op.rm   # Number of extra tape annotations in setup
-    for i in range(N - 1, r - 2, -op.rm):
-        dual.assign(solve_blocks[i].adj_sol)
-        dual_u, dual_e = dual.split()
-        with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexString(int((i - r + 1) / op.rm)),  mode=FILE_CREATE) as saveAdj:
-            saveAdj.store(dual_u)                   # TODO: Why not just save ^^^ using same index as timestep?
-            saveAdj.store(dual_e)
-            saveAdj.close()
-        if op.plotpvd:
-            adjointFile.write(dual_u, dual_e, time=op.dt * (i - r + 1))
-        print('Adjoint simulation %.2f%% complete' % ((N - i + r - 1) / N * 100))
-    dualTimer = clock() - dualTimer
-    print('Dual run complete. Run time: %.3fs' % dualTimer)
+        # Compute gradient
+        gradientTimer = clock()
+        dJdb = compute_gradient(J, Control(b))      # TODO: Rewrite pyadjoint to avoid computing this
+        gradientTimer = clock() - gradientTimer
+        # File(di + 'gradient.pvd').write(dJdb)     # Too memory intensive in Tohoku case
+        print("Norm of gradient: %.3e. Computation time: %.1fs" % (dJdb.dat.norm, gradientTimer))
+
+        # Extract adjoint solutions
+        dualTimer = clock()
+        tape = get_working_tape()
+        solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
+        N = len(solve_blocks)
+        r = N % op.rm   # Number of extra tape annotations in setup
+        for i in range(N - 1, r - 2, -op.rm):
+            dual.assign(solve_blocks[i].adj_sol)
+            dual_u, dual_e = dual.split()
+            with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexString(int((i - r + 1) / op.rm)),  mode=FILE_CREATE) as saveAdj:
+                saveAdj.store(dual_u)                   # TODO: Why not just save ^^^ using same index as timestep?
+                saveAdj.store(dual_e)
+                saveAdj.close()
+            if op.plotpvd:
+                adjointFile.write(dual_u, dual_e, time=op.dt * (i - r + 1))
+            print('Adjoint simulation %.2f%% complete' % ((N - i + r - 1) / N * 100))
+        dualTimer = clock() - dualTimer
+        print('Dual run complete. Run time: %.3fs' % dualTimer)
 
     with pyadjoint.stop_annotating():
 
@@ -632,7 +651,7 @@ def DWR(startRes, op=Options()):
                 loadAdj.load(dual_u)
                 loadAdj.load(dual_e)
                 loadAdj.close()
-            if op.orderChange:          # TODO: Fix space enrichment functionality
+            if op.orderChange:                  # TODO: Fix space enrichment functionality
                 duale_u.interpolate(dual_u)
                 duale_e.interpolate(dual_e)
                 # epsilon.interpolate(inner(rho, duale))
@@ -808,6 +827,7 @@ if __name__ == "__main__":
     parser.add_argument("-ho", help="Compute errors and residuals in a higher order space")
     parser.add_argument("-r", help="Compute errors and residuals in a refined space")
     parser.add_argument("-b", help="Intersect metrics with bathymetry")
+    parser.add_argument("-regen", help="Regenerate error estimates from saved data")
     args = parser.parse_args()
 
     solvers = {'fixedMesh': fixedMesh, 'hessianBased': hessianBased, 'DWP': DWP, 'DWR': DWR}
@@ -828,7 +848,6 @@ if __name__ == "__main__":
         orderChange = 1
     if args.r:
         assert not args.ho
-        raise NotImplementedError
     if args.b is not None:
         assert approach == 'hessianBased'
 
@@ -866,14 +885,16 @@ if __name__ == "__main__":
     for i in resolutions:
         # Get data and save to disk
         if mode == 'rossby-wave':   # TODO: Timing output undercalculates in adjoint cases
-            av, rel, J_h, integrand, relativePeak, distance, phaseSpd, solverTime, adaptSolveTime = solver(i, op=op)
+            av, rel, J_h, integrand, relativePeak, distance, phaseSpd, solverTime, adaptSolveTime = \
+                solver(i, op=op, regen=bool(args.regen))
             print("""Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs
         OF error: %.4e  Height error: %.4f  Distance: %.4fm  Speed error: %.4fm"""
                   % (i, av, J_h, solverTime, rel, relativePeak, distance, phaseSpd))
             errorfile.write('%d, %.4e, %.4f, %.4f, %.4f, %.1f, %.4e\n'
                            % (av, rel, relativePeak, distance, phaseSpd, solverTime, J_h))
         elif mode == 'tohoku':
-            av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, solverTime, adaptSolveTime = solver(i, op=op)
+            av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, solverTime, adaptSolveTime =\
+                solver(i, op=op, regen=bool(args.regen))
             print("""Run %d: Mean element count: %6d Objective %.4e Timing %.1fs 
         OF error: %.4e P02: %.3f P06: %.3f""" % (i, av, J_h, solverTime, rel, totalVarP02, totalVarP06))
             errorfile.write('%d, %.4e, %.3f, %.3f, %.1f, %.4e\n'
@@ -883,7 +904,7 @@ if __name__ == "__main__":
             gaugeFileP06.writelines(["%s," % val for val in gP06])
             gaugeFileP06.write("\n")
         else:
-            av, rel, J_h, integrand, solverTime, adaptSolveTime = solver(i, op=op)
+            av, rel, J_h, integrand, solverTime, adaptSolveTime = solver(i, op=op, regen=bool(args.regen))
             print('Run %d: Mean element count: %6d Objective: %.4e OF error %.4e Timing %.1fs'
                   % (i, av, J_h, rel, solverTime))
             errorfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, solverTime, J_h))

@@ -96,7 +96,7 @@ class Options:
             self.targetError = 1e-3
             self.hessMeth = 'dL2'       # Hessian recovery by double L2 projection. 'parts' also available
         if self.approach == "DWR":
-            self.rescaling = 0.1        # TODO: This is just a test
+            self.rescaling = 0.85        # TODO: Consider different values
         else:
             try:
                 assert rescaling > 0
