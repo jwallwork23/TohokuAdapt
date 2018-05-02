@@ -1,6 +1,5 @@
 from thetis_adjoint import *
 from thetis.field_defs import field_metadata
-from thetis.callback import ResidualCallback
 import pyadjoint
 from fenics_adjoint.solving import SolveBlock                                       # For extracting adjoint solutions
 

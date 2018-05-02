@@ -61,7 +61,7 @@ def readErrors(date, approach, mode='tohoku', bootstrapping=False):
     :param bootstrapping: toggle use of bootstrapping.
     :return: mean element count, (some aspect of) error and CPU time.
     """
-    filename = 'outdata/'+mode+'/'+approach+date
+    filename = 'outdata/'+mode+'/'+approach+'_'+date
     textfile = open(filename+'.txt', 'r')
     if mode == 'model-verification':
         bootstrapping = True
@@ -69,19 +69,19 @@ def readErrors(date, approach, mode='tohoku', bootstrapping=False):
     err = {}
     tim = []
     i = 0
-    fixedMeshes = Options().meshSizes
     for line in textfile:
-        if mode == 'model-verification':
-            J_h, gP02, gP06, timing = line.split(',')[1:]
-            nEls.append(fixedMeshes[i])
-        else:
-            nEls.append(int(av))
         if mode == 'tohoku':
             av, rel, gP02, gP06, timing, J_h = line.split(',')
         elif mode == 'shallow-water':
             av, rel, timing, J_h = line.split(',')
         elif mode == 'rossby-wave':
             av, rel, peak, dis, spd, timing, J_h = line.split(',')
+        if mode == 'model-verification':
+            fixedMeshes = Options().meshSizes
+            nEle, J_h, gP02, gP06, timing = line.split(',')[1:]
+            nEls.append(fixedMeshes[i])
+        else:
+            nEls.append(int(av))
         if bootstrapping:
             if mode == 'model-verification':
                 err[i] = [float(J_h), float(gP02), float(gP06)]
@@ -231,7 +231,7 @@ def compareTimeseries(date, run, quantity='Integrand', op=Options()):
     plt.clf()
 
 
-def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=None):
+def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=False, date=None):
     now = datetime.datetime.now()
     today = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
@@ -240,16 +240,12 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=True, date=
         names = ("nonlinear=False_rotational=False_", "nonlinear=False_rotational=True_",
                  "nonlinear=True_rotational=False_", "nonlinear=True_rotational=True_")
     else:
-        labels = ("Fixed mesh", "Hessian based", "Explicit", "Implicit", "DWF", "DWR", "Higher order DWR",
-                  "Lower order DWR", "Refined DWR")
-        names = ("fixedMesh", "hessianBased", "explicit", "implicit", "DWF", "DWR", "DWR_ho", "DWR_lo", "DWR_r")
+        labels = ("Fixed mesh", "Hessian based", "DWP", "DWR", "Higher order DWR", "Refined DWR")
+        names = ("fixedMesh", "hessianBased", "DWP", "DWR", "DWR_ho", "DWR_r")
     styles = {labels[0]: 's', labels[1]: '^', labels[2]: 'x', labels[3]: 'o'}
     if mode != 'model-verification':
         styles[labels[4]] = '*'
         styles[labels[5]] = 'h'
-        styles[labels[6]] = 'v'
-        styles[labels[7]] = '8'
-        styles[labels[8]] = 's'
     err = {}
     nEls = {}
     tim = {}

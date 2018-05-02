@@ -1,5 +1,5 @@
 from thetis_adjoint import *
-from thetis.callback import DiagnosticCallback, FunctionalCallback, GaugeCallback
+from thetis.callback import DiagnosticCallback, FunctionalCallback, GaugeCallback, ErrorCallback
 
 from .interpolation import interp
 from .misc import indicator
@@ -7,8 +7,8 @@ from .options import Options
 from .timeseries import gaugeTV
 
 
-__all__ = ["SWCallback", "ObjectiveSWCallback", "P02Callback", "P06Callback", "EnrichedErrorCallback",
-           "HigherOrderResidualCallback", "RefinedResidualCallback"]
+__all__ = ["SWCallback", "ObjectiveSWCallback", "P02Callback", "P06Callback", "ResidualCallback",
+           "EnrichedErrorCallback", "HigherOrderResidualCallback", "RefinedResidualCallback"]
 
 
 class SWCallback(FunctionalCallback):
@@ -126,7 +126,56 @@ class P06Callback(GaugeCallback):
         return gaugeTV(self.gauge_values, gauge="P06")
 
 
-class EnrichedErrorCallback(DiagnosticCallback):    # TODO: When fixed, move to Thetis branch
+class ResidualCallback(ErrorCallback):
+    """Computes strong residual for the shallow water case."""
+    name = 'strong residual'
+
+    def __init__(self, solver_obj, **kwargs):
+        """
+        :arg solver_obj: Thetis solver object
+        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+        """
+
+        def residualSW():   # TODO: More terms to include. Which timestepping approach is best?
+            """
+            Construct the strong residual for the semi-discrete shallow water equations at the current timestep,
+            using Crank-Nicolson timestepping.
+
+            :return: strong residual for shallow water equations at current timestep.
+            """
+            uv_old, elev_old = solver_obj.timestepper.solution_old.split()
+            uv_new, elev_new = solver_obj.fields.solution_2d.split()
+            uv_2d = 0.5 * (uv_old + uv_new)
+            elev_2d = 0.5 * (elev_old + elev_new)
+
+            # Collect fields and parameters
+            nu = solver_obj.fields.get('viscosity_h')
+            Dt = Constant(solver_obj.options.timestep)
+            H = solver_obj.fields.bathymetry_2d + elev_2d
+            g = physical_constants['g_grav']
+
+            # Construct residual
+            res_u = (uv_new - uv_old) / Dt + g * grad(elev_2d)
+            if solver_obj.options.use_nonlinear_equations:
+                res_u += dot(uv_2d, nabla_grad(uv_2d))
+            if solver_obj.options.coriolis_frequency is not None:
+                res_u += solver_obj.options.coriolis_frequency * as_vector((-uv_2d[1], uv_2d[0]))
+            if nu is not None:
+                if solver_obj.options.use_grad_depth_viscosity_term:
+                    res_u -= dot(nu * grad(H), (grad(uv_2d) + sym(grad(uv_2d))))
+                if solver_obj.options.use_grad_div_viscosity_term:
+                    res_u -= div(nu * (grad(uv_2d) + sym(grad(uv_2d))))
+                else:
+                    res_u -= div(nu * grad(uv_2d))
+
+            res_e = (elev_new - elev_old) / Dt + div((solver_obj.fields.bathymetry_2d + elev_2d) * uv_2d)
+
+            return res_u, res_e
+
+        super(ResidualCallback, self).__init__(residualSW, solver_obj, **kwargs)
+
+
+class EnrichedErrorCallback(DiagnosticCallback):
     """Base class for callbacks that evaluate an error quantity (such as the strong residual) related to the prognostic
     equation in an enriched finite element space of higher order."""
     variable_names = ['error', 'normed error']
@@ -181,7 +230,7 @@ class HigherOrderResidualCallback(EnrichedErrorCallback):   # TODO: When fixed, 
         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
         """
 
-        def residualSW():   # TODO: More terms to include
+        def residualSW():   # TODO: More terms to include. Which timestepping approach is best?
             """
             Construct the strong residual for the semi-discrete shallow water equations at the current timestep.
 
@@ -235,7 +284,7 @@ class RefinedResidualCallback(EnrichedErrorCallback):
         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
         """
 
-        def residualSW():   # TODO: More terms to include
+        def residualSW():   # TODO: More terms to include. Which timestepping approach is best?
             """
             Construct the strong residual for the semi-discrete shallow water equations at the current timestep.
 
