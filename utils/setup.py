@@ -1,7 +1,7 @@
 import numpy as np
 
 
-__all__ = ["MeshSetup", "problemDomain", "solutionRW", "integrateRW", "__main__"]
+__all__ = ["MeshSetup", "problemDomain", "HermiteCoefficients", "solutionRW", "integrateRW", "__main__"]
 
 
 class MeshSetup:
@@ -247,7 +247,74 @@ def problemDomain(level=0, mesh=None, op=Options(mode='tohoku')):
     return mesh, u0, eta0, b, BCs, f
 
 
-def solutionRW(V, t=0., B=0.395):
+class HermiteCoefficients:
+    """
+    Class containing Hermite expansion coefficients for the Rossby wave test case first order solution.
+    """
+    def __init__(self):
+
+        u = np.zeros(28)
+        v = np.zeros(28)
+        h = np.zeros(28)
+
+        #  Hermite series coefficients for U:
+
+        u[1]=1.789276   # TODO: Should this start at zero?
+        u[3]=0.1164146
+        u[5]=-0.3266961e-3
+        u[7]=-0.1274022e-2
+        u[9]=0.4762876e-4
+        u[11]=-0.1120652e-5
+        u[13]=0.1996333e-7
+        u[15]=-0.2891698e-9
+        u[17]=0.3543594e-11
+        u[19]=-0.3770130e-13
+        u[21]=0.3547600e-15
+        u[23]=-0.2994113e-17
+        u[25]=0.2291658e-19
+        u[27]=-0.1178252e-21
+
+        #  Hermite series coefficients for V:
+
+        v[4]=-0.6697824e-1
+        v[6]=-0.2266569e-2
+        v[8]=0.9228703e-4
+        v[10]=-0.1954691e-5
+        v[12]=0.2925271e-7
+        v[14]=-0.3332983e-9
+        v[16]=0.2916586e-11
+        v[18]=-0.1824357e-13
+        v[20]=0.4920951e-16
+        v[22]=0.6302640e-18
+        v[24]=-0.1289167e-19
+        v[26]=0.1471189e-21
+
+        #  Hermite series coefficients for H:
+
+        h[1]=-3.071430
+        h[3]=-0.3508384e-1
+        h[5]=-0.1861060e-1
+        h[7]=-0.2496364e-3
+        h[9]=0.1639537e-4
+        h[11]=-0.4410177e-6
+        h[13]=0.8354759e-9
+        h[15]=-0.1254222e-9
+        h[17]=0.1573519e-11
+        h[19]=-0.1702300e-13
+        h[21]=0.1621976e-15
+        h[23]=-0.1382304e-17
+        h[25]=0.1066277e-19
+        h[27]=-0.1178252e-21
+
+        self.uCoeffs = u
+        self.vCoeffs = v
+        self.hCoeffs = h
+
+    def __call__(self):
+        return self.uCoeffs, self.vCoeffs, self.hCoeffs
+
+
+def solutionRW(V, t=0., B=0.395):   # TODO: Consider 1st order soln
     """
     Analytic solution for equatorial Rossby wave test problem, as given by Huang.
 
@@ -281,7 +348,7 @@ def solutionRW(V, t=0., B=0.395):
     return q
 
 
-def integrateRW(V, op=Options()):
+def integrateRW(V, op=Options()):   # TODO: Consider 1st order soln
     t = 0.
     vals = []
     ks = Function(V)

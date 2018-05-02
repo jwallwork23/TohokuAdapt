@@ -141,7 +141,7 @@ class Options:
         self.rm = rm
         self.nAdapt = nAdapt
         self.orderChange = orderChange
-        self.nVerT = nVerT
+        self.nVerT = nVerT  # TODO: Make this optional
 
         # Override default parameter choices for SW and RW cases:
         if self.mode == 'shallow-water':
