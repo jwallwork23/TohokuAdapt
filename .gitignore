@@ -9,7 +9,7 @@
 *.pvtu
 *.vtu
 *.log
-
+*.patch
 
 ## Directories to be ignored:
 
@@ -44,6 +44,3 @@ thetis-tsunami.py
 residual-callback-test.py
 shallow-water-test.py
 rossby-wave-plots.py
-
-# Patches
-adapt_attrs.patch

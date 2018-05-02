@@ -488,7 +488,9 @@ def DWP(startRes, **kwargs):
 
             adaptSolveTimer += adaptTimer + solverTimer
 
-        totalTimer = primalTimer + gradientTimer + dualTimer + errorTimer + adaptSolveTimer
+        totalTimer = errorTimer + adaptSolveTimer
+        if not regen:
+            totalTimer += primalTimer + gradientTimer + dualTimer
 
         if op.mode == 'tohoku':
             totalVarP02 = cb3.totalVariation()
@@ -786,7 +788,10 @@ def DWR(startRes, **kwargs):
 
             adaptSolveTimer += adaptTimer + solverTimer
 
-        totalTimer = primalTimer + gradientTimer + dualTimer + errorTimer + adaptSolveTimer
+        totalTimer = errorTimer + adaptSolveTimer
+        if not regen:
+            totalTimer += primalTimer + gradientTimer + dualTimer
+
         if op.mode == 'tohoku':
             totalVarP02 = cb3.totalVariation()
             totalVarP06 = cb4.totalVariation()
