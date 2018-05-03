@@ -146,6 +146,7 @@ else:
 
     import scipy.interpolate as si
     from scipy.io.netcdf import NetCDFFile
+    from time import clock
 
     from .conversion import earth_radius, get_latitude, vectorlonlat_to_utm
     from .misc import indicator
@@ -419,17 +420,19 @@ class RossbyWaveSolution:
         kt = Constant(0.)
 
         # Time integrate
+        tic = clock()
         while t < self.op.Tend - 0.5 * self.op.dt:
             q = self.__call__(t)
             if t > self.op.Tstart - 0.5 * self.op.dt:  # Slightly smoothed transition
                 kt.assign(1. if t > self.op.Tstart + 0.5 * self.op.dt else 0.5)
             vals.append(assemble(kt * inner(ks, q) * dx))
-            if self.op.plotpvd and cnt % self.op.cntT / 10:
+            if self.op.plotpvd and cnt in (0, self.op.cntT):
                 u, eta = q.split()
                 u.rename("Depth averaged velocity")
                 eta.rename("Elevation")
                 outFile.write(u, eta, time=t)
-            print("t = %.2fs" % t)
+            if cnt % self.op.ndump == 0:
+                print("t = %.2fs, CPU time: %.2fs" % (t, clock() - tic))
             t += self.op.dt
             cnt += 1
         return vals
