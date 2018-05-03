@@ -403,19 +403,31 @@ class RossbyWaveSolution:
         return terms
 
     def integrate(self):
+        outFile = File("plots/rossby-wave/analytic/analytic.pvd")
         t = 0.
+        cnt = 0
         vals = []
+
+        # Set up spatial and temporal kernel functions
         ks = Function(self.function_space)
         k0, k1 = ks.split()
         k1.assign(indicator(self.function_space.sub(1), op=self.op))
         kt = Constant(0.)
+
+        # Time integrate
         while t < self.op.Tend - 0.5 * self.op.dt:
             q = self.__call__(t)
             if t > self.op.Tstart - 0.5 * self.op.dt:  # Slightly smoothed transition
                 kt.assign(1. if t > self.op.Tstart + 0.5 * self.op.dt else 0.5)
             vals.append(assemble(kt * inner(ks, q) * dx))
+            if self.op.plotpvd and cnt % self.op.ndump:
+                u, eta = q.split()
+                u.rename("Depth averaged velocity")
+                eta.rename("Elevation")
+                outFile.write(u, eta, time=t)
             print("t = %.2fs" % t)
             t += self.op.dt
+            cnt += 1
         return vals
 
     def __call__(self, t=0.):
