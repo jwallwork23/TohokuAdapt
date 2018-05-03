@@ -27,7 +27,7 @@ quantities = ['Integrand', 'P02', 'P06'] if op.mode in ('tohoku', 'model-verific
 if bool(args.s):
     assert op.mode == 'rossby-wave'
     integrandFile = open('outdata/' + op.mode + '/analytic_Integrand.txt', 'w+')
-    integrand = RossbyWaveSolution(op.mixedSpace(problemDomain(level=6, op=op)[0]), order=0, op=op).integrate()
+    integrand = RossbyWaveSolution(op.mixedSpace(problemDomain(level=6, op=op)[0]), order=1, op=op).integrate()
     integrandFile.writelines(["%s," % val for val in integrand])
     integrandFile.write("\n")
     integrandFile.close()

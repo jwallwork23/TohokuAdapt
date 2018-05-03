@@ -237,7 +237,7 @@ def problemDomain(level=0, mesh=None, op=Options(mode='tohoku')):
             mesh.coordinates.assign(xy)
         P1 = FunctionSpace(mesh, "CG", 1)
         b = Function(P1).assign(1.)
-        q = RossbyWaveSolution(op.mixedSpace(mesh), order=0, op=op).__call__()
+        q = RossbyWaveSolution(op.mixedSpace(mesh), order=1, op=op).__call__()
         u0, eta0 = q.split()
         BCs = {1: {'uv': Constant(0.)}, 2: {'uv': Constant(0.)}, 3: {'uv': Constant(0.)}, 4: {'uv': Constant(0.)}}
         f = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
@@ -339,6 +339,16 @@ class RossbyWaveSolution:
 
         return polys
 
+    def xi(self, t=0.):
+        """
+        :arg t: current time.
+        :return: time shifted x-coordinate.
+        """
+        c = -1./3.
+        if self.order == 1:
+            c -= 0.395 * self.soliton_amplitude * self.soliton_amplitude
+        return self.x - c * t
+
     def phi(self, t=0.):
         """
         :arg t: current time.
@@ -347,7 +357,15 @@ class RossbyWaveSolution:
         B = self.soliton_amplitude
         A = 0.771 * B * B
 
-        return A * (1 / (cosh(B * (self.x + 0.4 * t)) ** 2))
+        return A * (1 / (cosh(B * self.xi(t)) ** 2))
+
+    def dphidx(self, t=0.):
+        """
+        :arg t: current time. 
+        :return: tanh * phi term.
+        """
+        B = self.soliton_amplitude
+        return -2 * B * self.phi(t) * tanh(B * self.xi())
 
     def psi(self):
         """
@@ -363,7 +381,7 @@ class RossbyWaveSolution:
         """
         B = self.soliton_amplitude
         return {'u' : self.phi(t) * 0.25 * (-9 + 6 *  self.y * self.y) * self.psi(),
-                'v': -2 * B * tanh(B * (self.x + 0.4 * t)) * self.phi(t) * 2 * self.y * self.psi(),
+                'v': -2 * B * tanh(B * self.xi()) * self.phi(t) * 2 * self.y * self.psi(),
                 'eta': self.phi(t) * 0.25 * (3 + 6 * self.y * self.y) * self.psi()}
 
     def firstOrderTerms(self, t=0.):
@@ -371,12 +389,16 @@ class RossbyWaveSolution:
         :arg t: current time.
         :return: first order analytic solution for test problem of Huang.
         """
+        C = 0.395 * self.soliton_amplitude * self.soliton_amplitude
+        phi = self.phi(t)
         coeffs = self.coeffs()
         polys = self.polynomials()
         terms = self.zerothOrderTerms(t)
-        for field in coeffs:
-            for i in range(28):
-                terms[field] += coeffs[field][i] * self.psi() * polys[i]
+        terms['u'] += C * phi * 0.5625 * (3 + 2 * self.y * self.y)
+        terms['u'] += phi * phi * sum(coeffs['u'][i] * self.psi() * polys[i] for i in range(28))
+        terms['v'] += self.dphidx(t) * phi * sum(coeffs['v'][i] * self.psi() * polys[i] for i in range(28))
+        terms['eta'] += C * phi * 0.5625 * (-5 + 2 * self.y * self.y) * self.psi()
+        terms['eta'] += phi * phi * sum(coeffs['eta'][i] * self.psi() * polys[i] for i in range(28))
 
         return terms
 
