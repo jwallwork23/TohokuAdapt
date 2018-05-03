@@ -1,7 +1,7 @@
 import numpy as np
 
 
-__all__ = ["MeshSetup", "problemDomain", "HermiteCoefficients", "solutionRW", "integrateRW", "__main__"]
+__all__ = ["MeshSetup", "problemDomain", "RossbyWaveSolution", "__main__"]
 
 
 class MeshSetup:
@@ -237,7 +237,7 @@ def problemDomain(level=0, mesh=None, op=Options(mode='tohoku')):
             mesh.coordinates.assign(xy)
         P1 = FunctionSpace(mesh, "CG", 1)
         b = Function(P1).assign(1.)
-        q = solutionRW(op.mixedSpace(mesh))
+        q = zerothOrderSolution(op.mixedSpace(mesh))
         u0, eta0 = q.split()
         BCs = {1: {'uv': Constant(0.)}, 2: {'uv': Constant(0.)}, 3: {'uv': Constant(0.)}, 4: {'uv': Constant(0.)}}
         f = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
@@ -247,119 +247,173 @@ def problemDomain(level=0, mesh=None, op=Options(mode='tohoku')):
     return mesh, u0, eta0, b, BCs, f
 
 
-class HermiteCoefficients:
+class RossbyWaveSolution:
     """
-    Class containing Hermite expansion coefficients for the Rossby wave test case first order solution.
+    Class for constructing the analytic solution of the Rossby wave test case on a given FunctionSpace.
+    
+    Hermite polynomials taken from the Matlab code found at https://marine.rutgers.edu/po/tests/soliton/hermite.txt
     """
-    def __init__(self):
+    def __init__(self, function_space, order=1, op=Options()):
+        """
+        :arg function_space: mixed FunctionSpace in which to construct the Hermite polynomials.
+        """
+        try:
+            assert order in (0, 1)
+            self.order = order
+            self.function_space = function_space
+            self.soliton_amplitude = 0.395
+            x, y = SpatialCoordinate(self.function_space.mesh())
+            self.x = x
+            self.y = y
+        except:
+            raise NotImplementedError("Only zeroth and first order analytic solutions considered for this problem.")
+        try:
+            assert op.mode == 'rossby-wave'
+            self.op = op
+        except:
+            raise ValueError("Analyic solution only available for 'rossby-wave' test case.")
 
+    def coeffs(self):
+        """
+        Initialise Hermite coefficients.
+        """
         u = np.zeros(28)
         v = np.zeros(28)
-        h = np.zeros(28)
+        eta = np.zeros(28)
 
-        #  Hermite series coefficients for U:
+        #  Hermite series coefficients for u:
+        u[1] = 1.789276   # TODO: Should this start at zero?
+        u[3] = 0.1164146
+        u[5] = -0.3266961e-3
+        u[7] = -0.1274022e-2
+        u[9] = 0.4762876e-4
+        u[11] = -0.1120652e-5
+        u[13] = 0.1996333e-7
+        u[15] = -0.2891698e-9
+        u[17] = 0.3543594e-11
+        u[19] = -0.3770130e-13
+        u[21] = 0.3547600e-15
+        u[23] = -0.2994113e-17
+        u[25] = 0.2291658e-19
+        u[27] = -0.1178252e-21
 
-        u[1]=1.789276   # TODO: Should this start at zero?
-        u[3]=0.1164146
-        u[5]=-0.3266961e-3
-        u[7]=-0.1274022e-2
-        u[9]=0.4762876e-4
-        u[11]=-0.1120652e-5
-        u[13]=0.1996333e-7
-        u[15]=-0.2891698e-9
-        u[17]=0.3543594e-11
-        u[19]=-0.3770130e-13
-        u[21]=0.3547600e-15
-        u[23]=-0.2994113e-17
-        u[25]=0.2291658e-19
-        u[27]=-0.1178252e-21
+        #  Hermite series coefficients for v:
+        v[4] = -0.6697824e-1  # TODO: Should this start at three?
+        v[6] = -0.2266569e-2
+        v[8] = 0.9228703e-4
+        v[10] = -0.1954691e-5
+        v[12] = 0.2925271e-7
+        v[14] = -0.3332983e-9
+        v[16] = 0.2916586e-11
+        v[18] = -0.1824357e-13
+        v[20] = 0.4920951e-16
+        v[22] = 0.6302640e-18
+        v[24] = -0.1289167e-19
+        v[26] = 0.1471189e-21
 
-        #  Hermite series coefficients for V:
+        #  Hermite series coefficients for eta:
+        eta[1] = -3.071430  # TODO: Should this start at zero?
+        eta[3] = -0.3508384e-1
+        eta[5] = -0.1861060e-1
+        eta[7] = -0.2496364e-3
+        eta[9] = 0.1639537e-4
+        eta[11] = -0.4410177e-6
+        eta[13] = 0.8354759e-9
+        eta[15] = -0.1254222e-9
+        eta[17] = 0.1573519e-11
+        eta[19] = -0.1702300e-13
+        eta[21] = 0.1621976e-15
+        eta[23] = -0.1382304e-17
+        eta[25] = 0.1066277e-19
+        eta[27] = -0.1178252e-21
 
-        v[4]=-0.6697824e-1
-        v[6]=-0.2266569e-2
-        v[8]=0.9228703e-4
-        v[10]=-0.1954691e-5
-        v[12]=0.2925271e-7
-        v[14]=-0.3332983e-9
-        v[16]=0.2916586e-11
-        v[18]=-0.1824357e-13
-        v[20]=0.4920951e-16
-        v[22]=0.6302640e-18
-        v[24]=-0.1289167e-19
-        v[26]=0.1471189e-21
+        return {'u': u, 'v': v, 'eta': eta}
 
-        #  Hermite series coefficients for H:
+    def polynomials(self):
+        """
+        Get Hermite polynomials
+        """
+        polys = [Constant(1.), 2 * self.y]
+        for i in range(2, 28):
+            polys.append(2 * self.y * polys[i - 1] - 2 * (i - 1) * polys[i - 2])
 
-        h[1]=-3.071430
-        h[3]=-0.3508384e-1
-        h[5]=-0.1861060e-1
-        h[7]=-0.2496364e-3
-        h[9]=0.1639537e-4
-        h[11]=-0.4410177e-6
-        h[13]=0.8354759e-9
-        h[15]=-0.1254222e-9
-        h[17]=0.1573519e-11
-        h[19]=-0.1702300e-13
-        h[21]=0.1621976e-15
-        h[23]=-0.1382304e-17
-        h[25]=0.1066277e-19
-        h[27]=-0.1178252e-21
+        return polys
 
-        self.uCoeffs = u
-        self.vCoeffs = v
-        self.hCoeffs = h
+    def phi(self, t=0.):
+        """
+        :arg t: current time.
+        :return: sech^2 term.
+        """
+        B = self.soliton_amplitude
+        A = 0.771 * B * B
 
-    def __call__(self):
-        return self.uCoeffs, self.vCoeffs, self.hCoeffs
+        return A * (1 / (cosh(B * (self.x + 0.4 * t)) ** 2))
 
+    def psi(self):
+        """
+        :arg t: current time. 
+        :return: exp term.
+        """
+        return exp(-0.5 * self.y * self.y)
 
-def solutionRW(V, t=0., B=0.395):   # TODO: Consider 1st order soln
-    """
-    Analytic solution for equatorial Rossby wave test problem, as given by Huang.
+    def zerothOrderTerms(self, t=0.):
+        """
+        :arg t: current time.
+        :return: zeroth order analytic solution for test problem of Huang.
+        """
+        B = self.soliton_amplitude
+        return {'u' : self.phi(t) * 0.25 * (-9 + 6 *  self.y * self.y) * self.psi(t),
+                'v': -2 * B * tanh(B * (self.x + 0.4 * t)) * self.phi(t) * 2 * self.y * self.psi(t),
+                'eta': self.phi(t) * 0.25 * (3 + 6 * self.y * self.y) * self.psi(t)}
 
-    :arg V: Mixed function space upon which to define solutions.
-    :arg t: current time.
-    :param B: Parameter controlling amplitude of soliton.
-    :return: Analytic solution for rossby-wave test problem of Huang.
-    """
-    x, y = SpatialCoordinate(V.mesh())
-    q = Function(V)
-    u, eta = q.split()
-    u.rename("Depth averaged velocity")
-    eta.rename("Elevation")
+    def firstOrderTerms(self, t=0.):
+        """
+        :arg t: current time.
+        :return: first order analytic solution for test problem of Huang.
+        """
+        coeffs = self.coeffs()
+        polys = self.polynomials()
+        terms = self.zerothOrderTerms(t)
+        for field in coeffs:
+            for i in range(28):
+                terms[field] += coeffs[field][i] * self.psi() * polys[i]
 
-    A = 0.771 * B * B
-    W = FunctionSpace(V.mesh(), V.sub(0).ufl_element().family(), V.sub(0).ufl_element().degree())
-    u0 = Function(W).interpolate(
-        A * (1 / (cosh(B * (x + 0.4 * t)) ** 2))
-        * 0.25 * (-9 + 6 * y * y)
-        * exp(-0.5 * y * y))
-    u1 = Function(W).interpolate(
-        -2 * B * tanh(B * (x + 0.4 * t)) *
-        A * (1 / (cosh(B * (x + 0.4 * t)) ** 2))
-        * 2 * y * exp(-0.5 * y * y))
-    u.dat.data[:, 0] = u0.dat.data      # TODO: Shouldn't really do this in adjointland
-    u.dat.data[:, 1] = u1.dat.data
-    eta.interpolate(A * (1 / (cosh(B * (x + 0.4 * t)) ** 2))
-                    * 0.25 * (3 + 6 * y * y)
-                    * exp(-0.5 * y * y))
+        return terms
 
-    return q
+    def integrate(self):
+        t = 0.
+        vals = []
+        ks = Function(self.function_space)
+        k0, k1 = ks.split()
+        k1.assign(indicator(self.function_space.sub(1), op=self.op))
+        kt = Constant(0.)
+        while t < self.op.Tend - 0.5 * self.op.dt:
+            q = self.__call__(t)
+            if t > self.op.Tstart - 0.5 * self.op.dt:  # Slightly smoothed transition
+                kt.assign(1. if t > self.op.Tstart + 0.5 * self.op.dt else 0.5)
+            vals.append(assemble(kt * inner(ks, q) * dx))
+            print("t = %.2fs" % t)
+            t += self.op.dt
+        return vals
 
+    def __call__(self, t=0.):
+        """
+        :arg t: current time.
+        :return: semi-analytic solution for Rossby wave test case of Huang.
+        """
+        terms = self.zerothOrderTerms(t) if self.order == 0 else self.firstOrderTerms(t)
 
-def integrateRW(V, op=Options()):   # TODO: Consider 1st order soln
-    t = 0.
-    vals = []
-    ks = Function(V)
-    k0, k1 = ks.split()
-    k1.assign(indicator(V.sub(1), op=op))
-    kt = Constant(0.)
-    while t < op.Tend - 0.5 * op.dt:
-        q = solutionRW(V, t=t)
-        if t > op.Tstart - 0.5 * op.dt:  # Slightly smooth transition
-            kt.assign(1. if t > op.Tstart + 0.5 * op.dt else 0.5)
-        vals.append(assemble(kt * inner(ks, q) * dx))
-        print("t = %.2fs" % t)
-        t += op.dt
-    return vals
+        q = Function(self.function_space)
+        u, eta = q.split()
+        u.rename("Depth averaged velocity")
+        eta.rename("Elevation")
+
+        W = FunctionSpace(self.function_space.mesh(), self.function_space.sub(0).ufl_element().family(),
+                          self.function_space.sub(0).ufl_element().degree())
+        u0 = Function(W).interpolate(terms['u'])
+        u1 = Function(W).interpolate(terms['v'])
+        u.dat.data[:, 0] = u0.dat.data  # TODO: Shouldn't really do this in adjointland
+        u.dat.data[:, 1] = u1.dat.data
+        eta.interpolate(terms['eta'])
+
+        return q
