@@ -237,7 +237,7 @@ def problemDomain(level=0, mesh=None, op=Options(mode='tohoku')):
             mesh.coordinates.assign(xy)
         P1 = FunctionSpace(mesh, "CG", 1)
         b = Function(P1).assign(1.)
-        q = zerothOrderSolution(op.mixedSpace(mesh))
+        q = RossbyWaveSolution(op.mixedSpace(mesh), order=0, op=op).__call__()
         u0, eta0 = q.split()
         BCs = {1: {'uv': Constant(0.)}, 2: {'uv': Constant(0.)}, 3: {'uv': Constant(0.)}, 4: {'uv': Constant(0.)}}
         f = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
@@ -362,9 +362,9 @@ class RossbyWaveSolution:
         :return: zeroth order analytic solution for test problem of Huang.
         """
         B = self.soliton_amplitude
-        return {'u' : self.phi(t) * 0.25 * (-9 + 6 *  self.y * self.y) * self.psi(t),
-                'v': -2 * B * tanh(B * (self.x + 0.4 * t)) * self.phi(t) * 2 * self.y * self.psi(t),
-                'eta': self.phi(t) * 0.25 * (3 + 6 * self.y * self.y) * self.psi(t)}
+        return {'u' : self.phi(t) * 0.25 * (-9 + 6 *  self.y * self.y) * self.psi(),
+                'v': -2 * B * tanh(B * (self.x + 0.4 * t)) * self.phi(t) * 2 * self.y * self.psi(),
+                'eta': self.phi(t) * 0.25 * (3 + 6 * self.y * self.y) * self.psi()}
 
     def firstOrderTerms(self, t=0.):
         """

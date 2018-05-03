@@ -3,7 +3,7 @@ from firedrake import *
 import argparse
 
 from utils.options import Options
-from utils.setup import integrateRW, problemDomain
+from utils.setup import RossbyWaveSolution, problemDomain
 from utils.timeseries import plotTimeseries, compareTimeseries
 
 
@@ -24,17 +24,17 @@ if op.mode == 'model-verification':
 if approach is None and op.mode != 'model-verification':
     approach = 'fixedMesh'
 quantities = ['Integrand', 'P02', 'P06'] if op.mode in ('tohoku', 'model-verification') else ['Integrand']
-if args.s is not None:
+if bool(args.s):
     assert op.mode == 'rossby-wave'
     integrandFile = open('outdata/' + op.mode + '/analytic_Integrand.txt', 'w+')
-    integrand = integrateRW(op.mixedSpace(problemDomain(level=6, op=op)[0]), op=op)
+    integrand = RossbyWaveSolution(op.mixedSpace(problemDomain(level=6, op=op)[0]), order=0, op=op).integrate()
     integrandFile.writelines(["%s," % val for val in integrand])
     integrandFile.write("\n")
     integrandFile.close()
 if op.mode == 'model-verification':
     fileExt = '_rotational='
     fileExt += 'off' if args.r is None else args.r
-elif args.s is not None:
+elif bool(args.s):
     assert op.mode == 'rossby-wave'
     fileExt = 'analytic'
 else:
