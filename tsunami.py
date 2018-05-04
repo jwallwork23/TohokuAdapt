@@ -9,7 +9,7 @@ from time import clock
 from utils.adaptivity import isoP2, isotropicMetric, metricIntersection, metricGradation, pointwiseMax, steadyMetric
 from utils.callbacks import *
 from utils.interpolation import interp, mixedPairInterp
-from utils.setup import problemDomain, solutionRW
+from utils.setup import problemDomain, RossbyWaveSolution
 from utils.misc import indexString, peakAndDistance, meshStats
 from utils.options import Options
 
@@ -28,9 +28,9 @@ def fixedMesh(startRes, **kwargs):
         mesh, u0, eta0, b, BCs, f = problemDomain(startRes, op=op)
         nEle = meshStats(mesh)[0]
         V = op.mixedSpace(mesh)
-        uv_2d, elev_2d = Function(V).split()  # Needed to load data into
-        if op.mode == 'rossby-wave':
-            peak_a, distance_a = peakAndDistance(solutionRW(V, t=op.Tend).split()[1])  # Analytic final-time state
+        uv_2d, elev_2d = Function(V).split()    # Needed to load data into
+        if op.mode == 'rossby-wave':            # Analytic final-time state
+            peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
 
         # Initialise solver
         solver_obj = solver2d.FlowSolver2d(mesh, b)
@@ -100,8 +100,8 @@ def hessianBased(startRes, **kwargs):
         V = op.mixedSpace(mesh)
         P1 = FunctionSpace(mesh, "CG", 1)
         uv_2d, elev_2d = Function(V).split()  # Needed to load data into
-        if op.mode == 'rossby-wave':
-            peak_a, distance_a = peakAndDistance(solutionRW(V, t=op.Tend).split()[1])  # Analytic final-time state
+        if op.mode == 'rossby-wave':    # Analytic final-time state
+            peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
         elev_2d.interpolate(eta0)
         uv_2d.interpolate(u0)
 
@@ -266,8 +266,8 @@ def DWP(startRes, **kwargs):
     uv_2d.rename('uv_2d')
     elev_2d.rename('elev_2d')
     P1 = FunctionSpace(mesh, "CG", 1)
-    if op.mode == 'rossby-wave':
-        peak_a, distance_a = peakAndDistance(solutionRW(V, t=op.Tend).split()[1])  # Analytic final-time state
+    if op.mode == 'rossby-wave':    # Analytic final-time state
+        peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
 
     # Define Functions relating to a posteriori DWR error estimator
     dual = Function(V)
@@ -537,8 +537,8 @@ def DWR(startRes, **kwargs):
     uv_2d.rename('uv_2d')
     elev_2d.rename('elev_2d')
     P1 = FunctionSpace(mesh_H, "CG", 1)
-    if op.mode == 'rossby-wave':
-        peak_a, distance_a = peakAndDistance(solutionRW(V, t=op.Tend).split()[1])  # Analytic final-time state
+    if op.mode == 'rossby-wave':    # Analytic final-time state
+        peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
 
     # Define Functions relating to a posteriori DWR error estimator
     dual = Function(V)

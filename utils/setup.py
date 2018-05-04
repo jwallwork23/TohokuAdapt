@@ -366,7 +366,7 @@ class RossbyWaveSolution:
         :return: tanh * phi term.
         """
         B = self.soliton_amplitude
-        return -2 * B * self.phi(t) * tanh(B * self.xi())
+        return -2 * B * self.phi(t) * tanh(B * self.xi(t))
 
     def psi(self):
         """
@@ -380,9 +380,8 @@ class RossbyWaveSolution:
         :arg t: current time.
         :return: zeroth order analytic solution for test problem of Huang.
         """
-        B = self.soliton_amplitude
         return {'u' : self.phi(t) * 0.25 * (-9 + 6 *  self.y * self.y) * self.psi(),
-                'v': -2 * B * tanh(B * self.xi()) * self.phi(t) * 2 * self.y * self.psi(),
+                'v': 2 * self.y * self.dphidx(t) * self.psi(),
                 'eta': self.phi(t) * 0.25 * (3 + 6 * self.y * self.y) * self.psi()}
 
     def firstOrderTerms(self, t=0.):
@@ -390,16 +389,16 @@ class RossbyWaveSolution:
         :arg t: current time.
         :return: first order analytic solution for test problem of Huang.
         """
-        C = 0.395 * self.soliton_amplitude * self.soliton_amplitude
+        C = - 0.395 * self.soliton_amplitude * self.soliton_amplitude
         phi = self.phi(t)
         coeffs = self.coeffs()
         polys = self.polynomials()
         terms = self.zerothOrderTerms(t)
         terms['u'] += C * phi * 0.5625 * (3 + 2 * self.y * self.y)
-        terms['u'] += phi * phi * sum(coeffs['u'][i] * self.psi() * polys[i] for i in range(28))
-        terms['v'] += self.dphidx(t) * phi * sum(coeffs['v'][i] * self.psi() * polys[i] for i in range(28))
+        terms['u'] += phi * phi * self.psi() * sum(coeffs['u'][i] * polys[i] for i in range(28))
+        terms['v'] += self.dphidx(t) * phi * self.psi() * sum(coeffs['v'][i] * polys[i] for i in range(28))
         terms['eta'] += C * phi * 0.5625 * (-5 + 2 * self.y * self.y) * self.psi()
-        terms['eta'] += phi * phi * sum(coeffs['eta'][i] * self.psi() * polys[i] for i in range(28))
+        terms['eta'] += phi * phi * self.psi() * sum(coeffs['eta'][i] * polys[i] for i in range(28))
 
         return terms
 
@@ -421,7 +420,7 @@ class RossbyWaveSolution:
 
         # Time integrate
         tic = clock()
-        while t < self.op.Tend - 0.5 * self.op.dt:
+        while t < self.op.Tend + 0.5 * self.op.dt:
             q = self.__call__(t)
             if t > self.op.Tstart - 0.5 * self.op.dt:  # Slightly smoothed transition
                 kt.assign(1. if t > self.op.Tstart + 0.5 * self.op.dt else 0.5)
@@ -432,7 +431,8 @@ class RossbyWaveSolution:
                 eta.rename("Elevation")
                 outFile.write(u, eta, time=t)
             if cnt % self.op.ndump == 0:
-                print("t = %.2fs, CPU time: %.2fs" % (t, clock() - tic))
+                tic = clock() - tic
+                print("t = %.2fs, CPU time: %.2fs" % (t, tic))
             t += self.op.dt
             cnt += 1
         return vals

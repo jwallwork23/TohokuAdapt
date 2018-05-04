@@ -21,7 +21,7 @@ class Options:
                  bAdapt=False,
                  plotpvd=False,
                  maxGrowth=1.4,
-                 dt=0.5,
+                 dt=0.5,        # TODO: This is unnecessarily high for tsunami modelling. Use 5s?
                  ndump=50,
                  rm=50,         # TODO: Given that dt is now small, experiment with increasing this number
                  nAdapt=1,
