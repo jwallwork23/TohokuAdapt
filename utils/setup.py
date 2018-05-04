@@ -394,7 +394,7 @@ class RossbyWaveSolution:
         coeffs = self.coeffs()
         polys = self.polynomials()
         terms = self.zerothOrderTerms(t)
-        terms['u'] += C * phi * 0.5625 * (3 + 2 * self.y * self.y)
+        terms['u'] += C * phi * 0.5625 * (3 + 2 * self.y * self.y) * self.psi()     # NOTE: This last psi is not included
         terms['u'] += phi * phi * self.psi() * sum(coeffs['u'][i] * polys[i] for i in range(28))
         terms['v'] += self.dphidx(t) * phi * self.psi() * sum(coeffs['v'][i] * polys[i] for i in range(28))
         terms['eta'] += C * phi * 0.5625 * (-5 + 2 * self.y * self.y) * self.psi()
