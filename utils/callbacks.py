@@ -136,7 +136,7 @@ class ResidualCallback(ErrorCallback):
         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
         """
 
-        def residualSW():   # TODO: More terms to include. Which timestepping approach is best?
+        def residualSW():   # TODO: More terms to include
             """
             Construct the strong residual for the semi-discrete shallow water equations at the current timestep,
             using Crank-Nicolson timestepping.
@@ -145,8 +145,8 @@ class ResidualCallback(ErrorCallback):
             """
             uv_old, elev_old = solver_obj.timestepper.solution_old.split()
             uv_new, elev_new = solver_obj.fields.solution_2d.split()
-            uv_2d = 0.5 * (uv_old + uv_new)
-            elev_2d = 0.5 * (elev_old + elev_new)
+            uv_2d = 0.5 * (uv_old + uv_new)         # Use Crank-Nicolson timestepping so that we isolate errors as
+            elev_2d = 0.5 * (elev_old + elev_new)   # being related only to the spatial discretisation
 
             # Collect fields and parameters
             nu = solver_obj.fields.get('viscosity_h')
@@ -154,7 +154,7 @@ class ResidualCallback(ErrorCallback):
             H = solver_obj.fields.bathymetry_2d + elev_2d
             g = physical_constants['g_grav']
 
-            # Construct residual
+            # Construct residual        TODO: Consider boundary integrals resulting from IBP
             res_u = (uv_new - uv_old) / Dt + g * grad(elev_2d)
             if solver_obj.options.use_nonlinear_equations:
                 res_u += dot(uv_2d, nabla_grad(uv_2d))
@@ -230,22 +230,24 @@ class HigherOrderResidualCallback(EnrichedErrorCallback):   # TODO: When fixed, 
         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
         """
 
-        def residualSW():   # TODO: More terms to include. Which timestepping approach is best?
+        def residualSW():   # TODO: More terms to include
             """
             Construct the strong residual for the semi-discrete shallow water equations at the current timestep.
 
             :return: strong residual for shallow water equations at current timestep.
             """
             UV_old, ELEV_old = solver_obj.timestepper.solution_old.split()
-            UV_2d, ELEV_2d = solver_obj.fields.solution_2d.split()
+            UV_new, ELEV_new = solver_obj.fields.solution_2d.split()
 
             # Enrich finite element space
             uv_old, elev_old = Function(enriched_space).split()
             uv_old.interpolate(UV_old)
             elev_old.interpolate(ELEV_old)
-            uv_2d, elev_2d = Function(enriched_space).split()
-            uv_2d.interpolate(UV_2d)
-            elev_2d.interpolate(ELEV_2d)
+            uv_new, elev_new = Function(enriched_space).split()
+            uv_new.interpolate(UV_new)
+            elev_new.interpolate(ELEV_new)
+            uv_2d = 0.5 * (uv_old + uv_new)  # Use Crank-Nicolson timestepping so that we isolate errors as
+            elev_2d = 0.5 * (elev_old + elev_new)  # being related only to the spatial discretisation
 
             # Collect fields and parameters
             nu = solver_obj.fields.get('viscosity_h')
@@ -253,8 +255,8 @@ class HigherOrderResidualCallback(EnrichedErrorCallback):   # TODO: When fixed, 
             H = solver_obj.fields.bathymetry_2d + elev_2d
             g = physical_constants['g_grav']
 
-            # Construct residual
-            res_u = (uv_2d - uv_old) / Dt + g * grad(elev_2d)
+            # Construct residual        TODO: Consider boundary integrals resulting from IBP
+            res_u = (uv_new - uv_old) / Dt + g * grad(elev_2d)
             if solver_obj.options.use_nonlinear_equations:
                 res_u += dot(uv_2d, nabla_grad(uv_2d))
             if solver_obj.options.coriolis_frequency is not None:
@@ -267,7 +269,7 @@ class HigherOrderResidualCallback(EnrichedErrorCallback):   # TODO: When fixed, 
                 else:
                     res_u -= div(nu * grad(uv_2d))
 
-            res_e = (elev_2d - elev_old) / Dt + div((solver_obj.fields.bathymetry_2d + elev_2d) * uv_2d)
+            res_e = (elev_new - elev_old) / Dt + div((solver_obj.fields.bathymetry_2d + elev_2d) * uv_2d)
 
             return res_u, res_e
 
@@ -284,18 +286,20 @@ class RefinedResidualCallback(EnrichedErrorCallback):
         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
         """
 
-        def residualSW():   # TODO: More terms to include. Which timestepping approach is best?
+        def residualSW():   # TODO: More terms to include
             """
             Construct the strong residual for the semi-discrete shallow water equations at the current timestep.
 
             :return: strong residual for shallow water equations at current timestep.
             """
             UV_old, ELEV_old = solver_obj.timestepper.solution_old.split()
-            UV_2d, ELEV_2d = solver_obj.fields.solution_2d.split()
+            UV_new, ELEV_new = solver_obj.fields.solution_2d.split()
             nu = solver_obj.fields.get('viscosity_h')
 
             # Enrich finite element space
-            uv_old, elev_old, uv_2d, elev_2d = interp(enriched_space.mesh(), UV_old, ELEV_old, UV_2d, ELEV_2d)
+            uv_old, elev_old, uv_new, elev_new = interp(enriched_space.mesh(), UV_old, ELEV_old, UV_new, ELEV_new)
+            uv_2d = 0.5 * (uv_old + uv_new)  # Use Crank-Nicolson timestepping so that we isolate errors as
+            elev_2d = 0.5 * (elev_old + elev_new)  # being related only to the spatial discretisation
             b = interp(enriched_space.mesh(), solver_obj.fields.bathymetry_2d)
             if nu is not None:
                 nu = interp(enriched_space.mesh(), nu)
@@ -305,8 +309,8 @@ class RefinedResidualCallback(EnrichedErrorCallback):
             H = b + elev_2d
             g = physical_constants['g_grav']
 
-            # Construct residual
-            res_u = (uv_2d - uv_old) / Dt + g * grad(elev_2d)
+            # Construct residual        TODO: Consider boundary integrals resulting from IBP
+            res_u = (uv_new - uv_old) / Dt + g * grad(elev_2d)
             if solver_obj.options.use_nonlinear_equations:
                 res_u += dot(uv_2d, nabla_grad(uv_2d))
             if solver_obj.options.coriolis_frequency is not None:
@@ -320,7 +324,7 @@ class RefinedResidualCallback(EnrichedErrorCallback):
                 else:
                     res_u -= div(nu * grad(uv_2d))
 
-            res_e = (elev_2d - elev_old) / Dt + div((b + elev_2d) * uv_2d)
+            res_e = (elev_new - elev_old) / Dt + div((b + elev_2d) * uv_2d)
 
             return res_u, res_e
 
