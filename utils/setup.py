@@ -254,7 +254,7 @@ class RossbyWaveSolution:
     
     Hermite polynomials taken from the Matlab code found at https://marine.rutgers.edu/po/tests/soliton/hermite.txt
     """
-    def __init__(self, function_space, order=1, op=Options()):
+    def __init__(self, function_space, order=1, op=Options(mode='rossby-wave')):
         """
         :arg function_space: mixed FunctionSpace in which to construct the Hermite polynomials.
         """
@@ -402,12 +402,23 @@ class RossbyWaveSolution:
 
         return terms
 
+    def plot(self):
+        """
+        Plot initial condition and final state.
+        """
+        outFile = File("plots/rossby-wave/analytic/analytic.pvd")
+        for t in (0., self.op.Tend):
+            q = self.__call__(t)
+            u, eta = q.split()
+            u.rename("Depth averaged velocity")
+            eta.rename("Elevation")
+            print("t = %.4f, |u| = %.4f, |eta| = %.4f" % (t,u.dat.norm, eta.dat.norm))
+            outFile.write(u, eta, time=t)
+
     def integrate(self):
         """
         :return: list containing time integrand values at each timestep.
         """
-        if self.op.plotpvd:
-            outFile = File("plots/rossby-wave/analytic/analytic.pvd")
         t = 0.
         cnt = 0
         vals = []
@@ -425,11 +436,6 @@ class RossbyWaveSolution:
             if t > self.op.Tstart - 0.5 * self.op.dt:  # Slightly smoothed transition
                 kt.assign(1. if t > self.op.Tstart + 0.5 * self.op.dt else 0.5)
             vals.append(assemble(kt * inner(ks, q) * dx))
-            if self.op.plotpvd and cnt in (0, self.op.cntT):
-                u, eta = q.split()
-                u.rename("Depth averaged velocity")
-                eta.rename("Elevation")
-                outFile.write(u, eta, time=t)
             if cnt % self.op.ndump == 0:
                 tic = clock() - tic
                 print("t = %.2fs, CPU time: %.2fs" % (t, tic))

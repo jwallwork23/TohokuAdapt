@@ -154,7 +154,7 @@ class ResidualCallback(ErrorCallback):
             H = solver_obj.fields.bathymetry_2d + elev_2d
             g = physical_constants['g_grav']
 
-            # Construct residual        TODO: Consider boundary integrals resulting from IBP
+            # Construct residual        TODO: How to consider boundary integrals resulting from IBP?
             res_u = (uv_new - uv_old) / Dt + g * grad(elev_2d)
             if solver_obj.options.use_nonlinear_equations:
                 res_u += dot(uv_2d, nabla_grad(uv_2d))
@@ -255,7 +255,7 @@ class HigherOrderResidualCallback(EnrichedErrorCallback):   # TODO: When fixed, 
             H = solver_obj.fields.bathymetry_2d + elev_2d
             g = physical_constants['g_grav']
 
-            # Construct residual        TODO: Consider boundary integrals resulting from IBP
+            # Construct residual        TODO: How to consider boundary integrals resulting from IBP?
             res_u = (uv_new - uv_old) / Dt + g * grad(elev_2d)
             if solver_obj.options.use_nonlinear_equations:
                 res_u += dot(uv_2d, nabla_grad(uv_2d))
@@ -309,7 +309,7 @@ class RefinedResidualCallback(EnrichedErrorCallback):
             H = b + elev_2d
             g = physical_constants['g_grav']
 
-            # Construct residual        TODO: Consider boundary integrals resulting from IBP
+            # Construct residual        TODO: How to consider boundary integrals resulting from IBP?
             res_u = (uv_new - uv_old) / Dt + g * grad(elev_2d)
             if solver_obj.options.use_nonlinear_equations:
                 res_u += dot(uv_2d, nabla_grad(uv_2d))

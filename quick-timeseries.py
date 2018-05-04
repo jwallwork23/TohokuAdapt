@@ -15,11 +15,10 @@ parser.add_argument("-d", help="Specify a date")
 parser.add_argument("-c", help="Compare timeseries")
 parser.add_argument("-g", help="Include actual gauge data")
 parser.add_argument("-s", help="Generate rossby-wave analytic solution")
-parser.add_argument("-p", help="Plot analytic solution")
 args = parser.parse_args()
 approach = args.a
 date = args.d
-op = Options(mode=args.t, approach=approach, plotpvd=bool(args.p))
+op = Options(mode=args.t, approach=approach)
 if op.mode == 'model-verification':
     assert approach is None
 if approach is None and op.mode != 'model-verification':
