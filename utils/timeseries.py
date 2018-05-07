@@ -191,7 +191,8 @@ def integrateTimeseries(fileExt, date, op=Options()):
         separated = line.split(',')
         dat = [float(d) for d in separated[:-1]]
         I = 0
-        dt = op.Tend / len(dat)
+        # dt = op.Tend / len(dat)
+        dt = op.dt
         for i in range(1, len(dat)):
             I += 0.5 * (dat[i] + dat[i-1]) * dt
         integrals.append(I)
@@ -234,16 +235,18 @@ def compareTimeseries(date, run, quantity='Integrand', op=Options()):
 def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=False, date=None):
     now = datetime.datetime.now()
     today = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
+    di = 'outdata/' + mode + '/'
 
     if mode == 'model-verification':
-        labels = ("Linear, non-rotational", "Linear, rotational", "Nonlinear, non-rotational", "Nonlinear, rotational")
-        names = ("nonlinear=False_rotational=False_", "nonlinear=False_rotational=True_",
-                 "nonlinear=True_rotational=False_", "nonlinear=True_rotational=True_")
+        labels = ("Non-rotational", "Rotational")
+        names = ("nonlinear=False_", "nonlinear=True_")
     else:
         labels = ("Fixed mesh", "Hessian based", "DWP", "DWR", "Higher order DWR", "Refined DWR")
         names = ("fixedMesh", "hessianBased", "DWP", "DWR", "DWR_ho", "DWR_r")
-    styles = {labels[0]: 's', labels[1]: '^', labels[2]: 'x', labels[3]: 'o'}
+    styles = {labels[0]: 's', labels[1]: '^'}
     if mode != 'model-verification':
+        styles[labels[2]] = 'x'
+        styles[labels[3]] = 'o'
         styles[labels[4]] = '*'
         styles[labels[5]] = 'h'
     err = {}
@@ -251,7 +254,6 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=False, date
     tim = {}
     if mode == 'model-verification':
         bootstrapping = True
-
     if bootstrapping:
         errorlabels = [r'Objective value $J(\textbf{q})=\int_{T_{\mathrm{start}}}^{T_{\mathrm{end}}}\int\int_A'
                        +r'\eta(x,y,t)\,\mathrm{d}x\,\mathrm{d}y\,\mathrm{d}t$']
@@ -306,32 +308,31 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=False, date
         if err == {}:
             raise ValueError("No data available with these dates!")
 
-        di = 'outdata/' + mode + '/'
-        if bootstrapping:
-            # Plot OF values
-            for mesh in err:
+        # PLot errors vs. elements
+        for mesh in err:
+            plt.gcf()
+            if bootstrapping:
                 plt.semilogx(nEls[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
-            plt.gcf()
-            plt.legend(loc=1 if errornames[m] in ('P02', 'P06') else 4)
-            plt.xlabel(r'Mean element count')
-            plt.ylabel(errorlabels[m])
-            plt.savefig(di + errornames[m] + 'VsElements' + today + '.pdf', bbox_inches='tight')
-            plt.clf()
-        else:
-            # Plot errors
-            for mesh in err:
+                plt.legend(loc=1 if errornames[m] in ('P02', 'P06') else 4)
+            else:
                 plt.loglog(nEls[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
-            plt.gcf()
-            plt.legend(loc=1)
+                plt.legend(loc=1)
             plt.xlabel(r'Mean element count')
             plt.ylabel(errorlabels[m])
-            if mode == 'tohoku':
-                plt.xlim([5000, 60000])
-                plt.ylim([1e-4, 5e-1])
             plt.savefig(di + errornames[m] + 'VsElements' + today + '.pdf', bbox_inches='tight')
             plt.clf()
 
-        # Plot timings
+        # Plot errors vs. timings
+        for mesh in err:
+            plt.loglog(tim[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
+        plt.gcf()
+        plt.legend(loc=2)
+        plt.xlabel(r'CPU time (s)')
+        plt.ylabel(errorlabels[m])
+        plt.savefig(di + errorlabels[m] + 'VsTimings' + today + '.pdf', bbox_inches='tight')
+        plt.clf()
+
+        # Plot timings vs. elements
         if m == 0:
             for mesh in err:
                 plt.loglog(nEls[mesh], tim[mesh], label=mesh, marker=styles[mesh], linewidth=1.)

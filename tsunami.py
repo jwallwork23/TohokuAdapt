@@ -827,10 +827,10 @@ if __name__ == "__main__":
     parser.add_argument("-a", help="Choose adaptive approach from {'hessianBased', 'DWP', 'DWR'} (default 'fixedMesh')")
     parser.add_argument("-low", help="Lower bound for index range")
     parser.add_argument("-high", help="Upper bound for index range")
-    parser.add_argument("-o", help="Output data")
     parser.add_argument("-ho", help="Compute errors and residuals in a higher order space")
     parser.add_argument("-r", help="Compute errors and residuals in a refined space")
     parser.add_argument("-b", help="Intersect metrics with bathymetry")
+    parser.add_argument("-o", help="Output data")
     parser.add_argument("-regen", help="Regenerate error estimates from saved data")
     args = parser.parse_args()
 

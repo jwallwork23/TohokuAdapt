@@ -167,7 +167,7 @@ class Options:
             self.dt = 0.05
             self.ndump = 12
             self.g = 1.
-            self.J = 6.4235       # On mesh of 2,359,296 elements, using analytic solution
+            self.J = 5.7085       # On mesh of 2,359,296 elements, using asymptotic solution
             self.xy = [-16., -14., -3., 3.]
         elif self.mode in ('tohoku', 'model-verification'):
             self.Tstart = 300.
