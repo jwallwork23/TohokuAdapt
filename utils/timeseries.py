@@ -190,6 +190,7 @@ def integrateTimeseries(fileExt, date, op=Options()):
     for line in f:
         separated = line.split(',')
         dat = [float(d) for d in separated[:-1]]
+        print(len(dat))
         I = 0
         # dt = op.Tend / len(dat)
         dt = op.dt
@@ -317,10 +318,10 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=False, date
             else:
                 plt.loglog(nEls[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
                 plt.legend(loc=1)
-            plt.xlabel(r'Mean element count')
-            plt.ylabel(errorlabels[m])
-            plt.savefig(di + errornames[m] + 'VsElements' + today + '.pdf', bbox_inches='tight')
-            plt.clf()
+        plt.xlabel(r'Mean element count')
+        plt.ylabel(errorlabels[m])
+        plt.savefig(di + errornames[m] + 'VsElements' + today + '.pdf', bbox_inches='tight')
+        plt.clf()
 
         # Plot errors vs. timings
         for mesh in err:
@@ -329,7 +330,7 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=False, date
         plt.legend(loc=2)
         plt.xlabel(r'CPU time (s)')
         plt.ylabel(errorlabels[m])
-        plt.savefig(di + errorlabels[m] + 'VsTimings' + today + '.pdf', bbox_inches='tight')
+        plt.savefig(di + errornames[m] + 'VsTimings' + today + '.pdf', bbox_inches='tight')
         plt.clf()
 
         # Plot timings vs. elements

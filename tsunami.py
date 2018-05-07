@@ -63,7 +63,7 @@ def fixedMesh(startRes, **kwargs):
         solver_obj.iterate()
         solverTimer = clock() - solverTimer
         J_h = cb1.quadrature()          # Evaluate objective functional
-        integrand = cb1.__call__()[1]   # and get integrand timeseries
+        integrand = cb1.getVals()       # and get integrand timeseries
         if op.mode == 'tohoku':
             totalVarP02 = cb2.totalVariation()
             totalVarP06 = cb3.totalVariation()
@@ -211,10 +211,10 @@ def hessianBased(startRes, **kwargs):
             adapSolver.iterate()
             solverTimer = clock() - solverTimer
             J_h = cb1.quadrature()
-            integrand = cb1.__call__()[1]
+            integrand = cb1.getVals()
             if op.mode == 'tohoku':
-                gP02 = cb2.__call__()[1]
-                gP06 = cb3.__call__()[1]
+                gP02 = cb2.getVals()
+                gP06 = cb3.getVals()
                 totalVarP02 = cb2.totalVariation()
                 totalVarP06 = cb3.totalVariation()
 
@@ -474,10 +474,10 @@ def DWP(startRes, **kwargs):
             adapSolver.iterate()
             solverTimer = clock() - solverTimer
             J_h = cb2.quadrature()
-            integrand = cb2.__call__()[1]
+            integrand = cb2.getVals()
             if op.mode == 'tohoku':
-                gP02 = cb3.__call__()[1]
-                gP06 = cb4.__call__()[1]
+                gP02 = cb3.getVals()
+                gP06 = cb4.getVals()
 
             # Get mesh stats
             nEle = meshStats(mesh)[0]
@@ -774,10 +774,10 @@ def DWR(startRes, **kwargs):
             adapSolver.iterate()
             solverTimer = clock() - solverTimer
             J_h = cb2.quadrature()
-            integrand = cb2.__call__()[1]
+            integrand = cb2.getVals()
             if op.mode == 'tohoku':
-                gP02 = cb3.__call__()[1]
-                gP06 = cb4.__call__()[1]
+                gP02 = cb3.getVals()
+                gP06 = cb4.getVals()
 
             # Get mesh stats
             nEle = meshStats(mesh_H)[0]
