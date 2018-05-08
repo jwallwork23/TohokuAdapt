@@ -7,8 +7,8 @@ from .options import Options
 from .timeseries import gaugeTV
 
 
-__all__ = ["SWCallback", "ObjectiveSWCallback", "P02Callback", "P06Callback", "ResidualCallback",
-           "EnrichedErrorCallback", "HigherOrderResidualCallback", "RefinedResidualCallback"]
+__all__ = ["SWCallback", "MirroredSWCallback", "ObjectiveSWCallback", "P02Callback", "P06Callback",
+           "ResidualCallback", "EnrichedErrorCallback", "HigherOrderResidualCallback", "RefinedResidualCallback"]
 
 
 class SWCallback(FunctionalCallback):
@@ -23,7 +23,6 @@ class SWCallback(FunctionalCallback):
         from firedrake import assemble
 
         self.op = Options()
-        self.mirror = False
         dt = solver_obj.options.timestep
 
         def objectiveSW():
@@ -34,7 +33,7 @@ class SWCallback(FunctionalCallback):
             V = solver_obj.fields.solution_2d.function_space()
             ks = Function(V)
             k0, k1 = ks.split()
-            k1.assign(indicator(V.sub(1), mirror=self.mirror, op=self.op))
+            k1.assign(indicator(V.sub(1), op=self.op))
             kt = Constant(0.)
             if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:      # Slightly smooth transition
                 kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * dt else 0.5)
@@ -42,6 +41,38 @@ class SWCallback(FunctionalCallback):
             return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
 
         super(SWCallback, self).__init__(objectiveSW, solver_obj, **kwargs)
+
+
+class MirroredSWCallback(FunctionalCallback):
+    """Integrates objective functional."""
+    name = 'objective functional'
+
+    def __init__(self, solver_obj, **kwargs):
+        """
+        :arg solver_obj: Thetis solver object
+        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+        """
+        from firedrake import assemble
+
+        self.op = Options()
+        dt = solver_obj.options.timestep
+
+        def objectiveSW():
+            """
+            :param solver_obj: FlowSolver2d object.
+            :return: objective functional value for callbacks.
+            """
+            V = solver_obj.fields.solution_2d.function_space()
+            ks = Function(V)
+            k0, k1 = ks.split()
+            k1.assign(indicator(V.sub(1), mirror=True, op=self.op))
+            kt = Constant(0.)
+            if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:      # Slightly smooth transition
+                kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * dt else 0.5)
+
+            return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
+
+        super(MirroredSWCallback, self).__init__(objectiveSW, solver_obj, **kwargs)
 
 
 class ObjectiveSWCallback(FunctionalCallback):
@@ -56,6 +87,7 @@ class ObjectiveSWCallback(FunctionalCallback):
         from firedrake_adjoint import assemble
 
         self.op = Options()
+        self.mirror = False
         dt = solver_obj.options.timestep
 
         def objectiveSW():
@@ -66,7 +98,7 @@ class ObjectiveSWCallback(FunctionalCallback):
             V = solver_obj.fields.solution_2d.function_space()
             ks = Function(V)
             k0, k1 = ks.split()
-            k1.assign(indicator(V.sub(1), op=self.op))
+            k1.assign(indicator(V.sub(1), mirror=self.mirror, op=self.op))
             kt = Constant(0.)
             if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:
                 kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * dt else 0.5)

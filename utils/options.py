@@ -179,6 +179,7 @@ class Options:
             self.J = 1.240e+13  #  On mesh of 681,666 elements     TODO: Check
             self.xy = [490e3, 640e3, 4160e3, 4360e3]
             self.g = 9.81
+            self.xy2 = [0., 0., 0., 0.]
         if self.approach in ("DWP", "DWR"):
             self.rm *= 2
 

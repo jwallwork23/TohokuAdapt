@@ -51,9 +51,8 @@ def fixedMesh(startRes, **kwargs):
         cb1 = SWCallback(solver_obj)
         cb1.op = op
         if op.mode != 'tohoku':
-            cb2 = SWCallback(solver_obj)
+            cb2 = MirroredSWCallback(solver_obj)
             cb2.op = op
-            cb2.mirror = True
         else:
             cb3 = P02Callback(solver_obj)
             cb4 = P06Callback(solver_obj)
@@ -203,9 +202,8 @@ def hessianBased(startRes, **kwargs):
             cb1 = SWCallback(adapSolver)
             cb1.op = op
             if op.mode != 'tohoku':
-                cb2 = SWCallback(adapSolver)
+                cb2 = MirroredSWCallback(adapSolver)
                 cb2.op = op
-                cb2.mirror = True
             else:
                 cb3 = P02Callback(adapSolver)
                 cb4 = P06Callback(adapSolver)
@@ -333,6 +331,7 @@ def DWP(startRes, **kwargs):
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         cb1 = ObjectiveSWCallback(solver_obj)
         cb1.op = op
+        cb1.mirror = kwargs.get('mirror')
         solver_obj.add_callback(cb1, 'timestep')
         solver_obj.bnd_functions['shallow_water'] = BCs
         initTimer = clock() - initTimer
@@ -347,7 +346,6 @@ def DWP(startRes, **kwargs):
         gradientTimer = clock()
         dJdb = compute_gradient(J, Control(b))      # TODO: Rewrite pyadjoint to avoid computing this
         gradientTimer = clock() - gradientTimer
-        # File(di + 'gradient.pvd').write(dJdb)     # Too memory intensive in Tohoku case
         print("Norm of gradient: %.3e. Computation time: %.1fs" % (dJdb.dat.norm, gradientTimer))
 
         # Extract adjoint solutions
@@ -479,9 +477,8 @@ def DWP(startRes, **kwargs):
             cb1 = SWCallback(adapSolver)
             cb1.op = op
             if op.mode != 'tohoku':
-                cb2 = SWCallback(adapSolver)
+                cb2 = MirroredSWCallback(adapSolver)
                 cb2.op = op
-                cb2.mirror = True
             else:
                 cb3 = P02Callback(adapSolver)
                 cb4 = P06Callback(adapSolver)
@@ -626,6 +623,7 @@ def DWR(startRes, **kwargs):
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         cb1 = ObjectiveSWCallback(solver_obj)
         cb1.op = op
+        cb1.mirror = kwargs.get('mirror')
         if op.orderChange:
             cb2 = HigherOrderResidualCallback(solver_obj, Ve)
         elif op.refinedSpace:
@@ -647,7 +645,6 @@ def DWR(startRes, **kwargs):
         gradientTimer = clock()
         dJdb = compute_gradient(J, Control(b))      # TODO: Rewrite pyadjoint to avoid computing this
         gradientTimer = clock() - gradientTimer
-        # File(di + 'gradient.pvd').write(dJdb)     # Too memory intensive in Tohoku case
         print("Norm of gradient: %.3e. Computation time: %.1fs" % (dJdb.dat.norm, gradientTimer))
 
         # Extract adjoint solutions
@@ -788,9 +785,8 @@ def DWR(startRes, **kwargs):
             cb1 = SWCallback(adapSolver)
             cb1.op = op
             if op.mode != 'tohoku':
-                cb2 = SWCallback(adapSolver)
+                cb2 = MirroredSWCallback(adapSolver)
                 cb2.op = op
-                cb2.mirror = True
             else:
                 cb3 = P02Callback(adapSolver)
                 cb4 = P06Callback(adapSolver)
@@ -875,6 +871,7 @@ if __name__ == "__main__":
     parser.add_argument("-b", help="Intersect metrics with bathymetry")
     parser.add_argument("-o", help="Output data")
     parser.add_argument("-regen", help="Regenerate error estimates from saved data")
+    parser.add_argument("-mirror", help="Use a 'mirrored' region of interest")
     args = parser.parse_args()
 
     solvers = {'fixedMesh': fixedMesh, 'hessianBased': hessianBased, 'DWP': DWP, 'DWR': DWR}
@@ -897,6 +894,8 @@ if __name__ == "__main__":
         assert not args.ho
     if args.b is not None:
         assert approach == 'hessianBased'
+    if bool(args.mirror):
+        assert mode in ('shallow-water', 'rossby-wave')
 
     # Choose mode and set parameter values
     op = Options(mode=mode,
@@ -935,8 +934,8 @@ if __name__ == "__main__":
     resolutions = range(0 if args.low is None else int(args.low), 6 if args.high is None else int(args.high))
     Jlist = np.zeros(len(resolutions))
     for i in resolutions:
-        quantities = solver(i, op=op, regen=bool(args.regen))
-        rel = np.abs(op.J - quantities['J_h']) / np.abs(op.J)   # TODO: also mirrored value
+        quantities = solver(i, regen=bool(args.regen), mirror=bool(args.mirror), op=op)
+        rel = np.abs(op.J - quantities['J_h']) / np.abs(op.J)   # TODO: Need also compute mirrored value
         print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs OF error: %.4e"
               % (i, quantities['meanElements'], quantities['J_h'], quantities['solverTimer'], rel))
         errorFile.write('%d, %.4e' % (quantities['meanElements'], rel))
