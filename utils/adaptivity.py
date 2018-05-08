@@ -175,8 +175,8 @@ def normaliseIndicator(f, op=Options()):
     else:
         gnorm = max(assemble(sqrt(inner(f, f)) * dx), op.minNorm)   # Equivalent thresholded metric complexity
     scaleFactor = min(op.nVerT / gnorm, op.maxScaling)              # Cap error estimate, also computational cost
-    print("Complexity = %.4e" % gnorm)
-    print("Scale factor = %.4e" % (op.nVerT / gnorm))
+    # print("#### DEBUG: Complexity = %.4e" % gnorm)
+    # print("#### DEBUG: Scale factor = %.4e" % (op.nVerT / gnorm))
     f.dat.data[:] = np.abs(f.dat.data) * scaleFactor
 
     return f
