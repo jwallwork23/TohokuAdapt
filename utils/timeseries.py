@@ -75,7 +75,12 @@ def readErrors(date, approach, mode='tohoku', bootstrapping=False):
         elif mode == 'shallow-water':
             av, rel, timing, J_h = line.split(',')
         elif mode == 'rossby-wave':
-            av, rel, peak, dis, spd, timing, J_h = line.split(',')
+            # av, rel, peak, dis, spd, timing, J_h = line.split(',')   # TODO: update for generalised framework
+            quantities = line.split(',')
+            av = quantities[0]
+            rel = quantities[1]
+            timing = quantities[-2]
+            J_h = quantities[-1]
         if mode == 'model-verification':
             fixedMeshes = Options().meshSizes
             nEle, J_h, gP02, gP06, timing = line.split(',')[1:]
@@ -93,7 +98,8 @@ def readErrors(date, approach, mode='tohoku', bootstrapping=False):
             elif mode == 'shallow-water':
                 err[i] = [float(rel)]
             elif mode == 'rossby-wave':
-                err[i] = [float(rel), float(peak), float(dis), float(spd)]
+                # err[i] = [float(rel), float(peak), float(dis), float(spd)]
+                err[i] = [float(rel)]
         tim.append(float(timing))
         i += 1
     textfile.close()
@@ -274,13 +280,14 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=False, date
     elif mode == 'shallow-water':
         errortypes = 1
     elif mode == 'rossby-wave':
-        errortypes = 4
-        errorlabels.append('Relative error in solition peak')
-        errorlabels.append('Relative error in distance travelled')
-        errorlabels.append('Relative error in phase speed')
-        errornames.append('peak')
-        errornames.append('dis')
-        errornames.append('spd')
+        # errortypes = 4
+        # errorlabels.append('Relative error in solition peak')
+        # errorlabels.append('Relative error in distance travelled')
+        # errorlabels.append('Relative error in phase speed')
+        # errornames.append('peak')
+        # errornames.append('dis')
+        # errornames.append('spd')
+        errortypes = 1
 
     # Get dates (if necessary)
     dates = []
