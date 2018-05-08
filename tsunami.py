@@ -8,6 +8,7 @@ from time import clock
 
 from utils.adaptivity import *
 from utils.callbacks import *
+from utils.forms import strongResidualSW
 from utils.interpolation import interp, mixedPairInterp
 from utils.setup import problemDomain, RossbyWaveSolution
 from utils.misc import indexString, peakAndDistance, meshStats
@@ -110,7 +111,6 @@ def hessianBased(startRes, **kwargs):
             physical_constants['g_grav'].assign(op.g)
         mesh, u0, eta0, b, BCs, f = problemDomain(startRes, op=op)
         V = op.mixedSpace(mesh)
-        P1 = FunctionSpace(mesh, "CG", 1)
         uv_2d, elev_2d = Function(V).split()  # Needed to load data into
         if op.mode == 'rossby-wave':    # Analytic final-time state
             peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
@@ -128,20 +128,6 @@ def hessianBased(startRes, **kwargs):
         adaptSolveTimer = 0.
         quantities = {}
         while cnt < op.cntT:
-            indexStr = indexString(int(cnt / op.ndump))
-
-            # Load variables from disk
-            if cnt != 0:
-                V = op.mixedSpace(mesh)
-                q = Function(V)
-                uv_2d, elev_2d = q.split()
-                with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as loadElev:
-                    loadElev.load(elev_2d, name='elev_2d')
-                    loadElev.close()
-                with DumbCheckpoint(di + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as loadVel:
-                    loadVel.load(uv_2d, name='uv_2d')
-                    loadVel.close()
-
             adaptTimer = clock()
             for l in range(op.nAdapt):                                          # TODO: Test this functionality
 
@@ -160,7 +146,8 @@ def hessianBased(startRes, **kwargs):
                 # Adapt mesh and interpolate variables
                 if op.bAdapt or cnt != 0 or op.adaptField == 'f':
                     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-                    P1 = FunctionSpace(mesh, "CG", 1)
+                    if cnt != 0:
+                        uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
                     elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
                     b = problemDomain(mesh=mesh, op=op)[3]                      # Reset bathymetry on new mesh
                     uv_2d.rename('uv_2d')
@@ -183,7 +170,7 @@ def hessianBased(startRes, **kwargs):
             adapOpt.output_directory = di
             adapOpt.export_diagnostics = True
             adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-            adapOpt.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
+            adapOpt.coriolis_frequency = Function(FunctionSpace(mesh, "CG", 1)).interpolate(SpatialCoordinate(mesh)[1])
             field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
             e = exporter.ExportManager(di + 'hdf5',
                                        ['elev_2d', 'uv_2d'],
@@ -406,21 +393,7 @@ def DWP(startRes, **kwargs):
         uv_2d.interpolate(u0)
         quantities = {}
         while cnt < op.cntT:
-            indexStr = indexString(int(cnt / op.ndump))
-
-            # Load variables from solver session on previous mesh
             adaptTimer = clock()
-            if cnt != 0:
-                V = op.mixedSpace(mesh)
-                q = Function(V)
-                uv_2d, elev_2d = q.split()
-                with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as loadElev:
-                    loadElev.load(elev_2d, name='elev_2d')
-                    loadElev.close()
-                with DumbCheckpoint(di + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as loadVel:
-                    loadVel.load(uv_2d, name='uv_2d')
-                    loadVel.close()
-
             for l in range(op.nAdapt):                                  # TODO: Test this functionality
 
                 # Construct metric
@@ -428,7 +401,7 @@ def DWP(startRes, **kwargs):
                     loadErr.load(epsilon)
                     loadErr.close()
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(interp(mesh, epsilon))
-                M = isotropicMetric(errEst, invert=False, op=op)        # TODO: Not sure normalisation is working
+                M = isotropicMetric(errEst, invert=False, op=op)
                 if op.gradate:
                     M_ = isotropicMetric(interp(mesh, H0), bdy=True, op=op)  # Initial boundary metric
                     M = metricIntersection(M, M_, bdy=True)
@@ -436,7 +409,8 @@ def DWP(startRes, **kwargs):
 
                 # Adapt mesh and interpolate variables
                 mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-                P1 = FunctionSpace(mesh, "CG", 1)
+                if cnt != 0:
+                    uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
                 elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
                 b = problemDomain(mesh=mesh, op=op)[3]  # Reset bathymetry on new mesh
                 uv_2d.rename('uv_2d')
@@ -459,7 +433,7 @@ def DWP(startRes, **kwargs):
             adapOpt.output_directory = di
             adapOpt.export_diagnostics = True
             adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-            adapOpt.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
+            adapOpt.coriolis_frequency = Function(FunctionSpace(mesh, "CG", 1)).interpolate(SpatialCoordinate(mesh)[1])
             field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
             e = exporter.ExportManager(di + 'hdf5',
                                        ['elev_2d', 'uv_2d'],
@@ -715,21 +689,7 @@ def DWR(startRes, **kwargs):
         uv_2d.interpolate(u0)
         quantities = {}
         while cnt < op.cntT:
-            indexStr = indexString(int(cnt / op.ndump))
-
-            # Load variables from solver session on previous mesh
             adaptTimer = clock()
-            if cnt != 0:
-                V = op.mixedSpace(mesh_H)
-                q = Function(V)
-                uv_2d, elev_2d = q.split()
-                with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as loadElev:
-                    loadElev.load(elev_2d, name='elev_2d')
-                    loadElev.close()
-                with DumbCheckpoint(di + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as loadVel:
-                    loadVel.load(uv_2d, name='uv_2d')
-                    loadVel.close()
-
             for l in range(op.nAdapt):                                          # TODO: Test this functionality
 
                 # Construct metric
@@ -738,7 +698,7 @@ def DWR(startRes, **kwargs):
                     loadErr.load(epsilon)
                     loadErr.close()
                 errEst = Function(FunctionSpace(mesh_H, "CG", 1)).assign(interp(mesh_H, epsilon))
-                M = isotropicMetric(errEst, invert=False, op=op)        # TODO: Not sure normalisation is working
+                M = isotropicMetric(errEst, invert=False, op=op)
                 if op.gradate:
                     M_ = isotropicMetric(interp(mesh_H, H0), bdy=True, op=op)   # Initial boundary metric
                     M = metricIntersection(M, M_, bdy=True)
@@ -746,7 +706,8 @@ def DWR(startRes, **kwargs):
 
                 # Adapt mesh and interpolate variables
                 mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
-                P1 = FunctionSpace(mesh_H, "CG", 1)
+                if cnt != 0:
+                    uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
                 elev_2d, uv_2d = interp(mesh_H, elev_2d, uv_2d)
                 b = problemDomain(mesh=mesh_H, op=op)[3]                        # Reset bathymetry on new mesh
                 uv_2d.rename('uv_2d')
@@ -769,7 +730,7 @@ def DWR(startRes, **kwargs):
             adapOpt.output_directory = di
             adapOpt.export_diagnostics = True
             adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-            adapOpt.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh_H)[1])
+            adapOpt.coriolis_frequency = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(SpatialCoordinate(mesh_H)[1])
             e = exporter.ExportManager(di + 'hdf5',
                                        ['elev_2d', 'uv_2d'],
                                        {'elev_2d': elev_2d, 'uv_2d': uv_2d},
@@ -919,14 +880,7 @@ def DWR2(startRes, **kwargs):
         cb1 = ObjectiveSWCallback(solver_obj)
         cb1.op = op
         cb1.mirror = kwargs.get('mirror')
-        if op.orderChange:
-            cb2 = HigherOrderResidualCallback(solver_obj, Ve)
-        elif op.refinedSpace:
-            cb2 = RefinedResidualCallback(solver_obj, Ve)
-        else:
-            cb2 = ResidualCallback(solver_obj)
         solver_obj.add_callback(cb1, 'timestep')
-        solver_obj.add_callback(cb2, 'export')
         solver_obj.bnd_functions['shallow_water'] = BCs
         initTimer = clock() - initTimer
         print('Problem initialised. Setup time: %.3fs' % initTimer)
@@ -971,9 +925,6 @@ def DWR2(startRes, **kwargs):
         uv_2d.interpolate(u0)
         quantities = {}
         while cnt < op.cntT:
-            indexStr = indexString(int(cnt / op.ndump))
-
-            # Load variables from solver session on previous mesh
             adaptTimer = clock()
             V = op.mixedSpace(mesh_H)
             if op.orderChange:              # Define variables on higher/lower order space
@@ -988,26 +939,26 @@ def DWR2(startRes, **kwargs):
             else:                           # Copy standard variables to mimic enriched space labels
                 Ve = V
                 epsilon = Function(P1, name="Error indicator")
-            v = TestFunction(
-                FunctionSpace(mesh_h if op.refinedSpace else mesh_H, "DG", 0))  # For forming error indicators
-            rho = Function(Ve)
-            rho_u, rho_e = rho.split()
-
-            if cnt != 0:
-                q = Function(V)
-                uv_2d, elev_2d = q.split()
-                with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexStr, mode=FILE_READ) as loadElev:
-                    loadElev.load(elev_2d, name='elev_2d')
-                    loadElev.close()
-                with DumbCheckpoint(di + 'hdf5/Velocity2d_' + indexStr, mode=FILE_READ) as loadVel:
-                    loadVel.load(uv_2d, name='uv_2d')
-                    loadVel.close()
-            with DumbCheckpoint(di + 'hdf5/Error2d_' + indexString(cnt/op.rm), mode=FILE_READ) as loadRes:
-                loadRes.load(rho_u, name="Momentum error")
-                loadRes.load(rho_e, name="Continuity error")
-                loadRes.close()
+            v = TestFunction(FunctionSpace(mesh_h if op.refinedSpace else mesh_H, "DG", 0))
+            residual = Function(Ve)
+            residual_u, residual_e = residual.split()
+            if cnt == 0:                    # For initial residual
+                adapSolver = solver2d.FlowSolver2d(mesh_H, b)
+                adapOpt = adapSolver.options
+                adapOpt.element_family = op.family
+                adapOpt.use_nonlinear_equations = True
+                adapOpt.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
+                adapOpt.use_lax_friedrichs_velocity = False  # TODO: This is a temporary fix
+                adapOpt.timestep = op.dt
+                adapOpt.no_exports = True
+                adapOpt.coriolis_frequency = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(
+                    SpatialCoordinate(mesh_H)[1])
+                adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
+            rho_u, rho_e = strongResidualSW(adapSolver)     # TODO: Account for space enrichment
+            residual_u.interpolate(rho_u)
+            residual_e.interpolate(rho_e)
             if op.plotpvd:
-                residualFile.write(rho_u, rho_e, time=float(op.dt * cnt))
+                residualFile.write(residual_u, residual_e, time=float(op.dt * cnt))
 
             # Load adjoint data and form indicators
             with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexString(cnt/op.rm), mode=FILE_READ) as loadAdj:
@@ -1017,18 +968,18 @@ def DWR2(startRes, **kwargs):
             if op.orderChange:                  # TODO: Fix space enrichment functionality
                 duale_u.interpolate(dual_u)
                 duale_e.interpolate(dual_e)
-                epsilon.interpolate(assemble(v * inner(rho, duale) * dx))
+                epsilon.interpolate(assemble(v * inner(residual, duale) * dx))
             elif op.refinedSpace:
                 duale = mixedPairInterp(mesh_h, dual)
-                epsilon.interpolate(assemble(v * inner(rho, duale) * dx))
+                epsilon.interpolate(assemble(v * inner(residual, duale) * dx))
             else:
-                epsilon.interpolate(assemble(v * inner(rho, dual) * dx))
+                epsilon.interpolate(assemble(v * inner(residual, dual) * dx))
             epsilon = normaliseIndicator(epsilon, op=op)
-            epsilon.rename("Error indicator")  # TODO: Try scaling by H0 as in Rannacher 08
+            epsilon.rename("Error indicator")   # TODO: Try scaling by H0 as in Rannacher 08
             if op.plotpvd:
                 errorFile.write(epsilon, time=float(cnt/op.rm))
 
-            for l in range(op.nAdapt):  # TODO: Test this functionality
+            for l in range(op.nAdapt):          # TODO: Test this functionality
 
                 # Construct metric
                 M = isotropicMetric(epsilon, invert=False, op=op)
@@ -1039,7 +990,8 @@ def DWR2(startRes, **kwargs):
 
                 # Adapt mesh and interpolate variables
                 mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
-                P1 = FunctionSpace(mesh_H, "CG", 1)
+                if cnt != 0:
+                    uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
                 elev_2d, uv_2d = interp(mesh_H, elev_2d, uv_2d)
                 b = problemDomain(mesh=mesh_H, op=op)[3]                        # Reset bathymetry on new mesh
                 uv_2d.rename('uv_2d')
@@ -1062,7 +1014,7 @@ def DWR2(startRes, **kwargs):
             adapOpt.output_directory = di
             adapOpt.export_diagnostics = True
             adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-            adapOpt.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh_H)[1])
+            adapOpt.coriolis_frequency = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(SpatialCoordinate(mesh_H)[1])
             e = exporter.ExportManager(di + 'hdf5',
                                        ['elev_2d', 'uv_2d'],
                                        {'elev_2d': elev_2d, 'uv_2d': uv_2d},
@@ -1077,13 +1029,6 @@ def DWR2(startRes, **kwargs):
                 e.set_next_export_ix(adapSolver.i_export)
 
             # Evaluate callbacks and iterate
-            if op.orderChange:
-                cb0 = HigherOrderResidualCallback(solver_obj, Ve)
-            elif op.refinedSpace:
-                cb0 = RefinedResidualCallback(solver_obj, Ve)
-            else:
-                cb0 = ResidualCallback(solver_obj)
-            solver_obj.add_callback(cb20, 'export')
             cb1 = SWCallback(adapSolver)
             cb1.op = op
             if op.mode != 'tohoku':
@@ -1144,8 +1089,8 @@ def DWR2(startRes, **kwargs):
             quantities['dist'] = distance / distance_a
             quantities['spd'] = distance / (op.Tend * 0.4)
 
-            # Output mesh statistics and solver times
-        totalTimer = errorTimer + adaptSolveTimer
+        # Output mesh statistics and solver times
+        totalTimer = adaptSolveTimer
         if not regen:
             totalTimer += primalTimer + gradientTimer + dualTimer
         quantities['meanElements'] = av
