@@ -98,7 +98,7 @@ class Options:
         else:
             self.maxScaling = 5e5       # Maximum scale factor for error estimator  TODO: choose for Tohoku
         if self.approach == "DWR":
-            self.rescaling = 0.1        # Chosen small enough to ensure accuracy for a small element count
+            self.rescaling = 0.4        # Chosen small enough to ensure accuracy for a small element count
         else:
             try:
                 assert rescaling > 0

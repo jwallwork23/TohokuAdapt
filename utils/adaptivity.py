@@ -182,14 +182,13 @@ def normaliseIndicator(f, op=Options()):
     return f
 
 
-def isotropicMetric(f, bdy=False, invert=True, normalise=False, op=Options()):
+def isotropicMetric(f, bdy=False, invert=True, op=Options()):
     """
     Given a scalar error indicator field `f`, construct an associated isotropic metric field.
     
     :arg f: function to adapt to.
     :param bdy: when True, only values of `f` on the domain boundary contribute towards the metric.
     :param invert: when True, the inverse square of field `f` is considered, as in anisotropic mesh adaptivity.
-    :param normalise: toggle normalisation and scaling of error estimator.
     :param op: Options class object providing min/max cell size values.
     :return: isotropic metric corresponding to `f`.
     """
@@ -202,10 +201,6 @@ def isotropicMetric(f, bdy=False, invert=True, normalise=False, op=Options()):
         g.assign(f)
     else:
         g.interpolate(f)
-
-    # Normalise error estimate
-    if normalise:
-        g = normaliseIndicator(g, op=op)
 
     # Establish metric
     V = TensorFunctionSpace(mesh, "CG", 1)
