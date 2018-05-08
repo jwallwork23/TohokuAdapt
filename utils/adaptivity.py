@@ -10,7 +10,7 @@ from .options import Options
 
 __all__ = ["constructGradient", "constructHessian", "steadyMetric", "isotropicMetric", "isoP2", "anisoRefine",
            "metricGradation", "localMetricIntersection", "metricIntersection", "metricConvexCombination",
-           "symmetricProduct", "pointwiseMax", "metricComplexity"]
+           "symmetricProduct", "pointwiseMax", "metricComplexity", "normaliseIndicator"]
 
 
 def constructGradient(f):
@@ -60,7 +60,7 @@ def constructHessian(f, g=None, op=Options()):
         Lh = (inner(tau, H) + inner(div(tau), grad(f))) * dx
         Lh -= (tau[0, 1] * nhat[1] * f.dx(0) + tau[1, 0] * nhat[0] * f.dx(1)) * ds
         Lh -= (tau[0, 0] * nhat[1] * f.dx(0) + tau[1, 1] * nhat[0] * f.dx(1)) * ds  # Term not in Firedrake tutorial
-    elif op.hessMeth == 'dL2':  # TODO: Alternatively, we could actually solve the mixed FE problem.
+    elif op.hessMeth == 'dL2':
         if g is None:
             g = constructGradient(f)
         Lh = (inner(tau, H) + inner(div(tau), g)) * dx
@@ -84,7 +84,7 @@ def steadyMetric(f, H=None, op=Options()):
     :param op: Options class object providing min/max cell size values.
     :return: steady metric associated with Hessian H.
     """
-    if not H:
+    if H is None:
         H = constructHessian(f, op=op)
     V = H.function_space()
     mesh = V.mesh()
@@ -161,7 +161,28 @@ def steadyMetric(f, H=None, op=Options()):
     return M
 
 
-def isotropicMetric(f, bdy=False, invert=True, normalise=True, op=Options()):
+def normaliseIndicator(f, op=Options()):
+    """
+    Normalise error indicator `f` using procedure defined by `op`.
+    
+    :arg f: error indicator to normalise.
+    :param op: option parameters object.
+    :return: normalised indicator.
+    """
+    f.dat.data[:] = np.abs(f.dat.data)
+    if len(f.ufl_element().value_shape()) == 0:
+        gnorm = max(np.abs(assemble(f * dx)), op.minNorm)           # NOTE this changes in 3D case
+    else:
+        gnorm = max(assemble(sqrt(inner(f, f)) * dx), op.minNorm)   # Equivalent thresholded metric complexity
+    scaleFactor = min(op.nVerT / gnorm, op.maxScaling)              # Cap error estimate, also computational cost
+    print("Complexity = %.4e" % gnorm)
+    print("Scale factor = %.4e" % (op.nVerT / gnorm))
+    f.dat.data[:] = np.abs(f.dat.data) * scaleFactor
+
+    return f
+
+
+def isotropicMetric(f, bdy=False, invert=True, normalise=False, op=Options()):
     """
     Given a scalar error indicator field `f`, construct an associated isotropic metric field.
     
@@ -184,15 +205,7 @@ def isotropicMetric(f, bdy=False, invert=True, normalise=True, op=Options()):
 
     # Normalise error estimate
     if normalise:
-        if scalar:
-            gnorm = max(np.abs(assemble(g * dx)), op.minNorm)           # NOTE this changes in 3D case
-        else:
-            gnorm = max(assemble(sqrt(inner(g, g)) * dx), op.minNorm)   # Equivalent thresholded metric complexity
-        scaleFactor = min(op.nVerT / gnorm, op.maxScaling)              # Cap error estimate, also computational cost
-        print("Scale factor = %.4e" % (op.nVerT / gnorm))
-        g.dat.data[:] = np.abs(g.dat.data) * scaleFactor
-    else:
-        g.dat.data[:] = np.abs(g.dat.data)
+        g = normaliseIndicator(g, op=op)
 
     # Establish metric
     V = TensorFunctionSpace(mesh, "CG", 1)

@@ -124,8 +124,8 @@ def extractData(gauge):
             y.append(float(xy[1]))
 
         return x, y
-    elif gauge == "Integrand":
-        measuredFile = open('outdata/rossby-wave/analytic_Integrand.txt', 'r')
+    elif gauge in ("Integrand", "Integrand-mirrored"):
+        measuredFile = open('outdata/rossby-wave/analytic_'+gauge+'.txt', 'r')
         dat = measuredFile.readline()
         xy = dat.split(",")
         measuredFile.close()
@@ -134,7 +134,7 @@ def extractData(gauge):
 
 
 def plotTimeseries(fileExt, date, quantity='Integrand', realData=False, op=Options()):
-    assert quantity in ('Integrand', 'P02', 'P06')
+    assert quantity in ('Integrand', 'Integrand-mirrored', 'P02', 'P06')
     filename = 'outdata/' + op.mode + '/' + fileExt + '_' + date + quantity + '.txt'
     filename2 = 'outdata/' + op.mode + '/' + fileExt + '_' + date + '.txt'
     f = open(filename, 'r')

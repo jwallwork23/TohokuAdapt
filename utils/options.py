@@ -170,9 +170,10 @@ class Options:
             self.dt = 0.05
             self.ndump = 12
             self.g = 1.
-            self.J = 5.7085       # On mesh of 2,359,296 elements, using asymptotic solution
+            self.J = 5.7085                     # On mesh of 2,359,296 elements, using asymptotic solution
             self.xy = [-16., -14., -3., 3.]
             self.xy2 = [14., 16., -3., 3.]
+            self.J_mirror = 6.1729e-06          # On mesh of 2,359,296 elements, using asymptotic solution
         elif self.mode in ('tohoku', 'model-verification'):
             self.Tstart = 300.
             self.Tend = 1500.

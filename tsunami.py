@@ -6,7 +6,7 @@ from fenics_adjoint.solving import SolveBlock                                   
 import numpy as np
 from time import clock
 
-from utils.adaptivity import isoP2, isotropicMetric, metricIntersection, metricGradation, pointwiseMax, steadyMetric
+from utils.adaptivity import *
 from utils.callbacks import *
 from utils.interpolation import interp, mixedPairInterp
 from utils.setup import problemDomain, RossbyWaveSolution
@@ -388,6 +388,7 @@ def DWP(startRes, **kwargs):
                     loadAdj.close()
                 epsilon_.interpolate(inner(q, dual))
                 epsilon = pointwiseMax(epsilon, epsilon_)
+            epsilon = normaliseIndicator(epsilon, op=op)
             with DumbCheckpoint(di + 'hdf5/ErrorIndicator2d_' + indexString(k), mode=FILE_CREATE) as saveErr:
                 saveErr.store(epsilon)
                 saveErr.close()
@@ -695,6 +696,7 @@ def DWR(startRes, **kwargs):
             else:
                 # epsilon.interpolate((inner(rho, dual)))
                 epsilon.interpolate(assemble(v * inner(rho, dual) * dx))
+            epsilon = normaliseIndicator(epsilon, op=op)
             epsilon.rename("Error indicator")   # TODO: Try scaling by H0 as in Rannacher 08
             with DumbCheckpoint(di + 'hdf5/ErrorIndicator2d_' + indexString(k), mode=FILE_CREATE) as saveErr:
                 saveErr.store(epsilon)
@@ -935,11 +937,13 @@ if __name__ == "__main__":
     Jlist = np.zeros(len(resolutions))
     for i in resolutions:
         quantities = solver(i, regen=bool(args.regen), mirror=bool(args.mirror), op=op)
-        rel = np.abs(op.J - quantities['J_h']) / np.abs(op.J)   # TODO: Need also compute mirrored value
+        rel = np.abs(op.J - quantities['J_h']) / np.abs(op.J)
+        if op.mode == "rossby-wave":
+            quantities["Mirrored OF error"] = np.abs(op.J_mirror - quantities['J_h mirrored']) / np.abs(op.J_mirror)
         print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs OF error: %.4e"
               % (i, quantities['meanElements'], quantities['J_h'], quantities['solverTimer'], rel))
         errorFile.write('%d, %.4e' % (quantities['meanElements'], rel))
-        for tag in ("peak", "dist", "spd", "TV P02", "TV P06", "J_h mirrored"):
+        for tag in ("peak", "dist", "spd", "TV P02", "TV P06", "J_h mirrored", "Mirrored OF error"):
             if tag in quantities:
                 errorFile.write(", %.4e" % quantities[tag])
         errorFile.write(", %.1f, %.4e\n" % (quantities['solverTimer'], quantities['J_h']))
