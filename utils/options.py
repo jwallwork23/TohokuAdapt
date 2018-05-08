@@ -21,9 +21,9 @@ class Options:
                  bAdapt=False,
                  plotpvd=False,
                  maxGrowth=1.4,
-                 dt=0.5,        # TODO: This is unnecessarily high for tsunami modelling. Use 5s?
-                 ndump=50,
-                 rm=50,         # TODO: Given that dt is now small, experiment with increasing this number
+                 dt=5.,
+                 ndump=10,
+                 rm=30,
                  nAdapt=1,
                  nVerT=1000,
                  orderChange=0,
@@ -95,8 +95,10 @@ class Options:
             self.normOrder = 2
             self.targetError = 1e-3
             self.hessMeth = 'dL2'       # Hessian recovery by double L2 projection. 'parts' also available
+        else:
+            self.maxScaling = 1e6       # Maximum scale factor for error estimator  TODO: choose for Tohoku
         if self.approach == "DWR":
-            self.rescaling = 0.1        # TODO: Consider different values
+            self.rescaling = 0.1        # Chosen small enough to ensure accuracy for a small element count
         else:
             try:
                 assert rescaling > 0
@@ -141,7 +143,7 @@ class Options:
         self.rm = rm
         self.nAdapt = nAdapt
         self.orderChange = orderChange
-        self.nVerT = nVerT  # TODO: Make this optional
+        self.nVerT = nVerT
 
         # Override default parameter choices for SW and RW cases:
         if self.mode == 'shallow-water':
@@ -155,6 +157,7 @@ class Options:
             self.ndump = 2
             self.J = 1.1184e-3,   # On mesh of 524,288 elements
             self.xy = [0., 0.5 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
+            self.xy2 = [1.5 * np.pi, 2 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
             self.g = 9.81
         elif self.mode == 'rossby-wave':
             self.coriolis = 'beta'
@@ -169,6 +172,7 @@ class Options:
             self.g = 1.
             self.J = 5.7085       # On mesh of 2,359,296 elements, using asymptotic solution
             self.xy = [-16., -14., -3., 3.]
+            self.xy2 = [14., 16., -3., 3.]
         elif self.mode in ('tohoku', 'model-verification'):
             self.Tstart = 300.
             self.Tend = 1500.

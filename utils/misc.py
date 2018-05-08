@@ -85,16 +85,17 @@ def meshStats(mesh):
     return cEnd - cStart, vEnd - vStart
 
 
-def indicator(V, op=Options()):
+def indicator(V, mirror=False, op=Options()):
     """
     :arg V: Function space to use.
+    :param mirror: consider 'mirror image' indicator region.
     :param op: options parameter class.
     :return: ('Smoothened') indicator function for region A = [x1, x2] x [y1, y1]
     """
     smooth = True if op.mode == 'tohoku' else False
 
     # Define extent of region A
-    xy = op.xy
+    xy = op.xy2 if mirror else op.xy
     if smooth:
         xd = (xy[1] - xy[0]) / 2
         yd = (xy[3] - xy[2]) / 2

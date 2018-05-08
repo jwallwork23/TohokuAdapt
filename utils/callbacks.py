@@ -23,6 +23,7 @@ class SWCallback(FunctionalCallback):
         from firedrake import assemble
 
         self.op = Options()
+        self.mirror = False
         dt = solver_obj.options.timestep
 
         def objectiveSW():
@@ -33,7 +34,7 @@ class SWCallback(FunctionalCallback):
             V = solver_obj.fields.solution_2d.function_space()
             ks = Function(V)
             k0, k1 = ks.split()
-            k1.assign(indicator(V.sub(1), op=self.op))
+            k1.assign(indicator(V.sub(1), mirror=self.mirror, op=self.op))
             kt = Constant(0.)
             if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:      # Slightly smooth transition
                 kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * dt else 0.5)

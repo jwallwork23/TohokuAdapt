@@ -187,8 +187,8 @@ def isotropicMetric(f, bdy=False, invert=True, normalise=True, op=Options()):
         if scalar:
             gnorm = max(np.abs(assemble(g * dx)), op.minNorm)           # NOTE this changes in 3D case
         else:
-            gnorm = max(assemble(sqrt(inner(g, g)) * dx), op.minNorm)   # Equiv. to scaling by thresholded metric complexity
-        scaleFactor = min(op.nVerT / gnorm, 1e7)                        # Cap error estimate and hence computational cost
+            gnorm = max(assemble(sqrt(inner(g, g)) * dx), op.minNorm)   # Equivalent thresholded metric complexity
+        scaleFactor = min(op.nVerT / gnorm, op.maxScaling)              # Cap error estimate, also computational cost
         print("Scale factor = %.4e" % (op.nVerT / gnorm))
         g.dat.data[:] = np.abs(g.dat.data) * scaleFactor
     else:

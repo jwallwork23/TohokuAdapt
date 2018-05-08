@@ -50,23 +50,34 @@ def fixedMesh(startRes, **kwargs):
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         cb1 = SWCallback(solver_obj)
         cb1.op = op
-        if op.mode == 'tohoku':
-            cb2 = P02Callback(solver_obj)
-            cb3 = P06Callback(solver_obj)
-            solver_obj.add_callback(cb2, 'timestep')
+        if op.mode != 'tohoku':
+            cb2 = SWCallback(solver_obj)
+            cb2.op = op
+            cb2.mirror = True
+        else:
+            cb3 = P02Callback(solver_obj)
+            cb4 = P06Callback(solver_obj)
             solver_obj.add_callback(cb3, 'timestep')
+            solver_obj.add_callback(cb4, 'timestep')
         solver_obj.add_callback(cb1, 'timestep')
+        solver_obj.add_callback(cb2, 'timestep')
         solver_obj.bnd_functions['shallow_water'] = BCs
 
         # Solve and extract timeseries / functionals
+        quantities = {}
         solverTimer = clock()
         solver_obj.iterate()
         solverTimer = clock() - solverTimer
-        J_h = cb1.quadrature()          # Evaluate objective functional
-        integrand = cb1.getVals()       # and get integrand timeseries
-        if op.mode == 'tohoku':
-            totalVarP02 = cb2.totalVariation()
-            totalVarP06 = cb3.totalVariation()
+        quantities['J_h'] = cb1.quadrature()          # Evaluate objective functional
+        quantities['Integrand'] = cb1.getVals()
+        if op.mode != 'tohoku':
+            quantities['J_h mirrored'] = cb2.quadrature()
+            quantities['Integrand-mirrored'] = cb2.getVals()
+        else:
+            quantities['TV P02'] = cb3.totalVariation()
+            quantities['TV P06'] = cb4.totalVariation()
+            quantities['P02'] = cb3.getVals()
+            quantities['P06'] = cb4.getVals()
 
         # Measure error using metrics, as in Huang et al.
         if op.mode == 'rossby-wave':
@@ -75,14 +86,16 @@ def fixedMesh(startRes, **kwargs):
                 loadElev.load(elev_2d, name='elev_2d')
                 loadElev.close()
             peak, distance = peakAndDistance(elev_2d, op=op)
+            quantities['peak'] = np.abs(peak/peak_a)
+            quantities['dist'] = distance/distance_a
+            quantities['spd'] = distance /(op.Tend * 0.4)
 
-        rel = np.abs(op.J - J_h) / np.abs(op.J)
-        if op.mode == 'rossby-wave':
-            return nEle, rel, J_h, integrand, np.abs(peak/peak_a), distance, distance/distance_a, solverTimer, 0.
-        elif op.mode == 'tohoku':
-            return nEle, rel, J_h, integrand, totalVarP02, totalVarP06, solverTimer, 0.
-        else:
-            return nEle, rel, J_h, integrand, solverTimer, 0.
+        # Output mesh statistics and solver times
+        quantities['meanElements'] = nEle
+        quantities['solverTimer'] = solverTimer
+        quantities['adaptSolveTimer'] = 0.
+
+        return quantities
 
 
 def hessianBased(startRes, **kwargs):
@@ -186,37 +199,48 @@ def hessianBased(startRes, **kwargs):
                 e.set_next_export_ix(adapSolver.i_export)
 
             # Establish callbacks and iterate
+            quantities = {}
             cb1 = SWCallback(adapSolver)
             cb1.op = op
-            if op.mode == 'tohoku':
-                cb2 = P02Callback(adapSolver)
-                cb3 = P06Callback(adapSolver)
+            if op.mode != 'tohoku':
+                cb2 = SWCallback(adapSolver)
+                cb2.op = op
+                cb2.mirror = True
+            else:
+                cb3 = P02Callback(adapSolver)
+                cb4 = P06Callback(adapSolver)
                 if cnt == 0:
-                    initP02 = cb2.init_value
-                    initP06 = cb3.init_value
-            adapSolver.add_callback(cb1, 'timestep')
+                    initP02 = cb3.init_value
+                    initP06 = cb4.init_value
             if cnt != 0:
-                cb1.objective_value = integrand
-                if op.mode == 'tohoku':
-                    cb2.gauge_values = gP02
-                    cb2.init_value = initP02
-                    cb3.gauge_values = gP06
-                    cb3.init_value = initP06
+                cb1.objective_value = quantities['Integrand']
+                if op.mode != 'tohoku':
+                    cb2.objective_value = quantities['Integrand-mirrored']
+                else:
+                    cb3.gauge_values = gP02
+                    cb3.init_value = initP02
+                    cb4.gauge_values = gP06
+                    cb4.init_value = initP06
             adapSolver.add_callback(cb1, 'timestep')
-            if op.mode == 'tohoku':
+            if op.mode != 'tohoku':
                 adapSolver.add_callback(cb2, 'timestep')
+            else:
                 adapSolver.add_callback(cb3, 'timestep')
+                adapSolver.add_callback(cb4, 'timestep')
             adapSolver.bnd_functions['shallow_water'] = BCs
             solverTimer = clock()
             adapSolver.iterate()
             solverTimer = clock() - solverTimer
-            J_h = cb1.quadrature()
-            integrand = cb1.getVals()
-            if op.mode == 'tohoku':
-                gP02 = cb2.getVals()
-                gP06 = cb3.getVals()
-                totalVarP02 = cb2.totalVariation()
-                totalVarP06 = cb3.totalVariation()
+            quantities['J_h'] = cb1.quadrature()  # Evaluate objective functional
+            quantities['Integrand'] = cb1.getVals()
+            if op.mode != 'tohoku':
+                quantities['J_h mirrored'] = cb2.quadrature()
+                quantities['Integrand-mirrored'] = cb2.getVals()
+            else:
+                quantities['P02'] = cb3.getVals()
+                quantities['P06'] = cb4.getVals()
+                quantities['TV P02'] = cb3.totalVariation()
+                quantities['TV P06'] = cb4.totalVariation()
 
             # Get mesh stats
             nEle = meshStats(mesh)[0]
@@ -234,14 +258,16 @@ def hessianBased(startRes, **kwargs):
                 loadElev.load(elev_2d, name='elev_2d')
                 loadElev.close()
             peak, distance = peakAndDistance(elev_2d, op=op)
+            quantities['peak'] = np.abs(peak / peak_a)
+            quantities['dist'] = distance / distance_a
+            quantities['spd'] = distance / (op.Tend * 0.4)
 
-        rel = np.abs(op.J - J_h) / np.abs(op.J)
-        if op.mode == 'rossby-wave':
-            return av, rel, J_h, integrand, np.abs(peak/peak_a), distance, distance/distance_a, adaptSolveTimer, 0.
-        elif op.mode == 'tohoku':
-            return av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, adaptSolveTimer, 0.
-        else:
-            return av, rel, J_h, integrand, adaptSolveTimer, 0.
+        # Output mesh statistics and solver times
+        quantities['meanElements'] = av
+        quantities['solverTimer'] = solverTimer
+        quantities['adaptSolveTimer'] = 0.
+
+        return quantities
 
 
 def DWP(startRes, **kwargs):
@@ -866,7 +892,7 @@ if __name__ == "__main__":
                  refinedSpace=True if args.r else False,
                  bAdapt=bool(args.b) if args.b is not None else False)
 
-    # Establish filename
+    # Establish filenames
     filename = 'outdata/' + mode + '/' + approach
     if args.ho:
         op.orderChange = 1
@@ -877,43 +903,32 @@ if __name__ == "__main__":
     if args.b:
         filename += '_b'
     filename += '_' + date
-    errorfile = open(filename + '.txt', 'w+')
-    integrandFile = open(filename + 'Integrand.txt', 'w+')
+    errorFile = open(filename + '.txt', 'w+')
+    files = {'Integrand': open(filename + 'Integrand.txt', 'w+')}
+    if op.mode == 'tohoku':
+        files['P02'] = open(filename + 'P02.txt', 'w+')
+        files['P06'] = open(filename + 'P06.txt', 'w+')
+    else:
+        files['Integrand-mirrored'] = open(filename + 'Integrand-mirrored.txt', 'w+')
 
-    # Run simulations
+    # Get data and save to disk
     resolutions = range(0 if args.low is None else int(args.low), 6 if args.high is None else int(args.high))
     Jlist = np.zeros(len(resolutions))
-    if mode == 'tohoku':
-        gaugeFileP02 = open(filename + 'P02.txt', 'w+')
-        gaugeFileP06 = open(filename + 'P06.txt', 'w+')
     for i in resolutions:
-        # Get data and save to disk
-        if mode == 'rossby-wave':   # TODO: Timing output undercalculates in adjoint cases
-            av, rel, J_h, integrand, relativePeak, distance, phaseSpd, solverTime, adaptSolveTime = \
-                solver(i, op=op, regen=bool(args.regen))
-            print("""Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs
-        OF error: %.4e  Height error: %.4f  Distance: %.4fm  Speed error: %.4fm"""
-                  % (i, av, J_h, solverTime, rel, relativePeak, distance, phaseSpd))
-            errorfile.write('%d, %.4e, %.4f, %.4f, %.4f, %.1f, %.4e\n'
-                           % (av, rel, relativePeak, distance, phaseSpd, solverTime, J_h))
-        elif mode == 'tohoku':
-            av, rel, J_h, integrand, totalVarP02, totalVarP06, gP02, gP06, solverTime, adaptSolveTime =\
-                solver(i, op=op, regen=bool(args.regen))
-            print("""Run %d: Mean element count: %6d Objective %.4e Timing %.1fs 
-        OF error: %.4e P02: %.3f P06: %.3f""" % (i, av, J_h, solverTime, rel, totalVarP02, totalVarP06))
-            errorfile.write('%d, %.4e, %.3f, %.3f, %.1f, %.4e\n'
-                            % (av, rel, totalVarP02, totalVarP06, solverTime, J_h))
-            gaugeFileP02.writelines(["%s," % val for val in gP02])
-            gaugeFileP02.write("\n")
-            gaugeFileP06.writelines(["%s," % val for val in gP06])
-            gaugeFileP06.write("\n")
-        else:
-            av, rel, J_h, integrand, solverTime, adaptSolveTime = solver(i, op=op, regen=bool(args.regen))
-            print('Run %d: Mean element count: %6d Objective: %.4e OF error %.4e Timing %.1fs'
-                  % (i, av, J_h, rel, solverTime))
-            errorfile.write('%d, %.4e, %.1f, %.4e\n' % (av, rel, solverTime, J_h))
+        quantities = solver(i, op=op, regen=bool(args.regen))
+        rel = np.abs(op.J - J_h) / np.abs(op.J)
+        print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs OF error: %.4e"
+              % (i, quantities['meanElements'], quantities['J_h'], quantities['solverTime'], rel))
+        errorFile.write('%d, %.4e' % (quantities['meanElements'], rel))
+        for tag in quantities:
+            if tag in ("peak", "dist", "spd", "TV P02", "TV P06", "J_h mirrored"):
+                errorFile.write(", %.4e" % quantities[tag])
+        errorFile.write(", %.1f, %.4e\n" % (quantities['solverTime'], quantities['J_h']))
+        for tag in files:
+            files[tag].writelines(["%s," % val for val in quantities[tag]])
+            files[tag].write("\n")
         if approach in ("DWP", "DWR"):
-            print("Time for final run: %.1fs" % adaptSolveTime)
-        integrandFile.writelines(["%s," % val for val in integrand])
-        integrandFile.write("\n")
-    integrandFile.close()
+            print("Time for final run: %.1fs" % quantities['adaptSolveTime'])
+    for tag in files:
+        files[tag].close()
+    errorFile.close()
