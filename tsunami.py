@@ -126,6 +126,7 @@ def hessianBased(startRes, **kwargs):
         endT = 0.
 
         adaptSolveTimer = 0.
+        quantities = {}
         while cnt < op.cntT:
             indexStr = indexString(int(cnt / op.ndump))
 
@@ -198,7 +199,6 @@ def hessianBased(startRes, **kwargs):
                 e.set_next_export_ix(adapSolver.i_export)
 
             # Establish callbacks and iterate
-            quantities = {}
             cb1 = SWCallback(adapSolver)
             cb1.op = op
             if op.mode != 'tohoku':
@@ -215,9 +215,9 @@ def hessianBased(startRes, **kwargs):
                 if op.mode != 'tohoku':
                     cb2.objective_value = quantities['Integrand-mirrored']
                 else:
-                    cb3.gauge_values = gP02
+                    cb3.gauge_values = quantities['P02']
                     cb3.init_value = initP02
-                    cb4.gauge_values = gP06
+                    cb4.gauge_values = quantities['P06']
                     cb4.init_value = initP06
             adapSolver.add_callback(cb1, 'timestep')
             if op.mode != 'tohoku':
@@ -403,6 +403,7 @@ def DWP(startRes, **kwargs):
         uv_2d, elev_2d = q.split()
         elev_2d.interpolate(eta0)
         uv_2d.interpolate(u0)
+        quantities = {}
         while cnt < op.cntT:
             indexStr = indexString(int(cnt / op.ndump))
 
@@ -473,7 +474,6 @@ def DWP(startRes, **kwargs):
                 e.set_next_export_ix(adapSolver.i_export)
 
             # Evaluate callbacks and iterate
-            quantities = {}
             cb1 = SWCallback(adapSolver)
             cb1.op = op
             if op.mode != 'tohoku':
@@ -711,6 +711,7 @@ def DWR(startRes, **kwargs):
         uv_2d, elev_2d = q.split()
         elev_2d.interpolate(eta0)
         uv_2d.interpolate(u0)
+        quantities = {}
         while cnt < op.cntT:
             indexStr = indexString(int(cnt / op.ndump))
 
@@ -781,7 +782,6 @@ def DWR(startRes, **kwargs):
                 e.set_next_export_ix(adapSolver.i_export)
 
             # Evaluate callbacks and iterate
-            quantities = {}
             cb1 = SWCallback(adapSolver)
             cb1.op = op
             if op.mode != 'tohoku':

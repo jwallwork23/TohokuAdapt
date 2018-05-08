@@ -45,7 +45,7 @@ class SWCallback(FunctionalCallback):
 
 class MirroredSWCallback(FunctionalCallback):
     """Integrates objective functional."""
-    name = 'objective functional'
+    name = 'mirrored objective functional'
 
     def __init__(self, solver_obj, **kwargs):
         """

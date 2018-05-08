@@ -10,6 +10,7 @@ parser.add_argument("-a", help="Choose from {'fixedMesh', 'hessianBased', 'impli
 parser.add_argument("-r", help="Use rotational equations")
 parser.add_argument("-d", help="Specify a date")
 parser.add_argument("-s", help="Consider rossby-wave analytic solution")
+parser.add_argument("-m", help="Consider 'mirror image' region of interest")
 args = parser.parse_args()
 op = Options(mode=args.t)
 approach = args.a
@@ -20,9 +21,11 @@ if approach is None and op.mode != 'model-verification':
 if op.mode == 'model-verification':
     fileExt = 'rotational='
     fileExt += 'True' if args.r else 'False'
-elif args.s is not None:
+elif bool(args.s):
     assert op.mode == 'rossby-wave'
     fileExt = 'analytic'
 else:
     fileExt = approach
+if bool(args.m):
+    fileExt += '_mirror'
 print('Integral = ', integrateTimeseries(fileExt, date=args.d, op=op))

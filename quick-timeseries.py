@@ -15,6 +15,7 @@ parser.add_argument("-d", help="Specify a date")
 parser.add_argument("-c", help="Compare timeseries")
 parser.add_argument("-g", help="Include actual gauge data")
 parser.add_argument("-s", help="Generate rossby-wave analytic solution")
+parser.add_argument("-m", help="Consider 'mirror image' region of interest")
 args = parser.parse_args()
 approach = args.a
 date = args.d
@@ -27,18 +28,19 @@ quantities = ['Integrand', 'P02', 'P06'] if op.mode in ('tohoku', 'model-verific
 if bool(args.s):
     assert op.mode == 'rossby-wave'
     integrandFile = open('outdata/' + op.mode + '/analytic_Integrand.txt', 'w+')
-    integrand = RossbyWaveSolution(op.mixedSpace(problemDomain(level=6, op=op)[0]), order=1, op=op).integrate()
+    integrand = RossbyWaveSolution(op.mixedSpace(problemDomain(level=6, op=op)[0]), order=1, op=op).integrate(bool(args.m))
     integrandFile.writelines(["%s," % val for val in integrand])
     integrandFile.write("\n")
     integrandFile.close()
-if op.mode == 'model-verification':
-    fileExt = '_rotational='
-    fileExt += 'off' if args.r is None else args.r
-elif bool(args.s):
-    assert op.mode == 'rossby-wave'
     fileExt = 'analytic'
 else:
     fileExt = approach
+if op.mode == 'model-verification':
+    fileExt = '_rotational='
+    fileExt += 'off' if args.r is None else args.r
+if bool(args.m):
+    assert bool(args.s) and op.mode in ('shallow-water', 'rossby-wave')
+    fileExt += '_mirror'
 for quantity in quantities:
     if args.c:
         for i in range(6):

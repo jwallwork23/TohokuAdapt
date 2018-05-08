@@ -415,7 +415,7 @@ class RossbyWaveSolution:
             print("t = %.4f, |u| = %.4f, |eta| = %.4f" % (t,u.dat.norm, eta.dat.norm))
             outFile.write(u, eta, time=t)
 
-    def integrate(self):
+    def integrate(self, mirror=False):
         """
         :return: list containing time integrand values at each timestep.
         """
@@ -426,7 +426,7 @@ class RossbyWaveSolution:
         # Set up spatial and temporal kernel functions
         ks = Function(self.function_space)
         k0, k1 = ks.split()
-        k1.assign(indicator(self.function_space.sub(1), op=self.op))
+        k1.assign(indicator(self.function_space.sub(1), mirror=mirror, op=self.op))
         kt = Constant(0.)
 
         # Time integrate
