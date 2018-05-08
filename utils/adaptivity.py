@@ -161,13 +161,14 @@ def steadyMetric(f, H=None, op=Options()):
     return M
 
 
-def isotropicMetric(f, bdy=False, invert=True, op=Options()):
+def isotropicMetric(f, bdy=False, invert=True, normalise=True, op=Options()):
     """
     Given a scalar error indicator field `f`, construct an associated isotropic metric field.
     
     :arg f: function to adapt to.
     :param bdy: when True, only values of `f` on the domain boundary contribute towards the metric.
     :param invert: when True, the inverse square of field `f` is considered, as in anisotropic mesh adaptivity.
+    :param normalise: toggle normalisation and scaling of error estimator.
     :param op: Options class object providing min/max cell size values.
     :return: isotropic metric corresponding to `f`.
     """
@@ -182,11 +183,16 @@ def isotropicMetric(f, bdy=False, invert=True, op=Options()):
         g.interpolate(f)
 
     # Normalise error estimate
-    if scalar:
-        gnorm = max(np.abs(assemble(g * dx)), op.minNorm)
+    if normalise:
+        if scalar:
+            gnorm = max(np.abs(assemble(g * dx)), op.minNorm)           # NOTE this changes in 3D case
+        else:
+            gnorm = max(assemble(sqrt(inner(g, g)) * dx), op.minNorm)   # Equiv. to scaling by thresholded metric complexity
+        scaleFactor = min(op.nVerT / gnorm, 1e7)                        # Cap error estimate and hence computational cost
+        print("Scale factor = %.4e" % (op.nVerT / gnorm))
+        g.dat.data[:] = np.abs(g.dat.data) * scaleFactor
     else:
-        gnorm = max(assemble(sqrt(inner(g, g)) * dx), op.minNorm)   # Equiv. to scaling by thresholded metric complexity
-    g.dat.data[:] = np.abs(g.dat.data) * op.nVerT / gnorm           # NOTE this changes in 3D case
+        g.dat.data[:] = np.abs(g.dat.data)
 
     # Establish metric
     V = TensorFunctionSpace(mesh, "CG", 1)

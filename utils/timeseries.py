@@ -189,8 +189,11 @@ def integrateTimeseries(fileExt, date, op=Options()):
     integrals = []
     for line in f:
         separated = line.split(',')
+        # for j in range(len(separated), 0, -1):
+        #     if j % (op.rm+2) in (op.rm,op.rm+1):
+        #         del separated[j]
         dat = [float(d) for d in separated[:-1]]
-        print(len(dat))
+        # print(len(dat))
         I = 0
         # dt = op.Tend / len(dat)
         dt = op.dt
@@ -327,7 +330,7 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=False, date
         for mesh in err:
             plt.loglog(tim[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
         plt.gcf()
-        plt.legend(loc=2)
+        plt.legend(loc=3)
         plt.xlabel(r'CPU time (s)')
         plt.ylabel(errorlabels[m])
         plt.savefig(di + errornames[m] + 'VsTimings' + today + '.pdf', bbox_inches='tight')
