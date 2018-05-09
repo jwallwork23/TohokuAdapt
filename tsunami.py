@@ -565,6 +565,8 @@ def DWR(startRes, **kwargs):
     v = TestFunction(FunctionSpace(mesh_h if op.refinedSpace else mesh_H, "DG", 0)) # For forming error indicators
     rho = Function(Ve)
     rho_u, rho_e = rho.split()
+    rho_u.rename("Momentum error")
+    rho_e.rename("Continuity error")
 
     # Initialise parameters and counters
     nEle, op.nVerT = meshStats(mesh_H)
@@ -592,25 +594,46 @@ def DWR(startRes, **kwargs):
         options.timestepper_type = op.timestepper
         options.timestep = op.dt
         options.output_directory = di   # Need this for residual callback
-        options.no_exports = True
+        options.export_diagnostics = True
+        options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         cb1 = ObjectiveSWCallback(solver_obj)
         cb1.op = op
         cb1.mirror = kwargs.get('mirror')
-        if op.orderChange:
-            cb2 = HigherOrderResidualCallback(solver_obj, Ve)
-        elif op.refinedSpace:
-            cb2 = RefinedResidualCallback(solver_obj, Ve)
-        else:
-            cb2 = ResidualCallback(solver_obj)
         solver_obj.add_callback(cb1, 'timestep')
-        solver_obj.add_callback(cb2, 'export')
         solver_obj.bnd_functions['shallow_water'] = BCs
         initTimer = clock() - initTimer
         print('Problem initialised. Setup time: %.3fs' % initTimer)
-        primalTimer = clock()
-        solver_obj.iterate()
-        primalTimer = clock() - primalTimer
+
+        # primalTimer = clock()
+        # solver_obj.iterate()
+        # primalTimer = clock() - primalTimer
+
+        cnt = 0
+        primalTimer = 0.
+        options.simulation_end_time = op.dt * op.rm
+        while solver_obj.simulation_time < op.Tend - 0.5 * op.dt:
+
+            # Calculate and store residuals
+            with pyadjoint.stop_annotating():
+                err_u, err_e = strongResidualSW(solver_obj)
+                rho_u.interpolate(err_u)
+                rho_e.interpolate(err_e)
+                with DumbCheckpoint(di + 'hdf5/Error2d_' + indexString(cnt), mode=FILE_CREATE) as saveRes:
+                    saveRes.store(rho_u)
+                    saveRes.store(rho_e)
+                    saveRes.close()
+                if cnt != 0:
+                    solver_obj.load_state(cnt, iteration=cnt*op.rm)
+
+            # Run simulation
+            stepTimer = clock()
+            solver_obj.iterate()
+            stepTimer = clock() - stepTimer
+            primalTimer += stepTimer
+            options.simulation_end_time += op.dt * op.rm
+            cnt += 1
+
         J = cb1.quadrature()                        # Assemble objective functional for adjoint computation
         print('Primal run complete. Solver time: %.3fs' % primalTimer)
 
@@ -658,14 +681,11 @@ def DWR(startRes, **kwargs):
             if op.orderChange:                  # TODO: Fix space enrichment functionality
                 duale_u.interpolate(dual_u)
                 duale_e.interpolate(dual_e)
-                # epsilon.interpolate(inner(rho, duale))
                 epsilon.interpolate(assemble(v * inner(rho, duale) * dx))
             elif op.refinedSpace:
                 duale = mixedPairInterp(mesh_h, dual)
-                # epsilon.interpolate(inner(rho, duale))
                 epsilon.interpolate(assemble(v * inner(rho, duale) * dx))
             else:
-                # epsilon.interpolate((inner(rho, dual)))
                 epsilon.interpolate(assemble(v * inner(rho, dual) * dx))
             epsilon = normaliseIndicator(epsilon, op=op)
             epsilon.rename("Error indicator")   # TODO: Try scaling by H0 as in Rannacher 08
