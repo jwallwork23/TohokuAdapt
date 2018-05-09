@@ -7,7 +7,7 @@ from .options import Options
 from .timeseries import gaugeTV
 
 
-__all__ = ["SWCallback", "MirroredSWCallback", "ObjectiveSWCallback", "P02Callback", "P06Callback",
+__all__ = ["SWCallback", "MirroredSWCallback", "ObjectiveSWCallback", "P02Callback", "P06Callback", "strongResidualSW",
            "ResidualCallback", "EnrichedErrorCallback", "HigherOrderResidualCallback", "RefinedResidualCallback"]
 
 
@@ -157,6 +157,46 @@ class P06Callback(GaugeCallback):
 
     def totalVariation(self):
         return gaugeTV(self.gauge_values, gauge="P06")
+
+
+def strongResidualSW(solver_obj):  # TODO: More terms to include
+    """
+    Construct the strong residual for the semi-discrete shallow water equations at the current timestep,
+    using Crank-Nicolson timestepping.
+
+    :return: strong residual for shallow water equations at current timestep.
+    """
+    if solver_obj.timestepper.solution_old is None:     # i.e. at first timestep
+        uv_old, elev_old = solver_obj.fields.solution_2d.split()
+    else:
+        uv_old, elev_old = solver_obj.timestepper.solution_old.split()
+    uv_new, elev_new = solver_obj.fields.solution_2d.split()
+    uv_2d = 0.5 * (uv_old + uv_new)  # Use Crank-Nicolson timestepping so that we isolate errors as
+    elev_2d = 0.5 * (elev_old + elev_new)  # being related only to the spatial discretisation
+
+    # Collect fields and parameters
+    nu = solver_obj.fields.get('viscosity_h')
+    Dt = Constant(solver_obj.options.timestep)
+    H = solver_obj.fields.bathymetry_2d + elev_2d
+    g = physical_constants['g_grav']
+
+    # Construct residual        TODO: How to consider boundary integrals resulting from IBP?
+    res_u = (uv_new - uv_old) / Dt + g * grad(elev_2d)
+    if solver_obj.options.use_nonlinear_equations:
+        res_u += dot(uv_2d, nabla_grad(uv_2d))
+    if solver_obj.options.coriolis_frequency is not None:
+        res_u += solver_obj.options.coriolis_frequency * as_vector((-uv_2d[1], uv_2d[0]))
+    if nu is not None:  # TODO: Should we consider viscosity in the T\=ohoku case?
+        if solver_obj.options.use_grad_depth_viscosity_term:
+            res_u -= dot(nu * grad(H), (grad(uv_2d) + sym(grad(uv_2d))))
+        if solver_obj.options.use_grad_div_viscosity_term:
+            res_u -= div(nu * (grad(uv_2d) + sym(grad(uv_2d))))
+        else:
+            res_u -= div(nu * grad(uv_2d))
+
+    res_e = (elev_new - elev_old) / Dt + div((solver_obj.fields.bathymetry_2d + elev_2d) * uv_2d)
+
+    return res_u, res_e
 
 
 class ResidualCallback(ErrorCallback):

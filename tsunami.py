@@ -8,7 +8,6 @@ from time import clock
 
 from utils.adaptivity import *
 from utils.callbacks import *
-from utils.forms import strongResidualSW
 from utils.interpolation import interp, mixedPairInterp
 from utils.setup import problemDomain, RossbyWaveSolution
 from utils.misc import indexString, peakAndDistance, meshStats
