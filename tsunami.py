@@ -592,9 +592,8 @@ def DWR(startRes, **kwargs):
         options.simulation_end_time = op.Tend
         options.timestepper_type = op.timestepper
         options.timestep = op.dt
-        options.output_directory = di
-        options.export_diagnostics = True
-        options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+        options.output_directory = di   # Need this for residual callback
+        options.no_exports = True
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         cb1 = ObjectiveSWCallback(solver_obj)
         cb1.op = op
@@ -620,7 +619,6 @@ def DWR(startRes, **kwargs):
         gradientTimer = clock()
         dJdb = compute_gradient(J, Control(b))      # TODO: Rewrite pyadjoint to avoid computing this
         gradientTimer = clock() - gradientTimer
-        print("Norm of gradient: %.3e. Computation time: %.1fs" % (dJdb.dat.norm, gradientTimer))
 
         # Extract adjoint solutions
         dualTimer = clock()
@@ -876,8 +874,7 @@ def DWR(startRes, **kwargs):
 #         options.timestepper_type = op.timestepper
 #         options.timestep = op.dt
 #         options.output_directory = di
-#         options.export_diagnostics = True
-#         options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+#         options.no_exports = True
 #         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
 #         cb1 = ObjectiveSWCallback(solver_obj)
 #         cb1.op = op
@@ -1115,7 +1112,7 @@ if __name__ == "__main__":
     date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", help="Choose test problem from {'shallow-water', 'rossby-wave'} (default 'tohoku')")
+    parser.add_argument("t", help="Choose test problem from {'shallow-water', 'rossby-wave'} (default 'tohoku')")
     parser.add_argument("-a", help="Choose adaptive approach from {'hessianBased', 'DWP', 'DWR'} (default 'fixedMesh')")
     parser.add_argument("-low", help="Lower bound for index range")
     parser.add_argument("-high", help="Upper bound for index range")

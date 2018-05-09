@@ -253,7 +253,7 @@ class EnrichedErrorCallback(DiagnosticCallback):
         return line
 
 
-class HigherOrderResidualCallback(EnrichedErrorCallback):   # TODO: When fixed, move to Thetis branch
+class HigherOrderResidualCallback(EnrichedErrorCallback):
     """Computes strong residual in an enriched finite element space of higher degree for the shallow water case."""
     name = 'strong residual'
 

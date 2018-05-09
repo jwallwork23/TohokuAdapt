@@ -30,18 +30,3 @@ outdata/
 
 # Old form compilers
 utils/forms.py
-
-# Test scripts
-wdTest.py
-heat_eqn.py
-helmholtz.py
-advection-diffusion.py
-pyadjoint-test-firedrake.py
-pyadjoint-test-burgers.py
-pyadjoint-test-thetis.py
-rossby-test-firedrake.py
-firedrake-tsunami.py
-thetis-tsunami.py
-residual-callback-test.py
-shallow-water-test.py
-rossby-wave-plots.py
