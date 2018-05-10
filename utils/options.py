@@ -130,6 +130,7 @@ class Options:
             self.maxGrowth = maxGrowth
         except:
             raise ValueError('Invalid value for growth parameter.')
+        self.di = 'plots/' + self.mode + '/' + self.approach + '/'
 
         # Timestepping and (more) adaptivity parameters
         self.dt = dt
