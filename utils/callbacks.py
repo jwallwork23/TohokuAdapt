@@ -207,7 +207,7 @@ class P06Callback(GaugeCallback):
 #         res_u += dot(uv_2d, nabla_grad(uv_2d))
 #     if solver_obj.options.coriolis_frequency is not None:
 #         res_u += solver_obj.options.coriolis_frequency * as_vector((-uv_2d[1], uv_2d[0]))
-#     if nu is not None:          # TODO: Should we consider viscosity in the T\=ohoku case?
+#     if nu is not None:
 #         if solver_obj.options.use_grad_depth_viscosity_term:
 #             res_u -= dot(nu * grad(H), (grad(uv_2d) + sym(grad(uv_2d))))
 #         if solver_obj.options.use_grad_div_viscosity_term:
@@ -260,7 +260,7 @@ def strongResidualSW(solver_obj, UV_new, ELEV_new, UV_old, ELEV_old, Ve=None, op
         res_u += dot(uv_2d, nabla_grad(uv_2d))
     if solver_obj.options.coriolis_frequency is not None:
         res_u += solver_obj.options.coriolis_frequency * as_vector((-uv_2d[1], uv_2d[0]))
-    if nu is not None:          # TODO: Should we consider viscosity in the T\=ohoku case?
+    if nu is not None:
         if solver_obj.options.use_grad_depth_viscosity_term:
             res_u -= dot(nu * grad(H), (grad(uv_2d) + sym(grad(uv_2d))))
         if solver_obj.options.use_grad_div_viscosity_term:
@@ -307,7 +307,7 @@ class ResidualCallback(ErrorCallback):
                 res_u += dot(uv_2d, nabla_grad(uv_2d))
             if solver_obj.options.coriolis_frequency is not None:
                 res_u += solver_obj.options.coriolis_frequency * as_vector((-uv_2d[1], uv_2d[0]))
-            if nu is not None:          # TODO: Should we consider viscosity in the T\=ohoku case?
+            if nu is not None:
                 if solver_obj.options.use_grad_depth_viscosity_term:
                     res_u -= dot(nu * grad(H), (grad(uv_2d) + sym(grad(uv_2d))))
                 if solver_obj.options.use_grad_div_viscosity_term:
@@ -408,7 +408,7 @@ class HigherOrderResidualCallback(EnrichedErrorCallback):
                 res_u += dot(uv_2d, nabla_grad(uv_2d))
             if solver_obj.options.coriolis_frequency is not None:
                 res_u += solver_obj.options.coriolis_frequency * as_vector((-uv_2d[1], uv_2d[0]))
-            if nu is not None:          # TODO: Should we consider viscosity in the T\=ohoku case?
+            if nu is not None:
                 if solver_obj.options.use_grad_depth_viscosity_term:
                     res_u -= dot(nu * grad(H), (grad(uv_2d) + sym(grad(uv_2d))))
                 if solver_obj.options.use_grad_div_viscosity_term:
@@ -463,7 +463,7 @@ class RefinedResidualCallback(EnrichedErrorCallback):
             if solver_obj.options.coriolis_frequency is not None:
                 f = interp(enriched_space.mesh(), solver_obj.options.coriolis_frequency)
                 res_u += f * as_vector((-uv_2d[1], uv_2d[0]))
-            if nu is not None:          # TODO: Should we consider viscosity in the T\=ohoku case?
+            if nu is not None:
                 if solver_obj.options.use_grad_depth_viscosity_term:
                     res_u -= dot(nu * grad(H), (grad(uv_2d) + sym(grad(uv_2d))))
                 if solver_obj.options.use_grad_div_viscosity_term:

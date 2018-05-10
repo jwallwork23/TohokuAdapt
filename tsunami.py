@@ -247,7 +247,7 @@ def hessianBased(startRes, **kwargs):
 
         # Output mesh statistics and solver times
         quantities['meanElements'] = av
-        quantities['solverTimer'] = solverTimer
+        quantities['solverTimer'] = adaptSolveTimer
         quantities['adaptSolveTimer'] = adaptSolveTimer
 
         return quantities
@@ -330,7 +330,7 @@ def DWP(startRes, **kwargs):
 
         # Compute gradient
         gradientTimer = clock()
-        dJdb = compute_gradient(J, Control(b))      # TODO: Rewrite pyadjoint to avoid computing this
+        dJdb = compute_gradient(J, Control(b))
         gradientTimer = clock() - gradientTimer
         print("Norm of gradient: %.3e. Computation time: %.1fs" % (dJdb.dat.norm, gradientTimer))
 
@@ -598,7 +598,7 @@ def DWR(startRes, **kwargs):
         options.timestep = op.dt
         options.output_directory = di   # Need this for residual callback
         options.export_diagnostics = True
-        options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+        options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']            # TODO: EXPORT FROM PREVIOUS STEP?
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         cb1 = ObjectiveSWCallback(solver_obj)
         cb1.op = op
@@ -661,7 +661,7 @@ def DWR(startRes, **kwargs):
 
         # Compute gradient
         gradientTimer = clock()
-        dJdb = compute_gradient(J, Control(b))      # TODO: Rewrite pyadjoint to avoid computing this
+        dJdb = compute_gradient(J, Control(b))
         gradientTimer = clock() - gradientTimer
 
         # Extract adjoint solutions
@@ -674,7 +674,7 @@ def DWR(startRes, **kwargs):
             dual.assign(solve_blocks[i].adj_sol)
             dual_u, dual_e = dual.split()
             with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexString(int((i - r + 1) / op.rm)),  mode=FILE_CREATE) as saveAdj:
-                saveAdj.store(dual_u)                   # TODO: Why not just save ^^^ using same index as timestep?
+                saveAdj.store(dual_u)
                 saveAdj.store(dual_e)
                 saveAdj.close()
             if op.plotpvd:
@@ -948,7 +948,7 @@ def DWR(startRes, **kwargs):
 #
 #         # Compute gradient
 #         gradientTimer = clock()
-#         dJdb = compute_gradient(J, Control(b))      # TODO: Rewrite pyadjoint to avoid computing this
+#         dJdb = compute_gradient(J, Control(b))
 #         gradientTimer = clock() - gradientTimer
 #         print("Norm of gradient: %.3e. Computation time: %.1fs" % (dJdb.dat.norm, gradientTimer))
 #

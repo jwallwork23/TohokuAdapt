@@ -11,7 +11,7 @@ class Options:
                  family='dg-dg',
                  timestepper='CrankNicolson',
                  approach='fixedMesh',
-                 coriolis='off',
+                 coriolis='off',                # TODO: Test beta-plane approximation and check f-plane again
                  rescaling=0.85,
                  hmin=500.,
                  hmax=1e5,
