@@ -547,8 +547,8 @@ def DWR(startRes, **kwargs):
     dual_u.rename("Adjoint velocity")
     dual_e.rename("Adjoint elevation")
 
-    if op.orderChange:                      # Define variables on higher/lower order space
-        Ve = op.mixedSpace(mesh_H)          # Automatically generates a higher/lower order space
+    if op.orderChange:
+        Ve = op.mixedSpace(mesh_H, enrich=True)
         duale = Function(Ve)
         duale_u, duale_e = duale.split()
         epsilon = Function(P1, name="Error indicator")
@@ -559,8 +559,6 @@ def DWR(startRes, **kwargs):
     else:                                   # Copy standard variables to mimic enriched space labels
         Ve = V
         epsilon = Function(P1, name="Error indicator")
-    print("Index of V = ", V.index)
-    print("Index of Ve = ", Ve.index)
     v = TestFunction(FunctionSpace(mesh_h if op.refinedSpace else mesh_H, "DG", 0)) # For forming error indicators
     rho = Function(Ve)
     rho_u, rho_e = rho.split()

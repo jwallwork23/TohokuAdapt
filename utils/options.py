@@ -11,7 +11,7 @@ class Options:
                  family='dg-dg',
                  timestepper='CrankNicolson',
                  approach='fixedMesh',
-                 coriolis='off',                # TODO: Test beta-plane approximation and check f-plane again
+                 coriolis='beta',                # TODO: Test beta-plane approximation and check f-plane again
                  rescaling=0.85,
                  hmin=500.,
                  hmax=1e5,
@@ -227,13 +227,16 @@ class Options:
         return E, N
 
 
-    def mixedSpace(self, mesh):
+    def mixedSpace(self, mesh, enrich=False):
         """
         :param mesh: mesh upon which to build mixed space.
         :return: mixed VectorFunctionSpace x FunctionSpace as specified by ``self.family``.
         """
-        deg1 = self.degree1 + self.orderChange
-        deg2 = self.degree2 + self.orderChange
+        deg1 = self.degree1
+        deg2 = self.degree2
+        if enrich:
+            deg1 += self.orderChange
+            deg2 += self.orderChange
         return VectorFunctionSpace(mesh, self.space1, deg1) * FunctionSpace(mesh, self.space2, deg2)
 
 
