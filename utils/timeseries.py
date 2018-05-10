@@ -351,8 +351,5 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=False, date
             plt.legend(loc=2)
             plt.xlabel(r'Mean element count')
             plt.ylabel(r'CPU time (s)')
-            if mode == 'tohoku':
-                plt.xlim([0, 55000])
-                plt.ylim([0, 5000])
             plt.savefig(di + 'timeVsElements' + today + '.pdf', bbox_inches='tight')
             plt.clf()

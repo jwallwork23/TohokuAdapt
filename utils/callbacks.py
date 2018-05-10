@@ -1,7 +1,7 @@
 from thetis_adjoint import *
 from thetis.callback import DiagnosticCallback, FunctionalCallback, GaugeCallback, ErrorCallback
 
-from .interpolation import interp
+from .interpolation import *
 from .misc import indicator
 from .options import Options
 from .timeseries import gaugeTV
@@ -159,20 +159,94 @@ class P06Callback(GaugeCallback):
         return gaugeTV(self.gauge_values, gauge="P06")
 
 
-def strongResidualSW(solver_obj):  # TODO: More terms to include
+# def strongResidualSW(solver_obj, Ve=None, op=Options()):  # TODO: More terms to include
+#     """
+#     Construct the strong residual for the semi-discrete shallow water equations at the current timestep,
+#     using Crank-Nicolson timestepping.
+#
+#     :param op: option parameters object.
+#     :return: strong residual for shallow water equations at current timestep.
+#     """
+#     if solver_obj.timestepper.solution_old is None:     # i.e. at first timestep
+#         Q_old = solver_obj.fields.solution_2d
+#     else:
+#         Q_old = solver_obj.timestepper.solution_old
+#     UV_old, ELEV_old = Q_old.split()
+#     Q_new = solver_obj.fields.solution_2d
+#     UV_new, ELEV_new = Q_new.split()
+#
+#     if op.orderChange:
+#         uv_old, elev_old = Function(Ve).split()
+#         uv_new, elev_new = Function(Ve).split()
+#         uv_old.interpolate(UV_old)
+#         uv_new.interpolate(UV_new)
+#         elev_old.interpolate(ELEV_old)
+#         elev_new.interpolate(ELEV_new)
+#     elif op.refinedSpace:
+#         q_old, q_new = mixedPairInterp(Ve, Q_old, Q_new)
+#         uv_old, elev_old = q_old.split()
+#         uv_new, elev_new = q_new.split()
+#     else:
+#         uv_old = UV_old
+#         uv_new = UV_new
+#         elev_old = ELEV_old
+#         elev_new = ELEV_new
+#
+#     uv_2d = 0.5 * (uv_old + uv_new)         # Use Crank-Nicolson timestepping so that we isolate errors as being
+#     elev_2d = 0.5 * (elev_old + elev_new)   # related only to the spatial discretisation
+#
+#     # Collect fields and parameters
+#     nu = solver_obj.fields.get('viscosity_h')
+#     Dt = Constant(solver_obj.options.timestep)
+#     H = solver_obj.fields.bathymetry_2d + elev_2d
+#     g = physical_constants['g_grav']
+#
+#     # Construct residual        # TODO: How to consider boundary integrals resulting from IBP?
+#     res_u = (uv_new - uv_old) / Dt + g * grad(elev_2d)
+#     if solver_obj.options.use_nonlinear_equations:
+#         res_u += dot(uv_2d, nabla_grad(uv_2d))
+#     if solver_obj.options.coriolis_frequency is not None:
+#         res_u += solver_obj.options.coriolis_frequency * as_vector((-uv_2d[1], uv_2d[0]))
+#     if nu is not None:          # TODO: Should we consider viscosity in the T\=ohoku case?
+#         if solver_obj.options.use_grad_depth_viscosity_term:
+#             res_u -= dot(nu * grad(H), (grad(uv_2d) + sym(grad(uv_2d))))
+#         if solver_obj.options.use_grad_div_viscosity_term:
+#             res_u -= div(nu * (grad(uv_2d) + sym(grad(uv_2d))))
+#         else:
+#             res_u -= div(nu * grad(uv_2d))
+#
+#     res_e = (elev_new - elev_old) / Dt + div((solver_obj.fields.bathymetry_2d + elev_2d) * uv_2d)
+#
+#     return res_u, res_e
+
+def strongResidualSW(solver_obj, UV_new, ELEV_new, UV_old, ELEV_old, Ve=None, op=Options()):  # TODO: More terms to include
     """
     Construct the strong residual for the semi-discrete shallow water equations at the current timestep,
     using Crank-Nicolson timestepping.
 
+    :param op: option parameters object.
     :return: strong residual for shallow water equations at current timestep.
     """
-    if solver_obj.timestepper.solution_old is None:     # i.e. at first timestep
-        uv_old, elev_old = solver_obj.fields.solution_2d.split()
+    if op.orderChange:
+        uv_old, elev_old = Function(Ve).split()
+        uv_new, elev_new = Function(Ve).split()
+        uv_old.interpolate(UV_old)
+        uv_new.interpolate(UV_new)
+        elev_old.interpolate(ELEV_old)
+        elev_new.interpolate(ELEV_new)
+    elif op.refinedSpace:
+        raise NotImplementedError
+        # q_old, q_new = mixedPairInterp(Ve, Q_old, Q_new)
+        # uv_old, elev_old = q_old.split()
+        # uv_new, elev_new = q_new.split()
     else:
-        uv_old, elev_old = solver_obj.timestepper.solution_old.split()
-    uv_new, elev_new = solver_obj.fields.solution_2d.split()
-    uv_2d = 0.5 * (uv_old + uv_new)  # Use Crank-Nicolson timestepping so that we isolate errors as
-    elev_2d = 0.5 * (elev_old + elev_new)  # being related only to the spatial discretisation
+        uv_old = UV_old
+        uv_new = UV_new
+        elev_old = ELEV_old
+        elev_new = ELEV_new
+
+    uv_2d = 0.5 * (uv_old + uv_new)         # Use Crank-Nicolson timestepping so that we isolate errors as being
+    elev_2d = 0.5 * (elev_old + elev_new)   # related only to the spatial discretisation
 
     # Collect fields and parameters
     nu = solver_obj.fields.get('viscosity_h')
@@ -180,13 +254,13 @@ def strongResidualSW(solver_obj):  # TODO: More terms to include
     H = solver_obj.fields.bathymetry_2d + elev_2d
     g = physical_constants['g_grav']
 
-    # Construct residual        TODO: How to consider boundary integrals resulting from IBP?
+    # Construct residual        # TODO: How to consider boundary integrals resulting from IBP?
     res_u = (uv_new - uv_old) / Dt + g * grad(elev_2d)
     if solver_obj.options.use_nonlinear_equations:
         res_u += dot(uv_2d, nabla_grad(uv_2d))
     if solver_obj.options.coriolis_frequency is not None:
         res_u += solver_obj.options.coriolis_frequency * as_vector((-uv_2d[1], uv_2d[0]))
-    if nu is not None:  # TODO: Should we consider viscosity in the T\=ohoku case?
+    if nu is not None:          # TODO: Should we consider viscosity in the T\=ohoku case?
         if solver_obj.options.use_grad_depth_viscosity_term:
             res_u -= dot(nu * grad(H), (grad(uv_2d) + sym(grad(uv_2d))))
         if solver_obj.options.use_grad_div_viscosity_term:

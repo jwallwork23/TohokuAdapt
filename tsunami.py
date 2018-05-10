@@ -37,7 +37,7 @@ def fixedMesh(startRes, **kwargs):
         options = solver_obj.options
         options.element_family = op.family
         options.use_nonlinear_equations = True
-        options.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
+        options.use_grad_div_viscosity_term = True              # Symmetric viscous stress
         options.use_lax_friedrichs_velocity = False             # TODO: This is a temporary fix
         options.coriolis_frequency = f
         options.simulation_export_time = op.dt * op.ndump
@@ -53,13 +53,13 @@ def fixedMesh(startRes, **kwargs):
         if op.mode != 'tohoku':
             cb2 = MirroredSWCallback(solver_obj)
             cb2.op = op
+            solver_obj.add_callback(cb2, 'timestep')
         else:
             cb3 = P02Callback(solver_obj)
             cb4 = P06Callback(solver_obj)
             solver_obj.add_callback(cb3, 'timestep')
             solver_obj.add_callback(cb4, 'timestep')
         solver_obj.add_callback(cb1, 'timestep')
-        solver_obj.add_callback(cb2, 'timestep')
         solver_obj.bnd_functions['shallow_water'] = BCs
 
         # Solve and extract timeseries / functionals
@@ -158,7 +158,7 @@ def hessianBased(startRes, **kwargs):
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = True
-            adapOpt.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
+            adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
             adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump
             startT = endT
@@ -304,7 +304,7 @@ def DWP(startRes, **kwargs):
         options = solver_obj.options
         options.element_family = op.family
         options.use_nonlinear_equations = True
-        options.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
+        options.use_grad_div_viscosity_term = True                      # Symmetric viscous stress
         options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
         options.coriolis_frequency = f
         options.simulation_export_time = op.dt * op.rm
@@ -421,7 +421,7 @@ def DWP(startRes, **kwargs):
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = True
-            adapOpt.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
+            adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
             adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump
             startT = endT
@@ -550,6 +550,7 @@ def DWR(startRes, **kwargs):
     dual_u, dual_e = dual.split()
     dual_u.rename("Adjoint velocity")
     dual_e.rename("Adjoint elevation")
+
     if op.orderChange:                      # Define variables on higher/lower order space
         Ve = op.mixedSpace(mesh_H)          # Automatically generates a higher/lower order space
         duale = Function(Ve)
@@ -562,6 +563,8 @@ def DWR(startRes, **kwargs):
     else:                                   # Copy standard variables to mimic enriched space labels
         Ve = V
         epsilon = Function(P1, name="Error indicator")
+    print("Index of V = ", V.index)
+    print("Index of Ve = ", Ve.index)
     v = TestFunction(FunctionSpace(mesh_h if op.refinedSpace else mesh_H, "DG", 0)) # For forming error indicators
     rho = Function(Ve)
     rho_u, rho_e = rho.split()
@@ -586,7 +589,7 @@ def DWR(startRes, **kwargs):
         options = solver_obj.options
         options.element_family = op.family
         options.use_nonlinear_equations = True
-        options.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
+        options.use_grad_div_viscosity_term = True                      # Symmetric viscous stress
         options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
         options.coriolis_frequency = f
         options.simulation_export_time = op.dt * op.rm
@@ -600,7 +603,14 @@ def DWR(startRes, **kwargs):
         cb1 = ObjectiveSWCallback(solver_obj)
         cb1.op = op
         cb1.mirror = kwargs.get('mirror')
+        # if op.orderChange:
+        #     cb2 = HigherOrderResidualCallback(solver_obj, Ve)
+        # elif op.refinedSpace:
+        #     cb2 = RefinedResidualCallback(solver_obj, Ve)
+        # else:
+        #     cb2 = ResidualCallback(solver_obj)
         solver_obj.add_callback(cb1, 'timestep')
+        # solver_obj.add_callback(cb2, 'export')
         solver_obj.bnd_functions['shallow_water'] = BCs
         initTimer = clock() - initTimer
         print('Problem initialised. Setup time: %.3fs' % initTimer)
@@ -614,15 +624,27 @@ def DWR(startRes, **kwargs):
         options.simulation_end_time = op.dt * op.rm
         while solver_obj.simulation_time < op.Tend - 0.5 * op.dt:
 
-            # Calculate and store residuals
+            # # Calculate and store residuals
+            # with pyadjoint.stop_annotating():
+            #     err_u, err_e = strongResidualSW(solver_obj, Ve, op=op)
+            #     rho_u.interpolate(err_u)
+            #     rho_e.interpolate(err_e)
+            #     with DumbCheckpoint(di + 'hdf5/Error2d_' + indexString(cnt), mode=FILE_CREATE) as saveRes:
+            #         saveRes.store(rho_u)
+            #         saveRes.store(rho_e)
+            #         saveRes.close()
+            #     if op.plotpvd:
+            #         residualFile.write(rho_u, rho_e, time=solver_obj.simulation_time)
+
             with pyadjoint.stop_annotating():
-                err_u, err_e = strongResidualSW(solver_obj)
-                rho_u.interpolate(err_u)
-                rho_e.interpolate(err_e)
-                with DumbCheckpoint(di + 'hdf5/Error2d_' + indexString(cnt), mode=FILE_CREATE) as saveRes:
-                    saveRes.store(rho_u)
-                    saveRes.store(rho_e)
-                    saveRes.close()
+                uv_old, elev_old = solver_obj.timestepper.solution_old.split()
+                uv_old.rename("Previous velocity")
+                elev_old.rename("Previous elevation")
+                with DumbCheckpoint(di + 'hdf5/Previous2d_' + indexString(cnt), mode=FILE_CREATE) as savePrev:
+                    savePrev.store(uv_old)
+                    savePrev.store(elev_old)
+                    savePrev.close()
+
                 if cnt != 0:
                     solver_obj.load_state(cnt, iteration=cnt*op.rm)
 
@@ -666,12 +688,28 @@ def DWR(startRes, **kwargs):
         errorTimer = clock()
         for k in range(0, int(op.cntT / op.rm)):
             print('Generating error estimate %d / %d' % (k + 1, int(op.cntT / op.rm)))
-            with DumbCheckpoint(di + 'hdf5/Error2d_' + indexString(k), mode=FILE_READ) as loadRes:
-                loadRes.load(rho_u, name="Momentum error")
-                loadRes.load(rho_e, name="Continuity error")
-                loadRes.close()
+            # with DumbCheckpoint(di + 'hdf5/Error2d_' + indexString(k), mode=FILE_READ) as loadRes:
+            #     loadRes.load(rho_u, name="Momentum error")
+            #     loadRes.load(rho_e, name="Continuity error")
+            #     loadRes.close()
+
+            # Generate residuals
+            with DumbCheckpoint(di + 'hdf5/Velocity2d_' + indexString(k), mode=FILE_READ) as loadVel:
+                loadVel.load(uv_2d, name="uv_2d")
+                loadVel.close()
+            with DumbCheckpoint(di + 'hdf5/Elevation2d_' + indexString(k), mode=FILE_READ) as loadElev:
+                loadElev.load(elev_2d, name="elev_2d")
+                loadElev.close()
+            with DumbCheckpoint(di + 'hdf5/Previous2d_' + indexString(k), mode=FILE_READ) as loadPrev:
+                loadPrev.load(uv_old, name="Previous velocity")
+                loadPrev.load(elev_old, name="Previous elevation")
+                loadPrev.close()
+            err_u, err_e = strongResidualSW(solver_obj, uv_2d, elev_2d, uv_old, elev_old, Ve, op=op)
+            rho_u.interpolate(err_u)
+            rho_e.interpolate(err_e)
             if op.plotpvd:
                 residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * k))
+
 
             # Load adjoint data and form indicators
             with DumbCheckpoint(di + 'hdf5/Adjoint2d_' + indexString(k), mode=FILE_READ) as loadAdj:
@@ -736,7 +774,7 @@ def DWR(startRes, **kwargs):
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = True
-            adapOpt.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
+            adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
             adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump
             startT = endT
@@ -885,7 +923,7 @@ def DWR(startRes, **kwargs):
 #         options = solver_obj.options
 #         options.element_family = op.family
 #         options.use_nonlinear_equations = True
-#         options.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
+#         options.use_grad_div_viscosity_term = True                      # Symmetric viscous stress
 #         options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
 #         options.coriolis_frequency = f
 #         options.simulation_export_time = op.dt * op.rm
@@ -965,7 +1003,7 @@ def DWR(startRes, **kwargs):
 #                 adapOpt = adapSolver.options
 #                 adapOpt.element_family = op.family
 #                 adapOpt.use_nonlinear_equations = True
-#                 adapOpt.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
+#                 adapOpt.use_grad_div_viscosity_term = True   # Symmetric viscous stress
 #                 adapOpt.use_lax_friedrichs_velocity = False  # TODO: This is a temporary fix
 #                 adapOpt.timestep = op.dt
 #                 adapOpt.no_exports = True
@@ -1025,7 +1063,7 @@ def DWR(startRes, **kwargs):
 #             adapOpt = adapSolver.options
 #             adapOpt.element_family = op.family
 #             adapOpt.use_nonlinear_equations = True
-#             adapOpt.use_grad_depth_viscosity_term = True if op.mode == 'tohoku' else False
+#             adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
 #             adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
 #             adapOpt.simulation_export_time = op.dt * op.ndump
 #             startT = endT

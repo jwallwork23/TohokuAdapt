@@ -144,6 +144,10 @@ class Options:
         self.nAdapt = nAdapt
         self.orderChange = orderChange
         self.nVerT = nVerT
+        if self.refinedSpace:
+            assert self.orderChange == 0
+        if self.orderChange != 0:
+            assert not self.refinedSpace
 
         # Override default parameter choices for SW and RW cases:
         if self.mode == 'shallow-water':
@@ -177,19 +181,20 @@ class Options:
         elif self.mode in ('tohoku', 'model-verification'):
             self.Tstart = 300.
             self.Tend = 1500.
-            self.J = 1.240e+13  #  On mesh of 681,666 elements     TODO: Check
+            self.J = 1.225e+13                  # On mesh of 678,185 elements
             self.xy = [490e3, 640e3, 4160e3, 4360e3]
             self.g = 9.81
             self.xy2 = [0., 0., 0., 0.]
-        if self.approach in ("DWP", "DWR"):
-            self.rm *= 2
 
             # Gauge locations in latitude-longitude coordinates and mesh element counts
             self.glatlon = {"P02": (38.5002, 142.5016), "P06": (38.6340, 142.5838), "801": (38.2, 141.7),
                             "802": (39.3, 142.1), "803": (38.9, 141.8), "804": (39.7, 142.2), "806": (37.0, 141.2)}
             self.meshSizes = (5918, 7068, 8660, 10988, 14160, 19082, 27280, 41730, 72602, 160586, 681616)
-            self.latFukushima = 37.050419   # Latitude of Fukushima
-            self.Omega = 7.291e-5           # Planetary rotation rate
+            self.latFukushima = 37.050419  # Latitude of Fukushima
+            self.Omega = 7.291e-5  # Planetary rotation rate
+
+        if self.approach in ("DWP", "DWR"):
+            self.rm *= 2
 
         # Derived timestep indices
         self.cntT = int(np.ceil(self.Tend / self.dt))               # Final timestep index
