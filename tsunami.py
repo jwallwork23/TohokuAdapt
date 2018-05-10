@@ -22,7 +22,7 @@ def fixedMesh(startRes, **kwargs):
 
         # Initialise domain and physical parameters
         try:
-            assert (float(physical_constants['g_grav'].dat.data) == op.g)
+            assert float(physical_constants['g_grav'].dat.data) == op.g
         except:
             physical_constants['g_grav'].assign(op.g)
         mesh, u0, eta0, b, BCs, f = problemDomain(startRes, op=op)
@@ -105,16 +105,16 @@ def hessianBased(startRes, **kwargs):
 
         # Initialise domain and physical parameters
         try:
-            assert (float(physical_constants['g_grav'].dat.data) == op.g)
+            assert float(physical_constants['g_grav'].dat.data) == op.g
         except:
             physical_constants['g_grav'].assign(op.g)
         mesh, u0, eta0, b, BCs, f = problemDomain(startRes, op=op)
         V = op.mixedSpace(mesh)
         uv_2d, elev_2d = Function(V).split()  # Needed to load data into
-        if op.mode == 'rossby-wave':    # Analytic final-time state
-            peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
         elev_2d.interpolate(eta0)
         uv_2d.interpolate(u0)
+        if op.mode == 'rossby-wave':    # Analytic final-time state
+            peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
 
         # Initialise parameters and counters
         nEle, op.nVerT = meshStats(mesh)
@@ -148,7 +148,7 @@ def hessianBased(startRes, **kwargs):
                     if cnt != 0:
                         uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
                     elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
-                    b = problemDomain(mesh=mesh, op=op)[3]                      # Reset bathymetry on new mesh
+                    b, BCs, f = problemDomain(mesh=mesh, op=op)[3:]
                     uv_2d.rename('uv_2d')
                     elev_2d.rename('elev_2d')
             adaptTimer = clock() - adaptTimer
@@ -169,7 +169,7 @@ def hessianBased(startRes, **kwargs):
             adapOpt.output_directory = di
             adapOpt.export_diagnostics = True
             adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-            adapOpt.coriolis_frequency = Function(FunctionSpace(mesh, "CG", 1)).interpolate(SpatialCoordinate(mesh)[1])
+            adapOpt.coriolis_frequency = f
             field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
             e = exporter.ExportManager(di + 'hdf5',
                                        ['elev_2d', 'uv_2d'],
@@ -411,7 +411,7 @@ def DWP(startRes, **kwargs):
                 if cnt != 0:
                     uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
                 elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
-                b = problemDomain(mesh=mesh, op=op)[3]  # Reset bathymetry on new mesh
+                b, BCs, f = problemDomain(mesh=mesh, op=op)[3:]
                 uv_2d.rename('uv_2d')
                 elev_2d.rename('elev_2d')
             adaptTimer = clock() - adaptTimer
@@ -432,7 +432,7 @@ def DWP(startRes, **kwargs):
             adapOpt.output_directory = di
             adapOpt.export_diagnostics = True
             adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-            adapOpt.coriolis_frequency = Function(FunctionSpace(mesh, "CG", 1)).interpolate(SpatialCoordinate(mesh)[1])
+            adapOpt.coriolis_frequency = f
             field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
             e = exporter.ExportManager(di + 'hdf5',
                                        ['elev_2d', 'uv_2d'],
@@ -764,7 +764,7 @@ def DWR(startRes, **kwargs):
                 if cnt != 0:
                     uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
                 elev_2d, uv_2d = interp(mesh_H, elev_2d, uv_2d)
-                b = problemDomain(mesh=mesh_H, op=op)[3]                        # Reset bathymetry on new mesh
+                b, BCs, f = problemDomain(mesh=mesh_H, op=op)[3:]
                 uv_2d.rename('uv_2d')
                 elev_2d.rename('elev_2d')
             adaptTimer = clock() - adaptTimer
@@ -785,7 +785,7 @@ def DWR(startRes, **kwargs):
             adapOpt.output_directory = di
             adapOpt.export_diagnostics = True
             adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-            adapOpt.coriolis_frequency = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(SpatialCoordinate(mesh_H)[1])
+            adapOpt.coriolis_frequency = f
             e = exporter.ExportManager(di + 'hdf5',
                                        ['elev_2d', 'uv_2d'],
                                        {'elev_2d': elev_2d, 'uv_2d': uv_2d},
@@ -1053,7 +1053,7 @@ def DWR(startRes, **kwargs):
 #                     uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
 #                 elev_2d, uv_2d = interp(mesh_H, elev_2d, uv_2d)
 #                 P1 = FunctionSpace(mesh_H, "CG", 1)
-#                 b = problemDomain(mesh=mesh_H, op=op)[3]                        # Reset bathymetry on new mesh
+#                 b, BCs, f = problemDomain(mesh=mesh_H, op=op)[3:]
 #                 uv_2d.rename('uv_2d')
 #                 elev_2d.rename('elev_2d')
 #             adaptTimer = clock() - adaptTimer
@@ -1074,7 +1074,7 @@ def DWR(startRes, **kwargs):
 #             adapOpt.output_directory = di
 #             adapOpt.export_diagnostics = True
 #             adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
-#             adapOpt.coriolis_frequency = Function(P1).interpolate(SpatialCoordinate(mesh_H)[1])
+#             adapOpt.coriolis_frequency = f
 #             e = exporter.ExportManager(di + 'hdf5',
 #                                        ['elev_2d', 'uv_2d'],
 #                                        {'elev_2d': elev_2d, 'uv_2d': uv_2d},
@@ -1207,8 +1207,8 @@ if __name__ == "__main__":
     # Choose mode and set parameter values
     op = Options(mode=mode,
                  approach=approach,
-                 # gradate=True if approach in ('DWP', 'DWR') and mode == 'tohoku' else False,
-                 gradate=False,  # TODO: Fix this for tohoku case
+                 gradate=True if approach in ('DWP', 'DWR') and mode == 'tohoku' else False,
+                 # gradate=False,
                  # gradate=True,
                  plotpvd=True if args.o else False,
                  orderChange=orderChange,
