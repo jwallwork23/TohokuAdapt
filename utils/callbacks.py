@@ -235,16 +235,12 @@ def strongResidualSW(solver_obj, UV_new, ELEV_new, UV_old, ELEV_old, Ve=None, op
         elev_old.interpolate(ELEV_old)
         elev_new.interpolate(ELEV_new)
     elif op.refinedSpace:
-        raise NotImplementedError       # TODO
-        # q_old, q_new = mixedPairInterp(Ve, Q_old, Q_new)
-        # uv_old, elev_old = q_old.split()
-        # uv_new, elev_new = q_new.split()
+        uv_old, elev_old, uv_new, elev_new = interp(Ve.mesh(), UV_old, ELEV_old, UV_new, ELEV_new)
     else:
         uv_old = UV_old
         uv_new = UV_new
         elev_old = ELEV_old
         elev_new = ELEV_new
-
     uv_2d = 0.5 * (uv_old + uv_new)         # Use Crank-Nicolson timestepping so that we isolate errors as being
     elev_2d = 0.5 * (elev_old + elev_new)   # related only to the spatial discretisation
 
@@ -352,6 +348,13 @@ class EnrichedErrorCallback(DiagnosticCallback):
         err_e.interpolate(t1)
         err_u.rename("Momentum error")
         err_e.rename("Continuity error")
+
+        # TODO: Could we build in the following functionality?
+                # Load residuals from this remesh period (if existent)
+                # Time integrate in the sense of adding current residual and multiplying by timestep
+                # Store partially time integrated residual for next callback
+        # Not only would it have the effect of considering the 'future' residuals, but it would also weight the residual
+        #   more heavily than the dual. If necessary an averaging procedure could be applied
 
         self.normed_error = self.error.dat.norm
         indexStr = (5 - len(str(self.index))) * '0' + str(self.index)
