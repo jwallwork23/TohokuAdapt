@@ -542,6 +542,8 @@ def DWR(startRes, **kwargs):
     elif op.refinedSpace:                   # Define variables on an iso-P2 refined space
         mesh_h = isoP2(mesh_H)
         Ve = op.mixedSpace(mesh_h)
+        duale = Function(Ve)
+        duale_u, duale_e = duale.split()
         epsilon = Function(FunctionSpace(mesh_h, "CG", 1), name="Error indicator")
     else:                                   # Copy standard variables to mimic enriched space labels
         Ve = V
@@ -691,7 +693,6 @@ def DWR(startRes, **kwargs):
                 if op.plotpvd:
                     residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * k))
 
-
                 # Load adjoint data and form indicators
                 with DumbCheckpoint(op.di + 'hdf5/Adjoint2d_' + indexString(k), mode=FILE_READ) as loadAdj:
                     loadAdj.load(dual_u)
@@ -702,12 +703,15 @@ def DWR(startRes, **kwargs):
                     duale_e.interpolate(dual_e)
                     epsilon.interpolate(assemble(v * inner(rho, duale) * dx))
                 elif op.refinedSpace:
-                    duale = mixedPairInterp(mesh_h, dual)
+                    dual_h_u, dual_h_e = interp(mesh_h, dual_u, dual_e)
+                    duale_u.interpolate(dual_h_u)
+                    duale_e.interpolate(dual_h_e)
+                    print(duale)
                     epsilon.interpolate(assemble(v * inner(rho, duale) * dx))
                 else:
                     epsilon.interpolate(assemble(v * inner(rho, dual) * dx))
                 epsilon = normaliseIndicator(epsilon, op=op)
-                epsilon.rename("Error indicator")   # TODO: Try scaling by H0 as in Rannacher 08
+                epsilon.rename("Error indicator")
                 with DumbCheckpoint(op.di + 'hdf5/ErrorIndicator2d_' + indexString(k), mode=FILE_CREATE) as saveErr:
                     saveErr.store(epsilon)
                     saveErr.close()
