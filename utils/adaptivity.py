@@ -112,6 +112,8 @@ def steadyMetric(f, H=None, op=Options()):
             lam_max = max(lam1, lam2)
             lam1 = max(lam1, ia2 * lam_max)
             lam2 = max(lam2, ia2 * lam_max)
+            if (lam[0] >= 0.9999 * ihmin2) or (lam[1] >= 0.9999 * ihmin2):
+                print("WARNING: minimum element size reached")
 
             # Reconstruct edited Hessian
             M.dat.data[i][0, 0] = lam1 * v1[0] * v1[0] + lam2 * v2[0] * v2[0]
@@ -152,6 +154,8 @@ def steadyMetric(f, H=None, op=Options()):
             lam_max = max(lam1, lam2)
             lam1 = max(lam1, ia2 * lam_max)
             lam2 = max(lam2, ia2 * lam_max)
+            if (lam[0] >= 0.9999 * ihmin2) or (lam[1] >= 0.9999 * ihmin2):
+                print("WARNING: minimum element size reached")
 
             # Reconstruct edited Hessian
             M.dat.data[i][0, 0] = lam1 * v1[0] * v1[0] + lam2 * v2[0] * v2[0]
@@ -221,6 +225,10 @@ def isotropicMetric(f, bdy=False, invert=True, op=Options()):
                 beta = max(1. / hmax2, min(g.dat.data[i, 1], 1. / hmin2))
         M.dat.data[i][0, 0] = alpha
         M.dat.data[i][1, 1] = beta
+
+        if (alpha <= 1.0001 * op.hmin) or (beta <= 1.0001 * op.hmin):
+            print("WARNING: minimum element size reached")
+
     return M
 
 

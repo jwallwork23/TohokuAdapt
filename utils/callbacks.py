@@ -235,7 +235,7 @@ def strongResidualSW(solver_obj, UV_new, ELEV_new, UV_old, ELEV_old, Ve=None, op
         elev_old.interpolate(ELEV_old)
         elev_new.interpolate(ELEV_new)
     elif op.refinedSpace:
-        raise NotImplementedError
+        raise NotImplementedError       # TODO
         # q_old, q_new = mixedPairInterp(Ve, Q_old, Q_new)
         # uv_old, elev_old = q_old.split()
         # uv_new, elev_new = q_new.split()

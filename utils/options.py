@@ -168,7 +168,7 @@ class Options:
             self.coriolis = 'beta'
             self.Tstart = 10.
             self.Tend = 36.
-            self.hmin = 5e-3
+            self.hmin = 1e-3
             self.hmax = 10.
             self.minNorm = 1e-4
             self.rm = 24
