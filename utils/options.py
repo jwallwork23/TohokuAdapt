@@ -54,7 +54,7 @@ class Options:
 
         # Model parameters
         try:
-            assert approach in ('fixedMesh', 'hessianBased', 'DWP', 'DWR')
+            assert approach in ('fixedMesh', 'hessianBased', 'DWP', 'DWR', 'DWR_ho', 'DWR_r')
             self.approach = approach
         except:
             raise ValueError('Meshing strategy %s not recognised' % approach)

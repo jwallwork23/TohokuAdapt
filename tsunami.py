@@ -44,8 +44,7 @@ def fixedMesh(startRes, **kwargs):
         options.timestepper_type = op.timestepper
         options.timestep = op.dt
         options.output_directory = op.di
-        options.export_diagnostics = True
-        options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+        options.no_exports = True
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         cb1 = SWCallback(solver_obj)
         cb1.op = op
@@ -79,11 +78,7 @@ def fixedMesh(startRes, **kwargs):
 
         # Measure error using metrics, as in Huang et al.
         if op.mode == 'rossby-wave':
-            index = int(op.cntT/op.ndump)
-            with DumbCheckpoint(op.di + 'hdf5/Elevation2d_'+indexString(index), mode=FILE_READ) as loadElev:
-                loadElev.load(elev_2d, name='elev_2d')
-                loadElev.close()
-            peak, distance = peakAndDistance(elev_2d, op=op)
+            peak, distance = peakAndDistance(solver_obj.fields.solution_2d.split()[1], op=op)
             quantities['peak'] = peak/peak_a
             quantities['dist'] = distance/distance_a
             quantities['spd'] = distance /(op.Tend * 0.4)
@@ -234,11 +229,7 @@ def hessianBased(startRes, **kwargs):
 
         # Measure error using metrics, as in Huang et al.
         if op.mode == 'rossby-wave':
-            index = int(op.cntT / op.ndump)
-            with DumbCheckpoint(op.di + 'hdf5/Elevation2d_' + indexString(index), mode=FILE_READ) as loadElev:
-                loadElev.load(elev_2d, name='elev_2d')
-                loadElev.close()
-            peak, distance = peakAndDistance(elev_2d, op=op)
+            peak, distance = peakAndDistance(adapSolver.fields.solution_2d.split()[1], op=op)
             quantities['peak'] = peak / peak_a
             quantities['dist'] = distance / distance_a
             quantities['spd'] = distance / (op.Tend * 0.4)
@@ -496,11 +487,7 @@ def DWP(startRes, **kwargs):
 
             # Measure error using metrics, as in Huang et al.
         if op.mode == 'rossby-wave':
-            index = int(op.cntT / op.ndump)
-            with DumbCheckpoint(op.di + 'hdf5/Elevation2d_' + indexString(index), mode=FILE_READ) as loadElev:
-                loadElev.load(elev_2d, name='elev_2d')
-                loadElev.close()
-            peak, distance = peakAndDistance(elev_2d, op=op)
+            peak, distance = peakAndDistance(adapSolver.fields.solution_2d.split()[1], op=op)
             quantities['peak'] = peak / peak_a
             quantities['dist'] = distance / distance_a
             quantities['spd'] = distance / (op.Tend * 0.4)
@@ -845,11 +832,7 @@ def DWR(startRes, **kwargs):
 
             # Measure error using metrics, as in Huang et al.
         if op.mode == 'rossby-wave':
-            index = int(op.cntT / op.ndump)
-            with DumbCheckpoint(op.di + 'hdf5/Elevation2d_' + indexString(index), mode=FILE_READ) as loadElev:
-                loadElev.load(elev_2d, name='elev_2d')
-                loadElev.close()
-            peak, distance = peakAndDistance(elev_2d, op=op)
+            peak, distance = peakAndDistance(adapSolver.fields.solution_2d.split()[1], op=op)
             quantities['peak'] = peak / peak_a
             quantities['dist'] = distance / distance_a
             quantities['spd'] = distance / (op.Tend * 0.4)
@@ -1133,11 +1116,7 @@ def DWR(startRes, **kwargs):
 #
 #             # Measure error using metrics, as in Huang et al.
 #         if op.mode == 'rossby-wave':
-#             index = int(op.cntT / op.ndump)
-#             with DumbCheckpoint(op.di + 'hdf5/Elevation2d_' + indexString(index), mode=FILE_READ) as loadElev:
-#                 loadElev.load(elev_2d, name='elev_2d')
-#                 loadElev.close()
-#             peak, distance = peakAndDistance(elev_2d, op=op)
+#             peak, distance = peakAndDistance(adapSolver.fields.solution_2d.split()[1], op=op)
 #             quantities['peak'] = peak / peak_a
 #             quantities['dist'] = distance / distance_a
 #             quantities['spd'] = distance / (op.Tend * 0.4)
