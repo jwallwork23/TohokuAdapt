@@ -459,7 +459,7 @@ class RossbyWaveSolution:
                           self.function_space.sub(0).ufl_element().degree())
         u0 = Function(W).interpolate(terms['u'])
         u1 = Function(W).interpolate(terms['v'])
-        u.dat.data[:, 0] = u0.dat.data  # TODO: Shouldn't really do this in adjointland
+        u.dat.data[:, 0] = u0.dat.data
         u.dat.data[:, 1] = u1.dat.data
         eta.interpolate(terms['eta'])
 

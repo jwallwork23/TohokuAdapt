@@ -275,7 +275,7 @@ def metricGradation(M, op=Options()):
 
     # Establish arrays for storage and a list of tags for vertices
     v12 = np.zeros(2)
-    v21 = np.zeros(2)   # TODO: Work only with the upper triangular part for speed
+    v21 = np.zeros(2)   # Could work only with the upper triangular part for speed
     verTag = np.zeros(numVer) + 1
     correction = True
     i = 0

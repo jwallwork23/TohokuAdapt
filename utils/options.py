@@ -11,7 +11,7 @@ class Options:
                  family='dg-dg',
                  timestepper='CrankNicolson',
                  approach='fixedMesh',
-                 coriolis='beta',                # TODO: Test beta-plane approximation and check f-plane again
+                 coriolis='sin',
                  rescaling=0.85,
                  hmin=500.,
                  hmax=1e5,
@@ -96,7 +96,7 @@ class Options:
             self.targetError = 1e-3
             self.hessMeth = 'dL2'       # Hessian recovery by double L2 projection. 'parts' also available
         else:
-            self.maxScaling = 5e5       # Maximum scale factor for error estimator  TODO: choose for Tohoku
+            self.maxScaling = 5e5       # Maximum scale factor for error estimator
         if self.approach == "DWR":
             self.rescaling = 0.4        # Chosen small enough to ensure accuracy for a small element count
         else:

@@ -338,7 +338,7 @@ def DWP(startRes, **kwargs):
         N = len(solve_blocks)
         r = N % op.ndump                            # Number of extra tape annotations in setup
         for i in range(N - 1, r - 2, -op.ndump):
-            dual.assign(solve_blocks[i].adj_sol)    # TODO: In some cases a None type appears
+            dual.assign(solve_blocks[i].adj_sol)
             dual_u, dual_e = dual.split()
             with DumbCheckpoint(op.di + 'hdf5/Adjoint2d_' + indexString(int((i - r + 1) / op.ndump)), mode=FILE_CREATE) as saveAdj:
                 saveAdj.store(dual_u)
@@ -710,7 +710,7 @@ def DWR(startRes, **kwargs):
                 loadAdj.load(dual_u)
                 loadAdj.load(dual_e)
                 loadAdj.close()
-            if op.orderChange:                  # TODO: Fix space enrichment functionality
+            if op.orderChange:
                 duale_u.interpolate(dual_u)
                 duale_e.interpolate(dual_e)
                 epsilon.interpolate(assemble(v * inner(rho, duale) * dx))
@@ -955,7 +955,7 @@ def DWR(startRes, **kwargs):
 #             dual.assign(solve_blocks[i].adj_sol)
 #             dual_u, dual_e = dual.split()
 #             with DumbCheckpoint(op.di + 'hdf5/Adjoint2d_' + indexString(int((i - r + 1) / op.rm)),  mode=FILE_CREATE) as saveAdj:
-#                 saveAdj.store(dual_u)                   # TODO: Why not just save ^^^ using same index as timestep?
+#                 saveAdj.store(dual_u)
 #                 saveAdj.store(dual_e)
 #                 saveAdj.close()
 #             if op.plotpvd:
@@ -1003,7 +1003,7 @@ def DWR(startRes, **kwargs):
 #                 adapOpt.coriolis_frequency = Function(FunctionSpace(mesh_H, "CG", 1)).interpolate(
 #                     SpatialCoordinate(mesh_H)[1])
 #                 adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
-#             rho_u, rho_e = strongResidualSW(adapSolver)     # TODO: Account for space enrichment
+#             rho_u, rho_e = strongResidualSW(adapSolver)
 #             residual_u.interpolate(rho_u)
 #             residual_e.interpolate(rho_e)
 #             residual_u.rename("Velocity residual")
@@ -1021,7 +1021,7 @@ def DWR(startRes, **kwargs):
 #             else:
 #                 new_dual_u.interpolate(dual_u)
 #                 new_dual_e.interpolate(dual_e)
-#             if op.refinedSpace:                 # TODO: Fix space enrichment functionality
+#             if op.refinedSpace:
 #                 raise NotImplementedError
 #             duale_u.interpolate(new_dual_u)
 #             duale_e.interpolate(new_dual_e)
