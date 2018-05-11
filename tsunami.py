@@ -664,57 +664,59 @@ def DWR(startRes, **kwargs):
         dualTimer = clock() - dualTimer
         print('Dual run complete. Run time: %.3fs' % dualTimer)
 
+        with pyadjoint.stop_annotating():
+
+            errorTimer = clock()
+            for k in range(0, int(op.cntT / op.rm)):
+                print('Generating error estimate %d / %d' % (k + 1, int(op.cntT / op.rm)))
+                # with DumbCheckpoint(op.di + 'hdf5/Error2d_' + indexString(k), mode=FILE_READ) as loadRes:
+                #     loadRes.load(rho_u, name="Momentum error")
+                #     loadRes.load(rho_e, name="Continuity error")
+                #     loadRes.close()
+
+                # Generate residuals
+                with DumbCheckpoint(op.di + 'hdf5/Velocity2d_' + indexString(k), mode=FILE_READ) as loadVel:
+                    loadVel.load(uv_2d, name="uv_2d")
+                    loadVel.close()
+                with DumbCheckpoint(op.di + 'hdf5/Elevation2d_' + indexString(k), mode=FILE_READ) as loadElev:
+                    loadElev.load(elev_2d, name="elev_2d")
+                    loadElev.close()
+                with DumbCheckpoint(op.di + 'hdf5/Previous2d_' + indexString(k), mode=FILE_READ) as loadPrev:
+                    loadPrev.load(uv_old, name="Previous velocity")
+                    loadPrev.load(elev_old, name="Previous elevation")
+                    loadPrev.close()
+                err_u, err_e = strongResidualSW(solver_obj, uv_2d, elev_2d, uv_old, elev_old, Ve, op=op)
+                rho_u.interpolate(err_u)
+                rho_e.interpolate(err_e)
+                if op.plotpvd:
+                    residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * k))
+
+
+                # Load adjoint data and form indicators
+                with DumbCheckpoint(op.di + 'hdf5/Adjoint2d_' + indexString(k), mode=FILE_READ) as loadAdj:
+                    loadAdj.load(dual_u)
+                    loadAdj.load(dual_e)
+                    loadAdj.close()
+                if op.orderChange:
+                    duale_u.interpolate(dual_u)
+                    duale_e.interpolate(dual_e)
+                    epsilon.interpolate(assemble(v * inner(rho, duale) * dx))
+                elif op.refinedSpace:
+                    duale = mixedPairInterp(mesh_h, dual)
+                    epsilon.interpolate(assemble(v * inner(rho, duale) * dx))
+                else:
+                    epsilon.interpolate(assemble(v * inner(rho, dual) * dx))
+                epsilon = normaliseIndicator(epsilon, op=op)
+                epsilon.rename("Error indicator")   # TODO: Try scaling by H0 as in Rannacher 08
+                with DumbCheckpoint(op.di + 'hdf5/ErrorIndicator2d_' + indexString(k), mode=FILE_CREATE) as saveErr:
+                    saveErr.store(epsilon)
+                    saveErr.close()
+                if op.plotpvd:
+                    errorFile.write(epsilon, time=float(k))
+            errorTimer = clock() - errorTimer
+            print('Errors estimated. Run time: %.3fs' % errorTimer)
+
     with pyadjoint.stop_annotating():
-
-        errorTimer = clock()
-        for k in range(0, int(op.cntT / op.rm)):
-            print('Generating error estimate %d / %d' % (k + 1, int(op.cntT / op.rm)))
-            # with DumbCheckpoint(op.di + 'hdf5/Error2d_' + indexString(k), mode=FILE_READ) as loadRes:
-            #     loadRes.load(rho_u, name="Momentum error")
-            #     loadRes.load(rho_e, name="Continuity error")
-            #     loadRes.close()
-
-            # Generate residuals
-            with DumbCheckpoint(op.di + 'hdf5/Velocity2d_' + indexString(k), mode=FILE_READ) as loadVel:
-                loadVel.load(uv_2d, name="uv_2d")
-                loadVel.close()
-            with DumbCheckpoint(op.di + 'hdf5/Elevation2d_' + indexString(k), mode=FILE_READ) as loadElev:
-                loadElev.load(elev_2d, name="elev_2d")
-                loadElev.close()
-            with DumbCheckpoint(op.di + 'hdf5/Previous2d_' + indexString(k), mode=FILE_READ) as loadPrev:
-                loadPrev.load(uv_old, name="Previous velocity")
-                loadPrev.load(elev_old, name="Previous elevation")
-                loadPrev.close()
-            err_u, err_e = strongResidualSW(solver_obj, uv_2d, elev_2d, uv_old, elev_old, Ve, op=op)
-            rho_u.interpolate(err_u)
-            rho_e.interpolate(err_e)
-            if op.plotpvd:
-                residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * k))
-
-
-            # Load adjoint data and form indicators
-            with DumbCheckpoint(op.di + 'hdf5/Adjoint2d_' + indexString(k), mode=FILE_READ) as loadAdj:
-                loadAdj.load(dual_u)
-                loadAdj.load(dual_e)
-                loadAdj.close()
-            if op.orderChange:
-                duale_u.interpolate(dual_u)
-                duale_e.interpolate(dual_e)
-                epsilon.interpolate(assemble(v * inner(rho, duale) * dx))
-            elif op.refinedSpace:
-                duale = mixedPairInterp(mesh_h, dual)
-                epsilon.interpolate(assemble(v * inner(rho, duale) * dx))
-            else:
-                epsilon.interpolate(assemble(v * inner(rho, dual) * dx))
-            epsilon = normaliseIndicator(epsilon, op=op)
-            epsilon.rename("Error indicator")   # TODO: Try scaling by H0 as in Rannacher 08
-            with DumbCheckpoint(op.di + 'hdf5/ErrorIndicator2d_' + indexString(k), mode=FILE_CREATE) as saveErr:
-                saveErr.store(epsilon)
-                saveErr.close()
-            if op.plotpvd:
-                errorFile.write(epsilon, time=float(k))
-        errorTimer = clock() - errorTimer
-        print('Errors estimated. Run time: %.3fs' % errorTimer)
 
         # Run adaptive primal run
         cnt = 0

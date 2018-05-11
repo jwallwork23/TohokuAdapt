@@ -13,7 +13,7 @@ class Options:
                  approach='fixedMesh',
                  coriolis='sin',
                  rescaling=0.85,
-                 hmin=500.,
+                 hmin=10.,
                  hmax=1e5,
                  minNorm=1.,
                  maxAnisotropy=100,

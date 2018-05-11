@@ -93,6 +93,7 @@ def steadyMetric(f, H=None, op=Options()):
     ihmin2 = 1. / pow(op.hmin, 2)           # Inverse square minimal side-length
     ihmax2 = 1. / pow(op.hmax, 2)           # Inverse square maximal side-length
     M = Function(V)
+
     if op.normalisation == 'manual':
         f_min = 1e-3  # Minimum tolerated value for the solution field
 
@@ -113,7 +114,7 @@ def steadyMetric(f, H=None, op=Options()):
             lam1 = max(lam1, ia2 * lam_max)
             lam2 = max(lam2, ia2 * lam_max)
             if (lam[0] >= 0.9999 * ihmin2) or (lam[1] >= 0.9999 * ihmin2):
-                print("WARNING: minimum element size reached")
+                print("WARNING: minimum element size reached as %.2e" % np.sqrt(min(1./lam[0], 1./lam[1])))
 
             # Reconstruct edited Hessian
             M.dat.data[i][0, 0] = lam1 * v1[0] * v1[0] + lam2 * v2[0] * v2[0]
@@ -155,7 +156,7 @@ def steadyMetric(f, H=None, op=Options()):
             lam1 = max(lam1, ia2 * lam_max)
             lam2 = max(lam2, ia2 * lam_max)
             if (lam[0] >= 0.9999 * ihmin2) or (lam[1] >= 0.9999 * ihmin2):
-                print("WARNING: minimum element size reached")
+                print("WARNING: minimum element size reached as %.2e" % np.sqrt(min(1./lam[0], 1./lam[1])))
 
             # Reconstruct edited Hessian
             M.dat.data[i][0, 0] = lam1 * v1[0] * v1[0] + lam2 * v2[0] * v2[0]
@@ -179,8 +180,9 @@ def normaliseIndicator(f, op=Options()):
     else:
         gnorm = max(assemble(sqrt(inner(f, f)) * dx), op.minNorm)   # Equivalent thresholded metric complexity
     scaleFactor = min(op.nVerT / gnorm, op.maxScaling)              # Cap error estimate, also computational cost
+    if scaleFactor == op.maxScaling:
+        print("WARNING: maximum scaling for error estimator reached as %.2e" % (op.nVerT / gnorm))
     # print("#### DEBUG: Complexity = %.4e" % gnorm)
-    # print("#### DEBUG: Scale factor = %.4e" % (op.nVerT / gnorm))
     f.dat.data[:] = np.abs(f.dat.data) * scaleFactor
 
     return f
@@ -226,8 +228,8 @@ def isotropicMetric(f, bdy=False, invert=True, op=Options()):
         M.dat.data[i][0, 0] = alpha
         M.dat.data[i][1, 1] = beta
 
-        if (alpha <= 1.0001 * op.hmin) or (beta <= 1.0001 * op.hmin):
-            print("WARNING: minimum element size reached")
+        if (alpha >= 0.9999 / hmin2) or (beta >= 0.9999 / hmin2):
+            print("WARNING: minimum element size reached as %.2e" % np.sqrt(min(1./alpha, 1./beta)))
 
     return M
 
