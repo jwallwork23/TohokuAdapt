@@ -11,7 +11,7 @@ from utils.adaptivity import *
 from utils.callbacks import *
 from utils.interpolation import interp, mixedPairInterp
 from utils.setup import problemDomain, RossbyWaveSolution
-from utils.misc import indexString, peakAndDistance, meshStats
+from utils.misc import indexString, peakAndDistance
 from utils.options import Options
 
 
@@ -26,7 +26,7 @@ def fixedMesh(startRes, **kwargs):
         except:
             physical_constants['g_grav'].assign(op.g)
         mesh, u0, eta0, b, BCs, f = problemDomain(startRes, op=op)
-        nEle = meshStats(mesh)[0]
+        nEle = mesh.num_cells()
         V = op.mixedSpace(mesh)
         if op.mode == 'rossby-wave':            # Analytic final-time state
             peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
@@ -110,8 +110,8 @@ def hessianBased(startRes, **kwargs):
             peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
 
         # Initialise parameters and counters
-        nEle, op.nVerT = meshStats(mesh)
-        op.nVerT *= op.rescaling  # Target #Vertices
+        nEle = mesh.num_cells()
+        op.nVerT = mesh.num_vertices() * op.rescaling   # Target #Vertices
         mM = [nEle, nEle]  # Min/max #Elements
         Sn = nEle
         cnt = 0
@@ -220,7 +220,7 @@ def hessianBased(startRes, **kwargs):
                 quantities['TV P06'] = cb4.totalVariation()
 
             # Get mesh stats
-            nEle = meshStats(mesh)[0]
+            nEle = mesh.num_cells()
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
             cnt += op.rm
@@ -275,8 +275,8 @@ def DWP(startRes, **kwargs):
     epsilon_ = Function(P1)
 
     # Initialise parameters and counters
-    nEle, op.nVerT = meshStats(mesh)
-    op.nVerT *= op.rescaling  # Target #Vertices
+    nEle = mesh.num_cells()
+    op.nVerT = mesh.num_vertices() * op.rescaling  # Target #Vertices
     mM = [nEle, nEle]  # Min/max #Elements
     Sn = nEle
     endT = 0.
@@ -478,7 +478,7 @@ def DWP(startRes, **kwargs):
                 quantities['TV P06'] = cb4.totalVariation()
 
             # Get mesh stats
-            nEle = meshStats(mesh)[0]
+            nEle = mesh.num_cells()
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
             cnt += op.rm
@@ -555,8 +555,8 @@ def DWR(startRes, **kwargs):
     rho_e.rename("Continuity error")
 
     # Initialise parameters and counters
-    nEle, op.nVerT = meshStats(mesh_H)
-    op.nVerT *= op.rescaling  # Target #Vertices
+    nEle = mesh_H.num_cells()
+    op.nVerT = mesh_H.num_vertices() *  op.rescaling  # Target #Vertices
     mM = [nEle, nEle]  # Min/max #Elements
     Sn = nEle
     endT = 0.
@@ -828,7 +828,7 @@ def DWR(startRes, **kwargs):
                 quantities['TV P06'] = cb4.totalVariation()
 
             # Get mesh stats
-            nEle = meshStats(mesh_H)[0]
+            nEle = mesh_H.num_cells()
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
             cnt += op.rm
@@ -887,8 +887,8 @@ def DWR(startRes, **kwargs):
 #     new_dual_u, new_dual_e = new_dual.split()
 #
 #     # Initialise parameters and counters
-#     nEle, op.nVerT = meshStats(mesh_H)
-#     op.nVerT *= op.rescaling  # Target #Vertices
+#     nEle = mesh.num_cells()
+#     op.nVerT = mesh.num_vertices() * op.rescaling  # Target #Vertices
 #     mM = [nEle, nEle]  # Min/max #Elements
 #     Sn = nEle
 #     endT = 0.
@@ -1112,7 +1112,7 @@ def DWR(startRes, **kwargs):
 #                 quantities['TV P06'] = cb4.totalVariation()
 #
 #             # Get mesh stats
-#             nEle = meshStats(mesh_H)[0]
+#             nEle = mesh.num_cells()
 #             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
 #             Sn += nEle
 #             cnt += op.rm
