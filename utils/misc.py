@@ -7,7 +7,7 @@ from .interpolation import interp
 from .options import Options
 
 
-__all__ = ["indexString", "cheatCodes", "getMax", "peakAndDistance"]
+__all__ = ["indexString", "getMax", "peakAndDistance"]
 
 
 def indexString(index):
@@ -16,41 +16,6 @@ def indexString(index):
     :return: five-digit string form of index.
     """
     return (5 - len(str(index))) * '0' + str(index)
-
-
-def cheatCodes(approach, default='DWR'):
-    """
-    Enable skipping of sections of code using 'saved' and 'regen'.
-    
-    :arg approach: user specified input.
-    :return: approach to use and keys to skip sections.
-    """
-    approach = approach or default
-    if approach in ('norm', 'fieldBased', 'gradientBased', 'hessianBased', 'fluxJump'):
-        getData = False
-        getError = False
-        useAdjoint = False
-        aposteriori = False
-    elif approach in ('residual', 'explicit', 'implicit', 'DWR', 'DWE', 'DWP'):
-        getData = True
-        getError = True
-        useAdjoint = approach in ('DWR', 'DWE', 'DWP')
-        aposteriori = True
-    elif approach in ('saved', 'regen'):
-        getError = approach == 'regen'
-        approach = input("""Choose error estimator from 'residual', 'explicit', 'implicit', 'DWP', 'DWR' or 'DWE': """)\
-                   or 'DWR'
-        getData = False
-        useAdjoint = approach in ('DWR', 'DWE', 'DWP')
-        aposteriori = True
-    else:
-        approach = 'fixedMesh'
-        getData = True
-        getError = False
-        useAdjoint = False
-        aposteriori = False
-
-    return approach, getData, getError, useAdjoint, aposteriori
 
 
 def getMax(array):

@@ -26,7 +26,6 @@ def fixedMesh(startRes, **kwargs):
         except:
             physical_constants['g_grav'].assign(op.g)
         mesh, u0, eta0, b, BCs, f = problemDomain(startRes, op=op)
-        nEle = mesh.num_cells()
         V = op.mixedSpace(mesh)
         if op.mode == 'rossby-wave':            # Analytic final-time state
             peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
@@ -84,7 +83,7 @@ def fixedMesh(startRes, **kwargs):
             quantities['spd'] = distance /(op.Tend * 0.4)
 
         # Output mesh statistics and solver times
-        quantities['meanElements'] = nEle
+        quantities['meanElements'] = mesh.num_cells()
         quantities['solverTimer'] = solverTimer
         quantities['adaptSolveTimer'] = 0.
 

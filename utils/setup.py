@@ -143,6 +143,7 @@ if __name__ == "__main__":
 else:
     from thetis import *
     from thetis_adjoint import *
+    from firedrake.petsc import PETSc
 
     import scipy.interpolate as si
     from scipy.io.netcdf import NetCDFFile
@@ -243,7 +244,11 @@ def problemDomain(level=0, mesh=None, op=Options(mode='tohoku')):
         BCs = {1: {'uv': Constant(0.)}, 2: {'uv': Constant(0.)}, 3: {'uv': Constant(0.)}, 4: {'uv': Constant(0.)}}
         f = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
     else:
-        raise NotImplementedError
+        raise
+
+    PETSc.Sys.Print("Setting up mesh across %d processes" % COMM_WORLD.size)
+    PETSc.Sys.Print("  rank %d owns %d elements and can access %d vertices" \
+                    % (mesh.comm.rank, mesh.num_cells(), mesh.num_vertices()), comm=COMM_SELF)
 
     return mesh, u0, eta0, b, BCs, f
 
