@@ -2,6 +2,7 @@ from thetis_adjoint import *
 from thetis.field_defs import field_metadata
 import pyadjoint
 from fenics_adjoint.solving import SolveBlock                                       # For extracting adjoint solutions
+from firedrake.petsc import PETSc
 
 import numpy as np
 from time import clock
@@ -27,7 +28,6 @@ def fixedMesh(startRes, **kwargs):
         mesh, u0, eta0, b, BCs, f = problemDomain(startRes, op=op)
         nEle = meshStats(mesh)[0]
         V = op.mixedSpace(mesh)
-        uv_2d, elev_2d = Function(V).split()    # Needed to load data into
         if op.mode == 'rossby-wave':            # Analytic final-time state
             peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
 
@@ -706,7 +706,6 @@ def DWR(startRes, **kwargs):
                     dual_h_u, dual_h_e = interp(mesh_h, dual_u, dual_e)
                     duale_u.interpolate(dual_h_u)
                     duale_e.interpolate(dual_h_e)
-                    print(duale)
                     epsilon.interpolate(assemble(v * inner(rho, duale) * dx))
                 else:
                     epsilon.interpolate(assemble(v * inner(rho, dual) * dx))
@@ -1170,7 +1169,6 @@ if __name__ == "__main__":
         mode = 'tohoku'
     else:
         mode = args.t
-    print("Mode: %s, approach: %s" % (mode, approach))
     orderChange = 0
     if args.ho:
         assert not args.r
@@ -1186,8 +1184,6 @@ if __name__ == "__main__":
     op = Options(mode=mode,
                  approach=approach,
                  gradate=True if approach in ('DWP', 'DWR') and mode == 'tohoku' else False,
-                 # gradate=False,
-                 # gradate=True,
                  plotpvd=True if args.o else False,
                  orderChange=orderChange,
                  refinedSpace=True if args.r else False,
@@ -1220,11 +1216,12 @@ if __name__ == "__main__":
     Jlist = np.zeros(len(resolutions))
     for i in resolutions:
         quantities = solver(i, regen=bool(args.regen), mirror=bool(args.mirror), op=op)
+        PETSc.Sys.Print("Mode: %s Approach: %s. Run: %d" % (mode, approach, i), comm=COMM_WORLD)
         rel = np.abs(op.J - quantities['J_h']) / np.abs(op.J)
         if op.mode == "rossby-wave":
             quantities["Mirrored OF error"] = np.abs(op.J_mirror - quantities['J_h mirrored']) / np.abs(op.J_mirror)
-        print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs OF error: %.4e"
-              % (i, quantities['meanElements'], quantities['J_h'], quantities['solverTimer'], rel))
+        PETSc.Sys.Print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs OF error: %.4e"
+              % (i, quantities['meanElements'], quantities['J_h'], quantities['solverTimer'], rel), comm=COMM_WORLD)
         errorFile.write('%d, %.4e' % (quantities['meanElements'], rel))
         for tag in ("peak", "dist", "spd", "TV P02", "TV P06", "J_h mirrored", "Mirrored OF error"):
             if tag in quantities:
@@ -1234,7 +1231,7 @@ if __name__ == "__main__":
             files[tag].writelines(["%s," % val for val in quantities[tag]])
             files[tag].write("\n")
         if approach in ("DWP", "DWR"):
-            print("Time for final run: %.1fs" % quantities['adaptSolveTimer'])
+            PETSc.Sys.Print("Time for final run: %.1fs" % quantities['adaptSolveTimer'], comm=COMM_WORLD)
     for tag in files:
         files[tag].close()
     errorFile.close()
