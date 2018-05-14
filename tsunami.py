@@ -574,7 +574,7 @@ def DWR(startRes, **kwargs):
         options.use_grad_div_viscosity_term = True                      # Symmetric viscous stress
         options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
         options.coriolis_frequency = f
-        options.simulation_export_time = op.dt * op.rm
+        options.simulation_export_time = op.dt * op.ndump
         options.simulation_end_time = op.Tend
         options.timestepper_type = op.timestepper
         options.timestep = op.dt
@@ -585,38 +585,15 @@ def DWR(startRes, **kwargs):
         cb1 = ObjectiveSWCallback(solver_obj)
         cb1.op = op
         cb1.mirror = kwargs.get('mirror')
-        # if op.orderChange:
-        #     cb2 = HigherOrderResidualCallback(solver_obj, Ve)
-        # elif op.refinedSpace:
-        #     cb2 = RefinedResidualCallback(solver_obj, Ve)
-        # else:
-        #     cb2 = ResidualCallback(solver_obj)
         solver_obj.add_callback(cb1, 'timestep')
-        # solver_obj.add_callback(cb2, 'export')
         solver_obj.bnd_functions['shallow_water'] = BCs
         initTimer = clock() - initTimer
         print('Problem initialised. Setup time: %.3fs' % initTimer)
 
-        # primalTimer = clock()
-        # solver_obj.iterate()
-        # primalTimer = clock() - primalTimer
-
         cnt = 0
         primalTimer = 0.
-        options.simulation_end_time = op.dt * op.rm
+        options.simulation_end_time = op.dt * op.ndump
         while solver_obj.simulation_time < op.Tend - 0.5 * op.dt:
-
-            # # Calculate and store residuals
-            # with pyadjoint.stop_annotating():
-            #     err_u, err_e = strongResidualSW(solver_obj, Ve, op=op)
-            #     rho_u.interpolate(err_u)
-            #     rho_e.interpolate(err_e)
-            #     with DumbCheckpoint(op.di + 'hdf5/Error2d_' + indexString(cnt), mode=FILE_CREATE) as saveRes:
-            #         saveRes.store(rho_u)
-            #         saveRes.store(rho_e)
-            #         saveRes.close()
-            #     if op.plotpvd:
-            #         residualFile.write(rho_u, rho_e, time=solver_obj.simulation_time)
 
             with pyadjoint.stop_annotating():
                 uv_old, elev_old = solver_obj.timestepper.solution_old.split()
@@ -628,14 +605,14 @@ def DWR(startRes, **kwargs):
                     savePrev.close()
 
                 if cnt != 0:
-                    solver_obj.load_state(cnt, iteration=cnt*op.rm)
+                    solver_obj.load_state(cnt, iteration=cnt*op.ndump)
 
             # Run simulation
             stepTimer = clock()
             solver_obj.iterate()
             stepTimer = clock() - stepTimer
             primalTimer += stepTimer
-            options.simulation_end_time += op.dt * op.rm
+            options.simulation_end_time += op.dt * op.ndump
             cnt += 1
 
         J = cb1.quadrature()                        # Assemble objective functional for adjoint computation
@@ -667,13 +644,10 @@ def DWR(startRes, **kwargs):
 
         with pyadjoint.stop_annotating():
 
+            residuals = {'Velocity': [], 'Elevation': []}
             errorTimer = clock()
-            for k in range(0, int(op.cntT / op.rm)):
-                print('Generating error estimate %d / %d' % (k + 1, int(op.cntT / op.rm)))
-                # with DumbCheckpoint(op.di + 'hdf5/Error2d_' + indexString(k), mode=FILE_READ) as loadRes:
-                #     loadRes.load(rho_u, name="Momentum error")
-                #     loadRes.load(rho_e, name="Continuity error")
-                #     loadRes.close()
+            for k in range(0, int(op.cntT / op.ndump)):
+                print('Generating error estimate %d / %d' % (int(k/op.dumpsPerRemesh) + 1, int(op.cntT / op.rm)))
 
                 # Generate residuals
                 with DumbCheckpoint(op.di + 'hdf5/Velocity2d_' + indexString(k), mode=FILE_READ) as loadVel:
@@ -687,34 +661,42 @@ def DWR(startRes, **kwargs):
                     loadPrev.load(elev_old, name="Previous elevation")
                     loadPrev.close()
                 err_u, err_e = strongResidualSW(solver_obj, uv_2d, elev_2d, uv_old, elev_old, Ve, op=op)
-                rho_u.interpolate(err_u)
-                rho_e.interpolate(err_e)
-                if op.plotpvd:
-                    residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * k))
-
-                # Load adjoint data and form indicators
-                with DumbCheckpoint(op.di + 'hdf5/Adjoint2d_' + indexString(k), mode=FILE_READ) as loadAdj:
-                    loadAdj.load(dual_u)
-                    loadAdj.load(dual_e)
-                    loadAdj.close()
-                if op.orderChange:
-                    duale_u.interpolate(dual_u)
-                    duale_e.interpolate(dual_e)
-                    epsilon.interpolate(assemble(v * inner(rho, duale) * dx))
-                elif op.refinedSpace:
-                    dual_h_u, dual_h_e = interp(mesh_h, dual_u, dual_e)
-                    duale_u.interpolate(dual_h_u)
-                    duale_e.interpolate(dual_h_e)
-                    epsilon.interpolate(assemble(v * inner(rho, duale) * dx))
+                if k % op.dumpsPerRemesh != 0:
+                    residuals['Velocity'].append(err_u)
+                    residuals['Elevation'].append(err_e)
                 else:
-                    epsilon.interpolate(assemble(v * inner(rho, dual) * dx))
-                epsilon = normaliseIndicator(epsilon, op=op)
-                epsilon.rename("Error indicator")
-                with DumbCheckpoint(op.di + 'hdf5/ErrorIndicator2d_' + indexString(k), mode=FILE_CREATE) as saveErr:
-                    saveErr.store(epsilon)
-                    saveErr.close()
-                if op.plotpvd:
-                    errorFile.write(epsilon, time=float(k))
+                    # Time integrate residual over current 'window'
+                    err_u = op.dt * sum(residuals['Velocity'][i] + residuals['Velocity'][i-1] for i in range(1, op.dumpsPerRemesh))
+                    err_e = op.dt * sum(residuals['Elevation'][i] + residuals['Elevation'][i-1] for i in range(1, op.dumpsPerRemesh))
+                    rho_u.interpolate(err_u)
+                    rho_e.interpolate(err_e)
+                    residuals = {'Velocity': [], 'Elevation': []}
+                    if op.plotpvd:
+                        residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * k))
+
+                    # Load adjoint data and form indicators
+                    with DumbCheckpoint(op.di + 'hdf5/Adjoint2d_' + indexString(k/op.dumpsPerRemesh), mode=FILE_READ) as loadAdj:
+                        loadAdj.load(dual_u)
+                        loadAdj.load(dual_e)
+                        loadAdj.close()
+                    if op.orderChange:
+                        duale_u.interpolate(dual_u)
+                        duale_e.interpolate(dual_e)
+                        epsilon.interpolate(assemble(v * inner(rho, duale) * dx))
+                    elif op.refinedSpace:
+                        dual_h_u, dual_h_e = interp(mesh_h, dual_u, dual_e)
+                        duale_u.interpolate(dual_h_u)
+                        duale_e.interpolate(dual_h_e)
+                        epsilon.interpolate(assemble(v * inner(rho, duale) * dx))
+                    else:
+                        epsilon.interpolate(assemble(v * inner(rho, dual) * dx))
+                    epsilon = normaliseIndicator(epsilon, op=op)
+                    epsilon.rename("Error indicator")
+                    with DumbCheckpoint(op.di + 'hdf5/ErrorIndicator2d_' + indexString(k/op.dumpsPerRemesh), mode=FILE_CREATE) as saveErr:
+                        saveErr.store(epsilon)
+                        saveErr.close()
+                    if op.plotpvd:
+                        errorFile.write(epsilon, time=float(op.dt * op.rm * k))
             errorTimer = clock() - errorTimer
             print('Errors estimated. Run time: %.3fs' % errorTimer)
 

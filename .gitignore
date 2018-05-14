@@ -9,6 +9,7 @@
 *.pvtu
 *.vtu
 *.log
+*.patch
 
 ## Directories to be ignored:
 

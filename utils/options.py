@@ -202,6 +202,11 @@ class Options:
         self.iStart = int(self.Tstart / (self.ndump * self.dt))     # First exported timestep of period of interest
         self.iEnd = int(self.cntT / self.ndump)                     # Final exported timestep of period of interest
         self.rmEnd = int(self.cntT / self.rm)                       # Final mesh index
+        try:
+            assert self.rm % self.ndump == 0
+            self.dumpsPerRemesh = self.rm / self.ndump
+        except:
+            raise ValueError("Timesteps per data dump should divide timesteps per remesh")
 
         # Specify FunctionSpaces
         self.degree1 = 2 if self.family == 'cg-cg' else 1
