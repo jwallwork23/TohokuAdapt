@@ -2,8 +2,6 @@ from firedrake import *
 
 import numpy as np
 
-from .adaptivity import isoP2
-from .interpolation import interp
 from .options import Options
 
 
@@ -34,8 +32,7 @@ def getMax(array):
 
 def peakAndDistance(f, op=Options()):
     mesh = f.function_space().mesh()
-    # peak_i, peak = getMax(interp(isoP2(mesh), f).dat.data)
-    peak_i, peak = getMax(f.dat.data)
+    peak_i, peak = getMax(f.dat.data)   # TODO: This doesn't work in parallel
     dgCoords = Function(VectorFunctionSpace(mesh, op.space2, op.degree2)).interpolate(mesh.coordinates)
 
     return peak, np.abs(dgCoords.dat.data[peak_i][0])
