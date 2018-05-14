@@ -1,0 +1,1169 @@
+From c0af679d4f17c6cc4714086ee8ab2bd6fa251dca Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Thu, 26 Apr 2018 09:14:32 +0100
+Subject: [PATCH 01/17] timesteps_per_remesh option parameter for mesh
+ adaptivity
+
+---
+ thetis/options.py | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/thetis/options.py b/thetis/options.py
+index 95fe1a9..5818f03 100644
+--- a/thetis/options.py
++++ b/thetis/options.py
+@@ -386,6 +386,12 @@ class CommonModelOptions(FrozenConfigurable):
+         """).tag(config=True)
+     simulation_end_time = PositiveFloat(
+         1000.0, help="Simulation duration in seconds").tag(config=True)
++    timesteps_per_remesh = NonNegativeInteger(
++        10, help="""
++        Number of timesteps between each mesh adaptation
++
++        For use in mesh adaptivity.
++        """).tag(config=True)
+     horizontal_velocity_scale = FiredrakeConstant(
+         Constant(0.1), help="""
+         Maximum horizontal velocity magnitude
+-- 
+2.12.0
+
+
+From 51c8b6acd77da90ac34fbeb2a14a20d630f08530 Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Thu, 26 Apr 2018 09:33:30 +0100
+Subject: [PATCH 02/17] Callbacks for evaluating objective functionals and
+ gauge timeseries
+
+---
+ thetis/callback.py | 70 ++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 70 insertions(+)
+
+diff --git a/thetis/callback.py b/thetis/callback.py
+index 8cdad40..138cf77 100644
+--- a/thetis/callback.py
++++ b/thetis/callback.py
+@@ -454,3 +454,73 @@ class DetectorsCallback(DiagnosticCallback):
+             field_vals.append(np.reshape(self._evaluate_field(field_name), (ndetectors, -1)))
+ 
+         return np.hstack(field_vals)
++
++
++class FunctionalCallback(DiagnosticCallback):
++    """Base class for callbacks that evalutate a functional involving integrals in both time and space. Time 
++    integration is achieved using the trapezium rule."""
++    variable_names = ['current integral', 'objective value']
++
++    def __init__(self, scalar_callback, solver_obj, **kwargs):
++        """
++        Creates error comparison check callback object
++
++        :arg scalar_callback: Python function that takes the solver object as an argument and
++            returns a scalar quantity of interest
++        :arg solver_obj: Thetis solver object
++        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
++        """
++        super(FunctionalCallback, self).__init__(solver_obj, **kwargs)
++        self.scalar_callback = scalar_callback
++        self.objective_value = [scalar_callback()]
++        self.append_to_hdf5 = False
++        self.append_to_log = False
++        self.dt = solver_obj.options.timestep
++
++    def __call__(self):
++        value = self.scalar_callback()
++        self.objective_value.append(value)
++
++        return value, self.objective_value
++
++    def message_str(self, *args):
++        line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
++        return line
++
++    def quadrature(self):
++        func = self.objective_value
++        J = 0
++        for i in range(1, len(func)):
++            J += 0.5 * (func[i] + func[i-1]) * self.dt
++        return J
++
++
++class GaugeCallback(DiagnosticCallback):
++    """Base class for callbacks that evaluate a scalar quantity at a particular gauge location over all time.
++    Evaluations are based around the initial value being zero."""
++    variable_names = ['current value', 'gauge values']
++
++    def __init__(self, scalar_callback, solver_obj, **kwargs):
++        """
++        Creates gauge callback object
++
++        :arg scalar_callback: Python function that takes the solver object as an argument and
++            returns a scalar quantity of interest
++        :arg solver_obj: Thetis solver object
++        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
++        """
++        super(GaugeCallback, self).__init__(solver_obj, **kwargs)
++        self.scalar_callback = scalar_callback
++        self.init_value = scalar_callback()
++        self.gauge_values = [0.]
++        self.append_to_hdf5 = False
++        self.append_to_log = False
++
++    def __call__(self):
++        value = self.scalar_callback()
++        self.gauge_values.append(value - self.init_value)
++        return value, self.gauge_values
++
++    def message_str(self, *args):
++        line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
++        return line
+-- 
+2.12.0
+
+
+From 786c8af16727a5397b6a60f146957f120ae75f1e Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Thu, 26 Apr 2018 10:01:11 +0100
+Subject: [PATCH 03/17] Realised GaugeCallback is probably superfluous given
+ DetectorsCallback exists
+
+---
+ thetis/callback.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/thetis/callback.py b/thetis/callback.py
+index 138cf77..258d7a5 100644
+--- a/thetis/callback.py
++++ b/thetis/callback.py
+@@ -495,7 +495,7 @@ class FunctionalCallback(DiagnosticCallback):
+         return J
+ 
+ 
+-class GaugeCallback(DiagnosticCallback):
++class GaugeCallback(DiagnosticCallback):    # TODO: This is probably superfluous. Could just use DetectorsCallback?
+     """Base class for callbacks that evaluate a scalar quantity at a particular gauge location over all time.
+     Evaluations are based around the initial value being zero."""
+     variable_names = ['current value', 'gauge values']
+-- 
+2.12.0
+
+
+From b84e8ab4645b6fcf9f0c1b0dda1ff2208e9195cc Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Thu, 26 Apr 2018 15:41:16 +0100
+Subject: [PATCH 04/17] Extra documentation for FunctionalCallback
+
+---
+ thetis/callback.py | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/thetis/callback.py b/thetis/callback.py
+index 258d7a5..7ee7c45 100644
+--- a/thetis/callback.py
++++ b/thetis/callback.py
+@@ -457,8 +457,10 @@ class DetectorsCallback(DiagnosticCallback):
+ 
+ 
+ class FunctionalCallback(DiagnosticCallback):
+-    """Base class for callbacks that evalutate a functional involving integrals in both time and space. Time 
+-    integration is achieved using the trapezium rule."""
++    """Base class for callbacks that evaluate a functional involving integrals in both time and space. This callback
++    can also be used to assemble time dependent objective functionals for adjoint simulations.
++    
++    Time integration is achieved using the trapezium rule."""
+     variable_names = ['current integral', 'objective value']
+ 
+     def __init__(self, scalar_callback, solver_obj, **kwargs):
+-- 
+2.12.0
+
+
+From fc234ff588ba0043a0c1cc9fb3fa77928ef70ea2 Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Thu, 26 Apr 2018 15:56:47 +0100
+Subject: [PATCH 05/17] Reformatted callbacks in line with others
+
+---
+ thetis/callback.py | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/thetis/callback.py b/thetis/callback.py
+index 7ee7c45..6a23bd7 100644
+--- a/thetis/callback.py
++++ b/thetis/callback.py
+@@ -472,11 +472,11 @@ class FunctionalCallback(DiagnosticCallback):
+         :arg solver_obj: Thetis solver object
+         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+         """
++        kwargs.setdefault('export_to_hdf5', False)
++        kwargs.setdefault('append_to_log', False)
+         super(FunctionalCallback, self).__init__(solver_obj, **kwargs)
+         self.scalar_callback = scalar_callback
+         self.objective_value = [scalar_callback()]
+-        self.append_to_hdf5 = False
+-        self.append_to_log = False
+         self.dt = solver_obj.options.timestep
+ 
+     def __call__(self):
+@@ -511,12 +511,12 @@ class GaugeCallback(DiagnosticCallback):    # TODO: This is probably superfluous
+         :arg solver_obj: Thetis solver object
+         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+         """
++        kwargs.setdefault('export_to_hdf5', False)
++        kwargs.setdefault('append_to_log', False)
+         super(GaugeCallback, self).__init__(solver_obj, **kwargs)
+         self.scalar_callback = scalar_callback
+         self.init_value = scalar_callback()
+         self.gauge_values = [0.]
+-        self.append_to_hdf5 = False
+-        self.append_to_log = False
+ 
+     def __call__(self):
+         value = self.scalar_callback()
+-- 
+2.12.0
+
+
+From 202292713cc16ac552c375e4cad2a34c20514810 Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Thu, 26 Apr 2018 15:59:46 +0100
+Subject: [PATCH 06/17] Attempt to remove problematic whitespace
+
+---
+ thetis/callback.py | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/thetis/callback.py b/thetis/callback.py
+index 6a23bd7..417a889 100644
+--- a/thetis/callback.py
++++ b/thetis/callback.py
+@@ -458,9 +458,8 @@ class DetectorsCallback(DiagnosticCallback):
+ 
+ class FunctionalCallback(DiagnosticCallback):
+     """Base class for callbacks that evaluate a functional involving integrals in both time and space. This callback
+-    can also be used to assemble time dependent objective functionals for adjoint simulations.
+-    
+-    Time integration is achieved using the trapezium rule."""
++    can also be used to assemble time dependent objective functionals for adjoint simulations. Time integration is
++    achieved using the trapezium rule."""
+     variable_names = ['current integral', 'objective value']
+ 
+     def __init__(self, scalar_callback, solver_obj, **kwargs):
+-- 
+2.12.0
+
+
+From d0a852b37d6fb4eee2e82583cf4872aceabdd4d9 Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Sat, 28 Apr 2018 10:04:24 +0100
+Subject: [PATCH 07/17] Draft of ErrorCallback for strong residual computation
+
+---
+ thetis/callback.py | 38 +++++++++++++++++++++++++++++++++++---
+ 1 file changed, 35 insertions(+), 3 deletions(-)
+
+diff --git a/thetis/callback.py b/thetis/callback.py
+index 417a889..131f681 100644
+--- a/thetis/callback.py
++++ b/thetis/callback.py
+@@ -167,7 +167,7 @@ class DiagnosticCallback(object):
+ 
+     def set_write_mode(self, mode):
+         """
+-        Define whether to create a new hdf5 file or append to an exisiting one
++        Define whether to create a new hdf5 file or append to an existing one
+ 
+         :arg str mode: Either 'create' (default) or 'append'
+         """
+@@ -467,7 +467,7 @@ class FunctionalCallback(DiagnosticCallback):
+         Creates error comparison check callback object
+ 
+         :arg scalar_callback: Python function that takes the solver object as an argument and
+-            returns a scalar quantity of interest
++            returns a list of values of an objective functional.
+         :arg solver_obj: Thetis solver object
+         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+         """
+@@ -506,7 +506,7 @@ class GaugeCallback(DiagnosticCallback):    # TODO: This is probably superfluous
+         Creates gauge callback object
+ 
+         :arg scalar_callback: Python function that takes the solver object as an argument and
+-            returns a scalar quantity of interest
++            returns a single point value of a field related to the fluid state.
+         :arg solver_obj: Thetis solver object
+         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+         """
+@@ -525,3 +525,35 @@ class GaugeCallback(DiagnosticCallback):    # TODO: This is probably superfluous
+     def message_str(self, *args):
+         line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
+         return line
++
++
++class ErrorCallback(DiagnosticCallback):
++    """Base class for callbacks that evaluate an error quantity (such as the strong residual) of the shallow water
++    equations."""
++    variable_names = ['error', 'normed error']
++
++    def __init__(self, scalar_callback, solver_obj, **kwargs):
++        """
++        Creates error callback object
++
++        :arg scalar_callback: Python function that takes the solver object as an argument and
++            returns the equation residual at the current timestep.
++        :arg solver_obj: Thetis solver object
++        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
++        """
++        kwargs.setdefault('export_to_hdf5', True)
++        kwargs.setdefault('append_to_log', True)    # TODO: Will this work with field object?
++        super(ErrorCallback, self).__init__(solver_obj, **kwargs)
++        self.scalar_callback = scalar_callback
++        self.error = Function(solver_obj.fields.solution_2d.function_space())   # Intially zero residual
++        self.normed_error = 0
++
++    def __call__(self):
++        value = self.scalar_callback()      # Constructs residual
++        self.error.interpolate(value)
++        self.normed_error = self.error.dat.norm()
++        return self.error, self.normed_error
++
++    def message_str(self, *args):
++        line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
++        return line
+-- 
+2.12.0
+
+
+From d5fe4c459996187180dcec88a033813fdee66680 Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Sat, 28 Apr 2018 10:40:32 +0100
+Subject: [PATCH 08/17] (Untested) draft of ResidualCallback class
+
+---
+ thetis/callback.py | 72 ++++++++++++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 62 insertions(+), 10 deletions(-)
+
+diff --git a/thetis/callback.py b/thetis/callback.py
+index 131f681..fc38779 100644
+--- a/thetis/callback.py
++++ b/thetis/callback.py
+@@ -528,15 +528,15 @@ class GaugeCallback(DiagnosticCallback):    # TODO: This is probably superfluous
+ 
+ 
+ class ErrorCallback(DiagnosticCallback):
+-    """Base class for callbacks that evaluate an error quantity (such as the strong residual) of the shallow water
+-    equations."""
++    """Base class for callbacks that evaluate an error quantity (such as the strong residual) of the prognostic
++    equation."""
+     variable_names = ['error', 'normed error']
+ 
+-    def __init__(self, scalar_callback, solver_obj, **kwargs):
++    def __init__(self, tuple_callback, solver_obj, **kwargs):
+         """
+         Creates error callback object
+ 
+-        :arg scalar_callback: Python function that takes the solver object as an argument and
++        :arg tuple_callback: Python function that takes the solver object as an argument and
+             returns the equation residual at the current timestep.
+         :arg solver_obj: Thetis solver object
+         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+@@ -544,16 +544,68 @@ class ErrorCallback(DiagnosticCallback):
+         kwargs.setdefault('export_to_hdf5', True)
+         kwargs.setdefault('append_to_log', True)    # TODO: Will this work with field object?
+         super(ErrorCallback, self).__init__(solver_obj, **kwargs)
+-        self.scalar_callback = scalar_callback
+-        self.error = Function(solver_obj.fields.solution_2d.function_space())   # Intially zero residual
+-        self.normed_error = 0
++        self.tuple_callback = tuple_callback
++        self.error = Function(solver_obj.fields.solution_2d.function_space())   # Intial zero error
++        self.normed_error = 0.
+ 
+     def __call__(self):
+-        value = self.scalar_callback()      # Constructs residual
+-        self.error.interpolate(value)
+-        self.normed_error = self.error.dat.norm()
++        r0, r1 = self.tuple_callback()      # Constructs error quantities TODO: Consider 3D case
++        R0, R1 = self.error.split()
++        R0.interpolate(r0)
++        R1.interpolate(r1)
++        self.normed_error = self.error.dat.norm
+         return self.error, self.normed_error
+ 
+     def message_str(self, *args):
+         line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
+         return line
++
++
++class ResidualSWCallback(ErrorCallback):
++    """Computes strong residual in shallow water case."""
++    name = 'SW strong residual'
++
++    def __init__(self, solver_obj, **kwargs):
++        """
++        :arg solver_obj: Thetis solver object
++        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
++        """
++
++        def residualSW(Ve, solver_obj):
++            """
++            Construct the strong residual for the semi-discrete linear shallow water equations at the current timestep.
++
++            :arg Ve: enriched finite element space in which to compute strong residual.
++            :arg solver_obj: thetis solver object containing parameters and fields.
++            :return: strong residual for shallow water equations at current timestep.
++            """
++
++            # Collect fields and parameters
++            nu = solver_obj.fields.get('viscosity_h')
++            Dt = Constant(solver_obj.options.timestep)
++            uv_old, elev_old = solver_obj.timestepper.solution_old.split()
++            uv_2d, elev_2d = solver_obj.fields.solution_2d.split()
++            H = solver_obj.fields.bathymetry_2d + elev_2d
++            g = physical_constants['g_grav']
++
++            # Momentum equation
++            Au = (uv_2d - uv_old) / Dt + g * grad(elev_2d)  # TODO: Other terms to include
++            if solver_obj.options.use_nonlinear_equations:
++                Au += dot(uv_2d, nabla_grad(uv_2d))
++            if solver_obj.options.coriolis_frequency is not None:
++                Au += solver_obj.options.coriolis_frequency * as_vector((-uv_2d[1], uv_2d[0]))
++            if nu is not None:
++                if solver_obj.options.use_grad_depth_viscosity_term:
++                    Au -= dot(nu * grad(H), (grad(uv_2d) + sym(grad(uv_2d))))
++                if solver_obj.options.use_grad_div_viscosity_term:
++                    Au -= div(nu * (grad(uv_2d) + sym(grad(uv_2d))))
++                else:
++                    Au -= div(nu * grad(uv_2d))
++
++            # Continuity equation
++            Ae = (elev_2d - elev_old) / Dt + div((solver_obj.fields.bathymetry_2d + elev_2d) * uv_2d)
++
++            return Au, Ae
++
++
++        super(ResidualSWCallback, self).__init__(residualSW, solver_obj, **kwargs)
+-- 
+2.12.0
+
+
+From ec68b58ee03b26f965133851a7e17171389bce1f Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Sat, 28 Apr 2018 11:07:47 +0100
+Subject: [PATCH 09/17] ResidualSWCallback runs but cannot currently export to
+ hdf5.
+
+---
+ thetis/callback.py | 15 ++++++---------
+ 1 file changed, 6 insertions(+), 9 deletions(-)
+
+diff --git a/thetis/callback.py b/thetis/callback.py
+index fc38779..388b3e5 100644
+--- a/thetis/callback.py
++++ b/thetis/callback.py
+@@ -541,15 +541,15 @@ class ErrorCallback(DiagnosticCallback):
+         :arg solver_obj: Thetis solver object
+         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+         """
+-        kwargs.setdefault('export_to_hdf5', True)
+-        kwargs.setdefault('append_to_log', True)    # TODO: Will this work with field object?
++        kwargs.setdefault('export_to_hdf5', False)      # TODO: Perhaps have separate callbacks for each component?
++        kwargs.setdefault('append_to_log', True)
+         super(ErrorCallback, self).__init__(solver_obj, **kwargs)
+         self.tuple_callback = tuple_callback
+         self.error = Function(solver_obj.fields.solution_2d.function_space())   # Intial zero error
+         self.normed_error = 0.
+ 
+     def __call__(self):
+-        r0, r1 = self.tuple_callback()      # Constructs error quantities TODO: Consider 3D case
++        r0, r1 = self.tuple_callback()      # Constructs error quantities   TODO: Consider 3D case
+         R0, R1 = self.error.split()
+         R0.interpolate(r0)
+         R1.interpolate(r1)
+@@ -571,12 +571,10 @@ class ResidualSWCallback(ErrorCallback):
+         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+         """
+ 
+-        def residualSW(Ve, solver_obj):
++        def residualSW():   # TODO: More terms to include
+             """
+-            Construct the strong residual for the semi-discrete linear shallow water equations at the current timestep.
++            Construct the strong residual for the semi-discrete shallow water equations at the current timestep.
+ 
+-            :arg Ve: enriched finite element space in which to compute strong residual.
+-            :arg solver_obj: thetis solver object containing parameters and fields.
+             :return: strong residual for shallow water equations at current timestep.
+             """
+ 
+@@ -589,7 +587,7 @@ class ResidualSWCallback(ErrorCallback):
+             g = physical_constants['g_grav']
+ 
+             # Momentum equation
+-            Au = (uv_2d - uv_old) / Dt + g * grad(elev_2d)  # TODO: Other terms to include
++            Au = (uv_2d - uv_old) / Dt + g * grad(elev_2d)
+             if solver_obj.options.use_nonlinear_equations:
+                 Au += dot(uv_2d, nabla_grad(uv_2d))
+             if solver_obj.options.coriolis_frequency is not None:
+@@ -607,5 +605,4 @@ class ResidualSWCallback(ErrorCallback):
+ 
+             return Au, Ae
+ 
+-
+         super(ResidualSWCallback, self).__init__(residualSW, solver_obj, **kwargs)
+-- 
+2.12.0
+
+
+From 47b2e63f3b530440404bcfb63ff1359ed62bb487 Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Sat, 28 Apr 2018 13:54:44 +0100
+Subject: [PATCH 10/17] Separate continuity and momentum error callbacks
+
+---
+ thetis/callback.py | 106 +++++++++++++++++++++++++++++++++++++++--------------
+ 1 file changed, 79 insertions(+), 27 deletions(-)
+
+diff --git a/thetis/callback.py b/thetis/callback.py
+index 388b3e5..8d74ace 100644
+--- a/thetis/callback.py
++++ b/thetis/callback.py
+@@ -527,32 +527,29 @@ class GaugeCallback(DiagnosticCallback):    # TODO: This is probably superfluous
+         return line
+ 
+ 
+-class ErrorCallback(DiagnosticCallback):
+-    """Base class for callbacks that evaluate an error quantity (such as the strong residual) of the prognostic
+-    equation."""
++class MomentumErrorCallback(DiagnosticCallback):
++    """Base class for callbacks that evaluate an error quantity (such as the strong residual) related to the momentum
++    component of the prognostic equation."""
+     variable_names = ['error', 'normed error']
+ 
+-    def __init__(self, tuple_callback, solver_obj, **kwargs):
++    def __init__(self, vector_callback, solver_obj, **kwargs):
+         """
+         Creates error callback object
+ 
+-        :arg tuple_callback: Python function that takes the solver object as an argument and
++        :arg scalar_or_vector_callback: Python function that takes the solver object as an argument and
+             returns the equation residual at the current timestep.
+         :arg solver_obj: Thetis solver object
+         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+         """
+-        kwargs.setdefault('export_to_hdf5', False)      # TODO: Perhaps have separate callbacks for each component?
++        kwargs.setdefault('export_to_hdf5', False)      # TODO
+         kwargs.setdefault('append_to_log', True)
+-        super(ErrorCallback, self).__init__(solver_obj, **kwargs)
+-        self.tuple_callback = tuple_callback
+-        self.error = Function(solver_obj.fields.solution_2d.function_space())   # Intial zero error
++        super(MomentumErrorCallback, self).__init__(solver_obj, **kwargs)
++        self.vector_callback = vector_callback
++        self.error = Function(solver_obj.fields.solution_2d.function_space().sub(0))   # Intial zero error
+         self.normed_error = 0.
+ 
+     def __call__(self):
+-        r0, r1 = self.tuple_callback()      # Constructs error quantities   TODO: Consider 3D case
+-        R0, R1 = self.error.split()
+-        R0.interpolate(r0)
+-        R1.interpolate(r1)
++        self.error.interpolate(self.vector_callback())
+         self.normed_error = self.error.dat.norm
+         return self.error, self.normed_error
+ 
+@@ -561,9 +558,9 @@ class ErrorCallback(DiagnosticCallback):
+         return line
+ 
+ 
+-class ResidualSWCallback(ErrorCallback):
++class MomentumResidualCallback(MomentumErrorCallback):
+     """Computes strong residual in shallow water case."""
+-    name = 'SW strong residual'
++    name = 'momentum strong residual'
+ 
+     def __init__(self, solver_obj, **kwargs):
+         """
+@@ -571,7 +568,7 @@ class ResidualSWCallback(ErrorCallback):
+         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+         """
+ 
+-        def residualSW():   # TODO: More terms to include
++        def momentum_residual():   # TODO: More terms to include
+             """
+             Construct the strong residual for the semi-discrete shallow water equations at the current timestep.
+ 
+@@ -586,23 +583,78 @@ class ResidualSWCallback(ErrorCallback):
+             H = solver_obj.fields.bathymetry_2d + elev_2d
+             g = physical_constants['g_grav']
+ 
+-            # Momentum equation
+-            Au = (uv_2d - uv_old) / Dt + g * grad(elev_2d)
++            # Construct residual
++            res = (uv_2d - uv_old) / Dt + g * grad(elev_2d)
+             if solver_obj.options.use_nonlinear_equations:
+-                Au += dot(uv_2d, nabla_grad(uv_2d))
++                res += dot(uv_2d, nabla_grad(uv_2d))
+             if solver_obj.options.coriolis_frequency is not None:
+-                Au += solver_obj.options.coriolis_frequency * as_vector((-uv_2d[1], uv_2d[0]))
++                res += solver_obj.options.coriolis_frequency * as_vector((-uv_2d[1], uv_2d[0]))
+             if nu is not None:
+                 if solver_obj.options.use_grad_depth_viscosity_term:
+-                    Au -= dot(nu * grad(H), (grad(uv_2d) + sym(grad(uv_2d))))
++                    res -= dot(nu * grad(H), (grad(uv_2d) + sym(grad(uv_2d))))
+                 if solver_obj.options.use_grad_div_viscosity_term:
+-                    Au -= div(nu * (grad(uv_2d) + sym(grad(uv_2d))))
++                    res -= div(nu * (grad(uv_2d) + sym(grad(uv_2d))))
+                 else:
+-                    Au -= div(nu * grad(uv_2d))
++                    res -= div(nu * grad(uv_2d))
+ 
+-            # Continuity equation
+-            Ae = (elev_2d - elev_old) / Dt + div((solver_obj.fields.bathymetry_2d + elev_2d) * uv_2d)
++            return res
+ 
+-            return Au, Ae
++        super(MomentumResidualCallback, self).__init__(momentum_residual, solver_obj, **kwargs)
+ 
+-        super(ResidualSWCallback, self).__init__(residualSW, solver_obj, **kwargs)
++
++class ContinuityErrorCallback(DiagnosticCallback):
++    """Base class for callbacks that evaluate an error quantity (such as the strong residual) related to the continuity 
++    component of the prognostic equation."""
++    variable_names = ['error', 'normed error']
++
++    def __init__(self, scalar_callback, solver_obj, **kwargs):
++        """
++        Creates error callback object
++
++        :arg scalar_or_vector_callback: Python function that takes the solver object as an argument and
++            returns the equation residual at the current timestep.
++        :arg solver_obj: Thetis solver object
++        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
++        """
++        kwargs.setdefault('export_to_hdf5', False)      # TODO
++        kwargs.setdefault('append_to_log', True)
++        super(ContinuityErrorCallback, self).__init__(solver_obj, **kwargs)
++        self.scalar_callback = scalar_callback
++        self.error = Function(solver_obj.fields.solution_2d.function_space().sub(1))   # Intial zero error
++        self.normed_error = 0.
++
++    def __call__(self):
++        self.error.interpolate(self.scalar_callback())
++        self.normed_error = self.error.dat.norm
++        return self.error, self.normed_error
++
++    def message_str(self, *args):
++        line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
++        return line
++
++
++class ContinuityResidualCallback(ContinuityErrorCallback):
++    """Computes strong residual in shallow water case."""
++    name = 'continuity strong residual'
++
++    def __init__(self, solver_obj, **kwargs):
++        """
++        :arg solver_obj: Thetis solver object
++        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
++        """
++
++        def continuity_residual():
++            """
++            Construct the strong residual for the semi-discrete shallow water equations at the current timestep.
++
++            :return: strong residual for shallow water equations at current timestep.
++            """
++
++            # Collect fields and parameters
++            Dt = Constant(solver_obj.options.timestep)
++            uv_old, elev_old = solver_obj.timestepper.solution_old.split()
++            uv_2d, elev_2d = solver_obj.fields.solution_2d.split()
++
++            return (elev_2d - elev_old) / Dt + div((solver_obj.fields.bathymetry_2d + elev_2d) * uv_2d)
++
++        super(ContinuityResidualCallback, self).__init__(continuity_residual, solver_obj, **kwargs)
+-- 
+2.12.0
+
+
+From 161c5d3a02e14fdba9b2377cbd121773f69365e8 Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Sat, 28 Apr 2018 14:22:59 +0100
+Subject: [PATCH 11/17] Save residuals to hdf5 (in a slightly hacky way)
+
+---
+ thetis/callback.py | 22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
+
+diff --git a/thetis/callback.py b/thetis/callback.py
+index 8d74ace..269d752 100644
+--- a/thetis/callback.py
++++ b/thetis/callback.py
+@@ -541,16 +541,23 @@ class MomentumErrorCallback(DiagnosticCallback):
+         :arg solver_obj: Thetis solver object
+         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+         """
+-        kwargs.setdefault('export_to_hdf5', False)      # TODO
++        kwargs.setdefault('export_to_hdf5', False)  # Needs a different functionality as output is a Function
+         kwargs.setdefault('append_to_log', True)
+         super(MomentumErrorCallback, self).__init__(solver_obj, **kwargs)
+         self.vector_callback = vector_callback
+-        self.error = Function(solver_obj.fields.solution_2d.function_space().sub(0))   # Intial zero error
++        self.error = Function(solver_obj.fields.solution_2d.function_space().sub(0), name="Momentum error")
+         self.normed_error = 0.
++        self.index = 0
++        self.di = solver_obj.options.output_directory
+ 
+     def __call__(self):
+         self.error.interpolate(self.vector_callback())
+         self.normed_error = self.error.dat.norm
++        indexStr = (5 - len(str(self.index))) * '0' + str(self.index)
++        with DumbCheckpoint(self.di + 'hdf5/MomentumResidual2d_' + indexStr, mode=FILE_CREATE) as saveRes:
++            saveRes.store(self.error)
++            saveRes.close()
++        self.index += 1
+         return self.error, self.normed_error
+ 
+     def message_str(self, *args):
+@@ -616,16 +623,23 @@ class ContinuityErrorCallback(DiagnosticCallback):
+         :arg solver_obj: Thetis solver object
+         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+         """
+-        kwargs.setdefault('export_to_hdf5', False)      # TODO
++        kwargs.setdefault('export_to_hdf5', False)  # Needs a different functionality as output is a Function
+         kwargs.setdefault('append_to_log', True)
+         super(ContinuityErrorCallback, self).__init__(solver_obj, **kwargs)
+         self.scalar_callback = scalar_callback
+-        self.error = Function(solver_obj.fields.solution_2d.function_space().sub(1))   # Intial zero error
++        self.error = Function(solver_obj.fields.solution_2d.function_space().sub(1), name="Continuity error")
+         self.normed_error = 0.
++        self.index = 0
++        self.di = solver_obj.options.output_directory
+ 
+     def __call__(self):
+         self.error.interpolate(self.scalar_callback())
+         self.normed_error = self.error.dat.norm
++        indexStr = (5 - len(str(self.index))) * '0' + str(self.index)
++        with DumbCheckpoint(self.di + 'hdf5/ContinuityResidual2d_' + indexStr, mode=FILE_CREATE) as saveRes:
++            saveRes.store(self.error)
++            saveRes.close()
++        self.index += 1
+         return self.error, self.normed_error
+ 
+     def message_str(self, *args):
+-- 
+2.12.0
+
+
+From 6e48fe33ed1d4f18d453076d34f6aadb4f194224 Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Sun, 29 Apr 2018 12:51:47 +0100
+Subject: [PATCH 12/17] timesteps_per_remesh not actually needed
+
+---
+ thetis/options.py | 6 ------
+ 1 file changed, 6 deletions(-)
+
+diff --git a/thetis/options.py b/thetis/options.py
+index 5818f03..95fe1a9 100644
+--- a/thetis/options.py
++++ b/thetis/options.py
+@@ -386,12 +386,6 @@ class CommonModelOptions(FrozenConfigurable):
+         """).tag(config=True)
+     simulation_end_time = PositiveFloat(
+         1000.0, help="Simulation duration in seconds").tag(config=True)
+-    timesteps_per_remesh = NonNegativeInteger(
+-        10, help="""
+-        Number of timesteps between each mesh adaptation
+-
+-        For use in mesh adaptivity.
+-        """).tag(config=True)
+     horizontal_velocity_scale = FiredrakeConstant(
+         Constant(0.1), help="""
+         Maximum horizontal velocity magnitude
+-- 
+2.12.0
+
+
+From 511c4cf5af794ac45fab97290c9c423ea6e79e7f Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Sun, 29 Apr 2018 14:39:53 +0100
+Subject: [PATCH 13/17] Removed trailing whitespace
+
+---
+ thetis/callback.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/thetis/callback.py b/thetis/callback.py
+index 269d752..166db67 100644
+--- a/thetis/callback.py
++++ b/thetis/callback.py
+@@ -610,7 +610,7 @@ class MomentumResidualCallback(MomentumErrorCallback):
+ 
+ 
+ class ContinuityErrorCallback(DiagnosticCallback):
+-    """Base class for callbacks that evaluate an error quantity (such as the strong residual) related to the continuity 
++    """Base class for callbacks that evaluate an error quantity (such as the strong residual) related to the continuity
+     component of the prognostic equation."""
+     variable_names = ['error', 'normed error']
+ 
+-- 
+2.12.0
+
+
+From 463dc3d478c81338e2913a93517ef7a4ddccba12 Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Mon, 30 Apr 2018 14:21:21 +0100
+Subject: [PATCH 14/17] Decided it is better to combine ResidualCallback
+ components, for heightened generality.
+
+---
+ thetis/callback.py | 114 ++++++++++++++---------------------------------------
+ 1 file changed, 29 insertions(+), 85 deletions(-)
+
+diff --git a/thetis/callback.py b/thetis/callback.py
+index 166db67..c523583 100644
+--- a/thetis/callback.py
++++ b/thetis/callback.py
+@@ -527,12 +527,12 @@ class GaugeCallback(DiagnosticCallback):    # TODO: This is probably superfluous
+         return line
+ 
+ 
+-class MomentumErrorCallback(DiagnosticCallback):
+-    """Base class for callbacks that evaluate an error quantity (such as the strong residual) related to the momentum
+-    component of the prognostic equation."""
++class ErrorCallback(DiagnosticCallback):
++    """Base class for callbacks that evaluate an error quantity (such as the strong residual) related to the prognostic
++    equation."""
+     variable_names = ['error', 'normed error']
+ 
+-    def __init__(self, vector_callback, solver_obj, **kwargs):
++    def __init__(self, tuple_callback, solver_obj, **kwargs):
+         """
+         Creates error callback object
+ 
+@@ -543,19 +543,26 @@ class MomentumErrorCallback(DiagnosticCallback):
+         """
+         kwargs.setdefault('export_to_hdf5', False)  # Needs a different functionality as output is a Function
+         kwargs.setdefault('append_to_log', True)
+-        super(MomentumErrorCallback, self).__init__(solver_obj, **kwargs)
+-        self.vector_callback = vector_callback
+-        self.error = Function(solver_obj.fields.solution_2d.function_space().sub(0), name="Momentum error")
++        super(ErrorCallback, self).__init__(solver_obj, **kwargs)
++        self.tuple_callback = tuple_callback        # Error quantifier with 2 components: momentum and continuity
++        self.error = Function(solver_obj.fields.solution_2d.function_space())
+         self.normed_error = 0.
+         self.index = 0
+         self.di = solver_obj.options.output_directory
+ 
+     def __call__(self):
+-        self.error.interpolate(self.vector_callback())
++        t0, t1 = self.tuple_callback()
++        err_u, err_e = self.error.split()
++        err_u.interpolate(t0)
++        err_e.interpolate(t1)
++        err_u.rename("Momentum error")
++        err_e.rename("Continuity error")
++
+         self.normed_error = self.error.dat.norm
+         indexStr = (5 - len(str(self.index))) * '0' + str(self.index)
+-        with DumbCheckpoint(self.di + 'hdf5/MomentumResidual2d_' + indexStr, mode=FILE_CREATE) as saveRes:
+-            saveRes.store(self.error)
++        with DumbCheckpoint(self.di + 'hdf5/Error2d_' + indexStr, mode=FILE_CREATE) as saveRes:
++            saveRes.store(err_u)
++            saveRes.store(err_e)
+             saveRes.close()
+         self.index += 1
+         return self.error, self.normed_error
+@@ -565,9 +572,9 @@ class MomentumErrorCallback(DiagnosticCallback):
+         return line
+ 
+ 
+-class MomentumResidualCallback(MomentumErrorCallback):
++class ResidualCallback(ErrorCallback):
+     """Computes strong residual in shallow water case."""
+-    name = 'momentum strong residual'
++    name = 'strong residual'
+ 
+     def __init__(self, solver_obj, **kwargs):
+         """
+@@ -575,7 +582,7 @@ class MomentumResidualCallback(MomentumErrorCallback):
+         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+         """
+ 
+-        def momentum_residual():   # TODO: More terms to include
++        def residualSW():   # TODO: More terms to include
+             """
+             Construct the strong residual for the semi-discrete shallow water equations at the current timestep.
+ 
+@@ -591,84 +598,21 @@ class MomentumResidualCallback(MomentumErrorCallback):
+             g = physical_constants['g_grav']
+ 
+             # Construct residual
+-            res = (uv_2d - uv_old) / Dt + g * grad(elev_2d)
++            res_u = (uv_2d - uv_old) / Dt + g * grad(elev_2d)
+             if solver_obj.options.use_nonlinear_equations:
+-                res += dot(uv_2d, nabla_grad(uv_2d))
++                res_u += dot(uv_2d, nabla_grad(uv_2d))
+             if solver_obj.options.coriolis_frequency is not None:
+-                res += solver_obj.options.coriolis_frequency * as_vector((-uv_2d[1], uv_2d[0]))
++                res_u += solver_obj.options.coriolis_frequency * as_vector((-uv_2d[1], uv_2d[0]))
+             if nu is not None:
+                 if solver_obj.options.use_grad_depth_viscosity_term:
+-                    res -= dot(nu * grad(H), (grad(uv_2d) + sym(grad(uv_2d))))
++                    res_u -= dot(nu * grad(H), (grad(uv_2d) + sym(grad(uv_2d))))
+                 if solver_obj.options.use_grad_div_viscosity_term:
+-                    res -= div(nu * (grad(uv_2d) + sym(grad(uv_2d))))
++                    res_u -= div(nu * (grad(uv_2d) + sym(grad(uv_2d))))
+                 else:
+-                    res -= div(nu * grad(uv_2d))
+-
+-            return res
+-
+-        super(MomentumResidualCallback, self).__init__(momentum_residual, solver_obj, **kwargs)
+-
+-
+-class ContinuityErrorCallback(DiagnosticCallback):
+-    """Base class for callbacks that evaluate an error quantity (such as the strong residual) related to the continuity
+-    component of the prognostic equation."""
+-    variable_names = ['error', 'normed error']
+-
+-    def __init__(self, scalar_callback, solver_obj, **kwargs):
+-        """
+-        Creates error callback object
+-
+-        :arg scalar_or_vector_callback: Python function that takes the solver object as an argument and
+-            returns the equation residual at the current timestep.
+-        :arg solver_obj: Thetis solver object
+-        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+-        """
+-        kwargs.setdefault('export_to_hdf5', False)  # Needs a different functionality as output is a Function
+-        kwargs.setdefault('append_to_log', True)
+-        super(ContinuityErrorCallback, self).__init__(solver_obj, **kwargs)
+-        self.scalar_callback = scalar_callback
+-        self.error = Function(solver_obj.fields.solution_2d.function_space().sub(1), name="Continuity error")
+-        self.normed_error = 0.
+-        self.index = 0
+-        self.di = solver_obj.options.output_directory
+-
+-    def __call__(self):
+-        self.error.interpolate(self.scalar_callback())
+-        self.normed_error = self.error.dat.norm
+-        indexStr = (5 - len(str(self.index))) * '0' + str(self.index)
+-        with DumbCheckpoint(self.di + 'hdf5/ContinuityResidual2d_' + indexStr, mode=FILE_CREATE) as saveRes:
+-            saveRes.store(self.error)
+-            saveRes.close()
+-        self.index += 1
+-        return self.error, self.normed_error
+-
+-    def message_str(self, *args):
+-        line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
+-        return line
+-
+-
+-class ContinuityResidualCallback(ContinuityErrorCallback):
+-    """Computes strong residual in shallow water case."""
+-    name = 'continuity strong residual'
+-
+-    def __init__(self, solver_obj, **kwargs):
+-        """
+-        :arg solver_obj: Thetis solver object
+-        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+-        """
++                    res_u -= div(nu * grad(uv_2d))
+ 
+-        def continuity_residual():
+-            """
+-            Construct the strong residual for the semi-discrete shallow water equations at the current timestep.
+-
+-            :return: strong residual for shallow water equations at current timestep.
+-            """
+-
+-            # Collect fields and parameters
+-            Dt = Constant(solver_obj.options.timestep)
+-            uv_old, elev_old = solver_obj.timestepper.solution_old.split()
+-            uv_2d, elev_2d = solver_obj.fields.solution_2d.split()
++            res_e = (elev_2d - elev_old) / Dt + div((solver_obj.fields.bathymetry_2d + elev_2d) * uv_2d)
+ 
+-            return (elev_2d - elev_old) / Dt + div((solver_obj.fields.bathymetry_2d + elev_2d) * uv_2d)
++            return res_u, res_e
+ 
+-        super(ContinuityResidualCallback, self).__init__(continuity_residual, solver_obj, **kwargs)
++        super(ResidualCallback, self).__init__(residualSW, solver_obj, **kwargs)
+-- 
+2.12.0
+
+
+From 0c30d6808aa819df20da8bc1fc514d7acd74c6de Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Tue, 1 May 2018 12:41:32 +0100
+Subject: [PATCH 15/17] Small change in ordering
+
+---
+ thetis/callback.py | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/thetis/callback.py b/thetis/callback.py
+index c523583..4882662 100644
+--- a/thetis/callback.py
++++ b/thetis/callback.py
+@@ -573,7 +573,7 @@ class ErrorCallback(DiagnosticCallback):
+ 
+ 
+ class ResidualCallback(ErrorCallback):
+-    """Computes strong residual in shallow water case."""
++    """Computes strong residual for the shallow water case."""
+     name = 'strong residual'
+ 
+     def __init__(self, solver_obj, **kwargs):
+@@ -588,12 +588,12 @@ class ResidualCallback(ErrorCallback):
+ 
+             :return: strong residual for shallow water equations at current timestep.
+             """
++            uv_old, elev_old = solver_obj.timestepper.solution_old.split()
++            uv_2d, elev_2d = solver_obj.fields.solution_2d.split()
+ 
+             # Collect fields and parameters
+             nu = solver_obj.fields.get('viscosity_h')
+             Dt = Constant(solver_obj.options.timestep)
+-            uv_old, elev_old = solver_obj.timestepper.solution_old.split()
+-            uv_2d, elev_2d = solver_obj.fields.solution_2d.split()
+             H = solver_obj.fields.bathymetry_2d + elev_2d
+             g = physical_constants['g_grav']
+ 
+-- 
+2.12.0
+
+
+From fa88681f27e7b8dddb61d9c1fbfe3a1e300d6392 Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Mon, 7 May 2018 13:41:16 +0100
+Subject: [PATCH 16/17] Included option for extracting values without using
+ __call__
+
+---
+ thetis/callback.py | 52 ++++++----------------------------------------------
+ 1 file changed, 6 insertions(+), 46 deletions(-)
+
+diff --git a/thetis/callback.py b/thetis/callback.py
+index 0b181a9..bb2cb95 100644
+--- a/thetis/callback.py
++++ b/thetis/callback.py
+@@ -511,6 +511,9 @@ class FunctionalCallback(DiagnosticCallback):
+ 
+         return value, self.objective_value
+ 
++    def getVals(self):
++        return self.objective_value
++
+     def message_str(self, *args):
+         line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
+         return line
+@@ -549,6 +552,9 @@ class GaugeCallback(DiagnosticCallback):    # TODO: This is probably superfluous
+         self.gauge_values.append(value - self.init_value)
+         return value, self.gauge_values
+ 
++    def getVals(self):
++        return self.gauge_values
++
+     def message_str(self, *args):
+         line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
+         return line
+@@ -597,49 +603,3 @@ class ErrorCallback(DiagnosticCallback):
+     def message_str(self, *args):
+         line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
+         return line
+-
+-
+-class ResidualCallback(ErrorCallback):
+-    """Computes strong residual for the shallow water case."""
+-    name = 'strong residual'
+-
+-    def __init__(self, solver_obj, **kwargs):
+-        """
+-        :arg solver_obj: Thetis solver object
+-        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+-        """
+-
+-        def residualSW():   # TODO: More terms to include
+-            """
+-            Construct the strong residual for the semi-discrete shallow water equations at the current timestep.
+-
+-            :return: strong residual for shallow water equations at current timestep.
+-            """
+-            uv_old, elev_old = solver_obj.timestepper.solution_old.split()
+-            uv_2d, elev_2d = solver_obj.fields.solution_2d.split()
+-
+-            # Collect fields and parameters
+-            nu = solver_obj.fields.get('viscosity_h')
+-            Dt = Constant(solver_obj.options.timestep)
+-            H = solver_obj.fields.bathymetry_2d + elev_2d
+-            g = physical_constants['g_grav']
+-
+-            # Construct residual
+-            res_u = (uv_2d - uv_old) / Dt + g * grad(elev_2d)
+-            if solver_obj.options.use_nonlinear_equations:
+-                res_u += dot(uv_2d, nabla_grad(uv_2d))
+-            if solver_obj.options.coriolis_frequency is not None:
+-                res_u += solver_obj.options.coriolis_frequency * as_vector((-uv_2d[1], uv_2d[0]))
+-            if nu is not None:
+-                if solver_obj.options.use_grad_depth_viscosity_term:
+-                    res_u -= dot(nu * grad(H), (grad(uv_2d) + sym(grad(uv_2d))))
+-                if solver_obj.options.use_grad_div_viscosity_term:
+-                    res_u -= div(nu * (grad(uv_2d) + sym(grad(uv_2d))))
+-                else:
+-                    res_u -= div(nu * grad(uv_2d))
+-
+-            res_e = (elev_2d - elev_old) / Dt + div((solver_obj.fields.bathymetry_2d + elev_2d) * uv_2d)
+-
+-            return res_u, res_e
+-
+-        super(ResidualCallback, self).__init__(residualSW, solver_obj, **kwargs)
+-- 
+2.12.0
+
+
+From 6fde7f3deccca5be353e227b142b17c59398c006 Mon Sep 17 00:00:00 2001
+From: Joseph Wallwork <j.wallwork16@imperial.ac.uk>
+Date: Mon, 7 May 2018 13:57:28 +0100
+Subject: [PATCH 17/17] Introduce index in callback to avoid duplicating
+ initial measurements
+
+---
+ thetis/callback.py | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/thetis/callback.py b/thetis/callback.py
+index bb2cb95..be92bf5 100644
+--- a/thetis/callback.py
++++ b/thetis/callback.py
+@@ -504,10 +504,13 @@ class FunctionalCallback(DiagnosticCallback):
+         self.scalar_callback = scalar_callback
+         self.objective_value = [scalar_callback()]
+         self.dt = solver_obj.options.timestep
++        self.ix = 0
+ 
+     def __call__(self):
+         value = self.scalar_callback()
+-        self.objective_value.append(value)
++        if self.ix != 0:
++            self.objective_value.append(value)
++        self.ix += 1
+ 
+         return value, self.objective_value
+ 
+@@ -546,10 +549,13 @@ class GaugeCallback(DiagnosticCallback):    # TODO: This is probably superfluous
+         self.scalar_callback = scalar_callback
+         self.init_value = scalar_callback()
+         self.gauge_values = [0.]
++        self.ix = 0
+ 
+     def __call__(self):
+         value = self.scalar_callback()
+-        self.gauge_values.append(value - self.init_value)
++        if self.ix != 0:
++            self.gauge_values.append(value - self.init_value)
++        self.ix += 1
+         return value, self.gauge_values
+ 
+     def getVals(self):
+-- 
+2.12.0
+
