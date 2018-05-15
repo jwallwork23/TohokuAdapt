@@ -136,10 +136,6 @@ class Options:
         self.dt = dt
         for i in (ndump, rm, orderChange, nVerT, nAdapt):
             assert isinstance(i, int)
-            try:
-                assert rm % ndump == 0
-            except:
-                raise ValueError("`rm` should be an integer multiple of `ndump`.")
         self.ndump = ndump
         self.rm = rm
         self.nAdapt = nAdapt
@@ -204,14 +200,14 @@ class Options:
         self.rmEnd = int(self.cntT / self.rm)                       # Final mesh index
         try:
             assert self.rm % self.ndump == 0
-            self.dumpsPerRemesh = self.rm / self.ndump
+            self.dumpsPerRemesh = int(self.rm / self.ndump)
         except:
             raise ValueError("Timesteps per data dump should divide timesteps per remesh")
 
         # Specify FunctionSpaces
-        self.degree1 = 2 if self.family == 'cg-cg' else 1
+        self.degree1 = 1
         self.degree2 = 2 if self.family == 'dg-cg' else 1
-        self.space1 = "CG" if self.family == 'cg-cg' else "DG"
+        self.space1 = "DG"
         self.space2 = "DG" if self.family == 'dg-dg' else "CG"
 
         # Plotting dictionaries

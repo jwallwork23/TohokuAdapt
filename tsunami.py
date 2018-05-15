@@ -661,21 +661,22 @@ def DWR(startRes, **kwargs):
                     loadPrev.load(elev_old, name="Previous elevation")
                     loadPrev.close()
                 err_u, err_e = strongResidualSW(solver_obj, uv_2d, elev_2d, uv_old, elev_old, Ve, op=op)
-                if k % op.dumpsPerRemesh != 0:
+                if k % op.dumpsPerRemesh != op.dumpsPerRemesh-1:
                     residuals['Velocity'].append(err_u)
                     residuals['Elevation'].append(err_e)
                 else:
                     # Time integrate residual over current 'window'
-                    err_u = op.dt * sum(residuals['Velocity'][i] + residuals['Velocity'][i-1] for i in range(1, op.dumpsPerRemesh))
-                    err_e = op.dt * sum(residuals['Elevation'][i] + residuals['Elevation'][i-1] for i in range(1, op.dumpsPerRemesh))
+                    err_u = op.dt * sum(residuals['Velocity'][i] + residuals['Velocity'][i-1] for i in range(1, op.dumpsPerRemesh-1))
+                    err_e = op.dt * sum(residuals['Elevation'][i] + residuals['Elevation'][i-1] for i in range(1, op.dumpsPerRemesh-1))
                     rho_u.interpolate(err_u)
                     rho_e.interpolate(err_e)
                     residuals = {'Velocity': [], 'Elevation': []}
                     if op.plotpvd:
-                        residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * k))
+                        residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * (k+1)))
 
                     # Load adjoint data and form indicators
-                    with DumbCheckpoint(op.di + 'hdf5/Adjoint2d_' + indexString(k/op.dumpsPerRemesh), mode=FILE_READ) as loadAdj:
+                    indexStr = indexString(int((k+1)/op.dumpsPerRemesh))
+                    with DumbCheckpoint(op.di + 'hdf5/Adjoint2d_' + indexStr, mode=FILE_READ) as loadAdj:
                         loadAdj.load(dual_u)
                         loadAdj.load(dual_e)
                         loadAdj.close()
@@ -692,7 +693,7 @@ def DWR(startRes, **kwargs):
                         epsilon.interpolate(assemble(v * inner(rho, dual) * dx))
                     epsilon = normaliseIndicator(epsilon, op=op)
                     epsilon.rename("Error indicator")
-                    with DumbCheckpoint(op.di + 'hdf5/ErrorIndicator2d_' + indexString(k/op.dumpsPerRemesh), mode=FILE_CREATE) as saveErr:
+                    with DumbCheckpoint(op.di + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_CREATE) as saveErr:
                         saveErr.store(epsilon)
                         saveErr.close()
                     if op.plotpvd:
@@ -712,10 +713,10 @@ def DWR(startRes, **kwargs):
         quantities = {}
         while cnt < op.cntT:
             adaptTimer = clock()
-            for l in range(op.nAdapt):                                          # TODO: Test this functionality
+            for l in range(op.nAdapt):                          # TODO: Test this functionality
 
                 # Construct metric
-                indexStr = indexString(int(cnt / op.rm))
+                indexStr = indexString(int(cnt / op.rm+1))      # TODO: Test this +1 for future data
                 with DumbCheckpoint(op.di + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_READ) as loadErr:
                     loadErr.load(epsilon)
                     loadErr.close()
