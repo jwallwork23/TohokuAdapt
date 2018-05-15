@@ -169,7 +169,7 @@ class Options:
             self.minNorm = 1e-4
             self.rm = 24
             self.dt = 0.05
-            self.ndump = 12
+            self.ndump = 8
             self.g = 1.
             self.J = 5.7085                     # On mesh of 2,359,296 elements, using asymptotic solution
             self.xy = [-16., -14., -3., 3.]

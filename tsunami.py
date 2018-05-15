@@ -660,14 +660,15 @@ def DWR(startRes, **kwargs):
                     loadPrev.load(uv_old, name="Previous velocity")
                     loadPrev.load(elev_old, name="Previous elevation")
                     loadPrev.close()
+                tic = clock()
                 err_u, err_e = strongResidualSW(solver_obj, uv_2d, elev_2d, uv_old, elev_old, Ve, op=op)
-                if k % op.dumpsPerRemesh != op.dumpsPerRemesh-1:
-                    residuals['Velocity'].append(err_u)
-                    residuals['Elevation'].append(err_e)
-                else:
+                print("Residual computation: %.2fs" % (clock()- tic))
+                residuals['Velocity'].append(err_u)
+                residuals['Elevation'].append(err_e)
+                if k % op.dumpsPerRemesh == op.dumpsPerRemesh-1:
                     # Time integrate residual over current 'window'
-                    err_u = op.dt * sum(residuals['Velocity'][i] + residuals['Velocity'][i-1] for i in range(1, op.dumpsPerRemesh-1))
-                    err_e = op.dt * sum(residuals['Elevation'][i] + residuals['Elevation'][i-1] for i in range(1, op.dumpsPerRemesh-1))
+                    err_u = op.dt * sum(residuals['Velocity'][i] + residuals['Velocity'][i-1] for i in range(1, op.dumpsPerRemesh))
+                    err_e = op.dt * sum(residuals['Elevation'][i] + residuals['Elevation'][i-1] for i in range(1, op.dumpsPerRemesh))
                     rho_u.interpolate(err_u)
                     rho_e.interpolate(err_e)
                     residuals = {'Velocity': [], 'Elevation': []}

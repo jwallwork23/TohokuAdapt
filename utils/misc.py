@@ -19,7 +19,7 @@ def indexString(index):
 def peakAndDistance(f, op=Options()):
     mesh = f.function_space().mesh()
     with f.dat.vec_ro as fv:
-        peak_i, peak = fv.max()[1]
+        peak_i, peak = fv.max()
     dgCoords = Function(VectorFunctionSpace(mesh, op.space2, op.degree2)).interpolate(mesh.coordinates)
 
     return peak, np.abs(dgCoords.dat.data[peak_i][0])
