@@ -5,7 +5,7 @@ import numpy as np
 from .options import Options
 
 
-__all__ = ["indexString", "getMax", "peakAndDistance"]
+__all__ = ["indexString", "peakAndDistance", "indicator"]
 
 
 def indexString(index):
@@ -16,23 +16,10 @@ def indexString(index):
     return (5 - len(str(index))) * '0' + str(index)
 
 
-def getMax(array):
-    """
-    :param array: 1D array.
-    :return: index for maximum and its value. 
-    """
-    i = 0
-    m = 0
-    for j in range(len(array)):
-        if array[j] > m:
-            m = array[j]
-            i = j
-    return i, m
-
-
 def peakAndDistance(f, op=Options()):
     mesh = f.function_space().mesh()
-    peak_i, peak = getMax(f.dat.data)   # TODO: This doesn't work in parallel
+    with f.dat.vec_ro as fv:
+        peak_i, peak = fv.max()[1]
     dgCoords = Function(VectorFunctionSpace(mesh, op.space2, op.degree2)).interpolate(mesh.coordinates)
 
     return peak, np.abs(dgCoords.dat.data[peak_i][0])

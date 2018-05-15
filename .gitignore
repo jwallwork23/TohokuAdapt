@@ -30,3 +30,6 @@ outdata/
 
 # Old form compilers
 utils/forms.py
+
+# Test scripts
+paralleltest.py
