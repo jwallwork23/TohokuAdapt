@@ -25,7 +25,7 @@ def peakAndDistance(f, op=Options()):
     return peak, np.abs(dgCoords.dat.data[peak_i][0])
 
 
-def indicator(V, mirror=False, op=Options()):
+def indicator(V, mirror=False, op=Options()):       # TODO: Consider radial indicators, rather than boxes
     """
     :arg V: Function space to use.
     :param mirror: consider 'mirror image' indicator region.

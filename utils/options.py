@@ -172,6 +172,7 @@ class Options:
             self.ndump = 8
             self.g = 1.
             self.J = 5.7085                     # On mesh of 2,359,296 elements, using asymptotic solution
+            # Other values... mesh 4: 5.5496, mesh 5: 5.6556
             self.xy = [-16., -14., -3., 3.]
             self.xy2 = [14., 16., -3., 3.]
             self.J_mirror = 6.1729e-06          # On mesh of 2,359,296 elements, using asymptotic solution
@@ -179,7 +180,7 @@ class Options:
             self.Tstart = 300.
             self.Tend = 1500.
             self.J = 1.210e+13                  # (to 4.s.f.) On mesh of 678,185 elements
-            self.xy = [490e3, 640e3, 4160e3, 4360e3]
+            self.xy = [490e3, 640e3, 4160e3, 4360e3]        # TODO: Change indicator to give radius around important coordinate
             self.g = 9.81
             self.xy2 = [0., 0., 0., 0.]
 
@@ -187,7 +188,8 @@ class Options:
             self.glatlon = {"P02": (38.5002, 142.5016), "P06": (38.6340, 142.5838), "801": (38.2, 141.7),
                             "802": (39.3, 142.1), "803": (38.9, 141.8), "804": (39.7, 142.2), "806": (37.0, 141.2)}
             self.meshSizes = (5918, 7068, 8660, 10988, 14160, 19082, 27280, 41730, 72602, 160586, 681616)
-            self.latFukushima = 37.050419   # Latitude of Fukushima
+            self.latFukushima = 37.42       # Latitude of Daiichi Nuclear Power Plant
+            self.lonFukushima = 141.03      # Longitude of Daiichi Nuclear Power Plant
             self.Omega = 7.291e-5           # Planetary rotation rate
 
         if self.approach in ("DWP", "DWR"):

@@ -32,7 +32,7 @@ if bool(args.s):
     for q in quantities:
         if q in ['Integrand', 'Integrand-mirrored']:
             integrandFile = open('outdata/rossby-wave/analytic_'+q+'.txt', 'w+')
-            rw = RossbyWaveSolution(op.mixedSpace(problemDomain(level=6, op=op)[0]), order=1, op=op)
+            rw = RossbyWaveSolution(op.mixedSpace(problemDomain(level=7, op=op)[0]), order=1, op=op)
             integrand = rw.integrate(bool(q == 'Integrand_mirrored'))
             integrandFile.writelines(["%s," % val for val in integrand])
             integrandFile.write("\n")

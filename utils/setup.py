@@ -130,7 +130,7 @@ if __name__ == "__main__":
             ms = MeshSetup(i, wd=args.w)
             qmesh.setLogOutputFile(ms.dirName+'generateMesh.log')   # Store QMESH log for later reference
             qmesh.initialise()                                      # Initialise QGIS API
-            ms.generateMesh(wd=args.w)                             # Generate the mesh
+            ms.generateMesh(wd=args.w)                              # Generate the mesh
             ms.convertMesh()                                        # Convert to shapefile, for visualisation with QGIS
     else:
         ms = MeshSetup(args.m, wd=args.w)
@@ -138,8 +138,7 @@ if __name__ == "__main__":
         qmesh.initialise()
         ms.generateMesh(wd=args.w)
         ms.convertMesh()
-
-    exit(23)
+    exit(0)         # Unix tradition is that exit code 0 is success and anything else is a failure
 else:
     from thetis import *
     from thetis_adjoint import *
