@@ -164,6 +164,7 @@ def problemDomain(level=0, mesh=None, b=None, op=Options(mode='tohoku')):
     :return: associated mesh, initial conditions, bathymetry field, boundary conditions and Coriolis parameter. 
     """
     if op.mode == 'tohoku':
+        getBathy = b is None
         if mesh is None:
             # ms = MeshSetup(level, op.wd)
             ms = MeshSetup(level, False)
@@ -172,7 +173,7 @@ def problemDomain(level=0, mesh=None, b=None, op=Options(mode='tohoku')):
         P1 = FunctionSpace(mesh, 'CG', 1)
         eta0 = Function(P1, name='Initial free surface displacement')
         u0 = Function(VectorFunctionSpace(mesh, "CG", 1))
-        if b is None:
+        if getBathy:
             b = Function(P1, name='Bathymetry profile')
 
         # Read and interpolate initial surface data (courtesy of Saito)
@@ -191,7 +192,7 @@ def problemDomain(level=0, mesh=None, b=None, op=Options(mode='tohoku')):
         lat2 = nc2.variables['lat'][:-1]
         x2, y2 = vectorlonlat_to_utm(lat2, lon2, force_zone_number=54)
         elev2 = nc2.variables['elevation'][:-1, :]
-        if b is None:
+        if getBathy:
             interpolatorBath = si.RectBivariateSpline(y2, x2, elev2)
         b_vec = b.dat.data
         assert meshCoords.shape[0] == b_vec.shape[0]
@@ -199,7 +200,7 @@ def problemDomain(level=0, mesh=None, b=None, op=Options(mode='tohoku')):
         # Interpolate data onto initial surface and bathymetry profiles
         for i, p in enumerate(meshCoords):
             eta0vec[i] = interpolatorSurf(p[1], p[0])
-            if b is None:
+            if getBathy:
                 depth = - eta0vec[i] - interpolatorBath(p[1], p[0])
                 # b_vec[i] = depth if op.wd else max(depth, 30)
                 b_vec[i] = max(depth, 30)   # Post-process the bathymetry to have a minimum depth of 30m
