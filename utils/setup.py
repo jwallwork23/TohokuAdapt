@@ -443,6 +443,7 @@ class RossbyWaveSolution:
             if cnt % self.op.ndump == 0:
                 tic = clock() - tic
                 print("t = %.2fs, CPU time: %.2fs" % (t, tic))
+                tic = clock()
             t += self.op.dt
             cnt += 1
         return vals
