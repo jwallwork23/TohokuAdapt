@@ -53,21 +53,22 @@ if __name__ == "__main__":
 
     op = Options(mode='tohoku')
     mesh, b = problemDomain(0, op=op)[0::3]
+    hierarchy = MeshHierarchy(mesh, 5)
 
     q = getObjective(mesh, b, op)
     OF = [q['J_h']]
     nEls = [q['meanElements']]
-    PETSc.Sys.Print("   Objective value %s" % OF[0])
-    PETSc.Sys.Print("   Element count %s" % nEls[0])
+    PETSc.Sys.Print("   Objective value %.4e" % OF[0])
+    PETSc.Sys.Print("   Element count %d" % nEls[0])
 
     for i in range(5):
-        mesh = isoP2(mesh)      # Hierarchical refinement
+        mesh = hierarchy.__getitem__(i)      # Hierarchical refinement
         b = interp(mesh, b)
         q = getObjective(mesh, b, op)
         OF.append(q['J_h'])
         nEls.append(q['meanElements'])
-        PETSc.Sys.Print("   Objective value %s" % OF[-1])
-        PETSc.Sys.Print("   Element count %s" % nEls[-1])
+        PETSc.Sys.Print("   Objective value %.4e" % OF[-1])
+        PETSc.Sys.Print("   Element count %d" % nEls[-1])
 
     PETSc.Sys.Print("Objective values %s" % OF)
     PETSc.Sys.Print("Element counts %s" % nEls)
