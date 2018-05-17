@@ -1139,6 +1139,7 @@ if __name__ == "__main__":
     parser.add_argument("-ho", help="Compute errors and residuals in a higher order space")
     parser.add_argument("-r", help="Compute errors and residuals in a refined space")
     parser.add_argument("-b", help="Intersect metrics with bathymetry")
+    parser.add_argument("-c", help="Type of Coriolis coefficient to use, from {'off', 'f', 'beta', 'sin'}.")
     parser.add_argument("-o", help="Output data")
     parser.add_argument("-regen", help="Regenerate error estimates from saved data")
     parser.add_argument("-mirror", help="Use a 'mirrored' region of interest")
@@ -1165,12 +1166,14 @@ if __name__ == "__main__":
         assert approach == 'hessianBased'
     if bool(args.mirror):
         assert mode in ('shallow-water', 'rossby-wave')
+    coriolis = args.c if args.c is not None else 'f'
 
     # Choose mode and set parameter values
     op = Options(mode=mode,
                  approach=approach,
                  gradate=True if approach in ('DWP', 'DWR') and mode == 'tohoku' else False,
                  plotpvd=True if args.o else False,
+                 coriolis=coriolis,
                  orderChange=orderChange,
                  refinedSpace=True if args.r else False,
                  bAdapt=bool(args.b) if args.b is not None else False)

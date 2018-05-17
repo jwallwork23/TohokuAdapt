@@ -54,11 +54,11 @@ if __name__ == '__main__':
     date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-r", help="Choose Coriolis parameter from {'off', 'f', 'beta', 'sin'}")
+    parser.add_argument("-c", help="Choose Coriolis parameter from {'off', 'f', 'beta', 'sin'}")
     parser.add_argument("-o", help="Output data")
     args = parser.parse_args()
     op = Options(plotpvd=True if args.o else False,
-                 coriolis=args.r)
+                 coriolis=args.c)
     tag = 'rotational=' + op.coriolis
     filename = 'outdata/model-verification/' + tag + '_' + date
     errorfile = open(filename + '.txt', 'w+')

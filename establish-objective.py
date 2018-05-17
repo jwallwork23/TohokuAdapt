@@ -1,7 +1,6 @@
 from thetis import *
 from firedrake.petsc import PETSc
 
-from utils.adaptivity import isoP2
 from utils.callbacks import SWCallback
 from utils.interpolation import interp
 from utils.setup import problemDomain
