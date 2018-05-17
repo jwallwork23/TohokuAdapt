@@ -1,5 +1,5 @@
 from thetis_adjoint import *
-from thetis.callback import DiagnosticCallback, FunctionalCallback, GaugeCallback, ErrorCallback
+from thetis.callback import DiagnosticCallback, FunctionalCallback, GaugeCallback
 
 from .interpolation import *
 from .misc import indicator
@@ -278,6 +278,51 @@ def strongResidualSW(solver_obj, UV_new, ELEV_new, UV_old, ELEV_old, Ve=None, op
     res_e = (elev_new - elev_old) / Dt + div(H * uv_2d)
 
     return res_u, res_e
+
+
+class ErrorCallback(DiagnosticCallback):
+    """Base class for callbacks that evaluate an error quantity (such as the strong residual) related to the prognostic
+    equation."""
+    variable_names = ['error', 'normed error']
+
+    def __init__(self, tuple_callback, solver_obj, **kwargs):
+        """
+        Creates error callback object
+
+        :arg scalar_or_vector_callback: Python function that takes the solver object as an argument and
+            returns the equation residual at the current timestep.
+        :arg solver_obj: Thetis solver object
+        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+        """
+        kwargs.setdefault('export_to_hdf5', False)  # Needs a different functionality as output is a Function
+        kwargs.setdefault('append_to_log', True)
+        super(ErrorCallback, self).__init__(solver_obj, **kwargs)
+        self.tuple_callback = tuple_callback        # Error quantifier with 2 components: momentum and continuity
+        self.error = Function(solver_obj.fields.solution_2d.function_space())
+        self.normed_error = 0.
+        self.index = 0
+        self.di = solver_obj.options.output_directory
+
+    def __call__(self):
+        t0, t1 = self.tuple_callback()
+        err_u, err_e = self.error.split()
+        err_u.interpolate(t0)
+        err_e.interpolate(t1)
+        err_u.rename("Momentum error")
+        err_e.rename("Continuity error")
+
+        self.normed_error = self.error.dat.norm
+        indexStr = (5 - len(str(self.index))) * '0' + str(self.index)
+        with DumbCheckpoint(self.di + 'hdf5/Error2d_' + indexStr, mode=FILE_CREATE) as saveRes:
+            saveRes.store(err_u)
+            saveRes.store(err_e)
+            saveRes.close()
+        self.index += 1
+        return self.error, self.normed_error
+
+    def message_str(self, *args):
+        line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
+        return line
 
 
 class ResidualCallback(ErrorCallback):
