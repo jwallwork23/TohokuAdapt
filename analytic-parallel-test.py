@@ -24,3 +24,4 @@ def objectiveSW(f):
     return assemble(kt * inner(ks, f) * dx)
 
 PETSc.Sys.Print('Rank %d gives value %.4f' % (mesh.comm.rank, objectiveSW(f)), comm=COMM_SELF)
+PETSc.Sys.Print('Global value %.4f' % objectiveSW(f), comm=COMM_WORLD)
