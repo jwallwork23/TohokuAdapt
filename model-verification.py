@@ -1,4 +1,5 @@
 from thetis import *
+from firedrake.petsc import PETSc
 
 from time import clock
 
@@ -72,7 +73,7 @@ if __name__ == '__main__':
     g2list = np.zeros(len(resolutions))
     g6list = np.zeros(len(resolutions))
     for k, i in zip(resolutions, range(len(resolutions))):
-        print("\nStarting run %d... Rotational = %s\n" % (k, op.coriolis))
+        PETSc.Sys.Print("\nStarting run %d... Coriolis frequency: %s\n" % (k, op.coriolis), comm=COMM_WORLD)
         J_h, integrand, gP02, totalVarP02, gP06, totalVarP06, timing = solverSW(k, di, op=op)
 
         # Save to disk
@@ -83,8 +84,8 @@ if __name__ == '__main__':
         integrandFile.writelines(["%s," % val for val in integrand])
         integrandFile.write("\n")
         errorfile.write('%d, %.4e, %.4e, %.4e, %.1f\n' % (k, J_h, totalVarP02, totalVarP06, timing))
-        print("\nRun %d... J_h: %.4e TV P02: %.3f, TV P06: %.3f, time: %.1f\n"
-              % (k, J_h, totalVarP02, totalVarP06, timing))
+        PETSc.Sys.Print("\nRun %d... J_h: %.4e TV P02: %.3f, TV P06: %.3f, time: %.1f\n"
+              % (k, J_h, totalVarP02, totalVarP06, timing), comm=COMM_WORLD)
 
         # Calculate orders of convergence
         Jlist[i] = J_h
@@ -94,7 +95,8 @@ if __name__ == '__main__':
             Jconv = (Jlist[i] - Jlist[i - 1]) / (Jlist[i - 1] - Jlist[i - 2])
             g2conv = (g2list[i] - g2list[i - 1]) / (g2list[i - 1] - g2list[i - 2])
             g6conv = (g6list[i] - g6list[i - 1]) / (g6list[i - 1] - g6list[i - 2])
-            print("Orders of convergence... J: %.4f, P02: %.4f, P06: %.4f" % (Jconv, g2conv, g6conv))
+            PETSc.Sys.Print("Orders of convergence... J: %.4f, P02: %.4f, P06: %.4f" % (Jconv, g2conv, g6conv),
+                            comm=COMM_WORLD)
     errorfile.close()
     gaugeFileP02.close()
     gaugeFileP06.close()
