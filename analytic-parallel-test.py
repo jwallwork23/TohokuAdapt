@@ -2,15 +2,14 @@ from firedrake import *
 from firedrake.petsc import PETSc
 
 
-mesh = SquareMesh(100, 100, 2, 2)
+mesh = SquareMesh(100, 100, 10, 10)
 V = FunctionSpace(mesh, "DG", 1)
 f = Function(V).assign(1.)
 
 def indicator(V):
 
-    xy = [0., 0.5, 0.5, 1.5]
-    ind = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' % (xy[0], xy[1], xy[2], xy[3])
-    iA = Function(V, name="Region of interest").interpolate(Expression(ind))
+    iA = Function(V, name="Region of interest")
+    iA.interpolate(Expression('(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' % (0., 2., 4., 6.)))
 
     return iA
 
