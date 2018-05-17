@@ -21,8 +21,10 @@ def peakAndDistance(f, op=Options()):
     with f.dat.vec_ro as fv:
         peak_i, peak = fv.max()
     dgCoords = Function(VectorFunctionSpace(mesh, op.space2, op.degree2)).interpolate(mesh.coordinates)
+    with dgCoords.dat.vec_ro as dv:
+        val = np.abs(dv.getValue(peak_i)[0])
 
-    return peak, np.abs(dgCoords.dat.data[peak_i][0])
+    return peak, val
 
 
 def indicator(V, mirror=False, op=Options()):       # TODO: Consider radial indicators, rather than boxes
