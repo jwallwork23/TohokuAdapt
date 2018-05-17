@@ -36,14 +36,17 @@ def indicator(V, mirror=False, op=Options()):       # TODO: Consider radial indi
 
     # Define extent of region A
     xy = op.xy2 if mirror else op.xy
+    iA = Function(V, name="Region of interest")
     if smooth:
         xd = (xy[1] - xy[0]) / 2
         yd = (xy[3] - xy[2]) / 2
-        ind = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? ' \
+        iA.interpolate(Expression('(x[0] > %f - eps) && (x[0] < %f + eps) && (x[1] > %f - eps) && (x[1] < %f) + eps ? ' \
               'exp(1. / (pow(x[0] - %f, 2) - pow(%f, 2))) * exp(1. / (pow(x[1] - %f, 2) - pow(%f, 2))) : 0.' \
-              % (xy[0], xy[1], xy[2], xy[3], xy[0] + xd, xd, xy[2] + yd, yd)
+              % (xy[0], xy[1], xy[2], xy[3], xy[0] + xd, xd, xy[2] + yd, yd)), eps=1e-10)
     else:
-        ind = '(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' % (xy[0], xy[1], xy[2], xy[3])
-    iA = Function(V, name="Region of interest").interpolate(Expression(ind))
+        iA.interpolate(Expression(
+            '(x[0] > %f - eps) && (x[0] < %f + eps) && (x[1] > %f - eps) && (x[1] < %f + eps) ? 1. : 0.' % (
+            xy[0], xy[1], xy[2], xy[3]),
+            eps=1e-10))
 
     return iA
