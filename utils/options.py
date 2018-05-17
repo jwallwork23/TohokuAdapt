@@ -192,9 +192,6 @@ class Options:
             self.lonFukushima = 141.03      # Longitude of Daiichi Nuclear Power Plant
             self.Omega = 7.291e-5           # Planetary rotation rate
 
-        if self.approach in ("DWP", "DWR"):
-            self.rm *= 2
-
         # Derived timestep indices
         self.cntT = int(np.ceil(self.Tend / self.dt))               # Final timestep index
         self.iStart = int(self.Tstart / (self.ndump * self.dt))     # First exported timestep of period of interest
@@ -215,7 +212,7 @@ class Options:
         # Plotting dictionaries
         self.labels = ("Fixed mesh", "Hessian based", "DWP", "DWR")
         self.styles = {self.labels[0]: 's', self.labels[1]: '^', self.labels[2]: 'x', self.labels[3]: 'o'}
-        self.stamps = {self.labels[0]: 'fixedMesh', self.labels[1]: 'hessianBased', self.labels[2]: 'DWF',
+        self.stamps = {self.labels[0]: 'fixedMesh', self.labels[1]: 'hessianBased', self.labels[2]: 'DWP',
                        self.labels[3]: 'DWR'}
 
 
