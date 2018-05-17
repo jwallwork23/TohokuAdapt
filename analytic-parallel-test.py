@@ -2,7 +2,7 @@ from firedrake import *
 from firedrake.petsc import PETSc
 
 
-mesh = SquareMesh(100, 100, 10, 10)
+mesh = SquareMesh(200, 200, 10, 10)
 V = FunctionSpace(mesh, "DG", 1)
 f = Function(V).assign(1.)
 
