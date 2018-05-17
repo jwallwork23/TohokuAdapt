@@ -10,7 +10,9 @@ f.assign(1.)
 def indicator(V):
 
     iA = Function(V, name="Region of interest")
-    iA.interpolate(Expression('(x[0] > %f) & (x[0] < %f) & (x[1] > %f) & (x[1] < %f) ? 1. : 0.' % (0., 2., 4., 6.)))
+    iA.interpolate(Expression(
+        '(x[0] > %f - eps) && (x[0] < %f + eps) && (x[1] > %f - eps) && (x[1] < %f + eps) ? 1. : 0.' % (0., 2., 4., 6.),
+        eps=1e-10))
 
     return iA
 
