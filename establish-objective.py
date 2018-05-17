@@ -52,8 +52,7 @@ def getObjective(mesh, b, op=Options()):
 if __name__ == "__main__":
 
     op = Options(mode='tohoku')
-    mesh, b = problemDomain(0, op=op)[0::3]
-    hierarchy = MeshHierarchy(mesh, 5)
+    mesh, b, hierarchy = problemDomain(0, hierarchy=True, op=op)[0::3]
 
     q = getObjective(mesh, b, op)
     OF = [q['J_h']]

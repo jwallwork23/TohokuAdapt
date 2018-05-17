@@ -153,13 +153,14 @@ else:
     from .options import Options
 
 
-def problemDomain(level=0, mesh=None, b=None, op=Options(mode='tohoku')):
+def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='tohoku')):
     """
     Set up problem domain.
     
     :arg level: refinement level, where 0 is coarsest.
     :param mesh: user specified mesh, if already generated.
     :param b: user specified bathymetry, if already generated.
+    :param hierarchy: extract 5 level MeshHierarchy.
     :param op: options parameter object.
     :return: associated mesh, initial conditions, bathymetry field, boundary conditions and Coriolis parameter. 
     """
@@ -169,6 +170,8 @@ def problemDomain(level=0, mesh=None, b=None, op=Options(mode='tohoku')):
             # ms = MeshSetup(level, op.wd)
             ms = MeshSetup(level, False)
             mesh = Mesh(ms.dirName + ms.meshName + '.msh')
+        if hierarchy:
+            mh = MeshHierarchy(mesh, 5)
         meshCoords = mesh.coordinates.dat.data
         P1 = FunctionSpace(mesh, 'CG', 1)
         eta0 = Function(P1, name='Initial free surface displacement')
@@ -254,7 +257,10 @@ def problemDomain(level=0, mesh=None, b=None, op=Options(mode='tohoku')):
     PETSc.Sys.Print("  rank %d owns %d elements and can access %d vertices" \
                     % (mesh.comm.rank, mesh.num_cells(), mesh.num_vertices()), comm=COMM_SELF)
 
-    return mesh, u0, eta0, b, BCs, f
+    if hierarchy:
+        return mesh, u0, eta0, b, BCs, f, mh
+    else:
+        return mesh, u0, eta0, b, BCs, f
 
 
 class RossbyWaveSolution:
