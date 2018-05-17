@@ -2,9 +2,10 @@ from firedrake import *
 from firedrake.petsc import PETSc
 
 
-mesh = SquareMesh(200, 200, 10, 10)
+mesh = SquareMesh(100, 100, 10, 10)
 V = FunctionSpace(mesh, "DG", 1)
-f = Function(V).assign(1.)
+f = Function(V)
+f.assign(1.)
 
 def indicator(V):
 
@@ -14,10 +15,7 @@ def indicator(V):
     return iA
 
 def objectiveSW(f):
-    """
-    :param solver_obj: FlowSolver2d object.
-    :return: objective functional value for callbacks.
-    """
+
     V = f.function_space()
     ks = Function(V)
     ks.assign(indicator(V))
@@ -25,5 +23,4 @@ def objectiveSW(f):
 
     return assemble(kt * inner(ks, f) * dx)
 
-
-PETSc.Sys.Print('  rank %d gives value %.4f' % (mesh.comm.rank, objectiveSW(f)), comm=COMM_SELF)
+PETSc.Sys.Print('Rank %d gives value %.4f' % (mesh.comm.rank, objectiveSW(f)), comm=COMM_SELF)
