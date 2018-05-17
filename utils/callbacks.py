@@ -219,7 +219,7 @@ class P06Callback(GaugeCallback):
 #
 #     return res_u, res_e
 
-def strongResidualSW(solver_obj, UV_new, ELEV_new, UV_old, ELEV_old, Ve=None, op=Options()):  # TODO: More terms to include
+def strongResidualSW(solver_obj, UV_new, ELEV_new, UV_old, ELEV_old, Ve=None, op=Options()):
     """
     Construct the strong residual for the semi-discrete shallow water equations at the current timestep,
     using Crank-Nicolson timestepping.

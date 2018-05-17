@@ -666,7 +666,10 @@ def DWR(startRes, **kwargs):
                 residuals['Velocity'].append(err_u)
                 residuals['Elevation'].append(err_e)
                 if k % op.dumpsPerRemesh == op.dumpsPerRemesh-1:
-                    # Time integrate residual over current 'window'     TODO: Consider L1 norm, L-inf norm
+
+                    # TODO: Consider L1 norm, L-inf norm
+
+                    # Time integrate residual over current 'window'
                     err_u = op.dt * sum(residuals['Velocity'][i] + residuals['Velocity'][i-1] for i in range(1, op.dumpsPerRemesh))
                     err_e = op.dt * sum(residuals['Elevation'][i] + residuals['Elevation'][i-1] for i in range(1, op.dumpsPerRemesh))
                     rho_u.interpolate(err_u)

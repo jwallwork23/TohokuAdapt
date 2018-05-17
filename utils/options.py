@@ -171,8 +171,8 @@ class Options:
             self.dt = 0.05
             self.ndump = 8
             self.g = 1.
-            self.J = 5.7085                     # On mesh of 2,359,296 elements, using asymptotic solution
-            # Other values... mesh 4: 5.5496, mesh 5: 5.6556    TODO: Try mesh 7
+            self.J = 5.7349                    # On mesh of 9,437,184 elements, using asymptotic solution
+            # Other values... mesh 4: 5.5496, mesh 5: 5.6556, mesh 6: 5.7085
             self.xy = [-16., -14., -3., 3.]
             self.xy2 = [14., 16., -3., 3.]
             self.J_mirror = 6.1729e-06          # On mesh of 2,359,296 elements, using asymptotic solution
