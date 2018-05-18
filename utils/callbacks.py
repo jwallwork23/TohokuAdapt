@@ -30,10 +30,10 @@ class SWCallback(FunctionalCallback):
             :param solver_obj: FlowSolver2d object.
             :return: objective functional value for callbacks.
             """
-            V = solver_obj.fields.solution_2d.function_space()
-            ks = Function(V)
+            mesh = solver_obj.fields.solution_2d.function_space().mesh()
+            ks = Function(VectorFunctionSpace(mesh, "DG", 0) * FunctionSpace(mesh, "DG", 0))
             k0, k1 = ks.split()
-            k1.assign(indicator(V.sub(1), op=self.op))
+            k1.assign(indicator(mesh, op=self.op))
             kt = Constant(0.)
             if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:      # Slightly smooth transition
                 kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * dt else 0.5)
@@ -62,10 +62,10 @@ class MirroredSWCallback(FunctionalCallback):
             :param solver_obj: FlowSolver2d object.
             :return: objective functional value for callbacks.
             """
-            V = solver_obj.fields.solution_2d.function_space()
-            ks = Function(V)
+            mesh = solver_obj.fields.solution_2d.function_space().mesh()
+            ks = Function(VectorFunctionSpace(mesh, "DG", 0) * FunctionSpace(mesh, "DG", 0))
             k0, k1 = ks.split()
-            k1.assign(indicator(V.sub(1), mirror=True, op=self.op))
+            k1.assign(indicator(mesh, mirror=True, op=self.op))
             kt = Constant(0.)
             if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:      # Slightly smooth transition
                 kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * dt else 0.5)
@@ -95,10 +95,10 @@ class ObjectiveSWCallback(FunctionalCallback):
             :param solver_obj: FlowSolver2d object.
             :return: objective functional value for callbacks.
             """
-            V = solver_obj.fields.solution_2d.function_space()
-            ks = Function(V)
+            mesh = solver_obj.fields.solution_2d.function_space().mesh()
+            ks = Function(VectorFunctionSpace(mesh, "DG", 0) * FunctionSpace(mesh, "DG", 0))
             k0, k1 = ks.split()
-            k1.assign(indicator(V.sub(1), mirror=self.mirror, op=self.op))
+            k1.assign(indicator(mesh, mirror=self.mirror, op=self.op))
             kt = Constant(0.)
             if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:
                 kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * dt else 0.5)

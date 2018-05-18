@@ -27,18 +27,19 @@ def peakAndDistance(f, op=Options()):
     return peak, val
 
 
-def indicator(V, mirror=False, op=Options()):       # TODO: Consider radial indicators, rather than boxes
+def indicator(mesh, mirror=False, op=Options()):       # TODO: Consider radial indicators, rather than boxes
     """
-    :arg V: Function space to use.
+    :arg mesh: mesh to use.
     :param mirror: consider 'mirror image' indicator region.
     :param op: options parameter class.
     :return: ('Smoothened') indicator function for region A = [x1, x2] x [y1, y1]
     """
     smooth = True if op.mode == 'tohoku' else False
+    P0 = FunctionSpace(mesh, "DG", 0)
 
     # Define extent of region A
     xy = op.xy2 if mirror else op.xy
-    iA = Function(V, name="Region of interest")
+    iA = Function(P0, name="Region of interest")
     if smooth:
         xd = (xy[1] - xy[0]) / 2
         yd = (xy[3] - xy[2]) / 2

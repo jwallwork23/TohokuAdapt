@@ -248,8 +248,8 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=False, date
     di = 'outdata/' + mode + '/'
 
     if mode == 'model-verification':
-        labels = ("Non-rotational", "Rotational")
-        names = ("nonlinear=False_", "nonlinear=True_")     # TODO: This needs redoing
+        labels = ("Non-rotational", "f-plane", "beta-plane", "Full")
+        names = ("rotational=off_", "rotational=f_", "rotational=beta_", "rotational=sin_")
     else:
         labels = ("Fixed mesh", "Hessian based", "DWP", "DWR", "Higher order DWR", "Refined DWR")
         names = ("fixedMesh", "hessianBased", "DWP", "DWR", "DWR_ho", "DWR_r")

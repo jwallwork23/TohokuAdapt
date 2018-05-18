@@ -7,9 +7,10 @@ V = FunctionSpace(mesh, "DG", 1)
 f = Function(V)
 f.assign(1.)
 
-def indicator(V):
+def indicator(mesh):
 
-    iA = Function(V, name="Region of interest")
+    P0 = FunctionSpace(mesh, "DG", 0)
+    iA = Function(P0, name="Region of interest")
     iA.interpolate(Expression(
         '(x[0] > %f - eps) && (x[0] < %f + eps) && (x[1] > %f - eps) && (x[1] < %f + eps) ? 1. : 0.' % (0., 2., 4., 6.),
         eps=1e-10))
@@ -19,8 +20,7 @@ def indicator(V):
 def objectiveSW(f):
 
     V = f.function_space()
-    ks = Function(V)
-    ks.assign(indicator(V))
+    ks = indicator(V.mesh())
     kt = Constant(1.)
 
     return assemble(kt * inner(ks, f) * dx)
