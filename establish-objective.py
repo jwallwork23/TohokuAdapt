@@ -57,7 +57,7 @@ if __name__ == "__main__":
     nEls = [q['Element count']]
     PETSc.Sys.Print("   Objective value %.4e" % OF[0])
     PETSc.Sys.Print("   Element count %d" % nEls[0])
-    bathyfile = open("resources/bathymetry/array.txt", "w")
+    bathyfile = open("resources/bathymetry/array.txt", "r")
     bathyfile.readline()
 
     for i in range(1, 5):
