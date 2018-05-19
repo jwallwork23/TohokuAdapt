@@ -17,7 +17,8 @@ def solverSW(startRes, di, op=Options()):
     options.element_family = op.family
     options.use_nonlinear_equations = True
     options.use_grad_depth_viscosity_term = False
-    options.use_grad_div_viscosity_term = False
+    options.use_grad_div_viscosity_term = True
+    options.use_lax_friedrichs_velocity = False  # TODO: This is a temporary fix in adjoint case
     options.coriolis_frequency = f
     options.simulation_export_time = 50. if op.plotpvd else 100.
     options.simulation_end_time = op.Tend
@@ -37,10 +38,10 @@ def solverSW(startRes, di, op=Options()):
     cb3 = P06Callback(solver_obj)           # Gauge timeseries error P06
     solver_obj.add_callback(cb3, 'timestep')
 
+    # Run simulation and extract quantities
     timer = clock()
-    solver_obj.iterate()    # Run simulation
+    solver_obj.iterate()
     timer = clock() - timer
-
     quantities = {}
     quantities["J_h"] = cb1.quadrature()
     quantities["Integrand"] = cb1.getVals()
@@ -78,15 +79,13 @@ if __name__ == '__main__':
         integrandFile = open(filename + 'Integrand.txt', 'w+')
         di = 'plots/model-verification/' + tag + '/'
 
-        resolutions = range(10)
+        resolutions = range(11)
         Jlist = np.zeros(len(resolutions))
         g2list = np.zeros(len(resolutions))
         g6list = np.zeros(len(resolutions))
         for k, i in zip(resolutions, range(len(resolutions))):
             PETSc.Sys.Print("\nStarting run %d... Coriolis frequency: %s\n" % (k, c), comm=COMM_WORLD)
             quantities = solverSW(k, di, op=op)
-
-            # Save to disk
             gaugeFileP02.writelines(["%s," % val for val in quantities["P02"]])
             gaugeFileP02.write("\n")
             gaugeFileP06.writelines(["%s," % val for val in quantities["P06"]])

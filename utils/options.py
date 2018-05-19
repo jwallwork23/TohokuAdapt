@@ -11,7 +11,7 @@ class Options:
                  family='dg-dg',
                  timestepper='CrankNicolson',
                  approach='fixedMesh',
-                 coriolis='f',
+                 coriolis='sin',
                  rescaling=0.85,
                  hmin=10.,
                  hmax=1e5,
