@@ -64,50 +64,51 @@ if __name__ == '__main__':
     date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-c", help="Choose Coriolis parameter from {'off', 'f', 'beta', 'sin'}")
     parser.add_argument("-o", help="Output data")
     args = parser.parse_args()
-    op = Options(plotpvd=True if args.o else False,
-                 coriolis=args.c)
-    tag = 'rotational=' + op.coriolis
-    filename = 'outdata/model-verification/' + tag + '_' + date
-    errorfile = open(filename + '.txt', 'w+')
-    gaugeFileP02 = open(filename + 'P02.txt', 'w+')
-    gaugeFileP06 = open(filename + 'P06.txt', 'w+')
-    integrandFile = open(filename + 'Integrand.txt', 'w+')
-    di = 'plots/model-verification/' + tag + '/'
 
-    resolutions = range(10)
-    Jlist = np.zeros(len(resolutions))
-    g2list = np.zeros(len(resolutions))
-    g6list = np.zeros(len(resolutions))
-    for k, i in zip(resolutions, range(len(resolutions))):
-        PETSc.Sys.Print("\nStarting run %d... Coriolis frequency: %s\n" % (k, op.coriolis), comm=COMM_WORLD)
-        quantities = solverSW(k, di, op=op)
+    for c in ("off", "f", "beta", "sin"):
+        op = Options(plotpvd=True if args.o else False,
+                     coriolis=c)
+        tag = 'rotational=' + c
+        filename = 'outdata/model-verification/' + tag + '_' + date
+        errorfile = open(filename + '.txt', 'w+')
+        gaugeFileP02 = open(filename + 'P02.txt', 'w+')
+        gaugeFileP06 = open(filename + 'P06.txt', 'w+')
+        integrandFile = open(filename + 'Integrand.txt', 'w+')
+        di = 'plots/model-verification/' + tag + '/'
 
-        # Save to disk
-        gaugeFileP02.writelines(["%s," % val for val in quantities["P02"]])
-        gaugeFileP02.write("\n")
-        gaugeFileP06.writelines(["%s," % val for val in quantities["P06"]])
-        gaugeFileP06.write("\n")
-        integrandFile.writelines(["%s," % val for val in quantities["Integrand"]])
-        integrandFile.write("\n")
-        errorfile.write('%d, %.4e, %.4e, %.4e, %.1f\n'
-                        % (k, quantities["J_h"], quantities["TV P02"], quantities["TV P06"], quantities["Timer"]))
-        PETSc.Sys.Print("\nRun %d... J_h: %.4e TV P02: %.3f, TV P06: %.3f, time: %.1f\n"
-              % (k, quantities["J_h"], quantities["TV P02"], quantities["TV P06"], quantities["Timer"]), comm=COMM_WORLD)
+        resolutions = range(10)
+        Jlist = np.zeros(len(resolutions))
+        g2list = np.zeros(len(resolutions))
+        g6list = np.zeros(len(resolutions))
+        for k, i in zip(resolutions, range(len(resolutions))):
+            PETSc.Sys.Print("\nStarting run %d... Coriolis frequency: %s\n" % (k, c), comm=COMM_WORLD)
+            quantities = solverSW(k, di, op=op)
 
-        # Calculate orders of convergence
-        Jlist[i] = quantities["J_h"]
-        g2list[i] = quantities["TV P02"]
-        g6list[i] = quantities["TV P06"]
-        if i > 1:
-            Jconv = (Jlist[i] - Jlist[i - 1]) / (Jlist[i - 1] - Jlist[i - 2])
-            g2conv = (g2list[i] - g2list[i - 1]) / (g2list[i - 1] - g2list[i - 2])
-            g6conv = (g6list[i] - g6list[i - 1]) / (g6list[i - 1] - g6list[i - 2])
-            PETSc.Sys.Print("Orders of convergence... J: %.4f, P02: %.4f, P06: %.4f" % (Jconv, g2conv, g6conv),
-                            comm=COMM_WORLD)
-    errorfile.close()
-    gaugeFileP02.close()
-    gaugeFileP06.close()
-    integrandFile.close()
+            # Save to disk
+            gaugeFileP02.writelines(["%s," % val for val in quantities["P02"]])
+            gaugeFileP02.write("\n")
+            gaugeFileP06.writelines(["%s," % val for val in quantities["P06"]])
+            gaugeFileP06.write("\n")
+            integrandFile.writelines(["%s," % val for val in quantities["Integrand"]])
+            integrandFile.write("\n")
+            errorfile.write('%d, %.4e, %.4e, %.4e, %.1f\n'
+                            % (k, quantities["J_h"], quantities["TV P02"], quantities["TV P06"], quantities["Timer"]))
+            PETSc.Sys.Print("\nRun %d... J_h: %.4e TV P02: %.3f, TV P06: %.3f, time: %.1f\n"
+                  % (k, quantities["J_h"], quantities["TV P02"], quantities["TV P06"], quantities["Timer"]), comm=COMM_WORLD)
+
+            # Calculate orders of convergence
+            Jlist[i] = quantities["J_h"]
+            g2list[i] = quantities["TV P02"]
+            g6list[i] = quantities["TV P06"]
+            if i > 1:
+                Jconv = (Jlist[i] - Jlist[i - 1]) / (Jlist[i - 1] - Jlist[i - 2])
+                g2conv = (g2list[i] - g2list[i - 1]) / (g2list[i - 1] - g2list[i - 2])
+                g6conv = (g6list[i] - g6list[i - 1]) / (g6list[i - 1] - g6list[i - 2])
+                PETSc.Sys.Print("Orders of convergence... J: %.4f, P02: %.4f, P06: %.4f" % (Jconv, g2conv, g6conv),
+                                comm=COMM_WORLD)
+        errorfile.close()
+        gaugeFileP02.close()
+        gaugeFileP06.close()
+        integrandFile.close()

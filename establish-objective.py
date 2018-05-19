@@ -36,14 +36,12 @@ def getObjective(mesh, b, op=Options()):
     solver_obj.add_callback(cb1, 'timestep')
     solver_obj.bnd_functions['shallow_water'] = BCs
 
-    # Solve and extract timeseries / functionals
+    # Solve and extract quantities
     quantities = {}
     solver_obj.iterate()
     quantities['J_h'] = cb1.quadrature()  # Evaluate objective functional
     quantities['Integrand'] = cb1.getVals()
-
-    # Output mesh statistics and solver times
-    quantities['meanElements'] = mesh.num_cells()
+    quantities['Element count'] = mesh.num_cells()
 
     return quantities
 
@@ -55,7 +53,7 @@ if __name__ == "__main__":
 
     q = getObjective(mesh, b, op)
     OF = [q['J_h']]
-    nEls = [q['meanElements']]
+    nEls = [q['Element count']]
     PETSc.Sys.Print("   Objective value %.4e" % OF[0])
     PETSc.Sys.Print("   Element count %d" % nEls[0])
 
@@ -64,7 +62,7 @@ if __name__ == "__main__":
         b = interp(mesh, b)
         q = getObjective(mesh, b, op)
         OF.append(q['J_h'])
-        nEls.append(q['meanElements'])
+        nEls.append(q['Element count'])
         PETSc.Sys.Print("   Objective value %.4e" % OF[-1])
         PETSc.Sys.Print("   Element count %d" % nEls[-1])
 
