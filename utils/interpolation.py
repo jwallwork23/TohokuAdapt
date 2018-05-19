@@ -27,42 +27,36 @@ def interp(mesh, *fields):
         f_new = Function(FunctionSpace(mesh, element))
         notInDomain = []
         if family == 'Lagrange' and degree == 1:
-            with mesh.coordinates.dat.vec_ro as mc:
-                coords = mc.getArray()      # Vertex/node coords
-                coords.reshape((int(len(coords)/2), 2))
+            coords = mesh.coordinates.dat.data      # Vertex/node coords
         elif family in ('Lagrange', 'Discontinuous Lagrange'):
             C = VectorFunctionSpace(mesh, family, degree)
             interp_coordinates = Function(C).interpolate(mesh.coordinates)
-            with interp_coordinates.dat.vec_ro as mc:
-                coords = mc.getArray()      # Node coords (NOT just vertices)
-                coords.reshape((int(len(coords)/2), 2))
+            coords = interp_coordinates.dat.data    # Node coords (NOT just vertices)
         else:
             raise NotImplementedError('Interpolation not currently supported on requested field type.')
 
         # Establish which vertices fall outside the domain    TODO: Figure out how to do this in a less hacky way
-        for i in range(len(coords)):        # This looping is unnecessary in some cases
+        for x in range(len(coords)):        # This looping is unnecessary in some cases
             try:
-                val = f.at(coords[i])
+                val = f.at(coords[x])
             except PointNotInDomainError:
                 # print("#### DEBUG: offending coordinates = ", coords[x])
                 val = None
-                notInDomain.append(i)
+                notInDomain.append(x)
             finally:
-                with f_new.dat.vec_wo as fv:
-                    fv[i] = val
+                f_new.dat.data[x] = val
         eps = 1e-6                          # Tolerance to be increased
         while len(notInDomain) > 0:
             eps *= 10
-            for i in notInDomain:
+            for x in notInDomain:
                 try:
-                    val = f.at(coords[i], tolerance=eps)
+                    val = f.at(coords[x], tolerance=eps)
                 except PointNotInDomainError:
                     # print("#### DEBUG: offending coordinates = ", coords[x])
                     val = None
                 finally:
-                    with f_new.dat.vec_wo as fv:
-                        fv[i] = val
-                    notInDomain.remove(i)
+                    f_new.dat.data[x] = val
+                    notInDomain.remove(x)
             if eps >= 1e8:                                  # TODO: This value seems a bit high
                 raise PointNotInDomainError('Playing with epsilons failed. Abort.')
         fields_new += (f_new,)
