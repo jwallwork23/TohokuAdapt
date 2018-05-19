@@ -8,7 +8,7 @@ __all__ = ["Options"]
 class Options:
     def __init__(self,
                  mode='tohoku',
-                 family='dg-cg',
+                 family='dg-dg',
                  timestepper='CrankNicolson',
                  approach='fixedMesh',
                  coriolis='sin',

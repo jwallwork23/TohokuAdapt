@@ -16,6 +16,7 @@ def solverSW(startRes, di, op=Options()):
     options = solver_obj.options
     options.element_family = op.family
     options.use_nonlinear_equations = True
+    options.horizontal_viscosity = Constant(1e-3)
     options.use_grad_depth_viscosity_term = False
     options.use_grad_div_viscosity_term = True
     options.use_lax_friedrichs_velocity = False  # TODO: This is a temporary fix in adjoint case
