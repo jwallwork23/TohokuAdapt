@@ -1,8 +1,9 @@
 from thetis import *
 from firedrake.petsc import PETSc
 
+import numpy as np
+
 from utils.callbacks import SWCallback
-from utils.interpolation import interp
 from utils.setup import problemDomain
 from utils.options import Options
 
@@ -56,10 +57,13 @@ if __name__ == "__main__":
     nEls = [q['Element count']]
     PETSc.Sys.Print("   Objective value %.4e" % OF[0])
     PETSc.Sys.Print("   Element count %d" % nEls[0])
+    bathyfile = open("resources/bathymetry/array.txt", "w")
+    bathyfile.readline()
 
-    for i in range(5):
+    for i in range(1, 5):
         mesh = hierarchy.__getitem__(i)      # Hierarchical refinement
-        b = interp(mesh, b)
+        b = Function(FunctionSpace(mesh, "CG", 1))
+        b.dat.data[:] = np.array(bathyfile.readline())
         q = getObjective(mesh, b, op)
         OF.append(q['J_h'])
         nEls.append(q['Element count'])
