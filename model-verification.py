@@ -93,7 +93,7 @@ if __name__ == '__main__':
         integrandFile.writelines(["%s," % val for val in quantities["Integrand"]])
         integrandFile.write("\n")
         errorfile.write('%d, %.4e, %.4e, %.4e, %.1f\n'
-                        % (k, J_h, quantities["TV P02"], quantities["TV P06"], quantities["Timer"]))
+                        % (k, quantities["J_h"], quantities["TV P02"], quantities["TV P06"], quantities["Timer"]))
         PETSc.Sys.Print("\nRun %d... J_h: %.4e TV P02: %.3f, TV P06: %.3f, time: %.1f\n"
               % (k, quantities["J_h"], quantities["TV P02"], quantities["TV P06"], quantities["Timer"]), comm=COMM_WORLD)
 
