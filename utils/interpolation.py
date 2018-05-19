@@ -29,13 +29,13 @@ def interp(mesh, *fields):
         if family == 'Lagrange' and degree == 1:
             with mesh.coordinates.dat.vec_ro as mc:
                 coords = mc.getArray()      # Vertex/node coords
-                coords.reshape((len(coords)/2, 2))
+                coords.reshape((int(len(coords)/2), 2))
         elif family in ('Lagrange', 'Discontinuous Lagrange'):
             C = VectorFunctionSpace(mesh, family, degree)
             interp_coordinates = Function(C).interpolate(mesh.coordinates)
             with interp_coordinates.dat.vec_ro as mc:
                 coords = mc.getArray()      # Node coords (NOT just vertices)
-                coords.reshape((len(coords)/2, 2))
+                coords.reshape((int(len(coords)/2), 2))
         else:
             raise NotImplementedError('Interpolation not currently supported on requested field type.')
 
