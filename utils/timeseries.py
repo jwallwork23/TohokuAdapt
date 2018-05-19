@@ -83,7 +83,7 @@ def readErrors(date, approach, mode='tohoku', bootstrapping=False):
             J_h = quantities[-1]
         if mode == 'model-verification':
             fixedMeshes = Options().meshSizes
-            nEle, J_h, gP02, gP06, timing = line.split(',')[1:]
+            nEle, J_h, gP02, gP06, timing = line.split(',')
             nEls.append(fixedMeshes[i])
         else:
             nEls.append(int(av))

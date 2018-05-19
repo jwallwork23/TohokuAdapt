@@ -41,8 +41,17 @@ def solverSW(startRes, di, op=Options()):
     solver_obj.iterate()    # Run simulation
     timer = clock() - timer
 
-    return cb1.quadrature(), cb1.__call__()[1], cb2.__call__()[1], cb2.totalVariation(), cb3.__call__()[1], \
-           cb3.totalVariation(), timer
+    quantities = {}
+    quantities["J_h"] = cb1.quadrature()
+    quantities["Integrand"] = cb1.getVals()
+    quantities["TV P02"] = cb2.totalVariation()
+    quantities["P02"] = cb2.getVals()
+    quantities["TV P06"] = cb3.totalVariation()
+    quantities["P06"] = cb3.getVals()
+    quantities["Element count"] = mesh.num_cells()
+    quantities["Timer"] = timer
+
+    return quantities
 
 
 if __name__ == '__main__':
@@ -74,23 +83,24 @@ if __name__ == '__main__':
     g6list = np.zeros(len(resolutions))
     for k, i in zip(resolutions, range(len(resolutions))):
         PETSc.Sys.Print("\nStarting run %d... Coriolis frequency: %s\n" % (k, op.coriolis), comm=COMM_WORLD)
-        J_h, integrand, gP02, totalVarP02, gP06, totalVarP06, timing = solverSW(k, di, op=op)
+        quantities = solverSW(k, di, op=op)
 
         # Save to disk
-        gaugeFileP02.writelines(["%s," % val for val in gP02])
+        gaugeFileP02.writelines(["%s," % val for val in quantities["P02"]])
         gaugeFileP02.write("\n")
-        gaugeFileP06.writelines(["%s," % val for val in gP06])
+        gaugeFileP06.writelines(["%s," % val for val in quantities["P06"]])
         gaugeFileP06.write("\n")
-        integrandFile.writelines(["%s," % val for val in integrand])
+        integrandFile.writelines(["%s," % val for val in quantities["Integrand"]])
         integrandFile.write("\n")
-        errorfile.write('%d, %.4e, %.4e, %.4e, %.1f\n' % (k, J_h, totalVarP02, totalVarP06, timing))
+        errorfile.write('%d, %.4e, %.4e, %.4e, %.1f\n'
+                        % (k, J_h, quantities["TV P02"], quantities["TV P06"], quantities["Timer"]))
         PETSc.Sys.Print("\nRun %d... J_h: %.4e TV P02: %.3f, TV P06: %.3f, time: %.1f\n"
-              % (k, J_h, totalVarP02, totalVarP06, timing), comm=COMM_WORLD)
+              % (k, quantities["J_h"], quantities["TV P02"], quantities["TV P06"], quantities["Timer"]), comm=COMM_WORLD)
 
         # Calculate orders of convergence
-        Jlist[i] = J_h
-        g2list[i] = totalVarP02
-        g6list[i] = totalVarP06
+        Jlist[i] = quantities["J_h"]
+        g2list[i] = quantities["TV P02"]
+        g6list[i] = quantities["TV P06"]
         if i > 1:
             Jconv = (Jlist[i] - Jlist[i - 1]) / (Jlist[i - 1] - Jlist[i - 2])
             g2conv = (g2list[i] - g2list[i - 1]) / (g2list[i - 1] - g2list[i - 2])
