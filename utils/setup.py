@@ -171,8 +171,6 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
             # ms = MeshSetup(level, op.wd)
             ms = MeshSetup(level, False)
             mesh = Mesh(ms.dirName + ms.meshName + '.msh')
-        if getBathy and (b.function_space().mesh() != mesh):
-            b = interp(mesh, b)
         if hierarchy:
             mh = MeshHierarchy(mesh, 5)
         meshCoords = mesh.coordinates.dat.data
@@ -200,6 +198,8 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
         elev2 = nc2.variables['elevation'][:-1, :]
         if getBathy:
             interpolatorBath = si.RectBivariateSpline(y2, x2, elev2)
+        elif b.function_space().mesh() != mesh:
+            b = interp(mesh, b)
         b_vec = b.dat.data
         assert meshCoords.shape[0] == b_vec.shape[0]
 
