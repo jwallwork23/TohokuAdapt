@@ -198,10 +198,11 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
         elev2 = nc2.variables['elevation'][:-1, :]
         if getBathy:
             interpolatorBath = si.RectBivariateSpline(y2, x2, elev2)
-        elif b.function_space().mesh() != mesh:
-            b = interp(mesh, b)
         b_vec = b.dat.data
-        assert meshCoords.shape[0] == b_vec.shape[0]
+        try:
+            assert meshCoords.shape[0] == b_vec.shape[0]
+        except:
+            b = interp(mesh, b)
 
         # Interpolate data onto initial surface and bathymetry profiles
         for i, p in enumerate(meshCoords):
