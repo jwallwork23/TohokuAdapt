@@ -149,6 +149,7 @@ else:
     from time import clock
 
     from .conversion import earth_radius, get_latitude, vectorlonlat_to_utm
+    from .interpolation import interp
     from .misc import indicator
     from .options import Options
 
@@ -170,6 +171,8 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
             # ms = MeshSetup(level, op.wd)
             ms = MeshSetup(level, False)
             mesh = Mesh(ms.dirName + ms.meshName + '.msh')
+        if getBathy and (b.function_space().mesh() != mesh):
+            b = interp(mesh, b)
         if hierarchy:
             mh = MeshHierarchy(mesh, 5)
         meshCoords = mesh.coordinates.dat.data
