@@ -1,14 +1,12 @@
 from thetis import *
 from firedrake.petsc import PETSc
 
-import numpy as np
-
 from utils.callbacks import SWCallback
 from utils.setup import problemDomain
 from utils.options import Options
 
 
-def getObjective(level, b, op=Options()):
+def getObjective(level, b=None, op=Options()):
 
     # Initialise domain and physical parameters
     try:
@@ -16,6 +14,8 @@ def getObjective(level, b, op=Options()):
     except:
         physical_constants['g_grav'].assign(op.g)
     mesh, u0, eta0, b, BCs, f = problemDomain(level, b=b, op=op)
+    print(type(b))
+    print(b.dat.data)
 
     # Initialise solver
     solver_obj = solver2d.FlowSolver2d(mesh, b)
@@ -44,21 +44,20 @@ def getObjective(level, b, op=Options()):
     quantities['Integrand'] = cb1.getVals()
     quantities['Element count'] = mesh.num_cells()
 
-    return quantities
+    return quantities, b
 
 
 if __name__ == "__main__":
 
     op = Options(mode='tohoku')
-    b = problemDomain(0, op=op)[3]
-    q = getObjective(0, b, op)
+    q, b = getObjective(0, op=op)
     OF = [q['J_h']]
     nEls = [q['Element count']]
     PETSc.Sys.Print("   Objective value %.4e" % OF[0])
     PETSc.Sys.Print("   Element count %d" % nEls[0])
 
     for level in range(1, 11):
-        q = getObjective(level, b, op)
+        q = getObjective(level, b, op)[0]
         OF.append(q['J_h'])
         nEls.append(q['Element count'])
         PETSc.Sys.Print("   Objective value %.4e" % OF[-1])
