@@ -667,30 +667,30 @@ def DWR(startRes, **kwargs):
                 residuals['Elevation'].append(err_e)
                 if k % op.dumpsPerRemesh == op.dumpsPerRemesh-1:
 
-                    # L-inf
-                    temp = Function(Ve)
-                    temp_u, temp_e = temp.split()
-                    rho_u.interpolate(residuals['Velocity'][0])
-                    rho_e.interpolate(residuals['Elevation'][0])
-                    for i in range(1, op.dumpsPerRemesh):
-                        temp_u.interpolate(residuals['Velocity'][i])
-                        temp_e.interpolate(residuals['Elevation'][i])
-                        for j in range(len(temp_u.dat.data)):
-                            rho_u.dat.data[j, 0] = max(temp_u.dat.data[j, 0], rho_u.dat.data[j, 0])
-                            rho_u.dat.data[j, 1] = max(temp_u.dat.data[j, 1], rho_u.dat.data[j, 1])
-                            rho_e.dat.data[j] = max(temp_e.dat.data[j], rho_e.dat.data[j])
+                    # # L-inf
+                    # temp = Function(Ve)
+                    # temp_u, temp_e = temp.split()
+                    # rho_u.interpolate(residuals['Velocity'][0])
+                    # rho_e.interpolate(residuals['Elevation'][0])
+                    # for i in range(1, op.dumpsPerRemesh):
+                    #     temp_u.interpolate(residuals['Velocity'][i])
+                    #     temp_e.interpolate(residuals['Elevation'][i])
+                    #     for j in range(len(temp_u.dat.data)):
+                    #         rho_u.dat.data[j, 0] = max(temp_u.dat.data[j, 0], rho_u.dat.data[j, 0])
+                    #         rho_u.dat.data[j, 1] = max(temp_u.dat.data[j, 1], rho_u.dat.data[j, 1])
+                    #         rho_e.dat.data[j] = max(temp_e.dat.data[j], rho_e.dat.data[j])
 
                     # # L1
                     # err_u = op.dt * sum(abs(residuals['Velocity'][i] + residuals['Velocity'][i - 1]) for i in range(1, op.dumpsPerRemesh))
                     # err_e = op.dt * sum(abs(residuals['Elevation'][i] + residuals['Elevation'][i - 1]) for i in range(1, op.dumpsPerRemesh))
                     #
-                    # # Time integrate residual over current 'window'
-                    # err_u = op.dt * sum(residuals['Velocity'][i] + residuals['Velocity'][i-1] for i in range(1, op.dumpsPerRemesh))
-                    # err_e = op.dt * sum(residuals['Elevation'][i] + residuals['Elevation'][i-1] for i in range(1, op.dumpsPerRemesh))
-                    #
-                    # rho_u.interpolate(err_u)
-                    # rho_e.interpolate(err_e)
-                    #
+                    # Time integrate residual over current 'window'
+                    err_u = op.dt * sum(residuals['Velocity'][i] + residuals['Velocity'][i-1] for i in range(1, op.dumpsPerRemesh))
+                    err_e = op.dt * sum(residuals['Elevation'][i] + residuals['Elevation'][i-1] for i in range(1, op.dumpsPerRemesh))
+
+                    rho_u.interpolate(err_u)
+                    rho_e.interpolate(err_e)
+
 
                     residuals = {'Velocity': [], 'Elevation': []}
                     if op.plotpvd:

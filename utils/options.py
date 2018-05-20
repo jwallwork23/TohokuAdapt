@@ -167,7 +167,7 @@ class Options:
             self.hmin = 1e-3
             self.hmax = 10.
             self.minNorm = 1e-4
-            self.rm = 24
+            self.rm = 48
             self.dt = 0.05
             self.ndump = 8
             self.g = 1.
