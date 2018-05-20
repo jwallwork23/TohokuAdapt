@@ -676,7 +676,8 @@ def DWR(startRes, **kwargs):
                         temp_u.interpolate(residuals['Velocity'][i])
                         temp_e.interpolate(residuals['Elevation'][i])
                         for j in range(len(temp_u.dat.data)):
-                            rho_u.dat.data[j] = max(temp_u.dat.data[j], rho_u.dat.data[j])
+                            rho_u.dat.data[j, 0] = max(temp_u.dat.data[j, 0], rho_u.dat.data[j, 0])
+                            rho_u.dat.data[j, 1] = max(temp_u.dat.data[j, 1], rho_u.dat.data[j, 1])
                             rho_e.dat.data[j] = max(temp_e.dat.data[j], rho_e.dat.data[j])
 
                     # # L1
