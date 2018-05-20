@@ -63,7 +63,7 @@ if __name__ == "__main__":
     for i in range(1, 5):
         mesh = hierarchy.__getitem__(i)      # Hierarchical refinement
         b = Function(FunctionSpace(mesh, "CG", 1))
-        b.dat.data[:] = np.array(bathyfile.readline().split())
+        b.dat.data[:] = np.array(bathyfile.readline().split(','))
         q = getObjective(mesh, b, op)
         OF.append(q['J_h'])
         nEls.append(q['Element count'])
