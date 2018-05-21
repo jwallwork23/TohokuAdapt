@@ -552,6 +552,8 @@ def DWR(startRes, **kwargs):
     rho_u, rho_e = rho.split()
     rho_u.rename("Momentum error")
     rho_e.rename("Continuity error")
+    temp = Function(Ve)
+    temp_u, temp_e = temp.split()
 
     # Initialise parameters and counters
     nEle = mesh_H.num_cells()
@@ -667,29 +669,31 @@ def DWR(startRes, **kwargs):
                 residuals['Elevation'].append(err_e)
                 if k % op.dumpsPerRemesh == op.dumpsPerRemesh-1:
 
-                    # # L-inf
-                    # temp = Function(Ve)
-                    # temp_u, temp_e = temp.split()
-                    # rho_u.interpolate(residuals['Velocity'][0])
-                    # rho_e.interpolate(residuals['Elevation'][0])
-                    # for i in range(1, op.dumpsPerRemesh):
-                    #     temp_u.interpolate(residuals['Velocity'][i])
-                    #     temp_e.interpolate(residuals['Elevation'][i])
-                    #     for j in range(len(temp_u.dat.data)):
-                    #         rho_u.dat.data[j, 0] = max(temp_u.dat.data[j, 0], rho_u.dat.data[j, 0])
-                    #         rho_u.dat.data[j, 1] = max(temp_u.dat.data[j, 1], rho_u.dat.data[j, 1])
-                    #         rho_e.dat.data[j] = max(temp_e.dat.data[j], rho_e.dat.data[j])
+                    # L-inf
+                    rho_u.interpolate(residuals['Velocity'][0])
+                    rho_e.interpolate(residuals['Elevation'][0])
+                    rho_u.dat.data[:] = np.abs(rho_u.dat.data)
+                    rho_e.dat.data[:] = np.abs(rho_e.dat.data)
+                    for i in range(1, len(residuals['Velocity'])):
+                        temp_u.interpolate(residuals['Velocity'][i])
+                        temp_e.interpolate(residuals['Elevation'][i])
+                        temp_u.dat.data[:] = np.abs(temp_u.dat.data)
+                        temp_e.dat.data[:] = np.abs(temp_e.dat.data)
+                        for j in range(len(temp_e.dat.data)):
+                            rho_u.dat.data[j, 0] = max(temp_u.dat.data[j, 0], rho_u.dat.data[j, 0])
+                            rho_u.dat.data[j, 1] = max(temp_u.dat.data[j, 1], rho_u.dat.data[j, 1])
+                            rho_e.dat.data[j] = max(temp_e.dat.data[j], rho_e.dat.data[j])
 
                     # # L1
                     # err_u = op.dt * sum(abs(residuals['Velocity'][i] + residuals['Velocity'][i - 1]) for i in range(1, op.dumpsPerRemesh))
                     # err_e = op.dt * sum(abs(residuals['Elevation'][i] + residuals['Elevation'][i - 1]) for i in range(1, op.dumpsPerRemesh))
-                    #
-                    # Time integrate residual over current 'window'
-                    err_u = op.dt * sum(residuals['Velocity'][i] + residuals['Velocity'][i-1] for i in range(1, op.dumpsPerRemesh))
-                    err_e = op.dt * sum(residuals['Elevation'][i] + residuals['Elevation'][i-1] for i in range(1, op.dumpsPerRemesh))
 
-                    rho_u.interpolate(err_u)
-                    rho_e.interpolate(err_e)
+                    # # Time integrate residual over current 'window'
+                    # err_u = op.dt * sum(residuals['Velocity'][i] + residuals['Velocity'][i-1] for i in range(1, op.dumpsPerRemesh))
+                    # err_e = op.dt * sum(residuals['Elevation'][i] + residuals['Elevation'][i-1] for i in range(1, op.dumpsPerRemesh))
+                    #
+                    # rho_u.interpolate(err_u)
+                    # rho_e.interpolate(err_e)
 
 
                     residuals = {'Velocity': [], 'Elevation': []}
@@ -738,7 +742,7 @@ def DWR(startRes, **kwargs):
             for l in range(op.nAdapt):                          # TODO: Test this functionality
 
                 # Construct metric
-                indexStr = indexString(int(cnt / op.rm+1))      # TODO: Test this +1 for future data
+                indexStr = indexString(int(cnt / op.rm+1))
                 with DumbCheckpoint(op.di + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_READ) as loadErr:
                     loadErr.load(epsilon)
                     loadErr.close()
