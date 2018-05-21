@@ -1,6 +1,8 @@
 from thetis import *
 from firedrake.petsc import PETSc
 
+import math
+
 from utils.callbacks import SWCallback
 from utils.setup import problemDomain
 from utils.options import Options
@@ -14,6 +16,9 @@ def getObjective(level=0, mesh=None, b=None, op=Options()):
     except:
         physical_constants['g_grav'].assign(op.g)
     mesh, u0, eta0, b, BCs, f = problemDomain(level, mesh=mesh, b=b, op=op)
+    for i in range(len(b.dat.data)):
+        if math.isnan(b.dat.data[i]):
+            b.dat.data[i] = 30.
 
     # Initialise solver
     solver_obj = solver2d.FlowSolver2d(mesh, b)
@@ -28,7 +33,8 @@ def getObjective(level=0, mesh=None, b=None, op=Options()):
     options.timestepper_type = op.timestepper
     options.timestep = op.dt
     options.output_directory = op.di
-    options.no_exports = True
+    # options.no_exports = True
+    options.no_exports = False
     solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
     cb1 = SWCallback(solver_obj)
     cb1.op = op
@@ -49,11 +55,9 @@ if __name__ == "__main__":
 
     op = Options(mode='tohoku')
     mesh = Mesh("resources/meshes/wd_Tohoku0.msh")
-    q, coarse_bathy = getObjective(mesh=mesh, op=op)
-    OF = [q['J_h']]
-    nEls = [q['Element count']]
-    PETSc.Sys.Print("   Objective value %.4e" % OF[0])
-    PETSc.Sys.Print("   Element count %d" % nEls[0])
+    coarse_bathy = problemDomain(mesh=mesh, op=op)[3]
+    OF = []
+    nEls = []
 
     for level in range(11):
         q = getObjective(level=level, b=coarse_bathy, op=op)[0]
