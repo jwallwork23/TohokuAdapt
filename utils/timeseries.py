@@ -253,10 +253,8 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=False, date
     else:
         labels = ("Fixed mesh", "Hessian based", "DWP", "DWR", "Higher order DWR", "Refined DWR")
         names = ("fixedMesh", "hessianBased", "DWP", "DWR", "DWR_ho", "DWR_r")
-    styles = {labels[0]: 's', labels[1]: '^'}
+    styles = {labels[0]: 's', labels[1]: '^', labels[2]: 'x', labels[3]: 'o'}
     if mode != 'model-verification':
-        styles[labels[2]] = 'x'
-        styles[labels[3]] = 'o'
         styles[labels[4]] = '*'
         styles[labels[5]] = 'h'
     err = {}
@@ -324,7 +322,7 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=False, date
             plt.gcf()
             if bootstrapping:
                 plt.semilogx(nEls[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
-                plt.legend(loc=1 if errornames[m] in ('P02', 'P06') else 4)
+                plt.legend(loc=1 if (errornames[m] in ('P02', 'P06')) or (mode == 'model-verification') else 4)
             else:
                 plt.loglog(nEls[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
                 plt.legend(loc=1)

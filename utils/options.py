@@ -171,7 +171,7 @@ class Options:
             self.dt = 0.05
             self.ndump = 12
             self.g = 1.
-            self.J = 5.7349                    # On mesh of 9,437,184 elements, using asymptotic solution
+            self.J = 5.7349                     # On mesh of 9,437,184 elements, using asymptotic solution
             # Other values... mesh 6: 5.7613
             self.xy = [-16., -14., -3., 3.]
             self.xy2 = [14., 16., -3., 3.]
@@ -179,7 +179,14 @@ class Options:
         elif self.mode in ('tohoku', 'model-verification'):
             self.Tstart = 300.
             self.Tend = 1500.
-            self.J = 1.210e+13                  # (to 4.s.f.) On mesh of 678,185 elements
+            if self.coriolis == 'off':
+                self.J = 1.324e+13              # (to 4.s.f.) On mesh of 158,596 elements
+            elif self.coriolis == 'f':
+                self.J = 1.309e+13
+            elif self.coriolis == 'beta':
+                self.J = 1.288e+13
+            elif self.coriolis == 'sin':
+                self.J = 1.305e+13
             self.xy = [490e3, 640e3, 4160e3, 4360e3]        # TODO: Change indicator to give radius around important coordinate
             self.g = 9.81
             self.xy2 = [0., 0., 0., 0.]

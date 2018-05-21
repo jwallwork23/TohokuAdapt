@@ -63,6 +63,7 @@ if __name__ == "__main__":
         q = getObjective(level=level, b=coarse_bathy, op=op)[0]
         OF.append(q['J_h'])
         nEls.append(q['Element count'])
+        PETSc.Sys.Print("Run %d" % level)
         PETSc.Sys.Print("   Objective value %.4e" % OF[-1])
         PETSc.Sys.Print("   Element count %d" % nEls[-1])
 
