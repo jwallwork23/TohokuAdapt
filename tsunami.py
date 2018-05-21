@@ -15,6 +15,9 @@ from utils.misc import indexString, peakAndDistance
 from utils.options import Options
 
 
+__all__ = ["fixedMesh", "hessianBased", "DWP", "DWR", "__main__"]
+
+
 def fixedMesh(startRes, **kwargs):
     op = kwargs.get('op')
 
