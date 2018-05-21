@@ -121,18 +121,19 @@ def hessianBased(startRes, **kwargs):
 
     return quantities
 
-for nAdapt in [1,2,3,4]:
-    outfile = open("outdata/rossby-wave/rmTest_nAdapt="+str(nAdapt)+'.txt', 'w')
-    rm = [12, 24, 48, 72]
-    for i in range(3):
+rm = [12, 24, 48, 72]
+for i in range(3):
+    outfile = open("outdata/rossby-wave/rmTest_mesh"+str(i)+'.txt', 'w')
+    for nAdapt in [1, 2, 3, 4]:
         for j in range(len(rm)):
-            op = Options(mode='rossby-wave', approach='hessianBased', rm=rm[i])
+            op = Options(mode='rossby-wave', approach='hessianBased')
             op.rm = rm[j]
             op.nAdapt = nAdapt
             q = hessianBased(i, op=op)
             err = np.abs((op.J - q['J_h'])/op.J)
             timer = q['solverTimer']
-            print("Mesh %d: rm = %d, J_h = %.4f, error = %.4f, Time = %.2fs" % (i, rm[j], q['J_h'], err, timer))
-            outfile.write("%d, %d, %.4f, %.4f, %.2fs" % (i, rm[i], q['J_h'], err, timer))
-        outfile.write('\n')
+            print("Mesh %d: rm = %d, #Elements = %d, J_h = %.4f, error = %.4f, Time = %.2fs"
+                  % (i, rm[j], q['meanElements'], q['J_h'], err, timer))
+            outfile.write("%d, %d, %d, %.4f, %.4f, %.2f\n" % (i, rm[j], q['meanElements'], q['J_h'], err, timer))
+        outfile.write("\n")
     outfile.close()
