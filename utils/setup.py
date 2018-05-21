@@ -133,7 +133,7 @@ if __name__ == "__main__":
             ms.generateMesh(wd=args.w)                              # Generate the mesh
             ms.convertMesh()                                        # Convert to shapefile, for visualisation with QGIS
     else:
-        ms = MeshSetup(args.m, wd=args.w)
+        ms = MeshSetup(int(args.m), wd=args.w)
         qmesh.setLogOutputFile(ms.dirName+'generateMesh.log')
         qmesh.initialise()
         ms.generateMesh(wd=args.w)

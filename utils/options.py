@@ -169,10 +169,10 @@ class Options:
             self.minNorm = 1e-4
             self.rm = 48
             self.dt = 0.05
-            self.ndump = 8
+            self.ndump = 12
             self.g = 1.
             self.J = 5.7349                    # On mesh of 9,437,184 elements, using asymptotic solution
-            # Other values... mesh 4: 5.5496, mesh 5: 5.6556, mesh 6: 5.7085
+            # Other values... mesh 6: 5.7613
             self.xy = [-16., -14., -3., 3.]
             self.xy2 = [14., 16., -3., 3.]
             self.J_mirror = 6.1729e-06          # On mesh of 2,359,296 elements, using asymptotic solution

@@ -6,24 +6,22 @@ from utils.setup import problemDomain
 from utils.options import Options
 
 
-def getObjective(level, b=None, op=Options()):
+def getObjective(level=0, mesh=None, b=None, op=Options()):
 
     # Initialise domain and physical parameters
     try:
         assert float(physical_constants['g_grav'].dat.data) == op.g
     except:
         physical_constants['g_grav'].assign(op.g)
-    mesh, u0, eta0, b, BCs, f = problemDomain(level, b=b, op=op)
-    print(type(b))
-    print(b.dat.data)
+    mesh, u0, eta0, b, BCs, f = problemDomain(level, mesh=mesh, b=b, op=op)
 
     # Initialise solver
     solver_obj = solver2d.FlowSolver2d(mesh, b)
     options = solver_obj.options
     options.element_family = op.family
     options.use_nonlinear_equations = True
-    options.use_grad_div_viscosity_term = True  # Symmetric viscous stress
-    options.use_lax_friedrichs_velocity = False  # TODO: This is a temporary fix
+    options.use_grad_div_viscosity_term = True      # Symmetric viscous stress
+    options.use_lax_friedrichs_velocity = False     # TODO: This is a temporary fix
     options.coriolis_frequency = f
     options.simulation_export_time = op.dt * op.ndump
     options.simulation_end_time = op.Tend
@@ -50,14 +48,15 @@ def getObjective(level, b=None, op=Options()):
 if __name__ == "__main__":
 
     op = Options(mode='tohoku')
-    q, b = getObjective(0, op=op)
+    mesh = Mesh("resources/meshes/wd_Tohoku0.msh")
+    q, coarse_bathy = getObjective(mesh=mesh, op=op)
     OF = [q['J_h']]
     nEls = [q['Element count']]
     PETSc.Sys.Print("   Objective value %.4e" % OF[0])
     PETSc.Sys.Print("   Element count %d" % nEls[0])
 
-    for level in range(1, 11):
-        q = getObjective(level, b, op)[0]
+    for level in range(11):
+        q = getObjective(level=level, b=coarse_bathy, op=op)[0]
         OF.append(q['J_h'])
         nEls.append(q['Element count'])
         PETSc.Sys.Print("   Objective value %.4e" % OF[-1])
