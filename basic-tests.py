@@ -105,10 +105,17 @@ def hessian(subset, space):
         plt.clf()
 
 
-def adapts(scale, space):
-    region = [-0.82, -0.44, -0.21, 0.33]    # TODO: Test 1: a box which lines up nicely
-    op = Options(mode=None,                 # TODO: Test 2: a box which does not, like opposite
-                 approach='hessianBased')   # TODO: Test 3: a disc
+def adapts(scale, space, indy):
+    if indy == 'aligned':
+        region = [-0.82, -0.44, -0.21, 0.33]    # Test 1: a box which lines up with the grid
+        r = None
+    elif indy == 'misaligned':
+        region = [-0.82, -0.44, -0.21, 0.33]    # Test 2: a box which does not line up with the grid
+        r = None
+    else:
+        region = [-0.6, 0.1]                    # Test 3: a disc
+        r = 0.2
+    op = Options(mode=None, approach='hessianBased')
     op.hmin = 1e-10
     op.hmax = 1
     for i in range(len(functions)):
@@ -133,7 +140,7 @@ def adapts(scale, space):
                 # Establish function and (analytical) functional value
                 f = Function(Vs).interpolate(Expression(functions[i]))
                 if nAdapt == 1:
-                    iA = indicator(mesh, xy=region, op=op)
+                    iA = indicator(mesh, xy=region, radius=r, op=op)
                     J_fixed = assemble(f * iA * dx)
                     fixed_diff.append(np.abs((J - J_fixed) / J))
 
@@ -146,7 +153,7 @@ def adapts(scale, space):
                 nEls.append(nEle)
 
                 # Calculate difference in functional approximation
-                iA = indicator(mesh, xy=region, op=op)
+                iA = indicator(mesh, xy=region, radius=r, op=op)
                 J_adapt = assemble(f * iA * dx)
                 adapt_diff.append(np.abs((J - J_adapt) / J))
                 print("Function %d, run %d, %s space, %d elements: Functional = %.4f, Error = %.4f)"
@@ -160,7 +167,7 @@ def adapts(scale, space):
         plt.xlabel("Element count" if scale else "Inital element count")
         plt.ylabel("Relative error in functional")
         plt.legend()
-        plt.savefig("outdata/adapt-tests/scale="+str(scale)+'function'+str(i)+'_'+date+".pdf")
+        plt.savefig("outdata/adapt-tests/test="+str(indy)+"_scale="+str(scale)+'_function'+str(i)+'_'+date+".pdf")
         plt.clf()
 
 
@@ -186,25 +193,25 @@ def directionalRefine(eps=1e-4):
             print(ratio)    # TODO: Check what is going on here
 
 
-# TODO: Multiple adaption tests for steady problems
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("test", help="Choose a test from {'Hessian', 'dirRefine'}")
     parser.add_argument("-subset", help="Toggle whether to calculate error over the whole domain or a subset thereof")
     parser.add_argument("-space", help="Toggle CG or DG space (default CG)")
     parser.add_argument("-scale", help="Toggle scaling of vertex count")
+    parser.add_argument("-i", help="Type of indicator function, from {'aligned', 'misaligned', 'disc'}")
     args = parser.parse_args()
     subset = bool(args.subset)
     space = args.space if args.space else "CG"
     scale = bool(args.scale)
     assert args.space in ("CG", "DG")
-    print(subset, space)
+    indy = 'aligned' if args.i is None else args.i
+    assert indy in ('aligned', 'misaligned', 'disc')
+    print(subset, space, indy)
 
     if args.test == 'Hessian':
         hessian(subset, space)
     elif args.test == 'dirRefine':
         directionalRefine()
     elif args.test == 'nAdapt':
-        adapts(scale, space)
+        adapts(scale, space, indy)

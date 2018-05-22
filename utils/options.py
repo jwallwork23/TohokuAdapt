@@ -164,6 +164,7 @@ class Options:
             # self.xy2 = [1.5 * np.pi, 2 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
             self.xy = [0., np.pi]
             self.xy2 = [2 * np.pi, np.pi]
+            self.radius = 0.3
             self.g = 9.81
         elif self.mode == 'rossby-wave':
             self.coriolis = 'beta'
@@ -177,10 +178,21 @@ class Options:
             self.ndump = 12
             self.g = 1.
             self.J = 5.7613                     # On mesh of 9,437,184 elements, using asymptotic solution
-            self.xy = [-16., -14., -3., 3.]
-            self.xy2 = [14., 16., -3., 3.]
+            # self.xy = [-16., -14., -3., 3.]
+            # self.xy2 = [14., 16., -3., 3.]
+            self.xy = [-15., 0.]                # TODO: Run with this
+            self.xy2 = [15., 0.]
+            self.radius = 3.
             self.J_mirror = 6.1729e-06          # On mesh of 2,359,296 elements, using asymptotic solution
         elif self.mode in ('tohoku', 'model-verification'):
+            # Gauge locations in latitude-longitude coordinates and mesh element counts
+            self.glatlon = {"P02": (38.5002, 142.5016), "P06": (38.6340, 142.5838), "801": (38.2, 141.7),
+                            "802": (39.3, 142.1), "803": (38.9, 141.8), "804": (39.7, 142.2), "806": (37.0, 141.2)}
+            self.meshSizes = (5918, 7068, 8660, 10988, 14160, 19082, 27280, 41730, 72602, 160586, 681616)
+            self.latFukushima = 37.42  # Latitude of Daiichi Nuclear Power Plant
+            self.lonFukushima = 141.03  # Longitude of Daiichi Nuclear Power Plant
+            self.Omega = 7.291e-5  # Planetary rotation rate
+
             self.Tstart = 300.
             self.Tend = 1500.
             if self.coriolis == 'off':
@@ -191,17 +203,11 @@ class Options:
                 self.J = 1.288e+13
             else:
                 self.J = 1.305e+13
-            self.xy = [490e3, 640e3, 4160e3, 4360e3]    # TODO: Change to give radius around important coordinate(s)
-            self.g = 9.81
+            # self.xy = [490e3, 640e3, 4160e3, 4360e3]
+            self.xy = [self.lonFukushima, self.latFukushima]    # TODO: Run with this
             self.xy2 = [0., 0., 0., 0.]
-
-            # Gauge locations in latitude-longitude coordinates and mesh element counts
-            self.glatlon = {"P02": (38.5002, 142.5016), "P06": (38.6340, 142.5838), "801": (38.2, 141.7),
-                            "802": (39.3, 142.1), "803": (38.9, 141.8), "804": (39.7, 142.2), "806": (37.0, 141.2)}
-            self.meshSizes = (5918, 7068, 8660, 10988, 14160, 19082, 27280, 41730, 72602, 160586, 681616)
-            self.latFukushima = 37.42       # Latitude of Daiichi Nuclear Power Plant
-            self.lonFukushima = 141.03      # Longitude of Daiichi Nuclear Power Plant
-            self.Omega = 7.291e-5           # Planetary rotation rate
+            self.radius = 150e3
+            self.g = 9.81
 
         # Derived timestep indices
         try:
