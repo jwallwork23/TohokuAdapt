@@ -59,7 +59,7 @@ class Options:
         except:
             raise ValueError('Meshing strategy %s not recognised' % approach)
         try:
-            assert mode in ('tohoku', 'shallow-water', 'rossby-wave', 'model-verification')
+            assert mode in ('tohoku', 'shallow-water', 'rossby-wave', 'model-verification', None)
             self.mode = mode
         except:
             raise ValueError('Test problem %s not recognised.' % mode)
@@ -130,7 +130,10 @@ class Options:
             self.maxGrowth = maxGrowth
         except:
             raise ValueError('Invalid value for growth parameter.')
-        self.di = 'plots/' + self.mode + '/' + self.approach + '/'
+        if self.mode is not None and self.approach is not None:
+            self.di = 'plots/' + self.mode + '/' + self.approach + '/'
+        else:
+            self.di = 'plots/'
 
         # Timestepping and (more) adaptivity parameters
         self.dt = dt
@@ -157,8 +160,10 @@ class Options:
             self.dt = 0.05
             self.ndump = 2
             self.J = 1.1184e-3,   # On mesh of 524,288 elements
-            self.xy = [0., 0.5 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
-            self.xy2 = [1.5 * np.pi, 2 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
+            # self.xy = [0., 0.5 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
+            # self.xy2 = [1.5 * np.pi, 2 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
+            self.xy = [0., np.pi]
+            self.xy2 = [2 * np.pi, np.pi]
             self.g = 9.81
         elif self.mode == 'rossby-wave':
             self.coriolis = 'beta'
@@ -199,10 +204,14 @@ class Options:
             self.Omega = 7.291e-5           # Planetary rotation rate
 
         # Derived timestep indices
-        self.cntT = int(np.ceil(self.Tend / self.dt))               # Final timestep index
-        self.iStart = int(self.Tstart / (self.ndump * self.dt))     # First exported timestep of period of interest
-        self.iEnd = int(self.cntT / self.ndump)                     # Final exported timestep of period of interest
-        self.rmEnd = int(self.cntT / self.rm)                       # Final mesh index
+        try:
+            self.cntT = int(np.ceil(self.Tend / self.dt))               # Final timestep index
+            self.iStart = int(self.Tstart / (self.ndump * self.dt))     # First exported timestep of period of interest
+            self.iEnd = int(self.cntT / self.ndump)                     # Final exported timestep of period of interest
+            self.rmEnd = int(self.cntT / self.rm)                       # Final mesh index
+        except:
+            print("Unable to compute some quantities")  # TODO: This whole class needs redoing
+            pass
         try:
             assert self.rm % self.ndump == 0
             self.dumpsPerRemesh = int(self.rm / self.ndump)
