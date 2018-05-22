@@ -55,7 +55,8 @@ if __name__ == "__main__":
 
     op = Options(mode='tohoku')
     mesh = Mesh("resources/meshes/wd_Tohoku0.msh")
-    coarse_bathy = problemDomain(mesh=mesh, op=op)[3]
+    # coarse_bathy = problemDomain(mesh=mesh, op=op)[3]
+    coarse_bathy = Function(FunctionSpace(mesh, "CG", 1)).assign(3000.)
     OF = []
     nEls = []
 

@@ -3,6 +3,7 @@ from thetis.field_defs import field_metadata
 
 from time import clock
 import numpy as np
+import datetime
 
 from utils.adaptivity import *
 from utils.callbacks import *
@@ -121,9 +122,13 @@ def hessianBased(startRes, **kwargs):
 
     return quantities
 
+
+now = datetime.datetime.now()
+date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
+
 rm = [12, 24, 48, 72]
 for i in range(3):
-    outfile = open("outdata/rossby-wave/rmTest_mesh"+str(i)+'.txt', 'w')
+    outfile = open("outdata/rossby-wave/rmTest_mesh"+str(i)+'_'+date+'.txt', 'w')
     for nAdapt in [1, 2, 3, 4]:
         for j in range(len(rm)):
             op = Options(mode='rossby-wave', approach='hessianBased')

@@ -242,7 +242,12 @@ def compareTimeseries(date, run, quantity='Integrand', op=Options()):
     plt.clf()
 
 
-def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=False, date=None):
+def errorVsElements(mode='tohoku',
+                    bootstrapping=False,
+                    noTinyMeshes=False,
+                    exact=False,
+                    date=None,
+                    op=Options(mode='rossby-wave')):
     now = datetime.datetime.now()
     today = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
     di = 'outdata/' + mode + '/'
@@ -322,10 +327,14 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=False, date
             plt.gcf()
             if bootstrapping:
                 plt.semilogx(nEls[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
-                plt.legend(loc=1 if (errornames[m] in ('P02', 'P06')) or (mode == 'model-verification') else 4)
             else:
                 plt.loglog(nEls[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
-                plt.legend(loc=1)
+        if bootstrapping:
+            if mode == 'rossby-wave':
+                plt.hlines(op.J, 1e2, 1e6, colors='k', linestyles='solid', label='First order asymptotic solution')
+            plt.legend(loc=1 if (errornames[m] in ('P02', 'P06')) or (mode == 'model-verification') else 4)
+        else:
+            plt.legend(loc=1)
         plt.xlabel(r'Mean element count')
         plt.ylabel(errorlabels[m])
         plt.savefig(di + errornames[m] + 'VsElements' + today + '.pdf', bbox_inches='tight')
@@ -334,6 +343,8 @@ def errorVsElements(mode='tohoku', bootstrapping=False, noTinyMeshes=False, date
         # Plot errors vs. timings
         for mesh in err:
             plt.loglog(tim[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
+        if bootstrapping and mode == 'rossby-wave':
+            plt.hlines(op.J, 1e2, 1e6, colors='k', linestyles='solid', label='First order asymptotic solution')
         plt.gcf()
         plt.legend(loc=3)
         plt.xlabel(r'CPU time (s)')
