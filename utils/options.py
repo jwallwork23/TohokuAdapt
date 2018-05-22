@@ -159,7 +159,8 @@ class Options:
             self.rm = 6
             self.dt = 0.05
             self.ndump = 2
-            self.J = 1.1184e-3,   # On mesh of 524,288 elements
+            # self.J = 1.1184e-3,   # On mesh of 524,288 elements
+            self.J = 1.6797e-04     # On mesh of 524,288 elements
             # self.xy = [0., 0.5 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
             # self.xy2 = [1.5 * np.pi, 2 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
             self.xy = [0., np.pi]

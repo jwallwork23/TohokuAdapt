@@ -121,7 +121,7 @@ def adapts(scale, space, indy):
         region = [0.0, 0.0]                     # Test 3: a centred disc
         r = 0.8
     elif indy == 'uncentred':
-        raise NotImplementedError               # Test 4: an uncentred disc TODO
+        raise NotImplementedError               # Test 4: an uncentred disc     TODO
     op = Options(mode=None, approach='hessianBased')
     op.hmin = 1e-10
     op.hmax = 1
