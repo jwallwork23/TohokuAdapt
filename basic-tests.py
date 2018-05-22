@@ -25,13 +25,18 @@ hessians = [[[2, 0], [0, 2]],
             [["-pi*pi*sin(pi*x[0])*sin(pi*x[1])", "pi*pi*cos(pi*x[0])*cos(pi*x[1])"],
              ["pi*pi*cos(pi*x[0])*cos(pi*x[1])", "-pi*pi*sin(pi*x[0])*sin(pi*x[1])"]]]
 
-def integrate(func, xy):
-    if func == 0:
-        return (xy[1]**3-xy[0]**3)*(xy[3]-xy[2])/3. + (xy[3]**3-xy[2]**3)*(xy[1]-xy[0])/3.
-    elif func == 1:
-        return (cos(pi * xy[1]) - cos(pi * xy[0])) * (cos(pi * xy[3]) - cos(pi * xy[2])) / (pow(pi, 2))
+def integrate(func, xy, r=None):
+    if r is not None:
+        if func == 0:
+            return 2 * pi * pow(r, 4) / 4.    # TODO: This will not work away from origin
+        elif func == 1:
+            raise NotImplementedError
     else:
-        raise NotImplementedError
+        if func == 0:
+            return (xy[1]**3-xy[0]**3)*(xy[3]-xy[2])/3. + (xy[3]**3-xy[2]**3)*(xy[1]-xy[0])/3.
+        elif func == 1:
+            return (cos(pi * xy[1]) - cos(pi * xy[0])) * (cos(pi * xy[3]) - cos(pi * xy[2])) / (pow(pi, 2))
+    raise NotImplementedError
 
 styles = {'dL2': 'x', 'parts': 'o'}
 labels = {'dL2': r'Double $\mathcal{L}_2$ projection', 'parts': r'Integration by parts'}
@@ -107,19 +112,21 @@ def hessian(subset, space):
 
 def adapts(scale, space, indy):
     if indy == 'aligned':
-        region = [-0.82, -0.44, -0.21, 0.33]    # Test 1: a box which lines up with the grid
+        region = [-0.8, -0.4, -0.2, 0.3]        # Test 1: a box which lines up with the grid
         r = None
     elif indy == 'misaligned':
         region = [-0.82, -0.44, -0.21, 0.33]    # Test 2: a box which does not line up with the grid
         r = None
-    else:
-        region = [-0.6, 0.1]                    # Test 3: a disc
-        r = 0.2
+    elif indy == 'centred':
+        region = [0.0, 0.0]                     # Test 3: a centred disc
+        r = 0.8
+    elif indy == 'uncentred':
+        raise NotImplementedError               # Test 4: an uncentred disc TODO
     op = Options(mode=None, approach='hessianBased')
     op.hmin = 1e-10
     op.hmax = 1
     for i in range(len(functions)):
-        J = integrate(i, xy=region)
+        J = integrate(i, xy=region, r=r)
         for nAdapt in range(1, 5):
             op.di = 'plots/adapt-tests/'
             adapt_diff = []
@@ -199,14 +206,14 @@ if __name__ == "__main__":
     parser.add_argument("-subset", help="Toggle whether to calculate error over the whole domain or a subset thereof")
     parser.add_argument("-space", help="Toggle CG or DG space (default CG)")
     parser.add_argument("-scale", help="Toggle scaling of vertex count")
-    parser.add_argument("-i", help="Type of indicator function, from {'aligned', 'misaligned', 'disc'}")
+    parser.add_argument("-i", help="Type of indicator function, from {'aligned', 'misaligned', 'centred'}")
     args = parser.parse_args()
     subset = bool(args.subset)
     space = args.space if args.space else "CG"
     scale = bool(args.scale)
     assert args.space in ("CG", "DG")
     indy = 'aligned' if args.i is None else args.i
-    assert indy in ('aligned', 'misaligned', 'disc')
+    assert indy in ('aligned', 'misaligned', 'centred', 'uncentred')
     print(subset, space, indy)
 
     if args.test == 'Hessian':
