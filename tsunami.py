@@ -43,7 +43,8 @@ def fixedMesh(startRes, **kwargs):
         options.timestepper_type = op.timestepper
         options.timestep = op.dt
         options.output_directory = op.di
-        options.no_exports = True
+        if not op.plotpvd:
+            options.no_exports = True
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         cb1 = SWCallback(solver_obj)
         cb1.op = op

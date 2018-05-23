@@ -15,17 +15,13 @@ class Options:
                  approach='fixedMesh',
                  coriolis='sin',
                  rescaling=0.85,
-                 hmin=10.,
-                 hmax=1e5,
-                 minNorm=1.,
                  maxAnisotropy=100,
                  gradate=False,
                  bAdapt=False,
                  plotpvd=False,
                  maxGrowth=1.4,
-                 dt=5.,
-                 ndump=10,
-                 rm=30,
+                 ndump=None,
+                 rm=None,
                  nAdapt=1,
                  nVerT=1000,
                  orderChange=0,
@@ -37,15 +33,11 @@ class Options:
         :param approach: meshing strategy, from {'fixedMesh', 'hessianBased', 'DWP', 'DWR'}.
         :param coriolis: Type of Coriolis term, from {'off', 'f', 'beta', 'sin'}.
         :param rescaling: Scaling parameter for target number of vertices.
-        :param hmin: Minimal tolerated element size (m).
-        :param hmax: Maximal tolerated element size (m).
-        :param minNorm: Minimal tolerated norm for error estimates.
         :param maxAnisotropy: maximum tolerated aspect ratio.
         :param gradate: Toggle metric gradation.
         :param bAdapt: intersect metrics with Hessian w.r.t. bathymetry.
         :param plotpvd: toggle saving solution fields to .pvd.
         :param maxGrowth: metric gradation scaling parameter.
-        :param dt: Timestep (s).
         :param ndump: Timesteps per data dump.
         :param rm: Timesteps per remesh. (Should be an integer multiple of ndump.)
         :param nAdapt: number of mesh adaptions per mesh regeneration.
@@ -65,6 +57,92 @@ class Options:
             self.mode = mode
         except:
             raise ValueError('Test problem %s not recognised.' % mode)
+
+        # Default parameter choices
+        if self.mode == 'shallow-water':
+            self.Tstart = 0.0
+            self.Tend = 3.
+            self.hmin = 1e-4
+            self.hmax = 1.
+            self.minNorm = 1e-6
+            if rm is None:
+                self.rm = 12
+            self.dt = 0.05
+            if ndump is None:
+                self.ndump = 1
+            # self.J = 1.1184e-3,   # On mesh of 524,288 elements
+            self.J = 1.6797e-04  # On mesh of 524,288 elements
+            # self.xy = [0., 0.5 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
+            # self.xy2 = [1.5 * np.pi, 2 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
+            self.xy = [0., np.pi]
+            self.xy2 = [2 * np.pi, np.pi]
+            self.radius = np.sqrt(0.3)
+            self.g = 9.81
+        elif self.mode == 'rossby-wave':
+            self.Tstart = 10.
+            self.Tend = 36.
+            self.hmin = 1e-3
+            self.hmax = 10.
+            self.minNorm = 1e-4
+            if rm is None:
+                self.rm = 48
+            self.dt = 0.05
+            if ndump is None:
+                self.ndump = 12
+            self.g = 1.
+            # self.J = 5.7613                     # On mesh of 9,437,184 elements, using asymptotic solution
+            self.J = 5.6105
+            # self.xy = [-16., -14., -3., 3.]
+            # self.xy2 = [14., 16., -3., 3.]
+            self.xy = [-15., 0.]
+            self.xy2 = [15., 0.]
+            self.radius = np.sqrt(3.)  # TODO: Change this to 3. and redo
+            self.J_mirror = 6.1729e-06  # On mesh of 2,359,296 elements, using asymptotic solution
+        elif self.mode in ('tohoku', 'model-verification'):
+            # Gauge locations in latitude-longitude coordinates and mesh element counts
+            self.glatlon = {"P02": (38.5002, 142.5016),
+                            "P06": (38.6340, 142.5838),
+                            "801": (38.2, 141.7),
+                            "802": (39.3, 142.1),
+                            "803": (38.9, 141.8),
+                            "804": (39.7, 142.2),
+                            "806": (37.0, 141.2)}
+            self.meshSizes = (5918, 7068, 8660, 10988, 14160, 19082, 27280, 41730, 72602, 160586, 681616)
+            self.latFukushima = 37.4213  # Latitude of Daiichi Nuclear Power Plant
+            self.lonFukushima = 141.0281  # Longitude of Daiichi Nuclear Power Plant
+            self.Omega = 7.291e-5  # Planetary rotation rate
+
+            self.dt = 5.
+            self.Tstart = 300.
+            self.Tend = 1500.
+            # self.Tend = 1800.
+            if ndump is None:
+                self.ndump = 10
+            if rm is None:
+                self.rm = 30
+            self.hmin=10.
+            self.hmax=1e5
+            self.minNorm = 1.
+            self.J = {'off': 1.324e+13,
+                      'f': 1.309e+13,
+                      'beta': 1.288e+13,
+                      'sin': 1.305e+13}[self.coriolis]  # (to 4.s.f.) On mesh of 158,596 elements
+            self.xy = [490e3, 640e3, 4160e3, 4360e3]
+            # self.xy = from_latlon(self.latFukushima, self.lonFukushima, force_zone_number=54)[:2]
+            self.xy2 = [0., 0., 0., 0.]
+            # self.radius = 50e3          # NOTE: P02 and P06 do not fall within this radius. 806 does
+            self.radius = None
+            self.g = 9.81
+        elif self.mode == 'advection-diffusion':
+            self.dt = 0.05
+            self.Tend = 2.4
+            self.hmin = 1e-4
+            self.hmax = 1.
+            if rm is None:
+                self.rm = 20
+            if ndump is None:
+                self.ndump = 10
+
         try:
             assert coriolis in ('off', 'f', 'beta', 'sin')
             self.coriolis = coriolis
@@ -82,13 +160,6 @@ class Options:
             self.timestepper = timestepper
         except:
             raise NotImplementedError
-        self.params = {'mat_type': 'matfree',
-                       'snes_type': 'ksponly',
-                       'pc_type': 'python',
-                       'pc_python_type': 'firedrake.AssembledPC',
-                       'assembled_pc_type': 'lu',
-                       'snes_lag_preconditioner': -1,
-                       'snes_lag_preconditioner_persists': True}
 
         # Adaptivity parameters
         if self.approach == 'hessianBased':
@@ -106,13 +177,6 @@ class Options:
                 self.rescaling = rescaling
             except:
                 raise ValueError('Invalid value of %.3f for scaling parameter. rescaling > 0 is required.' % rescaling)
-        try:
-            assert (hmin > 0) and (hmax > hmin) and (minNorm > 0)
-            self.hmin = hmin
-            self.hmax = hmax
-            self.minNorm = minNorm
-        except:
-            raise ValueError('Invalid min/max element sizes. hmax > hmin > 0 is required.')
         try:
             assert maxAnisotropy > 0
             self.maxAnisotropy = maxAnisotropy
@@ -137,11 +201,12 @@ class Options:
             self.di = 'plots/'
 
         # Timestepping and (more) adaptivity parameters
-        self.dt = dt
         for i in (ndump, rm, orderChange, nVerT, nAdapt):
             assert isinstance(i, int)
-        self.ndump = ndump
-        self.rm = rm
+        if ndump is not None:
+            self.ndump = ndump
+        if rm is not None:
+            self.rm = rm
         self.nAdapt = nAdapt
         self.orderChange = orderChange
         self.nVerT = nVerT
@@ -150,86 +215,13 @@ class Options:
         if self.orderChange != 0:
             assert not self.refinedSpace
 
-        # Override default parameter choices for SW and RW cases:
-        if self.mode == 'shallow-water':
-            self.Tstart = 0.0
-            self.Tend = 3.
-            self.hmin = 1e-4
-            self.hmax = 1.
-            self.minNorm = 1e-6
-            self.rm = 12
-            self.dt = 0.05
-            self.ndump = 1
-            # self.J = 1.1184e-3,   # On mesh of 524,288 elements
-            self.J = 1.6797e-04     # On mesh of 524,288 elements
-            # self.xy = [0., 0.5 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
-            # self.xy2 = [1.5 * np.pi, 2 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
-            self.xy = [0., np.pi]
-            self.xy2 = [2 * np.pi, np.pi]
-            self.radius = 0.3
-            self.g = 9.81
-        elif self.mode == 'rossby-wave':
-            self.coriolis = 'beta'
-            self.Tstart = 10.
-            self.Tend = 36.
-            self.hmin = 1e-3
-            self.hmax = 10.
-            self.minNorm = 1e-4
-            self.rm = 48
-            self.dt = 0.05
-            self.ndump = 12
-            self.g = 1.
-            # self.J = 5.7613                     # On mesh of 9,437,184 elements, using asymptotic solution
-            self.J = 5.6105
-            # self.xy = [-16., -14., -3., 3.]
-            # self.xy2 = [14., 16., -3., 3.]
-            self.xy = [-15., 0.]                # TODO: Run with this
-            self.xy2 = [15., 0.]
-            self.radius = 3.
-            self.J_mirror = 6.1729e-06          # On mesh of 2,359,296 elements, using asymptotic solution
-        elif self.mode in ('tohoku', 'model-verification'):
-            # Gauge locations in latitude-longitude coordinates and mesh element counts
-            self.glatlon = {"P02": (38.5002, 142.5016), "P06": (38.6340, 142.5838), "801": (38.2, 141.7),
-                            "802": (39.3, 142.1), "803": (38.9, 141.8), "804": (39.7, 142.2), "806": (37.0, 141.2)}
-            self.meshSizes = (5918, 7068, 8660, 10988, 14160, 19082, 27280, 41730, 72602, 160586, 681616)
-            self.latFukushima = 37.42  # Latitude of Daiichi Nuclear Power Plant
-            self.lonFukushima = 141.03  # Longitude of Daiichi Nuclear Power Plant
-            self.Omega = 7.291e-5  # Planetary rotation rate
-
-            self.Tstart = 300.
-            self.Tend = 1500.
-            if self.coriolis == 'off':
-                self.J = 1.324e+13              # (to 4.s.f.) On mesh of 158,596 elements
-            elif self.coriolis == 'f':
-                self.J = 1.309e+13
-            elif self.coriolis == 'beta':
-                self.J = 1.288e+13
-            else:
-                self.J = 1.305e+13
-            # self.xy = [490e3, 640e3, 4160e3, 4360e3]
-            self.xy = from_latlon(self.latFukushima, self.lonFukushima, force_zone_number=54)[:2]
-            self.xy2 = [0., 0., 0., 0.]
-            self.radius = 50e3
-            self.g = 9.81
-        elif self.mode == 'advection-diffusion':
-            self.dt = 0.05
-            self.Tend = 2.4
-            self.hmin = 1e-4
-            self.hmax = 1.
-            self.rm = 20
-            self.ndump = 10
-
         self.viscosity = 1e-3
 
         # Derived timestep indices
-        try:
-            self.cntT = int(np.ceil(self.Tend / self.dt))               # Final timestep index
-            self.iStart = int(self.Tstart / (self.ndump * self.dt))     # First exported timestep of period of interest
-            self.iEnd = int(self.cntT / self.ndump)                     # Final exported timestep of period of interest
-            self.rmEnd = int(self.cntT / self.rm)                       # Final mesh index
-        except:
-            print("Unable to compute some quantities")  # TODO: This whole class needs redoing
-            pass
+        self.cntT = int(np.ceil(self.Tend / self.dt))               # Final timestep index
+        self.iStart = int(self.Tstart / (self.ndump * self.dt))     # First exported timestep of period of interest
+        self.iEnd = int(self.cntT / self.ndump)                     # Final exported timestep of period of interest
+        self.rmEnd = int(self.cntT / self.rm)                       # Final mesh index
         try:
             assert self.rm % self.ndump == 0
             self.dumpsPerRemesh = int(self.rm / self.ndump)
