@@ -2,7 +2,7 @@ from thetis import *
 
 import numpy as np
 
-from utils.conversion import from_latlon
+from .conversion import from_latlon
 
 __all__ = ["Options"]
 
@@ -209,7 +209,7 @@ class Options:
             # self.xy = [490e3, 640e3, 4160e3, 4360e3]
             self.xy = from_latlon(self.latFukushima, self.lonFukushima, force_zone_number=54)[:2]
             self.xy2 = [0., 0., 0., 0.]
-            self.radius = 150e3
+            self.radius = 50e3
             self.g = 9.81
         elif self.mode == 'advection-diffusion':
             self.dt = 0.05
@@ -254,9 +254,7 @@ class Options:
         :param gauge: Tide / pressure gauge name, from {P02, P06, 801, 802, 803, 804, 806}.
         :return: UTM coordinate for chosen gauge.
         """
-        from .conversion import from_latlon
-
-        E, N, zn, zl = from_latlon(self.glatlon[gauge][0], self.glatlon[gauge][1], force_zone_number=54)
+        E, N = from_latlon(self.glatlon[gauge][0], self.glatlon[gauge][1], force_zone_number=54)[:2]
         return E, N
 
 

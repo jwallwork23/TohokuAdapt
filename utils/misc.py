@@ -36,7 +36,6 @@ def indicator(mesh, xy=None, mirror=False, radii=None, op=Options()):
     :param op: options parameter class.
     :return: ('Smoothened') indicator function for region A.
     """
-    smooth = True if op.mode == 'tohoku' else False
     P1 = FunctionSpace(mesh, "DG", 1)
 
     # Define extent of region A
@@ -44,19 +43,21 @@ def indicator(mesh, xy=None, mirror=False, radii=None, op=Options()):
         xy = op.xy2 if mirror else op.xy
     iA = Function(P1, name="Region of interest")
 
-    if radii is not None:      # TODO: Test this
+    if radii is not None:
         if len(np.shape(radii)) == 0:
-            expr = Expression("pow(x[0] - x0, 2) + pow(x[1] - y0, 2) < r + eps", x0=xy[0], y0=xy[1], r=radii, eps=1e-10)
+            expr = Expression("pow(x[0] - x0, 2) + pow(x[1] - y0, 2) < r + eps ? 1 : 0",
+                              x0=xy[0], y0=xy[1], r=pow(radii, 2), eps=1e-10)
         elif len(np.shape(radii)) == 1:
             assert len(xy) == len(radii)
-            e = "(pow(x[0] - %f, 2) + pow(x[1] - %f, 2) < %f + %f)" % (xy[0][0], xy[0][1], radii[0], 1e-10)
+            e = "(pow(x[0] - %f, 2) + pow(x[1] - %f, 2) < %f + %f)" % (xy[0][0], xy[0][1], pow(radii[0], 2), 1e-10)
             for i in range(1, len(radii)):
-                e += "&& (pow(x[0] - %f, 2) + pow(x[1] - %f, 2) < %f + %f)" % (xy[i][0], xy[i][1], radii[i], 1e-10)
+                e += "&& (pow(x[0] - %f, 2) + pow(x[1] - %f, 2) < %f + %f)" \
+                     % (xy[i][0], xy[i][1], pow(radii[i], 2), 1e-10)
             expr = Expression(e)
         else:
             raise ValueError("Indicator function radii input not recognised.")
     else:
-        if smooth:
+        if op.mode == 'tohoku':
             xd = (xy[1] - xy[0]) / 2
             yd = (xy[3] - xy[2]) / 2
             expr = Expression("(x[0] > %f - eps) && (x[0] < %f + eps) && (x[1] > %f - eps) && (x[1] < %f) + eps ? "
