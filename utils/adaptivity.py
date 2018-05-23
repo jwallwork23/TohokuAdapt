@@ -95,12 +95,12 @@ def steadyMetric(f, H=None, op=Options()):
     M = Function(V)
 
     if op.normalisation == 'manual':
-        f_min = 1e-3  # Minimum tolerated value for the solution field
+        f_min = 1e-6  # Minimum tolerated value for the solution field
 
         for i in range(mesh.topology.num_vertices()):
 
             # Generate local Hessian
-            H_loc = H.dat.data[i] / (op.targetError * max(np.sqrt(assemble(f * f * dx)), f_min)) # Avoid round-off error
+            H_loc = H.dat.data[i] * op.nVerT / max(np.sqrt(assemble(f * f * dx)), f_min)    # Avoid round-off error
             mean_diag = 0.5 * (H_loc[0][1] + H_loc[1][0])
             H_loc[0][1] = mean_diag
             H_loc[1][0] = mean_diag

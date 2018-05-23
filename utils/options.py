@@ -93,7 +93,6 @@ class Options:
             self.adaptField = 's'       # Adapt w.r.t 's'peed, 'f'ree surface or 'b'oth.
             self.normalisation = 'lp'   # Metric normalisation using Lp norm. 'manual' also available.
             self.normOrder = 2
-            self.targetError = 1e-3
             self.hessMeth = 'dL2'       # Hessian recovery by double L2 projection. 'parts' also available
         else:
             self.maxScaling = 5e5       # Maximum scale factor for error estimator

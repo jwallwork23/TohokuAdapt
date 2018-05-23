@@ -37,12 +37,12 @@ def indicator(mesh, xy=None, mirror=False, radius=None, op=Options()):
     :return: ('Smoothened') indicator function for region A.
     """
     smooth = True if op.mode == 'tohoku' else False
-    P0 = FunctionSpace(mesh, "DG", 0)
+    P1 = FunctionSpace(mesh, "DG", 1)
 
     # Define extent of region A
     if xy is None:
         xy = op.xy2 if mirror else op.xy
-    iA = Function(P0, name="Region of interest")
+    iA = Function(P1, name="Region of interest")
 
     if radius is not None:      # TODO: Consider a list of points.
         expr = Expression('pow(x[0] - x0, 2) + pow(x[1] - y0, 2) < r + eps', x0=xy[0], y0=xy[1], r=radius, eps=1e-10)

@@ -151,7 +151,10 @@ def plotTimeseries(fileExt, date, quantity='Integrand', realData=False, op=Optio
         separated = line.split(',')
         dat = [float(d) for d in separated[:-1]]    # Ignore carriage return
         tim = np.linspace(0, op.Tend, len(dat))
-        plt.plot(tim[::5], dat[::5], label=g.readline().split(',')[0])
+        if op.mode != 'shallow-water':
+            plt.plot(tim[::5], dat[::5], label=g.readline().split(',')[0])
+        else:
+            plt.plot(tim, dat, label=g.readline().split(',')[0])
         i += 1
     f.close()
     g.close()
@@ -199,9 +202,7 @@ def integrateTimeseries(fileExt, date, op=Options()):
         #     if j % (op.rm+2) in (op.rm,op.rm+1):
         #         del separated[j]
         dat = [float(d) for d in separated[:-1]]
-        # print(len(dat))
         I = 0
-        # dt = op.Tend / len(dat)
         dt = op.dt
         for i in range(1, len(dat)):
             I += 0.5 * (dat[i] + dat[i-1]) * dt
@@ -227,14 +228,17 @@ def compareTimeseries(date, run, quantity='Integrand', op=Options()):
             dates[approach] = date
     plt.gcf()
     for approach in approaches:
-        filename = 'outdata/' + op.mode + '/' + approach + '_' + dates[approach] + quantity + '.txt'
-        f = open(filename, 'r')
-        for i in range(run):
-            f.readline()
-        separated = f.readline().split(',')
-        dat = [float(d) for d in separated[:-1]]  # Ignore carriage return
-        tim = np.linspace(0, op.Tend, len(dat))
-        plt.plot(tim[::5], dat[::5], label=approach)
+        try:
+            filename = 'outdata/' + op.mode + '/' + approach + '_' + dates[approach] + quantity + '.txt'
+            f = open(filename, 'r')
+            for i in range(run):
+                f.readline()
+            separated = f.readline().split(',')
+            dat = [float(d) for d in separated[:-1]]  # Ignore carriage return
+            tim = np.linspace(0, op.Tend, len(dat))
+            plt.plot(tim[::5], dat[::5], label=approach)
+        except:
+            pass
     plt.xlabel('Time (s)')
     plt.ylabel(quantity + ' value')
     plt.legend(loc=2)

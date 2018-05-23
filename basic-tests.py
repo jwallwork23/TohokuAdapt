@@ -44,13 +44,13 @@ titles = (r'$f_1(x,y)=x^2+y^2$', r'$f_2(x,y)=\sin(\pi x)\sin(\pi y)$')
 
 
 def hessian(subset, space):
-    plt.plot([1, 2])
-    plt.subplot(211)
-    plt.ylabel("L2 error in gradient")
-    plt.subplot(212)
-    plt.xlabel("Element count")
-    plt.ylabel("L2 error in Hessian")
     for i in range(len(functions)):
+        plt.plot([1, 2])
+        plt.subplot(211)
+        plt.ylabel("L2 error in gradient")
+        plt.subplot(212)
+        plt.xlabel("Element count")
+        plt.ylabel("L2 error in Hessian")
         for hessMeth in ('dL2', 'parts'):
             op = Options(mode=None,
                          approach='hessianBased')
@@ -125,15 +125,18 @@ def adapts(scale, space, indy):
     op = Options(mode=None, approach='hessianBased')
     op.hmin = 1e-10
     op.hmax = 1
+    op.normalisation = 'manual'             # TODO: Make this selectable
     for i in range(len(functions)):
         J = integrate(i, xy=region, r=r)
-        for nAdapt in range(1, 5):
+        # for nAdapt in range(1, 5):
+        for nAdapt in range(1, 3):          # TODO: PointNotInDomainError occurs under manual normalisation
             op.di = 'plots/adapt-tests/'
             adapt_diff = []
             fixed_diff = []
             nEls = []
             inEls = []
-            for j in range(2, 8):
+            # for j in range(2, 8):         # TODO: PointNotInDomainError occurs under scaled manual normalisation
+            for j in range(2, 7):
                 n = pow(2, j)
                 mesh = SquareMesh(n, n, 2, 2)
                 if scale:
@@ -202,16 +205,16 @@ def directionalRefine(eps=1e-4):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("test", help="Choose a test from {'Hessian', 'dirRefine'}")
+    parser.add_argument("test", help="Choose a test from {'Hessian', 'dirRefine', 'nAdapt'}")
     parser.add_argument("-subset", help="Toggle whether to calculate error over the whole domain or a subset thereof")
     parser.add_argument("-space", help="Toggle CG or DG space (default CG)")
     parser.add_argument("-scale", help="Toggle scaling of vertex count")
     parser.add_argument("-i", help="Type of indicator function, from {'aligned', 'misaligned', 'centred'}")
     args = parser.parse_args()
     subset = bool(args.subset)
-    space = args.space if args.space else "CG"
+    space = "CG" if args.space is None else args.space
     scale = bool(args.scale)
-    assert args.space in ("CG", "DG")
+    assert space in ("CG", "DG")
     indy = 'aligned' if args.i is None else args.i
     assert indy in ('aligned', 'misaligned', 'centred', 'uncentred')
     print(subset, space, indy)
