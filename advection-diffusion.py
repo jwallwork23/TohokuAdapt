@@ -1,7 +1,6 @@
 from firedrake import *
-from firedrake_adjoint import *
+# from firedrake_adjoint import *
 
-import numpy as np
 from time import clock
 
 from utils.adaptivity import metricGradation, steadyMetric
@@ -15,7 +14,6 @@ def weakResidualAD(c, c_, w, op=Options(mode='advection-diffusion')):
     :arg c: concentration solution at current timestep. 
     :arg c_: concentration at previous timestep.
     :arg w: wind field.
-    :param nu: diffusivity parameter.
     :param op: Options parameter object.
     :return: weak residual for advection diffusion equation at current timestep.
     """
@@ -29,8 +27,7 @@ def weakResidualAD(c, c_, w, op=Options(mode='advection-diffusion')):
     return F
 
 
-def fixedMesh(n=3):
-    op = Options(mode='advection-diffusion')
+def fixedMesh(n=3, op=Options(mode='advection-diffusion', approach="fixedMesh")):
     forwardFile = File(op.di + "fixedMesh.pvd")
 
     mesh = RectangleMesh(4 * n, n, 4, 1)  # Computational mesh
@@ -66,9 +63,9 @@ def fixedMesh(n=3):
 
         J_list.append(assemble(iA * phi * dx))
 
-        if op.plotpvd & (cnt % op.ndump == 0):
+        if op.plotpvd and (cnt % op.ndump == 0):
             forwardFile.write(phi, time=t)
-        print('t = %.3fs' % t)
+            print('t = %.1fs' % t)
         t += op.dt
         cnt += 1
 
@@ -82,8 +79,7 @@ def fixedMesh(n=3):
 
     return quantities
 
-def hessianBased(n=3):
-    op = Options(mode='advection-diffusion')
+def hessianBased(n=3, op=Options(mode='advection-diffusion', approach="hessianBased")):
     forwardFile = File(op.di + "hessianBased.pvd")
 
     # Define problem
@@ -99,7 +95,7 @@ def hessianBased(n=3):
     nEle = mesh.num_cells()
     mM = [nEle, nEle]  # Min/max #Elements
     Sn = nEle
-    op.nVerT = mesh.num_vertices() * op.vscale  # Target #Vertices
+    op.nVerT = mesh.num_vertices() * op.rescaling  # Target #Vertices
 
     # Initialise counters
     t = 0.
@@ -110,31 +106,32 @@ def hessianBased(n=3):
     J_list = [assemble(iA * phi * dx)]
     while t <= op.Tend:
         adaptTimer = clock()
-        for l in range(op.nAdapt):
+        if cnt % op.rm == 0:
+            for l in range(op.nAdapt):
 
-            # Construct metric
-            M = steadyMetric(phi, op=op)
-            if op.gradate:
-                metricGradation(mesh, M)
+                # Construct metric
+                M = steadyMetric(phi, op=op)
+                if op.gradate:
+                    metricGradation(mesh, M)
 
-            # Adapt mesh and interpolate variables
-            mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-            phi = interp(mesh, phi)
-            phi.rename("Concentration")
-            V = FunctionSpace(mesh, "CG", 2)
-            phi_next = Function(V)
+                # Adapt mesh and interpolate variables
+                mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
+                phi = interp(mesh, phi)
+                phi.rename("Concentration")
+                V = FunctionSpace(mesh, "CG", 2)
+                phi_next = Function(V)
 
-            iA = indicator(mesh, xy=[3., 0.], radii=0.5, op=op)
-            J_list.append(assemble(iA * phi * dx))
+                iA = indicator(mesh, xy=[3., 0.], radii=0.5, op=op)
+                J_list.append(assemble(iA * phi * dx))
 
-            # Re-establish bilinear form and set boundary conditions
-            w = Function(VectorFunctionSpace(mesh, "CG", 1), name='Wind field').interpolate(Expression([1, 0]))
-            F = weakResidualAD(phi_next, phi, w, op=op)
+                # Re-establish bilinear form and set boundary conditions
+                w = Function(VectorFunctionSpace(mesh, "CG", 1), name='Wind field').interpolate(Expression([1, 0]))
+                F = weakResidualAD(phi_next, phi, w, op=op)
 
-            # Get mesh stats
-            nEle = mesh.num_cells()
-            mM = [min(nEle, mM[0]), max(nEle, mM[1])]
-            Sn += nEle
+                # Get mesh stats
+                nEle = mesh.num_cells()
+                mM = [min(nEle, mM[0]), max(nEle, mM[1])]
+                Sn += nEle
 
         # Solve problem at current timestep
         solverTimer = clock()
@@ -143,13 +140,15 @@ def hessianBased(n=3):
         solverTimer = clock() - solverTimer
 
         # Print to screen, save data and increment counters
-        print('t = %.3fs' % t)
-        if op.plotpvd & (cnt % op.ndump == 0):
+        if op.plotpvd and (cnt % op.ndump == 0):
             forwardFile.write(phi, time=t)
+            print('t = %.1fs' % t)
         t += op.dt
         cnt += 1
-        av = op.printToScreen(int(cnt / op.rm + 1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.dt)
-        adaptSolveTimer += adaptTimer + solverTimer
+
+        if cnt % op.rm == 0:
+            av = op.printToScreen(int(cnt / op.rm + 1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.dt)
+            adaptSolveTimer += adaptTimer + solverTimer
 
     J_h = 0.
     for i in range(1, len(J_list)):
@@ -169,13 +168,18 @@ if __name__ == "__main__":
     parser.add_argument("-a", help="Choose adaptive approach from {'hessianBased', 'DWP', 'DWR'} (default 'fixedMesh')")
     parser.add_argument("-low", help="Lower bound for index range")
     parser.add_argument("-high", help="Upper bound for index range")
+    parser.add_argument("-o", help="Output data")
     args = parser.parse_args()
+
+    op = Options(mode="advection-diffusion",
+                 approach=args.a,
+                 plotpvd=True if bool(args.o) else False)
 
     resolutions = range(0 if args.low is None else int(args.low), 6 if args.high is None else int(args.high))
     solvers = {'fixedMesh': fixedMesh, 'hessianBased': hessianBased}
 
     for i in resolutions:
-        q = solvers[args.a]
+        q = solvers[args.a](pow(2, i), op=op)
         print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs"
               % (i, q['meanElements'], q['J_h'], q['solverTimer']))
 

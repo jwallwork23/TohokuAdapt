@@ -2,6 +2,8 @@ from thetis import *
 
 import numpy as np
 
+from utils.conversion import from_latlon
+
 __all__ = ["Options"]
 
 
@@ -59,7 +61,7 @@ class Options:
         except:
             raise ValueError('Meshing strategy %s not recognised' % approach)
         try:
-            assert mode in ('tohoku', 'shallow-water', 'rossby-wave', 'model-verification', None)
+            assert mode in ('tohoku', 'shallow-water', 'rossby-wave', 'model-verification', 'advection-diffusion', None)
             self.mode = mode
         except:
             raise ValueError('Test problem %s not recognised.' % mode)
@@ -155,9 +157,9 @@ class Options:
             self.hmin = 1e-4
             self.hmax = 1.
             self.minNorm = 1e-6
-            self.rm = 6
+            self.rm = 12
             self.dt = 0.05
-            self.ndump = 2
+            self.ndump = 1
             # self.J = 1.1184e-3,   # On mesh of 524,288 elements
             self.J = 1.6797e-04     # On mesh of 524,288 elements
             # self.xy = [0., 0.5 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
@@ -177,7 +179,8 @@ class Options:
             self.dt = 0.05
             self.ndump = 12
             self.g = 1.
-            self.J = 5.7613                     # On mesh of 9,437,184 elements, using asymptotic solution
+            # self.J = 5.7613                     # On mesh of 9,437,184 elements, using asymptotic solution
+            self.J = 5.6105
             # self.xy = [-16., -14., -3., 3.]
             # self.xy2 = [14., 16., -3., 3.]
             self.xy = [-15., 0.]                # TODO: Run with this
@@ -204,16 +207,17 @@ class Options:
             else:
                 self.J = 1.305e+13
             # self.xy = [490e3, 640e3, 4160e3, 4360e3]
-            self.xy = [self.lonFukushima, self.latFukushima]    # TODO: Run with this
+            self.xy = from_latlon(self.latFukushima, self.lonFukushima, force_zone_number=54)[:2]
             self.xy2 = [0., 0., 0., 0.]
             self.radius = 150e3
             self.g = 9.81
         elif self.mode == 'advection-diffusion':
-            self.dt = 0.04
+            self.dt = 0.05
             self.Tend = 2.4
             self.hmin = 1e-4
             self.hmax = 1.
-            self.rm = 5
+            self.rm = 20
+            self.ndump = 10
 
         self.viscosity = 1e-3
 
