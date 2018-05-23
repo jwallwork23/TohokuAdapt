@@ -208,6 +208,14 @@ class Options:
             self.xy2 = [0., 0., 0., 0.]
             self.radius = 150e3
             self.g = 9.81
+        elif self.mode == 'advection-diffusion':
+            self.dt = 0.04
+            self.Tend = 2.4
+            self.hmin = 1e-4
+            self.hmax = 1.
+            self.rm = 5
+
+        self.viscosity = 1e-3
 
         # Derived timestep indices
         try:
