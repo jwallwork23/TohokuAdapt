@@ -31,9 +31,9 @@ class SWCallback(FunctionalCallback):
             :return: objective functional value for callbacks.
             """
             mesh = solver_obj.fields.solution_2d.function_space().mesh()
-            ks = Function(VectorFunctionSpace(mesh, "DG", 0) * FunctionSpace(mesh, "DG", 0))
+            ks = Function(VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1))
             k0, k1 = ks.split()
-            iA = indicator(mesh, radius=self.op.radius, op=self.op)
+            iA = indicator(mesh, radii=self.op.radius, op=self.op)
             File("plots/" + self.op.mode + "/indicator.pvd").write(iA)
             k1.assign(iA)
             kt = Constant(0.)
@@ -65,9 +65,9 @@ class MirroredSWCallback(FunctionalCallback):
             :return: objective functional value for callbacks.
             """
             mesh = solver_obj.fields.solution_2d.function_space().mesh()
-            ks = Function(VectorFunctionSpace(mesh, "DG", 0) * FunctionSpace(mesh, "DG", 0))
+            ks = Function(VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1))
             k0, k1 = ks.split()
-            k1.assign(indicator(mesh, mirror=True, radius=self.op.radius, op=self.op))
+            k1.assign(indicator(mesh, mirror=True, radii=self.op.radius, op=self.op))
             kt = Constant(0.)
             if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:      # Slightly smooth transition
                 kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * dt else 0.5)
@@ -98,9 +98,9 @@ class ObjectiveSWCallback(FunctionalCallback):
             :return: objective functional value for callbacks.
             """
             mesh = solver_obj.fields.solution_2d.function_space().mesh()
-            ks = Function(VectorFunctionSpace(mesh, "DG", 0) * FunctionSpace(mesh, "DG", 0))
+            ks = Function(VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1))
             k0, k1 = ks.split()
-            k1.assign(indicator(mesh, mirror=self.mirror, op=self.op))
+            k1.assign(indicator(mesh, radii=self.op.radius, mirror=self.mirror, op=self.op))
             kt = Constant(0.)
             if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:
                 kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * dt else 0.5)

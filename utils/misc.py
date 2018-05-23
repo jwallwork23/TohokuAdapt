@@ -27,12 +27,12 @@ def peakAndDistance(f, op=Options()):
     return peak, val
 
 
-def indicator(mesh, xy=None, mirror=False, radius=None, op=Options()):
+def indicator(mesh, xy=None, mirror=False, radii=None, op=Options()):
     """
     :arg mesh: mesh to use.
     :arg xy: Custom selection for indicator region.
     :param mirror: consider 'mirror image' indicator region.
-    :param radius: consider disc of radius `radius`, as opposed to rectangle.
+    :param radii: consider disc of radius `radius`, as opposed to rectangle.
     :param op: options parameter class.
     :return: ('Smoothened') indicator function for region A.
     """
@@ -44,18 +44,27 @@ def indicator(mesh, xy=None, mirror=False, radius=None, op=Options()):
         xy = op.xy2 if mirror else op.xy
     iA = Function(P1, name="Region of interest")
 
-    if radius is not None:      # TODO: Consider a list of points.
-        expr = Expression('pow(x[0] - x0, 2) + pow(x[1] - y0, 2) < r + eps', x0=xy[0], y0=xy[1], r=radius, eps=1e-10)
+    if radii is not None:      # TODO: Test this
+        if len(np.shape(radii)) == 0:
+            expr = Expression("pow(x[0] - x0, 2) + pow(x[1] - y0, 2) < r + eps", x0=xy[0], y0=xy[1], r=radii, eps=1e-10)
+        elif len(np.shape(radii)) == 1:
+            assert len(xy) == len(radii)
+            e = "(pow(x[0] - %f, 2) + pow(x[1] - %f, 2) < %f + %f)" % (xy[0][0], xy[0][1], radii[0], 1e-10)
+            for i in range(1, len(radii)):
+                e += "&& (pow(x[0] - %f, 2) + pow(x[1] - %f, 2) < %f + %f)" % (xy[i][0], xy[i][1], radii[i], 1e-10)
+            expr = Expression(e)
+        else:
+            raise ValueError("Indicator function radii input not recognised.")
     else:
         if smooth:
             xd = (xy[1] - xy[0]) / 2
             yd = (xy[3] - xy[2]) / 2
-            expr = Expression('(x[0] > %f - eps) && (x[0] < %f + eps) && (x[1] > %f - eps) && (x[1] < %f) + eps ? '
-                              'exp(1. / (pow(x[0] - %f, 2) - pow(%f, 2))) * exp(1. / (pow(x[1] - %f, 2) - pow(%f, 2))) '
-                              ': 0.' % (xy[0], xy[1], xy[2], xy[3], xy[0] + xd, xd, xy[2] + yd, yd), eps=1e-10)
+            expr = Expression("(x[0] > %f - eps) && (x[0] < %f + eps) && (x[1] > %f - eps) && (x[1] < %f) + eps ? "
+                              "exp(1. / (pow(x[0] - %f, 2) - pow(%f, 2))) * exp(1. / (pow(x[1] - %f, 2) - pow(%f, 2))) "
+                              ": 0." % (xy[0], xy[1], xy[2], xy[3], xy[0] + xd, xd, xy[2] + yd, yd), eps=1e-10)
         else:
             expr = Expression(
-                '(x[0] > %f - eps) && (x[0] < %f + eps) && (x[1] > %f - eps) && (x[1] < %f + eps) ? 1. : 0.'
+                "(x[0] > %f - eps) && (x[0] < %f + eps) && (x[1] > %f - eps) && (x[1] < %f + eps)"
                 % (xy[0], xy[1], xy[2], xy[3]), eps=1e-10)
     iA.interpolate(expr)
 

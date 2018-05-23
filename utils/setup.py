@@ -444,9 +444,9 @@ class RossbyWaveSolution:
 
         # Set up spatial and temporal kernel functions
         mesh = self.function_space.mesh()
-        ks = Function(VectorFunctionSpace(mesh, "DG", 0) * FunctionSpace(mesh, "DG", 0))
+        ks = Function(VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1))
         k0, k1 = ks.split()
-        k1.assign(indicator(mesh, mirror=mirror, op=self.op))
+        k1.assign(indicator(mesh, mirror=mirror, radii=self.op.radius, op=self.op))
         kt = Constant(0.)
 
         # Time integrate
