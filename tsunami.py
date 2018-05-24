@@ -121,30 +121,32 @@ def hessianBased(startRes, **kwargs):
         quantities = {}
         while cnt < op.cntT:
             adaptTimer = clock()
-            for l in range(op.nAdapt):                                          # TODO: Test this functionality
-
-                # Construct metric
-                if op.adaptField != 's':
-                    M = steadyMetric(elev_2d, op=op)
-                if cnt != 0:  # Can't adapt to zero velocity
-                    if op.adaptField != 'f':
-                        spd = Function(FunctionSpace(mesh, "DG", 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
-                        M2 = steadyMetric(spd, op=op)
-                        M = metricIntersection(M, M2) if op.adaptField == 'b' else M2
-                if op.bAdapt:
-                    M2 = steadyMetric(b, op=op)
-                    M = M2 if op.adaptField != 'f' and cnt == 0. else metricIntersection(M, M2)
-
-                # Adapt mesh and interpolate variables
-                if op.bAdapt or cnt != 0 or op.adaptField == 'f':
-                    mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-                    if cnt != 0:
-                        uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
-                    elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
-                    b, BCs, f = problemDomain(mesh=mesh, op=op)[3:]
-                    uv_2d.rename('uv_2d')
-                    elev_2d.rename('elev_2d')
-            adaptTimer = clock() - adaptTimer
+            # for l in range(op.nAdapt):                  # TODO: Test this functionality
+            #
+            #     # Construct metric
+            #     if op.adaptField != 's':
+            #         M = steadyMetric(elev_2d, op=op)
+            #     if cnt != 0:  # Can't adapt to zero velocity
+            #         if op.adaptField != 'f':
+            #             spd = Function(FunctionSpace(mesh, "DG", 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
+            #             M2 = steadyMetric(spd, op=op)
+            #             M = metricIntersection(M, M2) if op.adaptField == 'b' else M2
+            #     if op.bAdapt:
+            #         M2 = steadyMetric(b, op=op)
+            #         M = M2 if op.adaptField != 'f' and cnt == 0. else metricIntersection(M, M2)
+            #
+            #     # Adapt mesh and interpolate variables
+            #     if op.bAdapt or cnt != 0 or op.adaptField == 'f':
+            #         mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
+            #         if cnt != 0:
+            #             uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
+            #         elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
+            #         b, BCs, f = problemDomain(mesh=mesh, op=op)[3:]
+            #         uv_2d.rename('uv_2d')
+            #         elev_2d.rename('elev_2d')
+            # adaptTimer = clock() - adaptTimer
+            if cnt != 0:    # TODO: Figure out how to get this number to be the same as in fixedMesh
+                uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
 
             # Solver object and equations
             adapSolver = solver2d.FlowSolver2d(mesh, b)
@@ -916,8 +918,6 @@ if __name__ == "__main__":
                  orderChange=orderChange,
                  refinedSpace=True if args.r else False,
                  bAdapt=bool(args.b) if args.b is not None else False)
-
-    op.normalisation = 'manual'
 
     # Establish filenames
     filename = 'outdata/' + mode + '/' + approach

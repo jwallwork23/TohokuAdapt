@@ -112,7 +112,8 @@ def hessian(subset, space):
 
 def adapts(scale, space, indy):
     if indy == 'aligned':
-        region = [-0.8, -0.4, -0.2, 0.3]        # Test 1: a box which lines up with the grid
+        # region = [-0.8, -0.4, -0.2, 0.3]        # Test 1: a box which lines up with the grid
+        region = [0.25, 0.75, 0.25, 0.75]        # Test 1: a box which lines up with the grid
         r = None
     elif indy == 'misaligned':
         region = [-0.82, -0.44, -0.21, 0.33]    # Test 2: a box which does not line up with the grid
@@ -125,8 +126,9 @@ def adapts(scale, space, indy):
     op = Options(mode=None, approach='hessianBased')
     op.hmin = 1e-10
     op.hmax = 1
-    op.normalisation = 'manual'             # TODO: Make this selectable
-    for i in range(len(functions)):
+    # op.normalisation = 'manual'             # TODO: Make this selectable
+    op.normalisation = 'lp'
+    for i in range(1, len(functions)):
         J = integrate(i, xy=region, r=r)
         for nAdapt in range(1, 5):
             op.di = 'plots/adapt-tests/'
@@ -144,7 +146,7 @@ def adapts(scale, space, indy):
                     xy = Function(mesh.coordinates)
                     xy.dat.data[:, :] -= [1, 1]
                     mesh.coordinates.assign(xy)
-                    Vs = FunctionSpace(mesh, space, 1)
+                    Vs = FunctionSpace(mesh, space, 1)      # TODO: Try in P2 space?
 
                     # Establish function and (analytical) functional value
                     f = Function(Vs).interpolate(Expression(functions[i]))

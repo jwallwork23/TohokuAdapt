@@ -73,7 +73,11 @@ def readErrors(date, approach, mode='tohoku', bootstrapping=False):
         if mode == 'tohoku':
             av, rel, gP02, gP06, timing, J_h = line.split(',')
         elif mode == 'shallow-water':
-            av, rel, timing, J_h = line.split(',')
+            quantities = line.split(',')
+            av = quantities[0]
+            rel = quantities[1]
+            timing = quantities[-2]
+            J_h = quantities[-1]
         elif mode == 'rossby-wave':
             # av, rel, peak, dis, spd, timing, J_h = line.split(',')   # TODO: update for generalised framework
             quantities = line.split(',')
@@ -202,6 +206,7 @@ def integrateTimeseries(fileExt, date, op=Options()):
         #     if j % (op.rm+2) in (op.rm,op.rm+1):
         #         del separated[j]
         dat = [float(d) for d in separated[:-1]]
+        print("#### DEBUG: Number of timesteps stored = ", len(dat))
         I = 0
         dt = op.dt
         for i in range(1, len(dat)):
