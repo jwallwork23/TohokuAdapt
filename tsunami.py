@@ -917,6 +917,8 @@ if __name__ == "__main__":
                  refinedSpace=True if args.r else False,
                  bAdapt=bool(args.b) if args.b is not None else False)
 
+    op.normalisation = 'manual'
+
     # Establish filenames
     filename = 'outdata/' + mode + '/' + approach
     if args.ho:

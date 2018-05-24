@@ -57,6 +57,23 @@ class Options:
             self.mode = mode
         except:
             raise ValueError('Test problem %s not recognised.' % mode)
+        try:
+            assert coriolis in ('off', 'f', 'beta', 'sin')
+            self.coriolis = coriolis
+        except:
+            raise ValueError('Coriolis term type %s not recognised' % coriolis)
+
+        # Solver parameters
+        try:
+            assert family in ('dg-dg', 'dg-cg', 'cg-cg')
+            self.family = family
+        except:
+            raise ValueError('Mixed function space %s not recognised.' % family)
+        try:
+            assert timestepper in ('ForwardEuler', 'BackwardEuler', 'CrankNicolson')
+            self.timestepper = timestepper
+        except:
+            raise NotImplementedError
 
         # Default parameter choices
         if self.mode == 'shallow-water':
@@ -143,24 +160,6 @@ class Options:
             if ndump is None:
                 self.ndump = 10
 
-        try:
-            assert coriolis in ('off', 'f', 'beta', 'sin')
-            self.coriolis = coriolis
-        except:
-            raise ValueError('Coriolis term type %s not recognised' % coriolis)
-
-        # Solver parameters
-        try:
-            assert family in ('dg-dg', 'dg-cg', 'cg-cg')
-            self.family = family
-        except:
-            raise ValueError('Mixed function space %s not recognised.' % family)
-        try:
-            assert timestepper in ('ForwardEuler', 'BackwardEuler', 'CrankNicolson')
-            self.timestepper = timestepper
-        except:
-            raise NotImplementedError
-
         # Adaptivity parameters
         if self.approach == 'hessianBased':
             self.adaptField = 's'       # Adapt w.r.t 's'peed, 'f'ree surface or 'b'oth.
@@ -201,7 +200,7 @@ class Options:
             self.di = 'plots/'
 
         # Timestepping and (more) adaptivity parameters
-        for i in (ndump, rm, orderChange, nVerT, nAdapt):
+        for i in (orderChange, nVerT, nAdapt):
             assert isinstance(i, int)
         if ndump is not None:
             self.ndump = ndump
@@ -218,15 +217,20 @@ class Options:
         self.viscosity = 1e-3
 
         # Derived timestep indices
-        self.cntT = int(np.ceil(self.Tend / self.dt))               # Final timestep index
-        self.iStart = int(self.Tstart / (self.ndump * self.dt))     # First exported timestep of period of interest
-        self.iEnd = int(self.cntT / self.ndump)                     # Final exported timestep of period of interest
-        self.rmEnd = int(self.cntT / self.rm)                       # Final mesh index
         try:
-            assert self.rm % self.ndump == 0
-            self.dumpsPerRemesh = int(self.rm / self.ndump)
+            for i in (self.Tend, self.dt, self.Tstart, self.ndump, self.rm):
+                assert isinstance(i, (float, int))
+            self.cntT = int(np.ceil(self.Tend / self.dt))               # Final timestep index
+            self.iStart = int(self.Tstart / (self.ndump * self.dt))     # First exported timestep of period of interest
+            self.iEnd = int(self.cntT / self.ndump)                     # Final exported timestep of period of interest
+            self.rmEnd = int(self.cntT / self.rm)                       # Final mesh index
+            try:
+                assert self.rm % self.ndump == 0
+                self.dumpsPerRemesh = int(self.rm / self.ndump)
+            except:
+                raise ValueError("Timesteps per data dump should divide timesteps per remesh")
         except:
-            raise ValueError("Timesteps per data dump should divide timesteps per remesh")
+            pass
 
         # Specify FunctionSpaces
         self.degree1 = 1

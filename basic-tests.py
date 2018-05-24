@@ -128,46 +128,49 @@ def adapts(scale, space, indy):
     op.normalisation = 'manual'             # TODO: Make this selectable
     for i in range(len(functions)):
         J = integrate(i, xy=region, r=r)
-        # for nAdapt in range(1, 5):
-        for nAdapt in range(1, 3):          # TODO: PointNotInDomainError occurs under manual normalisation
+        for nAdapt in range(1, 5):
             op.di = 'plots/adapt-tests/'
             adapt_diff = []
             fixed_diff = []
             nEls = []
             inEls = []
-            # for j in range(2, 8):         # TODO: PointNotInDomainError occurs under scaled manual normalisation
-            for j in range(2, 7):
+            for j in range(2, 8):
                 n = pow(2, j)
                 mesh = SquareMesh(n, n, 2, 2)
-                if scale:
-                    op.nVerT = op.rescaling * mesh.num_vertices()
-                inEls.append(mesh.num_cells())
-                xy = Function(mesh.coordinates)
-                xy.dat.data[:, :] -= [1, 1]
-                mesh.coordinates.assign(xy)
-                Vs = FunctionSpace(mesh, space, 1)
+                try:
+                    if scale:
+                        op.nVerT = op.rescaling * mesh.num_vertices()
+                    inEls.append(mesh.num_cells())
+                    xy = Function(mesh.coordinates)
+                    xy.dat.data[:, :] -= [1, 1]
+                    mesh.coordinates.assign(xy)
+                    Vs = FunctionSpace(mesh, space, 1)
 
-                # Establish function and (analytical) functional value
-                f = Function(Vs).interpolate(Expression(functions[i]))
-                if nAdapt == 1:
-                    iA = indicator(mesh, xy=region, radius=r, op=op)
-                    J_fixed = assemble(f * iA * dx)
-                    fixed_diff.append(np.abs((J - J_fixed) / J))
+                    # Establish function and (analytical) functional value
+                    f = Function(Vs).interpolate(Expression(functions[i]))
+                    if nAdapt == 1:
+                        iA = indicator(mesh, xy=region, radii=r, op=op)
+                        J_fixed = assemble(f * iA * dx)
+                        fixed_diff.append(np.abs((J - J_fixed) / J))
 
-                # Adapt mesh
-                for k in range(nAdapt):
-                    M = steadyMetric(f, op=op)
-                    mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-                    f = interp(mesh, f)
-                nEle = mesh.num_cells()
-                nEls.append(nEle)
+                    # Adapt mesh
+                    for k in range(nAdapt):
+                        M = steadyMetric(f, op=op)
+                        mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
+                        f = interp(mesh, f)
+                    nEle = mesh.num_cells()
+                    nEls.append(nEle)
 
-                # Calculate difference in functional approximation
-                iA = indicator(mesh, xy=region, radius=r, op=op)
-                J_adapt = assemble(f * iA * dx)
-                adapt_diff.append(np.abs((J - J_adapt) / J))
-                print("Function %d, run %d, %s space, %d elements: Functional = %.4f, Error = %.4f)"
-                      % (i, j, space, nEle, J_adapt, adapt_diff[-1]))
+                    # Calculate difference in functional approximation
+                    iA = indicator(mesh, xy=region, radii=r, op=op)
+                    J_adapt = assemble(f * iA * dx)
+                    adapt_diff.append(np.abs((J - J_adapt) / J))
+                    print("Function %d, nAdapt %d, run %d, %s space, %d elements: Functional = %.4f, Error = %.4f"
+                          % (i, nAdapt, j, space, nEle, J_adapt, adapt_diff[-1]))
+                except PointNotInDomainError:
+                    del inEls[-1]
+                    del nEls[-1]
+                    print("Playing on epsilons failed for run %d" % i)
 
             if nAdapt == 1:
                 plt.loglog(inEls, fixed_diff, label="Fixed mesh", marker='x')

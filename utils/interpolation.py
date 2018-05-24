@@ -51,14 +51,13 @@ def interp(mesh, *fields):
             for x in notInDomain:
                 try:
                     val = f.at(coords[x], tolerance=eps)
-                except PointNotInDomainError:
-                    # print("#### DEBUG: offending coordinates = ", coords[x])
+                except PointNotInDomainError(mesh, coords[x]):
                     val = None
                 finally:
                     f_new.dat.data[x] = val
                     notInDomain.remove(x)
-            if eps >= 1e8:                                  # TODO: This value seems a bit high
-                raise PointNotInDomainError('Playing with epsilons failed. Abort.')
+            if eps >= 1e8:
+                raise PointNotInDomainError(mesh, notInDomain)
         fields_new += (f_new,)
 
     if len(fields_new) == 1:
