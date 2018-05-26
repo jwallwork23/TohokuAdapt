@@ -168,11 +168,12 @@ class Options:
             self.hessMeth = 'dL2'       # Hessian recovery by double L2 projection. 'parts' also available
         else:
             if self.mode == 'shallow-water':
-                self.maxScaling = 5e8       # TODO: What is the actual interpretation?
+                self.maxScaling = 5e9       # TODO: What is the actual interpretation?
             else:
                 self.maxScaling = 5e5       # Maximum scale factor for error estimator
         if self.approach == "DWR":
-            self.rescaling = 0.4        # Chosen small enough to ensure accuracy for a small element count
+            # self.rescaling = 0.4        # Chosen small enough to ensure accuracy for a small element count
+            self.rescaling = 0.85        # Chosen small enough to ensure accuracy for a small element count
         else:
             try:
                 assert rescaling > 0

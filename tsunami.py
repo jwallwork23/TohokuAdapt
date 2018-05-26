@@ -331,7 +331,6 @@ def DWP(startRes, **kwargs):
                 saveAdj.close()
             if op.plotpvd:
                 adjointFile.write(dual_u, dual_e, time=op.dt * (i - r))
-            print('Adjoint simulation %.2f%% complete' % ((N - i + r) / N * 100))
         dualTimer = clock() - dualTimer
         print('Dual run complete. Run time: %.3fs' % dualTimer)
 
@@ -379,7 +378,8 @@ def DWP(startRes, **kwargs):
             for l in range(op.nAdapt):                                  # TODO: Test this functionality
 
                 # Construct metric
-                with DumbCheckpoint(op.di + 'hdf5/ErrorIndicator2d_' + indexString(int(cnt/op.rm)), mode=FILE_READ) as loadErr:
+                indexStr = indexString(int(cnt / op.rm))
+                with DumbCheckpoint(op.di + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_READ) as loadErr:
                     loadErr.load(epsilon)
                     loadErr.close()
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(interp(mesh, epsilon))
@@ -410,7 +410,7 @@ def DWP(startRes, **kwargs):
             adapOpt.timestep = op.dt
             adapOpt.output_directory = op.di
             if not op.plotpvd:
-                options.no_exports = True
+                adapOpt.no_exports = True
             adapOpt.coriolis_frequency = f
             adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
             adapSolver.i_export = int(cnt / op.ndump)
@@ -620,8 +620,10 @@ def DWR(startRes, **kwargs):
         tape = get_working_tape()
         solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
         N = len(solve_blocks)
-        r = N % op.rm   # Number of extra tape annotations in setup
-        for i in range(N - 1, r - 1, -op.rm):
+        for i in range(N):
+            print(i, type(solve_blocks[i].adj_sol))
+        r = N % op.rm                       # Number of extra tape annotations in setup
+        for i in range(r, N, op.rm):        # Iterate r is the first timestep
             dual.assign(solve_blocks[i].adj_sol)
             dual_u, dual_e = dual.split()
             with DumbCheckpoint(op.di + 'hdf5/Adjoint2d_' + indexString(int((i - r) / op.rm)),  mode=FILE_CREATE) as saveAdj:
@@ -630,7 +632,6 @@ def DWR(startRes, **kwargs):
                 saveAdj.close()
             if op.plotpvd:
                 adjointFile.write(dual_u, dual_e, time=op.dt * (i - r))
-            print('Adjoint simulation %.2f%% complete' % ((N - i + r) / N * 100))
         dualTimer = clock() - dualTimer
         print('Dual run complete. Run time: %.3fs' % dualTimer)
 
@@ -765,7 +766,7 @@ def DWR(startRes, **kwargs):
             adapOpt.timestep = op.dt
             adapOpt.output_directory = op.di
             if not op.plotpvd:
-                options.no_exports = True
+                adapOpt.no_exports = True
             adapOpt.coriolis_frequency = f
             adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
             adapSolver.i_export = int(cnt / op.ndump)
