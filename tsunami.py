@@ -298,7 +298,7 @@ def DWP(startRes, **kwargs):
         options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
         options.coriolis_frequency = f
         options.simulation_export_time = op.dt * op.rm
-        options.simulation_end_time = op.Tend
+        options.simulation_end_time = op.Tend - 0.5 * op.dt
         options.timestepper_type = op.timestepper
         options.timestep = op.dt
         options.output_directory = op.di
@@ -330,16 +330,16 @@ def DWP(startRes, **kwargs):
         solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
         N = len(solve_blocks)
         r = N % op.ndump                            # Number of extra tape annotations in setup
-        for i in range(N - 1, r - 2, -op.ndump):
+        for i in range(N - 1, r - 1, -op.ndump):
             dual.assign(solve_blocks[i].adj_sol)
             dual_u, dual_e = dual.split()
-            with DumbCheckpoint(op.di + 'hdf5/Adjoint2d_' + indexString(int((i - r + 1) / op.ndump)), mode=FILE_CREATE) as saveAdj:
+            with DumbCheckpoint(op.di + 'hdf5/Adjoint2d_' + indexString(int((i - r) / op.ndump)), mode=FILE_CREATE) as saveAdj:
                 saveAdj.store(dual_u)
                 saveAdj.store(dual_e)
                 saveAdj.close()
             if op.plotpvd:
-                adjointFile.write(dual_u, dual_e, time=op.dt * (i - r + 1))
-            print('Adjoint simulation %.2f%% complete' % ((N - i + r - 1) / N * 100))
+                adjointFile.write(dual_u, dual_e, time=op.dt * (i - r))
+            print('Adjoint simulation %.2f%% complete' % ((N - i + r) / N * 100))
         dualTimer = clock() - dualTimer
         print('Dual run complete. Run time: %.3fs' % dualTimer)
 
@@ -376,6 +376,7 @@ def DWP(startRes, **kwargs):
         # Run adaptive primal run
         cnt = 0
         adaptSolveTimer = 0.
+        t = 0.
         q = Function(V)
         uv_2d, elev_2d = q.split()
         elev_2d.interpolate(eta0)
@@ -398,8 +399,6 @@ def DWP(startRes, **kwargs):
 
                 # Adapt mesh and interpolate variables
                 mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-                if cnt != 0:
-                    uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
                 elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
                 b, BCs, f = problemDomain(mesh=mesh, op=op)[3:]
                 uv_2d.rename('uv_2d')
@@ -414,9 +413,7 @@ def DWP(startRes, **kwargs):
             adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
             adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump
-            startT = endT
-            endT += op.dt * op.rm
-            adapOpt.simulation_end_time = endT
+            adapOpt.simulation_end_time = t + op.dt * op.rm
             adapOpt.timestepper_type = op.timestepper
             adapOpt.timestep = op.dt
             adapOpt.output_directory = op.di
@@ -431,9 +428,9 @@ def DWP(startRes, **kwargs):
                                        export_type='hdf5')
             adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
             adapSolver.i_export = int(cnt / op.ndump)
+            adapSolver.next_export_t = adapSolver.i_export * adapSolver.options.simulation_export_time
             adapSolver.iteration = cnt
-            adapSolver.simulation_time = startT
-            adapSolver.next_export_t = startT + adapOpt.simulation_export_time  # For next export
+            adapSolver.simulation_time = t
             for e in adapSolver.exporters.values():
                 e.set_next_export_ix(adapSolver.i_export)
 
@@ -484,8 +481,12 @@ def DWP(startRes, **kwargs):
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
             cnt += op.rm
+            t += op.rm * op.dt
             av = op.printToScreen(int(cnt / op.rm + 1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.dt)
             adaptSolveTimer += adaptTimer + solverTimer
+
+            # Extract fields for next solver block
+            uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
 
             # Measure error using metrics, as in Huang et al.
         if op.mode == 'rossby-wave':
@@ -580,7 +581,7 @@ def DWR(startRes, **kwargs):
         options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
         options.coriolis_frequency = f
         options.simulation_export_time = op.dt * op.ndump
-        options.simulation_end_time = op.Tend
+        options.simulation_end_time = op.Tend - 0.5 * op.dt
         options.timestepper_type = op.timestepper
         options.timestep = op.dt
         options.output_directory = op.di   # Need this for residual callback
@@ -634,16 +635,16 @@ def DWR(startRes, **kwargs):
         solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
         N = len(solve_blocks)
         r = N % op.rm   # Number of extra tape annotations in setup
-        for i in range(N - 1, r - 2, -op.rm):
+        for i in range(N - 1, r - 1, -op.rm):
             dual.assign(solve_blocks[i].adj_sol)
             dual_u, dual_e = dual.split()
-            with DumbCheckpoint(op.di + 'hdf5/Adjoint2d_' + indexString(int((i - r + 1) / op.rm)),  mode=FILE_CREATE) as saveAdj:
+            with DumbCheckpoint(op.di + 'hdf5/Adjoint2d_' + indexString(int((i - r) / op.rm)),  mode=FILE_CREATE) as saveAdj:
                 saveAdj.store(dual_u)
                 saveAdj.store(dual_e)
                 saveAdj.close()
             if op.plotpvd:
-                adjointFile.write(dual_u, dual_e, time=op.dt * (i - r + 1))
-            print('Adjoint simulation %.2f%% complete' % ((N - i + r - 1) / N * 100))
+                adjointFile.write(dual_u, dual_e, time=op.dt * (i - r))
+            print('Adjoint simulation %.2f%% complete' % ((N - i + r) / N * 100))
         dualTimer = clock() - dualTimer
         print('Dual run complete. Run time: %.3fs' % dualTimer)
 
@@ -735,6 +736,7 @@ def DWR(startRes, **kwargs):
         # Run adaptive primal run
         cnt = 0
         adaptSolveTimer = 0.
+        t = 0.
         q = Function(V)
         uv_2d, elev_2d = q.split()
         elev_2d.interpolate(eta0)
@@ -758,8 +760,6 @@ def DWR(startRes, **kwargs):
 
                 # Adapt mesh and interpolate variables
                 mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
-                if cnt != 0:
-                    uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
                 elev_2d, uv_2d = interp(mesh_H, elev_2d, uv_2d)
                 b, BCs, f = problemDomain(mesh=mesh_H, op=op)[3:]
                 uv_2d.rename('uv_2d')
@@ -774,9 +774,7 @@ def DWR(startRes, **kwargs):
             adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
             adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump
-            startT = endT
-            endT += op.dt * op.rm
-            adapOpt.simulation_end_time = endT
+            adapOpt.simulation_end_time = t + op.dt * op.rm
             adapOpt.timestepper_type = op.timestepper
             adapOpt.timestep = op.dt
             adapOpt.output_directory = op.di
@@ -790,9 +788,9 @@ def DWR(startRes, **kwargs):
                                        export_type='hdf5')
             adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
             adapSolver.i_export = int(cnt / op.ndump)
+            adapSolver.next_export_t = adapSolver.i_export * adapSolver.options.simulation_export_time
             adapSolver.iteration = cnt
-            adapSolver.simulation_time = startT
-            adapSolver.next_export_t = startT + adapOpt.simulation_export_time  # For next export
+            adapSolver.simulation_time = t
             for e in adapSolver.exporters.values():
                 e.set_next_export_ix(adapSolver.i_export)
 
@@ -843,8 +841,12 @@ def DWR(startRes, **kwargs):
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
             cnt += op.rm
+            t += op.rm * op.dt
             av = op.printToScreen(int(cnt / op.rm + 1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.dt)
             adaptSolveTimer += adaptTimer + solverTimer
+
+            # Extract fields for next solver block
+            uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
 
             # Measure error using metrics, as in Huang et al.
         if op.mode == 'rossby-wave':

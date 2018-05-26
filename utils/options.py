@@ -86,7 +86,7 @@ class Options:
                 self.rm = 12
             self.dt = 0.05
             if ndump is None:
-                self.ndump = 1
+                self.ndump = 6
             # self.J = 1.1184e-3,   # On mesh of 524,288 elements
             self.J = 1.6797e-04  # On mesh of 524,288 elements
             # self.xy = [0., 0.5 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
