@@ -39,7 +39,7 @@ def fixedMesh(startRes, **kwargs):
         options.use_lax_friedrichs_velocity = False             # TODO: This is a temporary fix
         options.coriolis_frequency = f
         options.simulation_export_time = op.dt * op.ndump
-        options.simulation_end_time = op.Tend
+        options.simulation_end_time = op.Tend - 0.5 * op.dt
         options.timestepper_type = op.timestepper
         options.timestep = op.dt
         options.output_directory = op.di
@@ -115,38 +115,36 @@ def hessianBased(startRes, **kwargs):
         mM = [nEle, nEle]  # Min/max #Elements
         Sn = nEle
         cnt = 0
-        endT = 0.
+        t = 0.
 
         adaptSolveTimer = 0.
         quantities = {}
         while cnt < op.cntT:
             adaptTimer = clock()
-            # for l in range(op.nAdapt):                  # TODO: Test this functionality
-            #
-            #     # Construct metric
-            #     if op.adaptField != 's':
-            #         M = steadyMetric(elev_2d, op=op)
-            #     if cnt != 0:  # Can't adapt to zero velocity
-            #         if op.adaptField != 'f':
-            #             spd = Function(FunctionSpace(mesh, "DG", 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
-            #             M2 = steadyMetric(spd, op=op)
-            #             M = metricIntersection(M, M2) if op.adaptField == 'b' else M2
-            #     if op.bAdapt:
-            #         M2 = steadyMetric(b, op=op)
-            #         M = M2 if op.adaptField != 'f' and cnt == 0. else metricIntersection(M, M2)
-            #
-            #     # Adapt mesh and interpolate variables
-            #     if op.bAdapt or cnt != 0 or op.adaptField == 'f':
-            #         mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-            #         if cnt != 0:
-            #             uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
-            #         elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
-            #         b, BCs, f = problemDomain(mesh=mesh, op=op)[3:]
-            #         uv_2d.rename('uv_2d')
-            #         elev_2d.rename('elev_2d')
-            # adaptTimer = clock() - adaptTimer
-            if cnt != 0:    # TODO: Figure out how to get this number to be the same as in fixedMesh
-                uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
+            for l in range(op.nAdapt):                  # TODO: Test this functionality
+
+                # Construct metric
+                if op.adaptField != 's':
+                    M = steadyMetric(elev_2d, op=op)
+                if cnt != 0:  # Can't adapt to zero velocity
+                    if op.adaptField != 'f':
+                        spd = Function(FunctionSpace(mesh, "DG", 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
+                        M2 = steadyMetric(spd, op=op)
+                        M = metricIntersection(M, M2) if op.adaptField == 'b' else M2
+                if op.bAdapt:
+                    M2 = steadyMetric(b, op=op)
+                    M = M2 if op.adaptField != 'f' and cnt == 0. else metricIntersection(M, M2)
+
+                # Adapt mesh and interpolate variables
+                if op.bAdapt or cnt != 0 or op.adaptField == 'f':
+                    mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
+                    if cnt != 0:
+                        uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
+                    elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
+                    b, BCs, f = problemDomain(mesh=mesh, op=op)[3:]
+                    uv_2d.rename('uv_2d')
+                    elev_2d.rename('elev_2d')
+            adaptTimer = clock() - adaptTimer
 
             # Solver object and equations
             adapSolver = solver2d.FlowSolver2d(mesh, b)
@@ -156,9 +154,7 @@ def hessianBased(startRes, **kwargs):
             adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
             adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump
-            startT = endT
-            endT += op.dt * op.rm
-            adapOpt.simulation_end_time = endT
+            adapOpt.simulation_end_time = t + op.dt * (op.rm - 0.5)
             adapOpt.timestepper_type = op.timestepper
             adapOpt.timestep = op.dt
             adapOpt.output_directory = op.di
@@ -173,9 +169,9 @@ def hessianBased(startRes, **kwargs):
                                        export_type='hdf5')
             adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
             adapSolver.i_export = int(cnt / op.ndump)
+            adapSolver.next_export_t = adapSolver.i_export * adapSolver.options.simulation_export_time
             adapSolver.iteration = cnt
-            adapSolver.simulation_time = startT
-            adapSolver.next_export_t = startT + adapOpt.simulation_export_time  # For next export
+            adapSolver.simulation_time = t
             for e in adapSolver.exporters.values():
                 e.set_next_export_ix(adapSolver.i_export)
 
@@ -226,8 +222,12 @@ def hessianBased(startRes, **kwargs):
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
             cnt += op.rm
+            t += op.dt * op.rm
             av = op.printToScreen(int(cnt/op.rm+1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.dt)
             adaptSolveTimer += adaptTimer + solverTimer
+
+            # Extract fields for next step
+            uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
 
         # Measure error using metrics, as in Huang et al.
         if op.mode == 'rossby-wave':
@@ -884,6 +884,7 @@ if __name__ == "__main__":
     parser.add_argument("-o", help="Output data")
     parser.add_argument("-regen", help="Regenerate error estimates from saved data")
     parser.add_argument("-mirror", help="Use a 'mirrored' region of interest")
+    parser.add_argument("-nAdapt", help="Number of mesh adaptation steps")
     args = parser.parse_args()
 
     solvers = {'fixedMesh': fixedMesh, 'hessianBased': hessianBased, 'DWP': DWP, 'DWR': DWR}
@@ -915,6 +916,7 @@ if __name__ == "__main__":
                  gradate=True if approach in ('DWP', 'DWR') and mode == 'tohoku' else False,
                  plotpvd=True if args.o else False,
                  coriolis=coriolis,
+                 nAdapt=1 if args.nAdapt is None else int(args.nAdapt),
                  orderChange=orderChange,
                  refinedSpace=True if args.r else False,
                  bAdapt=bool(args.b) if args.b is not None else False)
