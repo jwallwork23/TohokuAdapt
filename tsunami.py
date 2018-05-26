@@ -875,8 +875,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("t", help="Choose test problem from {'shallow-water', 'rossby-wave'} (default 'tohoku')")
     parser.add_argument("-a", help="Choose adaptive approach from {'hessianBased', 'DWP', 'DWR'} (default 'fixedMesh')")
-    parser.add_argument("-low", help="Lower bound for index range")
-    parser.add_argument("-high", help="Upper bound for index range")
+    parser.add_argument("-low", help="Lower bound for mesh resolution range")
+    parser.add_argument("-high", help="Upper bound for mesh resolution range")
+    parser.add_argument("-level", help="Single mesh resolution")
     parser.add_argument("-ho", help="Compute errors and residuals in a higher order space")
     parser.add_argument("-r", help="Compute errors and residuals in a refined space")
     parser.add_argument("-b", help="Intersect metrics with bathymetry")
@@ -944,7 +945,11 @@ if __name__ == "__main__":
         files[e] = open(filename + e + '.txt', 'w+')
 
     # Get data and save to disk
-    resolutions = range(0 if args.low is None else int(args.low), 6 if args.high is None else int(args.high))
+    if args.low is not None or args.high is not None:
+        assert args.level is None
+        resolutions = range(0 if args.low is None else int(args.low), 6 if args.high is None else int(args.high))
+    else:
+        resolutions = [0 if args.level is None else int(args.level)]
     Jlist = np.zeros(len(resolutions))
     for i in resolutions:
         quantities = solver(i, regen=bool(args.regen), mirror=bool(args.mirror), op=op)
