@@ -158,15 +158,9 @@ def hessianBased(startRes, **kwargs):
             adapOpt.timestepper_type = op.timestepper
             adapOpt.timestep = op.dt
             adapOpt.output_directory = op.di
-            adapOpt.export_diagnostics = True
-            adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+            if not op.plotpvd:
+                options.no_exports = True
             adapOpt.coriolis_frequency = f
-            field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
-            e = exporter.ExportManager(op.di + 'hdf5',
-                                       ['elev_2d', 'uv_2d'],
-                                       field_dict,
-                                       field_metadata,
-                                       export_type='hdf5')
             adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
             adapSolver.i_export = int(cnt / op.ndump)
             adapSolver.next_export_t = adapSolver.i_export * adapSolver.options.simulation_export_time
@@ -231,7 +225,7 @@ def hessianBased(startRes, **kwargs):
 
         # Measure error using metrics, as in Huang et al.
         if op.mode == 'rossby-wave':
-            peak, distance = peakAndDistance(adapSolver.fields.solution_2d.split()[1], op=op)
+            peak, distance = peakAndDistance(elev_2d, op=op)
             quantities['peak'] = peak / peak_a
             quantities['dist'] = distance / distance_a
             quantities['spd'] = distance / (op.Tend * 0.4)
@@ -281,7 +275,6 @@ def DWP(startRes, **kwargs):
     op.nVerT = mesh.num_vertices() * op.rescaling  # Target #Vertices
     mM = [nEle, nEle]  # Min/max #Elements
     Sn = nEle
-    endT = 0.
 
     # Get initial boundary metric
     if op.gradate:
@@ -320,9 +313,8 @@ def DWP(startRes, **kwargs):
 
         # Compute gradient
         gradientTimer = clock()
-        dJdb = compute_gradient(J, Control(b))
+        compute_gradient(J, Control(b))
         gradientTimer = clock() - gradientTimer
-        print("Norm of gradient: %.3e. Computation time: %.1fs" % (dJdb.dat.norm, gradientTimer))
 
         # Extract adjoint solutions
         dualTimer = clock()
@@ -413,19 +405,13 @@ def DWP(startRes, **kwargs):
             adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
             adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump
-            adapOpt.simulation_end_time = t + op.dt * op.rm
+            adapOpt.simulation_end_time = t + (op.rm - 0.5) * op.dt
             adapOpt.timestepper_type = op.timestepper
             adapOpt.timestep = op.dt
             adapOpt.output_directory = op.di
-            adapOpt.export_diagnostics = True
-            adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+            if not op.plotpvd:
+                options.no_exports = True
             adapOpt.coriolis_frequency = f
-            field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
-            e = exporter.ExportManager(op.di + 'hdf5',
-                                       ['elev_2d', 'uv_2d'],
-                                       field_dict,
-                                       field_metadata,
-                                       export_type='hdf5')
             adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
             adapSolver.i_export = int(cnt / op.ndump)
             adapSolver.next_export_t = adapSolver.i_export * adapSolver.options.simulation_export_time
@@ -490,7 +476,7 @@ def DWP(startRes, **kwargs):
 
             # Measure error using metrics, as in Huang et al.
         if op.mode == 'rossby-wave':
-            peak, distance = peakAndDistance(adapSolver.fields.solution_2d.split()[1], op=op)
+            peak, distance = peakAndDistance(elev_2d, op=op)
             quantities['peak'] = peak / peak_a
             quantities['dist'] = distance / distance_a
             quantities['spd'] = distance / (op.Tend * 0.4)
@@ -564,7 +550,7 @@ def DWR(startRes, **kwargs):
     op.nVerT = mesh_H.num_vertices() *  op.rescaling  # Target #Vertices
     mM = [nEle, nEle]  # Min/max #Elements
     Sn = nEle
-    endT = 0.
+    t = 0.
 
     # Get initial boundary metric
     if op.gradate:
@@ -581,7 +567,7 @@ def DWR(startRes, **kwargs):
         options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
         options.coriolis_frequency = f
         options.simulation_export_time = op.dt * op.ndump
-        options.simulation_end_time = op.Tend - 0.5 * op.dt
+        options.simulation_end_time = (op.ndump - 0.5) * op.dt
         options.timestepper_type = op.timestepper
         options.timestep = op.dt
         options.output_directory = op.di   # Need this for residual callback
@@ -598,7 +584,6 @@ def DWR(startRes, **kwargs):
 
         cnt = 0
         primalTimer = 0.
-        options.simulation_end_time = op.dt * op.ndump
         while solver_obj.simulation_time < op.Tend - 0.5 * op.dt:
 
             with pyadjoint.stop_annotating():
@@ -618,15 +603,16 @@ def DWR(startRes, **kwargs):
             solver_obj.iterate()
             stepTimer = clock() - stepTimer
             primalTimer += stepTimer
-            options.simulation_end_time += op.dt * op.ndump
             cnt += 1
+            t += op.dt * op.ndump
+            options.simulation_end_time = t + (op.ndump - 0.5) * op.dt
 
         J = cb1.quadrature()                        # Assemble objective functional for adjoint computation
         print('Primal run complete. Solver time: %.3fs' % primalTimer)
 
         # Compute gradient
         gradientTimer = clock()
-        dJdb = compute_gradient(J, Control(b))
+        compute_gradient(J, Control(b))
         gradientTimer = clock() - gradientTimer
 
         # Extract adjoint solutions
@@ -705,7 +691,7 @@ def DWR(startRes, **kwargs):
                         residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * (k+1)))
 
                     # Load adjoint data and form indicators
-                    indexStr = indexString(int((k+1)/op.dumpsPerRemesh))
+                    indexStr = indexString(int((k+1)/op.dumpsPerRemesh-1))
                     with DumbCheckpoint(op.di + 'hdf5/Adjoint2d_' + indexStr, mode=FILE_READ) as loadAdj:
                         loadAdj.load(dual_u)
                         loadAdj.load(dual_e)
@@ -747,7 +733,7 @@ def DWR(startRes, **kwargs):
             for l in range(op.nAdapt):                          # TODO: Test this functionality
 
                 # Construct metric
-                indexStr = indexString(int(cnt / op.rm+1))
+                indexStr = indexString(int(cnt / op.rm))
                 with DumbCheckpoint(op.di + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_READ) as loadErr:
                     loadErr.load(epsilon)
                     loadErr.close()
@@ -774,18 +760,13 @@ def DWR(startRes, **kwargs):
             adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
             adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump
-            adapOpt.simulation_end_time = t + op.dt * op.rm
+            adapOpt.simulation_end_time = t + (op.rm - 0.5) * op.dt
             adapOpt.timestepper_type = op.timestepper
             adapOpt.timestep = op.dt
             adapOpt.output_directory = op.di
-            adapOpt.export_diagnostics = True
-            adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+            if not op.plotpvd:
+                options.no_exports = True
             adapOpt.coriolis_frequency = f
-            e = exporter.ExportManager(op.di + 'hdf5',
-                                       ['elev_2d', 'uv_2d'],
-                                       {'elev_2d': elev_2d, 'uv_2d': uv_2d},
-                                       field_metadata,
-                                       export_type='hdf5')
             adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
             adapSolver.i_export = int(cnt / op.ndump)
             adapSolver.next_export_t = adapSolver.i_export * adapSolver.options.simulation_export_time
@@ -850,7 +831,7 @@ def DWR(startRes, **kwargs):
 
             # Measure error using metrics, as in Huang et al.
         if op.mode == 'rossby-wave':
-            peak, distance = peakAndDistance(adapSolver.fields.solution_2d.split()[1], op=op)
+            peak, distance = peakAndDistance(elev_2d, op=op)
             quantities['peak'] = peak / peak_a
             quantities['dist'] = distance / distance_a
             quantities['spd'] = distance / (op.Tend * 0.4)

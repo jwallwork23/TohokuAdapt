@@ -88,7 +88,7 @@ class Options:
             if ndump is None:
                 self.ndump = 6
             # self.J = 1.1184e-3,   # On mesh of 524,288 elements
-            self.J = 1.6797e-04  # On mesh of 524,288 elements
+            self.J = 1.6160e-04     # On mesh of 131,072 elements
             # self.xy = [0., 0.5 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
             # self.xy2 = [1.5 * np.pi, 2 * np.pi, 0.5 * np.pi, 1.5 * np.pi]
             self.xy = [0., np.pi]
@@ -167,7 +167,10 @@ class Options:
             self.normOrder = 2
             self.hessMeth = 'dL2'       # Hessian recovery by double L2 projection. 'parts' also available
         else:
-            self.maxScaling = 5e5       # Maximum scale factor for error estimator
+            if self.mode == 'shallow-water':
+                self.maxScaling = 5e8       # TODO: What is the actual interpretation?
+            else:
+                self.maxScaling = 5e5       # Maximum scale factor for error estimator
         if self.approach == "DWR":
             self.rescaling = 0.4        # Chosen small enough to ensure accuracy for a small element count
         else:
