@@ -1,5 +1,4 @@
 from thetis_adjoint import *
-from thetis.field_defs import field_metadata
 import pyadjoint
 from fenics_adjoint.solving import SolveBlock                                       # For extracting adjoint solutions
 from firedrake.petsc import PETSc
@@ -121,14 +120,19 @@ def hessianBased(startRes, **kwargs):
         quantities = {}
         while cnt < op.cntT:
             adaptTimer = clock()
+            P1 = FunctionSpace(mesh, "CG", 1)
+
+            if op.adaptField != 's':
+                height = Function(P1).assign(elev_2d)
+            if op.adaptField != 'f':
+                spd = Function(P1).interpolate(sqrt(dot(uv_2d, uv_2d)))
             for l in range(op.nAdapt):                  # TODO: Test this functionality
 
                 # Construct metric
                 if op.adaptField != 's':
-                    M = steadyMetric(elev_2d, op=op)
+                    M = steadyMetric(height, op=op)
                 if cnt != 0:  # Can't adapt to zero velocity
                     if op.adaptField != 'f':
-                        spd = Function(FunctionSpace(mesh, "DG", 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
                         M2 = steadyMetric(spd, op=op)
                         M = metricIntersection(M, M2) if op.adaptField == 'b' else M2
                 if op.bAdapt:
@@ -138,12 +142,17 @@ def hessianBased(startRes, **kwargs):
                 # Adapt mesh and interpolate variables
                 if op.bAdapt or cnt != 0 or op.adaptField == 'f':
                     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-                    if cnt != 0:
-                        uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
-                    elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
-                    b, BCs, f = problemDomain(mesh=mesh, op=op)[3:]
-                    uv_2d.rename('uv_2d')
-                    elev_2d.rename('elev_2d')
+                if l < op.nAdapt-1:
+                    if op.adaptField != 's':
+                        height = interp(mesh, height)
+                    if op.adaptField != 'f':
+                        spd = interp(mesh, spd)
+
+            if cnt != 0 or op.adaptField == 'f':
+                elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
+                b, BCs, f = problemDomain(mesh=mesh, op=op)[3:]
+                uv_2d.rename('uv_2d')
+                elev_2d.rename('elev_2d')
             adaptTimer = clock() - adaptTimer
 
             # Solver object and equations
@@ -391,10 +400,11 @@ def DWP(startRes, **kwargs):
 
                 # Adapt mesh and interpolate variables
                 mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-                elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
-                b, BCs, f = problemDomain(mesh=mesh, op=op)[3:]
-                uv_2d.rename('uv_2d')
-                elev_2d.rename('elev_2d')
+
+            elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
+            b, BCs, f = problemDomain(mesh=mesh, op=op)[3:]
+            uv_2d.rename('uv_2d')
+            elev_2d.rename('elev_2d')
             adaptTimer = clock() - adaptTimer
 
             # Solver object and equations
@@ -747,10 +757,11 @@ def DWR(startRes, **kwargs):
 
                 # Adapt mesh and interpolate variables
                 mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
-                elev_2d, uv_2d = interp(mesh_H, elev_2d, uv_2d)
-                b, BCs, f = problemDomain(mesh=mesh_H, op=op)[3:]
-                uv_2d.rename('uv_2d')
-                elev_2d.rename('elev_2d')
+
+            elev_2d, uv_2d = interp(mesh_H, elev_2d, uv_2d)
+            b, BCs, f = problemDomain(mesh=mesh_H, op=op)[3:]
+            uv_2d.rename('uv_2d')
+            elev_2d.rename('elev_2d')
             adaptTimer = clock() - adaptTimer
 
             # Solver object and equations
