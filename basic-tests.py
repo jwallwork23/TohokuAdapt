@@ -156,10 +156,14 @@ def adapts(scale, space, indy):
                         fixed_diff.append(np.abs((J - J_fixed) / J))
 
                     # Adapt mesh
+                    temp = Function(Vs).assign(f)
                     for k in range(nAdapt):
                         M = steadyMetric(f, op=op)
                         mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-                        f = interp(mesh, f)
+                        if k < nAdapt -1:
+                            f = interp(mesh, f)
+                        else:
+                            f = interp(mesh, temp)
                     nEle = mesh.num_cells()
                     nEls.append(nEle)
 
@@ -176,7 +180,9 @@ def adapts(scale, space, indy):
 
             if nAdapt == 1:
                 plt.loglog(inEls, fixed_diff, label="Fixed mesh", marker='x')
-            label = "%d adaptations" % nAdapt
+                label = "%d adaptation" % nAdapt
+            else:
+                label = "%d adaptations" % nAdapt
             plt.loglog(nEls if scale else inEls, adapt_diff, label=label, marker='o')
         plt.title(titles[i])
         plt.xlabel("Element count" if scale else "Inital element count")
