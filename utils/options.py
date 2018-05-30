@@ -1,4 +1,5 @@
 from thetis import *
+from thetis.configuration import *
 
 import numpy as np
 
@@ -7,25 +8,66 @@ from .conversion import from_latlon
 __all__ = ["Options"]
 
 
+# class AdaptOptions(FrozenConfigurable):
+#     name = 'Common parameters for TohokuAdapt project'
+#
+#     approach = Unicode('fixedMesh', help="Mesh adaptive approach considered").tag(config=True)
+#     gradate = Bool(False, help='Apply metric gradation').tag(config=True)
+#     bAdapt = Bool(False, help='Adapt based on bathymetry field').tag(config=True)
+#     maxGrowth = PositiveFloat(1.4, help="Metric gradation scaling parameter.").tag(config=True)
+#     maxAnisotropy = PositiveFloat(100., help="Maximum tolerated anisotropy.").tag(config=True)
+#     nAdapt = NonNegativeInteger(1, help="Number of mesh adaptations per remeshing.").tag(config=True)
+#     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
+#     orderChange = NonNegativeInteger(1, help="Change in polynomial degree for residual approximation.").tag(config=True)
+#     refinedSpace = Bool(False, help="Refine space too compute errors and residuals.").tag(config=True)
+#
+# TODO
+
+
+# class TohokuOptions(AdaptOptions):
+#     name = 'Parameters for the Tohoku problem'
+#
+#     # TODO
+#
+#     def __init__(self,
+#                  coriolis='sin',
+#                  ndump=10,
+#                  rm=30,
+#                  nVerT=1000):
+#
+#         try:
+#             assert coriolis in ('off', 'f', 'beta', 'sin')
+#             self.coriolis = coriolis
+#         except:
+#             raise ValueError('Coriolis term type %s not recognised' % coriolis)
+#         for i in (ndump, rm, nVerT):
+#             assert isinstance(i, int)
+#         self.ndump = ndump
+#         self.rm = rm
+#         self.nVerT = nVerT
+#
+#         super(TohokuOptions, self).__init__()
+
+
 class Options:
     def __init__(self,
                  mode='tohoku',
+                 approach='fixedMesh',
                  family='dg-dg',
                  timestepper='CrankNicolson',
-                 approach='fixedMesh',
-                 coriolis='sin',
-                 rescaling=0.85,
-                 maxAnisotropy=100,
+                 maxAnisotropy=100.,
                  gradate=False,
                  bAdapt=False,
                  plotpvd=False,
                  maxGrowth=1.4,
+                 nAdapt=1,
+                 orderChange=0,
+                 refinedSpace=False,
+                 coriolis='sin',
+                 rescaling=0.85,
                  ndump=None,
                  rm=None,
-                 nAdapt=1,
-                 nVerT=1000,
-                 orderChange=0,
-                 refinedSpace=False):
+                 nVerT=1000):
         """
         :param mode: problem considered.
         :param family: mixed function space family, from {'dg-dg', 'dg-cg'}.
@@ -47,16 +89,12 @@ class Options:
         """
 
         # Model parameters
+        self.mode = mode
         try:
             assert approach in ('fixedMesh', 'hessianBased', 'DWP', 'DWR', 'DWR_ho', 'DWR_r')
             self.approach = approach
         except:
             raise ValueError('Meshing strategy %s not recognised' % approach)
-        try:
-            assert mode in ('tohoku', 'shallow-water', 'rossby-wave', 'model-verification', 'advection-diffusion', None)
-            self.mode = mode
-        except:
-            raise ValueError('Test problem %s not recognised.' % mode)
         try:
             assert coriolis in ('off', 'f', 'beta', 'sin')
             self.coriolis = coriolis
