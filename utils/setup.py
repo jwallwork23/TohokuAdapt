@@ -165,6 +165,7 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
     :param op: options parameter object.
     :return: associated mesh, initial conditions, bathymetry field, boundary conditions and Coriolis parameter. 
     """
+    newmesh = mesh == None
     if op.mode == 'tohoku':
         getBathy = b is None
         if mesh is None:
@@ -254,15 +255,24 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
         u0, eta0 = q.split()
         BCs = {1: {'uv': Constant(0.)}, 2: {'uv': Constant(0.)}, 3: {'uv': Constant(0.)}, 4: {'uv': Constant(0.)}}
         f = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
-    else:
-        raise
+    elif op.mode == 'advection-diffusion':
+        if mesh is None:
+            mesh = RectangleMesh(4 * level, level, 4, 1)
+        x, y = SpatialCoordinate(mesh)
+        P1 = FunctionSpace(mesh, "CG", 1)
+        phi0 = Function(P1).interpolate(exp(- (pow(x - 0.5, 2) + pow(y - 0.5, 2)) / 0.04))
+        BCs = DirichletBC(P1, 0, 'on_boundary')
+        w = Function(VectorFunctionSpace(mesh, "CG", 1), name='Wind field').interpolate(Expression([1, 0]))
 
-    PETSc.Sys.Print("Setting up mesh across %d processes" % COMM_WORLD.size)
-    PETSc.Sys.Print("  rank %d owns %d elements and can access %d vertices" \
-                    % (mesh.comm.rank, mesh.num_cells(), mesh.num_vertices()), comm=COMM_SELF)
+    if newmesh:
+        PETSc.Sys.Print("Setting up mesh across %d processes" % COMM_WORLD.size)
+        PETSc.Sys.Print("  rank %d owns %d elements and can access %d vertices" \
+                        % (mesh.comm.rank, mesh.num_cells(), mesh.num_vertices()), comm=COMM_SELF)
 
     if hierarchy:
         return mesh, u0, eta0, b, BCs, f, mh
+    elif op.mode == 'advection-diffusion':
+        return mesh, phi0, BCs, w
     else:
         return mesh, u0, eta0, b, BCs, f
 

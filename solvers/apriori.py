@@ -34,16 +34,10 @@ def weakResidualAD(c, c_, w, op=Options(mode='advection-diffusion')):
 def fixedMeshAD(n=3, op=Options(mode='advection-diffusion', approach="fixedMesh")):
     forwardFile = File(op.di + "fixedMesh.pvd")
 
-    mesh = RectangleMesh(4 * n, n, 4, 1)  # Computational mesh
-    x, y = SpatialCoordinate(mesh)
-
-    # Define FunctionSpaces and specify physical and solver parameters
+    # Initialise FunctionSpaces and variables
+    mesh, phi0, BCs, w = problemDomain(n, op=op)
     V = FunctionSpace(mesh, "CG", 1)
-    w = Function(VectorFunctionSpace(mesh, "CG", 1), name='Wind field').interpolate(Expression([1, 0]))
-
-    # Apply initial condition and define Functions
-    ic = project(exp(- (pow(x - 0.5, 2) + pow(y - 0.5, 2)) / 0.04), V)
-    phi = ic.copy(deepcopy=True)
+    phi = Function(V).assign(phi0)
     phi.rename('Concentration')
     phi_next = Function(V, name='Concentration next')
     nEle = mesh.num_cells()
@@ -57,11 +51,10 @@ def fixedMeshAD(n=3, op=Options(mode='advection-diffusion', approach="fixedMesh"
         forwardFile.write(phi, time=t)
     iA = indicator(mesh, xy=[3., 0.], radii=0.5, op=op)
     J_list = [assemble(iA * phi * dx)]
-    bc = DirichletBC(V, 0, 'on_boundary')
     while t < op.Tend:
         # Solve problem at current timestep
         solverTimer = clock()
-        solve(F == 0, phi_next, bcs=bc)
+        solve(F == 0, phi_next, bcs=BCs)
         solverTimer = clock() - solverTimer
         fullTimer += solverTimer
         phi.assign(phi_next)
@@ -88,17 +81,16 @@ def fixedMeshAD(n=3, op=Options(mode='advection-diffusion', approach="fixedMesh"
 def hessianBasedAD(n=3, op=Options(mode='advection-diffusion', approach="hessianBased")):
     forwardFile = File(op.di + "hessianBased.pvd")
 
-    # Define problem
-    mesh = RectangleMesh(4 * n, n, 4, 1)  # Computational mesh
-    x, y = SpatialCoordinate(mesh)
-    V = FunctionSpace(mesh, "CG", 2)
-    ic = project(exp(- (pow(x - 0.5, 2) + pow(y - 0.5, 2)) / 0.04), V)
-    phi = ic.copy(deepcopy=True)
+    # Initialise FunctionSpaces and variables
+    mesh, phi0, BCs, w = problemDomain(n, op=op)
+    V = FunctionSpace(mesh, "CG", 1)
+    phi = Function(V).assign(phi0)
     phi.rename('Concentration')
     phi_next = Function(V, name='Concentration next')
+    nEle = mesh.num_cells()
+    F = weakResidualAD(phi_next, phi, w, op=op)
 
     # Get adaptivity parameters
-    nEle = mesh.num_cells()
     mM = [nEle, nEle]  # Min/max #Elements
     Sn = nEle
     op.nVerT = mesh.num_vertices() * op.rescaling  # Target #Vertices
@@ -127,15 +119,14 @@ def hessianBasedAD(n=3, op=Options(mode='advection-diffusion', approach="hessian
                 if l < op.nAdapt-1:
                     temp = interp(mesh, temp)
 
-            if op.nAdapt != 0:
-                phi = interp(mesh, temp)
-                phi.rename("Concentration")
-                V = FunctionSpace(mesh, "CG", 2)
-                phi_next = Function(V)
-                iA = indicator(mesh, xy=[3., 0.], radii=0.5, op=op)
+            phi = interp(mesh, phi)
+            phi.rename("Concentration")
+            V = FunctionSpace(mesh, "CG", 1)
+            phi_next = Function(V)
+            iA = indicator(mesh, xy=[3., 0.], radii=0.5, op=op)
 
             # Re-establish bilinear form and set boundary conditions
-            w = Function(VectorFunctionSpace(mesh, "CG", 1), name='Wind field').interpolate(Expression([1, 0]))
+            BCs, w = problemDomain(mesh=mesh, op=op)[2:]
             F = weakResidualAD(phi_next, phi, w, op=op)
 
             # Get mesh stats
@@ -145,7 +136,7 @@ def hessianBasedAD(n=3, op=Options(mode='advection-diffusion', approach="hessian
 
         # Solve problem at current timestep
         solverTimer = clock()
-        solve(F == 0, phi_next, bcs=DirichletBC(V, 0, 'on_boundary'))
+        solve(F == 0, phi_next, bcs=BCs)
         phi.assign(phi_next)
         J_list.append(assemble(iA * phi * dx))
         solverTimer = clock() - solverTimer
