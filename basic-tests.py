@@ -18,12 +18,20 @@ plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 plt.rc('legend', fontsize='x-large')
 
-functions = ["x[0]*x[0] + x[1]*x[1]", "sin(pi*x[0])*sin(pi*x[1])"]
+functions = ["x[0]*x[0] + x[1]*x[1]",
+             "sin(pi*x[0])*sin(pi*x[1])",
+             "%f * pow(%f, -(x[0]*x[0] + x[1]*x[1])" % (1e-3, exp(1.))]
 gradients = [{0: "2 * x[0]", 1: "2 * x[1]"},
-             {0: "pi*cos(pi*x[0])*sin(pi*x[1])", 1: "pi*sin(pi*x[0])*cos(pi*x[1])"}]
+             {0: "pi*cos(pi*x[0])*sin(pi*x[1])", 1: "pi*sin(pi*x[0])*cos(pi*x[1])"},
+             {0: "%f * x[0] * pow(%f, -(x[0]*x[0] + x[1]*x[1])" % (-2e-3, exp(1.)),
+              1: "%f * x[1] * pow(%f, -(x[0]*x[0] + x[1]*x[1])" % (-2e-3, exp(1.))}]
 hessians = [[[2, 0], [0, 2]],
             [["-pi*pi*sin(pi*x[0])*sin(pi*x[1])", "pi*pi*cos(pi*x[0])*cos(pi*x[1])"],
-             ["pi*pi*cos(pi*x[0])*cos(pi*x[1])", "-pi*pi*sin(pi*x[0])*sin(pi*x[1])"]]]
+             ["pi*pi*cos(pi*x[0])*cos(pi*x[1])", "-pi*pi*sin(pi*x[0])*sin(pi*x[1])"]],
+            [["%f * (2 * x[0] - 1) * pow(%f, -(x[0]*x[0] + x[1]*x[1])" % (2e-3, exp(1.)),
+              "%f * x[0] * x[1] * pow(%f, -(x[0]*x[0] + x[1]*x[1])" % (4e-3, exp(1.))],
+             ["%f * x[0] * x[1] * pow(%f, -(x[0]*x[0] + x[1]*x[1])" % (4e-3, exp(1.)),
+              "%f * (2 * x[1] - 1) * pow(%f, -(x[0]*x[0] + x[1]*x[1])" % (2e-3, exp(1.))]]]
 
 def integrate(func, xy, r=None):
     if r is not None:
@@ -31,6 +39,8 @@ def integrate(func, xy, r=None):
             return 2 * pi * pow(r, 4) / 4.    # TODO: This will not work away from origin
         elif func == 1:
             raise NotImplementedError
+        elif func == 2:
+            return 1e-3 * pi * (1 - exp(-r*r))
     else:
         if func == 0:
             return (xy[1]**3-xy[0]**3)*(xy[3]-xy[2])/3. + (xy[3]**3-xy[2]**3)*(xy[1]-xy[0])/3.
@@ -62,6 +72,7 @@ def hessian(subset, space):
             for j in range(2, 8):
                 n = pow(2, j)
                 mesh = SquareMesh(n, n, 2, 2)
+                x, y = SpatialCoordinates(mesh)
                 nEle = mesh.num_cells()
                 nEls.append(nEle)
                 xy = Function(mesh.coordinates)
@@ -128,7 +139,8 @@ def adapts(scale, space, indy):
     op.hmax = 1
     # op.normalisation = 'manual'             # TODO: Make this selectable
     op.normalisation = 'lp'
-    for i in range(1, len(functions)):
+    # for i in range(1, len(functions)):
+    for i in range(2, len(functions)):
         J = integrate(i, xy=region, r=r)
         for nAdapt in range(1, 5):
             op.di = 'plots/adapt-tests/'

@@ -172,14 +172,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     op = Options(mode="advection-diffusion",
-                 approach=args.a,
+                 approach='fixedMesh' if args.a is None else args.a,
                  plotpvd=True if bool(args.o) else False)
 
     resolutions = range(0 if args.low is None else int(args.low), 6 if args.high is None else int(args.high))
     solvers = {'fixedMesh': fixedMesh, 'hessianBased': hessianBased}
 
     for i in resolutions:
-        q = solvers[args.a](pow(2, i), op=op)
+        q = solvers[op.approach](pow(2, i), op=op)
         print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs"
               % (i, q['meanElements'], q['J_h'], q['solverTimer']))
 

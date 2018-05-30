@@ -103,17 +103,18 @@ class Options:
             self.minNorm = 1e-4
             if rm is None:
                 self.rm = 48
+                # self.rm = 720        # TODO: experiment with different values
             self.dt = 0.05
             if ndump is None:
                 self.ndump = 12
             self.g = 1.
             # self.J = 5.7613                     # On mesh of 9,437,184 elements, using asymptotic solution
-            self.J = 5.6105
+            self.J = 5.3333
             # self.xy = [-16., -14., -3., 3.]
             # self.xy2 = [14., 16., -3., 3.]
             self.xy = [-15., 0.]
             self.xy2 = [15., 0.]
-            self.radius = np.sqrt(3.)  # TODO: Change this to 3. and redo
+            self.radius = np.sqrt(3.)  # TODO: Change this to 2. and redo
             self.J_mirror = 6.1729e-06  # On mesh of 2,359,296 elements, using asymptotic solution
         elif self.mode in ('tohoku', 'model-verification'):
             # Gauge locations in latitude-longitude coordinates and mesh element counts
@@ -172,8 +173,8 @@ class Options:
             else:
                 self.maxScaling = 5e5       # Maximum scale factor for error estimator
         if self.approach == "DWR":
-            # self.rescaling = 0.4        # Chosen small enough to ensure accuracy for a small element count
-            self.rescaling = 0.85        # Chosen small enough to ensure accuracy for a small element count
+            # self.rescaling = 0.6        # Chosen small enough to ensure accuracy for a small element count
+            self.rescaling = 0.85
         else:
             try:
                 assert rescaling > 0

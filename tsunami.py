@@ -131,13 +131,12 @@ def hessianBased(startRes, **kwargs):
                 # Construct metric
                 if op.adaptField != 's':
                     M = steadyMetric(height, op=op)
-                if cnt != 0:  # Can't adapt to zero velocity
-                    if op.adaptField != 'f':
-                        M2 = steadyMetric(spd, op=op)
-                        M = metricIntersection(M, M2) if op.adaptField == 'b' else M2
-                if op.bAdapt:
+                if op.adaptField != 'f' and cnt != 0:   # Can't adapt to zero velocity
+                    M2 = steadyMetric(spd, op=op)
+                    M = metricIntersection(M, M2) if op.adaptField == 'b' else M2
+                if op.bAdapt and not (op.adaptField != 'f' and cnt == 0):
                     M2 = steadyMetric(b, op=op)
-                    M = M2 if op.adaptField != 'f' and cnt == 0. else metricIntersection(M, M2)
+                    M = M2 if op.adaptField != 'f' and cnt == 0. else metricIntersection(M, M2)     # TODO: Convex combination?
 
                 # Adapt mesh and interpolate variables
                 if op.bAdapt or cnt != 0 or op.adaptField == 'f':
@@ -157,7 +156,7 @@ def hessianBased(startRes, **kwargs):
 
             # Solver object and equations
             adapSolver = solver2d.FlowSolver2d(mesh, b)
-            adapOpt = adapSolver.options
+            adapOpt = adapSolver.options                                # TODO: Maybe combine op with adapSolver.options
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = True
             adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
@@ -168,7 +167,7 @@ def hessianBased(startRes, **kwargs):
             adapOpt.timestep = op.dt
             adapOpt.output_directory = op.di
             if not op.plotpvd:
-                options.no_exports = True
+                adapOpt.no_exports = True
             adapOpt.coriolis_frequency = f
             adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
             adapSolver.i_export = int(cnt / op.ndump)
@@ -630,8 +629,6 @@ def DWR(startRes, **kwargs):
         tape = get_working_tape()
         solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
         N = len(solve_blocks)
-        for i in range(N):
-            print(i, type(solve_blocks[i].adj_sol))
         r = N % op.rm                       # Number of extra tape annotations in setup
         for i in range(r, N, op.rm):        # Iterate r is the first timestep
             dual.assign(solve_blocks[i].adj_sol)
