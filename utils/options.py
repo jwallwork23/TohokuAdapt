@@ -157,7 +157,7 @@ class Options:
             self.hmin = 1e-4
             self.hmax = 1.
             if rm is None:
-                self.rm = 20
+                self.rm = 10
             if ndump is None:
                 self.ndump = 10
 
