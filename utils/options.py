@@ -5,48 +5,117 @@ import numpy as np
 
 from .conversion import from_latlon
 
-__all__ = ["Options"]
+__all__ = ["Options", "AdaptOptions", "TohokuOptions", "RossbyWaveOptions", "GaussianOptions",
+           "AdvectionDiffusionOptions"]
 
 
-# class AdaptOptions(FrozenConfigurable):
-#     name = 'Common parameters for TohokuAdapt project'
-#
-#     approach = Unicode('fixedMesh', help="Mesh adaptive approach considered").tag(config=True)
-#     gradate = Bool(False, help='Apply metric gradation').tag(config=True)
-#     bAdapt = Bool(False, help='Adapt based on bathymetry field').tag(config=True)
-#     maxGrowth = PositiveFloat(1.4, help="Metric gradation scaling parameter.").tag(config=True)
-#     maxAnisotropy = PositiveFloat(100., help="Maximum tolerated anisotropy.").tag(config=True)
-#     nAdapt = NonNegativeInteger(1, help="Number of mesh adaptations per remeshing.").tag(config=True)
-#     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
-#     orderChange = NonNegativeInteger(1, help="Change in polynomial degree for residual approximation.").tag(config=True)
-#     refinedSpace = Bool(False, help="Refine space too compute errors and residuals.").tag(config=True)
-#
-# TODO
+class AdaptOptions(FrozenConfigurable):
+    name = 'Common parameters for TohokuAdapt project'
+
+    approach = Unicode('fixedMesh', help="Mesh adaptive approach considered").tag(config=True)
+    gradate = Bool(False, help='Apply metric gradation').tag(config=True)
+    bAdapt = Bool(False, help='Adapt based on bathymetry field').tag(config=True)
+    maxGrowth = PositiveFloat(1.4, help="Metric gradation scaling parameter.").tag(config=True)
+    maxAnisotropy = PositiveFloat(100., help="Maximum tolerated anisotropy.").tag(config=True)
+    nAdapt = NonNegativeInteger(1, help="Number of mesh adaptations per remeshing.").tag(config=True)
+    rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
+    orderChange = NonNegativeInteger(1, help="Change in polynomial degree for residual approximation.").tag(config=True)
+    refinedSpace = Bool(False, help="Refine space too compute errors and residuals.").tag(config=True)
 
 
-# class TohokuOptions(AdaptOptions):
-#     name = 'Parameters for the Tohoku problem'
-#
-#     # TODO
-#
-#     def __init__(self,
-#                  coriolis='sin',
-#                  ndump=10,
-#                  rm=30,
-#                  nVerT=1000):
-#
-#         try:
-#             assert coriolis in ('off', 'f', 'beta', 'sin')
-#             self.coriolis = coriolis
-#         except:
-#             raise ValueError('Coriolis term type %s not recognised' % coriolis)
-#         for i in (ndump, rm, nVerT):
-#             assert isinstance(i, int)
-#         self.ndump = ndump
-#         self.rm = rm
-#         self.nVerT = nVerT
-#
-#         super(TohokuOptions, self).__init__()
+class TohokuOptions(AdaptOptions):
+    name = 'Parameters for the Tohoku problem'
+
+    # Solver parameters
+    ndump = NonNegativeInteger(10, help="Timesteps per data dump").tag(config=True)
+    rm = NonNegativeInteger(30, help="Timesteps per mesh adaptation").tag(config=True)
+    nVerT = NonNegativeInteger(1000, help="Target number of vertices").tag(config=True)
+    dt = PositiveFloat(5., help="Timestep").tag(config=True)
+    Tstart = PositiveFloat(300., help="Start time of period of interest").tag(config=True)
+    Tend = PositiveFloat(1500., help="End time of period of interest").tag(config=True)
+    hmin = PositiveFloat(10., help="Minimum element size").tag(config=True)
+    hmax = PositiveFloat(1e5, help="Maximum element size").tag(config=True)
+    minNorm = PositiveFloat(1.).tag(config=True)    # TODO: Not sure about this
+    radius = PositiveFloat(50e3, help="Radius of indicator function around location of interest.").tag(config=True)
+
+    # Physical parameters
+    coriolis = Unicode('sin', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
+    g = PositiveFloat(9.81, help="Gravitational acceleration").tag(config=True)
+    Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
+
+    def J(self):    # TODO: Move this somewhere else - too specific
+        return {'off': 1.324e+13, 'f': 1.309e+13, 'beta': 1.288e+13, 'sin': 1.305e+13}[self.coriolis]
+
+    def gaugeLocation(self, gauge):
+        return {"P02": (38.5002, 142.5016), "P06": (38.6340, 142.5838),
+                "801": (38.2, 141.7), "802": (39.3, 142.1), "803": (38.9, 141.8), "804": (39.7, 142.2),
+                "806": (37.0, 141.2), "Fukushima": (37.4213, 141.0281)}[gauge]
+
+    def meshSize(self, i):
+        return (5918, 7068, 8660, 10988, 14160, 19082, 27280, 41730, 72602, 160586, 681616)[i]
+
+
+class RossbyWaveOptions(AdaptOptions):
+    name = 'Parameters for the equatorial Rossby wave test problem'
+
+    # Solver parameters
+    ndump = NonNegativeInteger(12, help="Timesteps per data dump").tag(config=True)
+    rm = NonNegativeInteger(48, help="Timesteps per mesh adaptation").tag(config=True)
+    nVerT = NonNegativeInteger(1000, help="Target number of vertices").tag(config=True)
+    dt = PositiveFloat(0.05, help="Timestep").tag(config=True)
+    Tstart = PositiveFloat(10., help="Start time of period of interest").tag(config=True)
+    Tend = PositiveFloat(36., help="End time of period of interest").tag(config=True)
+    hmin = PositiveFloat(1e-3, help="Minimum element size").tag(config=True)
+    hmax = PositiveFloat(10., help="Maximum element size").tag(config=True)
+    minNorm = PositiveFloat(1e-4).tag(config=True)  # TODO: Not sure about this
+    radius = PositiveFloat(np.sqrt(3), help="Radius of indicator function around location of interest.").tag(config=True)
+
+    # Physical parameters
+    coriolis = Unicode('beta', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
+    g = PositiveFloat(1., help="Gravitational acceleration").tag(config=True)
+
+    def J(self, mirror=False):    # TODO: Move this somewhere else - too specific
+        return 1729e-06 if mirror else 5.3333
+
+
+class GaussianOptions(AdaptOptions):
+    name = 'Parameters for the shallow water test problem with Gaussian initial condition'
+
+    # Solver parameters
+    ndump = NonNegativeInteger(6, help="Timesteps per data dump").tag(config=True)
+    rm = NonNegativeInteger(12, help="Timesteps per mesh adaptation").tag(config=True)
+    nVerT = NonNegativeInteger(1000, help="Target number of vertices").tag(config=True)
+    dt = PositiveFloat(0.05, help="Timestep").tag(config=True)
+    Tstart = PositiveFloat(0., help="Start time of period of interest").tag(config=True)
+    Tend = PositiveFloat(3., help="End time of period of interest").tag(config=True)
+    hmin = PositiveFloat(1e-4, help="Minimum element size").tag(config=True)
+    hmax = PositiveFloat(1., help="Maximum element size").tag(config=True)
+    minNorm = PositiveFloat(1e-6).tag(config=True)  # TODO: Not sure about this
+    radius = PositiveFloat(np.sqrt(0.3), help="Radius of indicator function around location of interest.").tag(config=True)
+
+    # Physical parameters
+    coriolis = Unicode('beta', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
+    g = PositiveFloat(9.81, help="Gravitational acceleration").tag(config=True)
+
+    def J(self):    # TODO: Move this somewhere else - too specific
+        return 1.6160e-4
+
+
+class AdvectionDiffusionOptions(AdaptOptions):
+    name = 'Parameters for advection diffusion test problem'
+
+    # Solver parameters
+    ndump = NonNegativeInteger(5, help="Timesteps per data dump").tag(config=True)
+    rm = NonNegativeInteger(10, help="Timesteps per mesh adaptation").tag(config=True)
+    nVerT = NonNegativeInteger(1000, help="Target number of vertices").tag(config=True)
+    dt = PositiveFloat(0.05, help="Timestep").tag(config=True)
+    Tstart = PositiveFloat(0., help="Start time of period of interest").tag(config=True)
+    Tend = PositiveFloat(2.4, help="End time of period of interest").tag(config=True)
+    hmin = PositiveFloat(1e-4, help="Minimum element size").tag(config=True)
+    hmax = PositiveFloat(1., help="Maximum element size").tag(config=True)
+    minNorm = PositiveFloat(1e-5).tag(config=True)  # TODO: Not sure about this
+    radius = PositiveFloat(0.2, help="Radius of indicator function around location of interest.").tag(
+        config=True)
 
 
 class Options:
@@ -169,9 +238,10 @@ class Options:
             self.Omega = 7.291e-5  # Planetary rotation rate
 
             self.dt = 5.
-            self.Tstart = 300.
-            self.Tend = 1500.
-            # self.Tend = 1800.
+            # self.Tstart = 300.
+            self.Tstart = 600.
+            # self.Tend = 1500.
+            self.Tend = 1800.
             if ndump is None:
                 self.ndump = 10
             if rm is None:
@@ -183,11 +253,11 @@ class Options:
                       'f': 1.309e+13,
                       'beta': 1.288e+13,
                       'sin': 1.305e+13}[self.coriolis]  # (to 4.s.f.) On mesh of 158,596 elements
-            self.xy = [490e3, 640e3, 4160e3, 4360e3]
-            # self.xy = from_latlon(self.latFukushima, self.lonFukushima, force_zone_number=54)[:2]
+            # self.xy = [490e3, 640e3, 4160e3, 4360e3]
+            self.xy = from_latlon(self.latFukushima, self.lonFukushima, force_zone_number=54)[:2]
             self.xy2 = [0., 0., 0., 0.]
-            # self.radius = 50e3          # NOTE: P02 and P06 do not fall within this radius. 806 does
-            self.radius = None
+            self.radius = 50e3          # NOTE: P02 and P06 do not fall within this radius. 806 does
+            # self.radius = None
             self.g = 9.81
         elif self.mode == 'advection-diffusion':
             self.dt = 0.05
