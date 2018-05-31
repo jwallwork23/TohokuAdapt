@@ -30,6 +30,22 @@ class AdaptOptions(FrozenConfigurable):
     normOrder = NonNegativeInteger(2, help="Degree p of Lp norm used.")
     family = Unicode('dg-dg', help="Mixed finite element family, from {'dg-dg', 'dg-cg'}.").tag(config=True)
 
+    def cntT(self):
+        return int(np.ceil(self.Tend / self.dt))  # Final timestep index
+
+    def iStart(self):
+        return int(self.Tstart / (self.ndump * self.dt))  # First exported timestep of period of interest
+
+    def iEnd(self):
+        return int(self.cntT / self.ndump)  # Final exported timestep of period of interest
+
+    def rmEnd(self):
+        return int(self.cntT / self.rm)  # Final mesh index
+
+    def dumpsPerRemesh(self):
+        assert self.rm % self.ndump == 0
+        return int(self.rm / self.ndump)
+
     def indicator(self, mesh):
         try:
             P1 = FunctionSpace(mesh, "DG", 1)
@@ -67,6 +83,24 @@ class AdaptOptions(FrozenConfigurable):
             d1 += self.orderChange
             d2 += self.orderChange
         return VectorFunctionSpace(mesh, "DG", d1) * FunctionSpace(mesh, "DG" if self.family == 'dg-dg' else "CG", d2)
+
+    def printToScreen(self, mn, adaptTimer, solverTime, nEle, Sn, mM, t):
+        """
+        :arg mn: mesh number.
+        :arg adaptTimer: time taken for mesh adaption.
+        :arg solverTime: time taken for solver.
+        :arg nEle: current number of elements.
+        :arg Sn: sum over #Elements.
+        :arg mM: tuple of min and max #Elements.
+        :arg t: current simuation time.
+        :return: mean element count.
+        """
+        av = Sn / mn
+        print("""\n************************** Adaption step %d ****************************
+Percent complete  : %4.1f%%    Adapt time : %4.2fs Solver time : %4.2fs     
+#Elements... Current : %d  Mean : %d  Minimum : %s  Maximum : %s\n""" %
+              (mn, 100 * t / self.Tend, adaptTimer, solverTime, nEle, av, mM[0], mM[1]))
+        return av
 
 
 class TohokuOptions(AdaptOptions):
