@@ -12,15 +12,61 @@ __all__ = ["Options", "AdaptOptions", "TohokuOptions", "RossbyWaveOptions", "Gau
 class AdaptOptions(FrozenConfigurable):
     name = 'Common parameters for TohokuAdapt project'
 
-    approach = Unicode('fixedMesh', help="Mesh adaptive approach considered").tag(config=True)
-    gradate = Bool(False, help='Apply metric gradation').tag(config=True)
-    bAdapt = Bool(False, help='Adapt based on bathymetry field').tag(config=True)
+    # Mesh adaptivity parameters
+    approach = Unicode('fixedMesh',
+                       help="Mesh adaptive approach considered, from {'fixedMesh', 'hessianBased', 'DWP', 'DWR'}"
+                       ).tag(config=True)
+    gradate = Bool(False, help='Toggle metric gradation.').tag(config=True)
+    bAdapt = Bool(False, help='Toggle adaptation based on bathymetry field.').tag(config=True)
     maxGrowth = PositiveFloat(1.4, help="Metric gradation scaling parameter.").tag(config=True)
     maxAnisotropy = PositiveFloat(100., help="Maximum tolerated anisotropy.").tag(config=True)
     nAdapt = NonNegativeInteger(1, help="Number of mesh adaptations per remeshing.").tag(config=True)
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
-    orderChange = NonNegativeInteger(1, help="Change in polynomial degree for residual approximation.").tag(config=True)
+    orderChange = NonNegativeInteger(0, help="Change in polynomial degree for residual approximation.").tag(config=True)
     refinedSpace = Bool(False, help="Refine space too compute errors and residuals.").tag(config=True)
+    adaptField = Unicode('s', help="Adaptation field of interest, from {'s', 'f', 'b'}.").tag(config=True)
+    normalisation = Unicode('lp', help="Normalisation approach, from {'lp', 'manual'}.").tag(config=True)
+    hessMeth = Unicode('dL2', help="Hessian recovery technique, from {'dL2', 'parts'}.").tag(config=True)
+    normOrder = NonNegativeInteger(2, help="Degree p of Lp norm used.")
+    family = Unicode('dg-dg', help="Mixed finite element family, from {'dg-dg', 'dg-cg'}.").tag(config=True)
+
+    def indicator(self, mesh):
+        try:
+            P1 = FunctionSpace(mesh, "DG", 1)
+            iA = Function(P1, name="Region of interest")
+
+            if len(np.shape(self.radii)) == 0:
+                expr = Expression("pow(x[0] - x0, 2) + pow(x[1] - y0, 2) < r + eps ? 1 : 0",
+                                  x0=self.loc[0], y0=self.loc[1], r=pow(self.radii, 2), eps=1e-10)
+            elif len(np.shape(self.radii)) == 1:
+                assert len(self.loc) == len(self.radii)
+                e = "(pow(x[0] - %f, 2) + pow(x[1] - %f, 2) < %f + %f)" \
+                    % (self.loc[0][0], self.loc[0][1], pow(self.radii[0], 2), 1e-10)
+                for i in range(1, len(self.radii)):
+                    e += "&& (pow(x[0] - %f, 2) + pow(x[1] - %f, 2) < %f + %f)" \
+                         % (self.loc[i][0], self.loc[i][1], pow(self.radii[i], 2), 1e-10)
+                expr = Expression(e)
+            else:
+                raise ValueError("Indicator function radii input not recognised.")
+        except:
+            raise ValueError("Radius or location of region of importance not currently given.")
+
+        iA.interpolate(expr)
+
+        return iA
+
+
+    def mixedSpace(self, mesh, enrich=False):
+        """
+        :param mesh: mesh upon which to build mixed space.
+        :return: mixed VectorFunctionSpace x FunctionSpace as specified by ``self.family``.
+        """
+        d1 = 1
+        d2 = 2 if self.family == 'dg-cg' else 1
+        if enrich:
+            d1 += self.orderChange
+            d2 += self.orderChange
+        return VectorFunctionSpace(mesh, "DG", d1) * FunctionSpace(mesh, "DG" if self.family == 'dg-dg' else "CG", d2)
 
 
 class TohokuOptions(AdaptOptions):
@@ -36,12 +82,13 @@ class TohokuOptions(AdaptOptions):
     hmin = PositiveFloat(10., help="Minimum element size").tag(config=True)
     hmax = PositiveFloat(1e5, help="Maximum element size").tag(config=True)
     minNorm = PositiveFloat(1.).tag(config=True)    # TODO: Not sure about this
-    radius = PositiveFloat(50e3, help="Radius of indicator function around location of interest.").tag(config=True)
+    maxScaling = PositiveFloat(5e5).tag(config=True)  # TODO: Not sure about this
 
     # Physical parameters
     coriolis = Unicode('sin', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
     g = PositiveFloat(9.81, help="Gravitational acceleration").tag(config=True)
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
+    viscosity = NonNegativeFloat(1e-3, help="Planetary rotation rate").tag(config=True)
 
     def J(self):    # TODO: Move this somewhere else - too specific
         return {'off': 1.324e+13, 'f': 1.309e+13, 'beta': 1.288e+13, 'sin': 1.305e+13}[self.coriolis]
@@ -53,6 +100,15 @@ class TohokuOptions(AdaptOptions):
 
     def meshSize(self, i):
         return (5918, 7068, 8660, 10988, 14160, 19082, 27280, 41730, 72602, 160586, 681616)[i]
+
+    def directory(self):
+        return 'plots/tohoku/' + self.approach + '/'
+
+    # Region of importance
+    radii = List(trait=Float, default_value=[50e3],
+                 help="Radius of indicator function around location of interest.").tag(config=True)
+    loc = List(trait=Float, default_value=[37.4213, 141.0281],
+               help="Important locations, written as a list.").tag(config=True)
 
 
 class RossbyWaveOptions(AdaptOptions):
@@ -68,7 +124,7 @@ class RossbyWaveOptions(AdaptOptions):
     hmin = PositiveFloat(1e-3, help="Minimum element size").tag(config=True)
     hmax = PositiveFloat(10., help="Maximum element size").tag(config=True)
     minNorm = PositiveFloat(1e-4).tag(config=True)  # TODO: Not sure about this
-    radius = PositiveFloat(np.sqrt(3), help="Radius of indicator function around location of interest.").tag(config=True)
+    maxScaling = PositiveFloat(5e5).tag(config=True)  # TODO: Not sure about this
 
     # Physical parameters
     coriolis = Unicode('beta', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
@@ -76,6 +132,15 @@ class RossbyWaveOptions(AdaptOptions):
 
     def J(self, mirror=False):    # TODO: Move this somewhere else - too specific
         return 1729e-06 if mirror else 5.3333
+
+    def directory(self):
+        return 'plots/rossby-wave/' + self.approach + '/'
+
+    # Region of importance
+    radii = List(trait=Float, default_value=[np.sqrt(3)],
+                 help="Radius of indicator function around location of interest.").tag(config=True)
+    loc = List(trait=Float, default_value=[-15., 0.],
+               help="Important locations, written as a list.").tag(config=True)
 
 
 class GaussianOptions(AdaptOptions):
@@ -86,12 +151,12 @@ class GaussianOptions(AdaptOptions):
     rm = NonNegativeInteger(12, help="Timesteps per mesh adaptation").tag(config=True)
     nVerT = NonNegativeInteger(1000, help="Target number of vertices").tag(config=True)
     dt = PositiveFloat(0.05, help="Timestep").tag(config=True)
-    Tstart = PositiveFloat(0., help="Start time of period of interest").tag(config=True)
+    Tstart = PositiveFloat(0.6, help="Start time of period of interest").tag(config=True)
     Tend = PositiveFloat(3., help="End time of period of interest").tag(config=True)
     hmin = PositiveFloat(1e-4, help="Minimum element size").tag(config=True)
     hmax = PositiveFloat(1., help="Maximum element size").tag(config=True)
     minNorm = PositiveFloat(1e-6).tag(config=True)  # TODO: Not sure about this
-    radius = PositiveFloat(np.sqrt(0.3), help="Radius of indicator function around location of interest.").tag(config=True)
+    maxScaling = PositiveFloat(5e9).tag(config=True)  # TODO: Not sure about this
 
     # Physical parameters
     coriolis = Unicode('beta', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
@@ -99,6 +164,15 @@ class GaussianOptions(AdaptOptions):
 
     def J(self):    # TODO: Move this somewhere else - too specific
         return 1.6160e-4
+
+    def directory(self):
+        return 'plots/shallow-water/' + self.approach + '/'
+
+    # Region of importance
+    radii = List(trait=Float, default_value=[np.sqrt(0.3)],
+                 help="Radius of indicator function around location of interest.").tag(config=True)
+    loc = List(trait=Float, default_value=[0., np.pi],
+               help="Important locations, written as a list.").tag(config=True)
 
 
 class AdvectionDiffusionOptions(AdaptOptions):
@@ -109,13 +183,21 @@ class AdvectionDiffusionOptions(AdaptOptions):
     rm = NonNegativeInteger(10, help="Timesteps per mesh adaptation").tag(config=True)
     nVerT = NonNegativeInteger(1000, help="Target number of vertices").tag(config=True)
     dt = PositiveFloat(0.05, help="Timestep").tag(config=True)
-    Tstart = PositiveFloat(0., help="Start time of period of interest").tag(config=True)
+    Tstart = PositiveFloat(0.4, help="Start time of period of interest").tag(config=True)
     Tend = PositiveFloat(2.4, help="End time of period of interest").tag(config=True)
     hmin = PositiveFloat(1e-4, help="Minimum element size").tag(config=True)
     hmax = PositiveFloat(1., help="Maximum element size").tag(config=True)
     minNorm = PositiveFloat(1e-5).tag(config=True)  # TODO: Not sure about this
-    radius = PositiveFloat(0.2, help="Radius of indicator function around location of interest.").tag(
-        config=True)
+    maxScaling = PositiveFloat(5e5).tag(config=True)  # TODO: Not sure about this
+
+    # Region of importance
+    radii = List(trait=Float, default_value=[0.2],
+                 help="Radius of indicator function around location of interest.").tag(config=True)
+    loc = List(trait=Float, default_value=[3.75, 0.5],
+               help="Important locations, written as a list.").tag(config=True)
+
+    def directory(self):
+        return 'plots/advection-diffusion/' + self.approach + '/'
 
 
 class Options:
