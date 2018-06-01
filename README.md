@@ -1,10 +1,10 @@
 ## TohokuAdapt : anisotropic mesh adaptivity applied to the 2011 Tohoku tsunami ##
 
-In this code, anisotropic mesh adaptivity is applied to solving the linearised shallow water equations in
-[Firedrake][1], using [PRAgMaTIc][2] to enable mesh adaptivity. Code builds upon my [MRes project][3] at the Mathematics
-of Planet Earth Centre for Doctoral Training [MPE CDT][4] at Imperial College London and University of Reading. 
-As part of my PhD research, that work is integrated into the coastal, estuarine and ocean modelling solver provided by 
-[Thetis][5].
+In this code, anisotropic mesh adaptivity is applied to solving the nonlinear shallow water equations in the coastal, 
+estuarine and ocean modelling solver provided by [Thetis][1]. The Thetis project is built upon the [Firedrake][2]
+project, which enables efficient FEM solution in Python by automatic generation of C code. Anisotropic mesh adaptivity
+is achieved using [PRAgMaTIc][3]. Code builds upon my [MRes project][4] at the Mathematics of Planet Earth Centre for 
+Doctoral Training ([MPE CDT][5]) at Imperial College London and University of Reading.
 
 ### Contents:
 * A ``utils`` directory, containing the necessary functions for implementation of isotropic and anisotropic mesh
@@ -13,9 +13,10 @@ adaptivity:
     * Callbacks for assembling objective functionals and extracting timeseries are provided in ``callbacks``.
     * Coordinate transformations are achieved using ``conversion``.
     * Interpolation of functions from an old mesh to a newly adapted mesh is achieved using ``interpolation``.
-    * Meshes of the physical domain can be generated using ``mesh``.
     * Some generic functions may be found in ``misc``.
     * Default parameters are specified using ``options``.
+    * Meshes of the physical domain, bathymetry and initial and boundary conditions are generated using ``setup``.
+    * Mesh adaptive solvers can be found in ``solvers``.
     * Time series and error estimate data can be stored and plotted using ``timeseries``.
 * Some basic tests for the mesh adaptivity functionalities above are provided in ``basic-tests.py``.
 * A ``resources`` directory, containing bathymetry and coastline data for the ocean domain surrounding Fukushima. Mesh
@@ -33,6 +34,7 @@ The following meshing strategies are implemented, with a number of other approac
     * calculate total variations between timeseries using ``quick-difference``; 
     * integrate timeseries using ``quick-integrate``; 
     * plot error curves and CPU timings against element count using ``quick-plot``.
+* An additional test case is provided by the ``advection-diffusion`` script.
     
 ### User instructions
 
@@ -44,9 +46,9 @@ with option parameters ``--install pyadjoint`` and ``--install thetis``. Fetch a
 
 For feedback, comments and questions, please email j.wallwork16@imperial.ac.uk.
 
-[1]: http://firedrakeproject.org/ "Firedrake"
-[2]: https://github.com/meshadaptation/pragmatic "PRAgMaTIc"
-[3]: https://github.com/jwallwork23/MResProject "MRes project"
-[4]: http://mpecdt.org "MPE CDT"
-[5]: http://thetisproject.org/index.html "Thetis"
+[1]: http://thetisproject.org/index.html "Thetis"
+[2]: http://firedrakeproject.org/ "Firedrake"
+[3]: https://github.com/meshadaptation/pragmatic "PRAgMaTIc"
+[4]: https://github.com/jwallwork23/MResProject "MRes project"
+[5]: http://mpecdt.org "MPE CDT"
 [6]: http://www.qmesh.org "QMESH"
