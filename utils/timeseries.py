@@ -8,8 +8,8 @@ import datetime
 from .options import Options
 
 
-__all__ = ["readErrors", "extractSpline", "extractData", "errorVsElements", "__main__", "plotTimeseries",
-           "compareTimeseries", "timeseriesDifference", "totalVariation", "gaugeTV", "integrateTimeseries"]
+__all__ = ["errorVsElements", "__main__", "plotTimeseries", "compareTimeseries", "timeseriesDifference",
+           "totalVariation", "gaugeTV", "integrateTimeseries"]
 
 
 plt.rc('text', usetex=True)
@@ -338,12 +338,9 @@ def errorVsElements(mode='tohoku',
                 plt.semilogx(nEls[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
             else:
                 plt.loglog(nEls[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
-        if bootstrapping:
-            if mode == 'rossby-wave':
-                plt.hlines(op.J, 1e2, 1e6, colors='k', linestyles='solid', label='First order asymptotic solution')
-            plt.legend(loc=1 if (errornames[m] in ('P02', 'P06')) or (mode == 'model-verification') else 4)
-        else:
-            plt.legend(loc=1)
+        if bootstrapping and mode == 'rossby-wave':
+            plt.hlines(op.J, 1e2, 1e6, colors='k', linestyles='solid', label=r'$1^{st}$ order asymptotic solution')
+        plt.legend(loc=1)
         plt.xlabel(r'Mean element count')
         plt.ylabel(errorlabels[m])
         plt.savefig(di + errornames[m] + 'VsElements' + today + '.pdf', bbox_inches='tight')
@@ -353,7 +350,7 @@ def errorVsElements(mode='tohoku',
         for mesh in err:
             plt.loglog(tim[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
         if bootstrapping and mode == 'rossby-wave':
-            plt.hlines(op.J, 1e2, 1e6, colors='k', linestyles='solid', label='First order asymptotic solution')
+            plt.hlines(op.J, 1e2, 1e6, colors='k', linestyles='solid', label=r'$1^{st}$ order asymptotic solution')
         plt.gcf()
         plt.legend(loc=3)
         plt.xlabel(r'CPU time (s)')

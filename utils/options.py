@@ -108,7 +108,7 @@ class TohokuOptions(AdaptOptions):
 
     # Solver parameters
     ndump = NonNegativeInteger(10, help="Timesteps per data dump").tag(config=True)
-    rm = NonNegativeInteger(30, help="Timesteps per mesh adaptation").tag(config=True)
+    rm = NonNegativeInteger(30, help="Timesteps per mesh aapdaptation").tag(config=True)
     nVerT = NonNegativeInteger(1000, help="Target number of vertices").tag(config=True)
     dt = PositiveFloat(5., help="Timestep").tag(config=True)
     Tstart = PositiveFloat(300., help="Start time of period of interest").tag(config=True)
