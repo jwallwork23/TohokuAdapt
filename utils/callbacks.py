@@ -34,7 +34,7 @@ class SWCallback(FunctionalCallback):
             ks = Function(VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1))
             k0, k1 = ks.split()
             iA = indicator(mesh, radii=self.op.radius, op=self.op)
-            File("plots/" + self.op.mode + "/indicator.pvd").write(iA)
+            # File("plots/" + self.op.mode + "/indicator.pvd").write(iA)
             k1.assign(iA)
             kt = Constant(0.)
             if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:      # Slightly smooth transition

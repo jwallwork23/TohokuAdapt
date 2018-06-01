@@ -335,8 +335,8 @@ class Options:
             self.J = 5.3333
             # self.xy = [-16., -14., -3., 3.]
             # self.xy2 = [14., 16., -3., 3.]
-            self.xy = [-15., 0.]
-            self.xy2 = [15., 0.]
+            self.xy = [-15., 2.]
+            self.xy2 = [15., 2.]
             self.radius = np.sqrt(3.)  # TODO: Change this to 2. and redo
             self.J_mirror = 6.1729e-06  # On mesh of 2,359,296 elements, using asymptotic solution
         elif self.mode in ('tohoku', 'model-verification'):
