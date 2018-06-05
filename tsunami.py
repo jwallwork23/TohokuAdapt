@@ -6,6 +6,7 @@ import datetime
 import numpy as np
 
 from utils.options import Options
+from utils.setup import problemDomain
 from utils.solvers import fixedMesh, hessianBased, DWP, DWR
 
 
@@ -92,7 +93,9 @@ else:
     resolutions = [0 if args.level is None else int(args.level)]
 Jlist = np.zeros(len(resolutions))
 for i in resolutions:
-    quantities = solver(i, regen=bool(args.regen), mirror=bool(args.mirror), op=op)
+    mesh, u0, eta0, b, BCs, f = problemDomain(i, op=op)
+    quantities = solver(mesh, u0, eta0, b, BCs, f,
+                        regen=bool(args.regen), mirror=bool(args.mirror), op=op)
     PETSc.Sys.Print("Mode: %s Approach: %s. Run: %d" % (mode, approach, i), comm=COMM_WORLD)
     rel = np.abs(op.J - quantities['J_h']) / np.abs(op.J)
     if op.mode == "rossby-wave":

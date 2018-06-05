@@ -168,7 +168,7 @@ def hessianBasedAD(n=3, op=Options(mode='advection-diffusion', approach="hessian
 from thetis import *
 
 
-def fixedMesh(startRes, **kwargs):
+def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
     op = kwargs.get('op')
 
     # Initialise domain and physical parameters
@@ -176,7 +176,6 @@ def fixedMesh(startRes, **kwargs):
         assert float(physical_constants['g_grav'].dat.data) == op.g
     except:
         physical_constants['g_grav'].assign(op.g)
-    mesh, u0, eta0, b, BCs, f = problemDomain(startRes, op=op)
     V = op.mixedSpace(mesh)
     if op.mode == 'rossby-wave':            # Analytic final-time state
         peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
@@ -242,7 +241,7 @@ def fixedMesh(startRes, **kwargs):
     return quantities
 
 
-def hessianBased(startRes, **kwargs):
+def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
     op = kwargs.get('op')
 
     # Initialise domain and physical parameters
@@ -250,7 +249,6 @@ def hessianBased(startRes, **kwargs):
         assert float(physical_constants['g_grav'].dat.data) == op.g
     except:
         physical_constants['g_grav'].assign(op.g)
-    mesh, u0, eta0, b, BCs, f = problemDomain(startRes, op=op)
     V = op.mixedSpace(mesh)
     uv_2d, elev_2d = Function(V).split()  # Needed to load data into
     elev_2d.interpolate(eta0)
@@ -299,7 +297,7 @@ def hessianBased(startRes, **kwargs):
 
         if cnt != 0 or op.adaptField == 'f':
             elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
-            b, BCs, f = problemDomain(mesh=mesh, op=op)[3:]
+            b, BCs, f = problemDomain(mesh=mesh, op=op)[3:]     # TODO: find a different way to reset these
             uv_2d.rename('uv_2d')
             elev_2d.rename('elev_2d')
         adaptTimer = clock() - adaptTimer
@@ -401,7 +399,7 @@ import pyadjoint
 from fenics_adjoint.solving import SolveBlock                                       # For extracting adjoint solutions
 
 
-def DWP(startRes, **kwargs):
+def DWP(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
     op = kwargs.get('op')
     regen = kwargs.get('regen')
 
@@ -415,7 +413,6 @@ def DWP(startRes, **kwargs):
         assert (float(physical_constants['g_grav'].dat.data) == op.g)
     except:
         physical_constants['g_grav'].assign(op.g)
-    mesh, u0, eta0, b, BCs, f = problemDomain(startRes, op=op)
     V = op.mixedSpace(mesh)
     q = Function(V)
     uv_2d, elev_2d = q.split()  # Needed to load data into
@@ -556,7 +553,7 @@ def DWP(startRes, **kwargs):
                 mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
 
             elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
-            b, BCs, f = problemDomain(mesh=mesh, op=op)[3:]
+            b, BCs, f = problemDomain(mesh=mesh, op=op)[3:]             # TODO: find a different way to reset these
             uv_2d.rename('uv_2d')
             elev_2d.rename('elev_2d')
             adaptTimer = clock() - adaptTimer
@@ -656,7 +653,7 @@ def DWP(startRes, **kwargs):
         return quantities
 
 
-def DWR(startRes, **kwargs):
+def DWR(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
     op = kwargs.get('op')
     regen = kwargs.get('regen')
 
@@ -671,7 +668,6 @@ def DWR(startRes, **kwargs):
         assert (float(physical_constants['g_grav'].dat.data) == op.g)
     except:
         physical_constants['g_grav'].assign(op.g)
-    mesh_H, u0, eta0, b, BCs, f = problemDomain(startRes, op=op)
     V = op.mixedSpace(mesh_H)
     q = Function(V)
     uv_2d, elev_2d = q.split()    # Needed to load data into
@@ -911,7 +907,7 @@ def DWR(startRes, **kwargs):
                 mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
 
             elev_2d, uv_2d = interp(mesh_H, elev_2d, uv_2d)
-            b, BCs, f = problemDomain(mesh=mesh_H, op=op)[3:]
+            b, BCs, f = problemDomain(mesh=mesh_H, op=op)[3:]           # TODO: Find a different way to reset these
             uv_2d.rename('uv_2d')
             elev_2d.rename('elev_2d')
             adaptTimer = clock() - adaptTimer

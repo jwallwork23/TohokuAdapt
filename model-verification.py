@@ -8,8 +8,7 @@ from utils.options import Options
 from utils.setup import problemDomain
 
 
-def solverSW(startRes, di, op=Options()):
-    mesh, u0, eta0, b, BCs, f = problemDomain(level=startRes, op=op)
+def solverSW(mesh, u0, eta0, b, BCs={}, f=None, op=Options()):
 
     # Get solver parameter values and construct solver
     solver_obj = solver2d.FlowSolver2d(mesh, b)
@@ -26,7 +25,7 @@ def solverSW(startRes, di, op=Options()):
     options.timestepper_type = op.timestepper
     options.timestep = op.dt
     if op.plotpvd:
-        options.output_directory = di
+        options.output_directory = op.di
     else:
         options.no_exports = True
     solver_obj.bnd_functions['shallow_water'] = BCs
@@ -78,7 +77,7 @@ if __name__ == '__main__':
         gaugeFileP02 = open(filename + 'P02.txt', 'w+')
         gaugeFileP06 = open(filename + 'P06.txt', 'w+')
         integrandFile = open(filename + 'Integrand.txt', 'w+')
-        di = 'plots/model-verification/' + tag + '/'
+        op.di = 'plots/model-verification/' + tag + '/'
 
         resolutions = range(11)
         Jlist = np.zeros(len(resolutions))
@@ -86,7 +85,8 @@ if __name__ == '__main__':
         g6list = np.zeros(len(resolutions))
         for k, i in zip(resolutions, range(len(resolutions))):
             PETSc.Sys.Print("\nStarting run %d... Coriolis frequency: %s\n" % (k, c), comm=COMM_WORLD)
-            quantities = solverSW(k, di, op=op)
+            mesh, u0, eta0, b, BCs, f = problemDomain(level=k, op=op)
+            quantities = solverSW(mesh, u0, eta0, b, BCs, f, op=op)
             gaugeFileP02.writelines(["%s," % val for val in quantities["P02"]])
             gaugeFileP02.write("\n")
             gaugeFileP06.writelines(["%s," % val for val in quantities["P06"]])
