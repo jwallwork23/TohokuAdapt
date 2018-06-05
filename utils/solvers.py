@@ -33,11 +33,10 @@ def weakResidualAD(c, c_, w, op=Options(mode='advection-diffusion')):
     return F
 
 
-def fixedMeshAD(n=3, op=Options(mode='advection-diffusion', approach="fixedMesh")):
+def fixedMeshAD(mesh, phi0, BCs, w, op=Options(mode='advection-diffusion', approach="fixedMesh")):
     forwardFile = File(op.di + "fixedMesh.pvd")
 
     # Initialise FunctionSpaces and variables
-    mesh, phi0, BCs, w = problemDomain(n, op=op)
     V = FunctionSpace(mesh, "CG", 1)
     phi = Function(V).assign(phi0)
     phi.rename('Concentration')
@@ -80,11 +79,10 @@ def fixedMeshAD(n=3, op=Options(mode='advection-diffusion', approach="fixedMesh"
     return quantities
 
 
-def hessianBasedAD(n=3, op=Options(mode='advection-diffusion', approach="hessianBased")):
+def hessianBasedAD(mesh, phi0, BCs, w, op=Options(mode='advection-diffusion', approach="hessianBased")):
     forwardFile = File(op.di + "hessianBased.pvd")
 
     # Initialise FunctionSpaces and variables
-    mesh, phi0, BCs, w = problemDomain(n, op=op)
     V = FunctionSpace(mesh, "CG", 1)
     phi = Function(V).assign(phi0)
     phi.rename('Concentration')
@@ -128,7 +126,7 @@ def hessianBasedAD(n=3, op=Options(mode='advection-diffusion', approach="hessian
             iA = indicator(mesh, xy=[3., 0.], radii=0.5, op=op)
 
             # Re-establish bilinear form and set boundary conditions
-            BCs, w = problemDomain(mesh=mesh, op=op)[2:]
+            BCs, w = problemDomain(mesh=mesh, op=op)[2:]        # TODO: find a different way to reset these
             F = weakResidualAD(phi_next, phi, w, op=op)
 
             # Get mesh stats

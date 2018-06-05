@@ -2,8 +2,9 @@ from firedrake import *
 
 import argparse
 
-from utils.solvers import fixedMeshAD, hessianBasedAD
 from utils.options import Options
+from utils.setup import problemDomain
+from utils.solvers import fixedMeshAD, hessianBasedAD
 
 
 parser = argparse.ArgumentParser()
@@ -30,7 +31,8 @@ solvers = {'fixedMesh': fixedMeshAD, 'hessianBased': hessianBasedAD}
 
 errorFile = open('outdata/advection-diffusion/' + op.approach + '.txt', 'w+')
 for i in resolutions:
-    q = solvers[op.approach](pow(2, i), op=op)
+    mesh, phi0, BCs, w = problemDomain(pow(2, i), op=op)
+    q = solvers[op.approach](mesh, phi0, BCs, w, op=op)
     print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs"
           % (i, q['meanElements'], q['J_h'], q['solverTimer']))
     errorFile.write('%d, %.4e\n' % (q['meanElements'], q['J_h']))
