@@ -5,7 +5,7 @@ import argparse
 import datetime
 import numpy as np
 
-from utils.options import Options
+from utils.options import Options, TohokuOptions, GaussianOptions, RossbyWaveOptions
 from utils.setup import problemDomain
 from utils.solvers import tsunami
 
@@ -50,16 +50,35 @@ if bool(args.mirror):
     assert mode in ('shallow-water', 'rossby-wave')
 coriolis = args.c if args.c is not None else 'f'
 
-# Choose mode and set parameter values
-op = Options(mode=mode,
-             approach=approach,
-             gradate=True if approach in ('DWP', 'DWR') and mode == 'tohoku' else False,
-             plotpvd=True if args.o else False,
-             coriolis=coriolis,
-             nAdapt=1 if args.nAdapt is None else int(args.nAdapt),
-             orderChange=orderChange,
-             refinedSpace=True if args.r else False,
-             bAdapt=bool(args.b) if args.b is not None else False)
+# # Choose mode and set parameter values
+# op = Options(mode=mode,
+#              approach=approach,
+#              gradate=True if approach in ('DWP', 'DWR') and mode == 'tohoku' else False,
+#              plotpvd=True if args.o else False,
+#              coriolis=coriolis,
+#              nAdapt=1 if args.nAdapt is None else int(args.nAdapt),
+#              orderChange=orderChange,
+#              refinedSpace=True if args.r else False,
+#              bAdapt=bool(args.b) if args.b is not None else False)
+
+# TODO...
+
+if mode == 'tohoku':
+    op = TohokuOptions(approach=approach)
+elif mode == 'rossby-wave':
+    op = RossbyWaveOptions(approach=approach)
+elif mode == 'shallow-water':
+    op = GaussianOptions(approach=approach)
+else:
+    raise NotImplementedError
+op.gradate = True if approach in ('DWP', 'DWR') and mode == 'tohoku' else False
+op.plotpvd = True if args.o else False
+op.nAdapt = 1 if args.nAdapt is None else int(args.nAdapt)
+op.orderChange =  orderChange
+op.refinedSpace = bool(args.r) if args.r is not None else False
+op.bAdapt = bool(args.b) if args.b is not None else False
+
+# TODO...
 
 # Establish filenames
 filename = 'outdata/' + mode + '/' + approach
@@ -75,7 +94,7 @@ filename += '_' + date
 errorFile = open(filename + '.txt', 'w+')
 files = {}
 extensions = ['Integrand']
-if op.mode == 'tohoku':
+if mode == 'tohoku':
     extensions.append('P02')
     extensions.append('P06')
 else:
@@ -94,7 +113,7 @@ for i in resolutions:
     mesh, u0, eta0, b, BCs, f = problemDomain(i, op=op)
     quantities = tsunami(mesh, u0, eta0, b, BCs, f,  regen=bool(args.regen), mirror=bool(args.mirror), op=op)
     PETSc.Sys.Print("Mode: %s Approach: %s. Run: %d" % (mode, approach, i), comm=COMM_WORLD)
-    rel = np.abs(op.J - quantities['J_h']) / np.abs(op.J)
+    rel = np.abs(op.J() - quantities['J_h']) / np.abs(op.J())
     if op.mode == "rossby-wave":
         quantities["Mirrored OF error"] = np.abs(op.J_mirror - quantities['J_h mirrored']) / np.abs(op.J_mirror)
     PETSc.Sys.Print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs OF error: %.4e"

@@ -1,12 +1,12 @@
 from thetis import *
 from thetis.configuration import *
+from firedrake import Expression
 
 import numpy as np
 
 from .conversion import from_latlon
 
-__all__ = ["Options", "AdaptOptions", "TohokuOptions", "RossbyWaveOptions", "GaussianOptions",
-           "AdvectionDiffusionOptions"]
+__all__ = ["Options", "TohokuOptions", "RossbyWaveOptions", "GaussianOptions", "AdvectionDiffusionOptions"]
 
 
 class AdaptOptions(FrozenConfigurable):
@@ -18,6 +18,7 @@ class AdaptOptions(FrozenConfigurable):
                        ).tag(config=True)
     gradate = Bool(False, help='Toggle metric gradation.').tag(config=True)
     bAdapt = Bool(False, help='Toggle adaptation based on bathymetry field.').tag(config=True)
+    plotpvd = Bool(False, help='Toggle plotting of fields.').tag(config=True)
     maxGrowth = PositiveFloat(1.4, help="Metric gradation scaling parameter.").tag(config=True)
     maxAnisotropy = PositiveFloat(100., help="Maximum tolerated anisotropy.").tag(config=True)
     nAdapt = NonNegativeInteger(1, help="Number of mesh adaptations per remeshing.").tag(config=True)
@@ -27,6 +28,7 @@ class AdaptOptions(FrozenConfigurable):
     adaptField = Unicode('s', help="Adaptation field of interest, from {'s', 'f', 'b'}.").tag(config=True)
     normalisation = Unicode('lp', help="Normalisation approach, from {'lp', 'manual'}.").tag(config=True)
     hessMeth = Unicode('dL2', help="Hessian recovery technique, from {'dL2', 'parts'}.").tag(config=True)
+    timestepper = Unicode('CrankNicolson', help="Time integration scheme used.").tag(config=True)
     normOrder = NonNegativeInteger(2, help="Degree p of Lp norm used.")
     family = Unicode('dg-dg', help="Mixed finite element family, from {'dg-dg', 'dg-cg'}.").tag(config=True)
 
@@ -37,10 +39,10 @@ class AdaptOptions(FrozenConfigurable):
         return int(self.Tstart / (self.ndump * self.dt))  # First exported timestep of period of interest
 
     def iEnd(self):
-        return int(self.cntT / self.ndump)  # Final exported timestep of period of interest
+        return int(self.cntT() / self.ndump)  # Final exported timestep of period of interest
 
     def rmEnd(self):
-        return int(self.cntT / self.rm)  # Final mesh index
+        return int(self.cntT() / self.rm)  # Final mesh index
 
     def dumpsPerRemesh(self):
         assert self.rm % self.ndump == 0
@@ -55,12 +57,12 @@ class AdaptOptions(FrozenConfigurable):
                 expr = Expression("pow(x[0] - x0, 2) + pow(x[1] - y0, 2) < r + eps ? 1 : 0",
                                   x0=self.loc[0], y0=self.loc[1], r=pow(self.radii, 2), eps=1e-10)
             elif len(np.shape(self.radii)) == 1:
-                assert len(self.loc) == len(self.radii)
+                assert len(self.loc)/2 == len(self.radii)
                 e = "(pow(x[0] - %f, 2) + pow(x[1] - %f, 2) < %f + %f)" \
-                    % (self.loc[0][0], self.loc[0][1], pow(self.radii[0], 2), 1e-10)
+                    % (self.loc[0], self.loc[1], pow(self.radii[0], 2), 1e-10)
                 for i in range(1, len(self.radii)):
                     e += "&& (pow(x[0] - %f, 2) + pow(x[1] - %f, 2) < %f + %f)" \
-                         % (self.loc[i][0], self.loc[i][1], pow(self.radii[i], 2), 1e-10)
+                         % (self.loc[2*i], self.loc[2*i+1], pow(self.radii[i], 2), 1e-10)
                 expr = Expression(e)
             else:
                 raise ValueError("Indicator function radii input not recognised.")
@@ -105,11 +107,12 @@ Percent complete  : %4.1f%%    Adapt time : %4.2fs Solver time : %4.2fs
 
 class TohokuOptions(AdaptOptions):
     name = 'Parameters for the Tohoku problem'
+    mode = 'tohoku'
 
     # Solver parameters
     ndump = NonNegativeInteger(10, help="Timesteps per data dump").tag(config=True)
     rm = NonNegativeInteger(30, help="Timesteps per mesh aapdaptation").tag(config=True)
-    nVerT = NonNegativeInteger(1000, help="Target number of vertices").tag(config=True)
+    nVerT = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
     dt = PositiveFloat(5., help="Timestep").tag(config=True)
     Tstart = PositiveFloat(300., help="Start time of period of interest").tag(config=True)
     Tend = PositiveFloat(1500., help="End time of period of interest").tag(config=True)
@@ -135,7 +138,7 @@ class TohokuOptions(AdaptOptions):
     def meshSize(self, i):
         return (5918, 7068, 8660, 10988, 14160, 19082, 27280, 41730, 72602, 160586, 681616)[i]
 
-    def directory(self):
+    def di(self):
         return 'plots/tohoku/' + self.approach + '/'
 
     # Region of importance
@@ -147,11 +150,12 @@ class TohokuOptions(AdaptOptions):
 
 class RossbyWaveOptions(AdaptOptions):
     name = 'Parameters for the equatorial Rossby wave test problem'
+    mode = 'rossby-wave'
 
     # Solver parameters
     ndump = NonNegativeInteger(12, help="Timesteps per data dump").tag(config=True)
     rm = NonNegativeInteger(48, help="Timesteps per mesh adaptation").tag(config=True)
-    nVerT = NonNegativeInteger(1000, help="Target number of vertices").tag(config=True)
+    nVerT = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
     dt = PositiveFloat(0.05, help="Timestep").tag(config=True)
     Tstart = PositiveFloat(10., help="Start time of period of interest").tag(config=True)
     Tend = PositiveFloat(36., help="End time of period of interest").tag(config=True)
@@ -167,7 +171,7 @@ class RossbyWaveOptions(AdaptOptions):
     def J(self, mirror=False):    # TODO: Move this somewhere else - too specific
         return 1729e-06 if mirror else 5.3333
 
-    def directory(self):
+    def di(self):
         return 'plots/rossby-wave/' + self.approach + '/'
 
     # Region of importance
@@ -179,11 +183,12 @@ class RossbyWaveOptions(AdaptOptions):
 
 class GaussianOptions(AdaptOptions):
     name = 'Parameters for the shallow water test problem with Gaussian initial condition'
+    mode = 'shallow-water'
 
     # Solver parameters
     ndump = NonNegativeInteger(6, help="Timesteps per data dump").tag(config=True)
     rm = NonNegativeInteger(12, help="Timesteps per mesh adaptation").tag(config=True)
-    nVerT = NonNegativeInteger(1000, help="Target number of vertices").tag(config=True)
+    nVerT = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
     dt = PositiveFloat(0.05, help="Timestep").tag(config=True)
     Tstart = PositiveFloat(0.6, help="Start time of period of interest").tag(config=True)
     Tend = PositiveFloat(3., help="End time of period of interest").tag(config=True)
@@ -199,7 +204,7 @@ class GaussianOptions(AdaptOptions):
     def J(self):    # TODO: Move this somewhere else - too specific
         return 1.6160e-4
 
-    def directory(self):
+    def di(self):
         return 'plots/shallow-water/' + self.approach + '/'
 
     # Region of importance
@@ -211,11 +216,12 @@ class GaussianOptions(AdaptOptions):
 
 class AdvectionDiffusionOptions(AdaptOptions):
     name = 'Parameters for advection diffusion test problem'
+    mode = 'advection-diffusion'
 
     # Solver parameters
     ndump = NonNegativeInteger(5, help="Timesteps per data dump").tag(config=True)
     rm = NonNegativeInteger(10, help="Timesteps per mesh adaptation").tag(config=True)
-    nVerT = NonNegativeInteger(1000, help="Target number of vertices").tag(config=True)
+    nVerT = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
     dt = PositiveFloat(0.05, help="Timestep").tag(config=True)
     Tstart = PositiveFloat(0.4, help="Start time of period of interest").tag(config=True)
     Tend = PositiveFloat(2.4, help="End time of period of interest").tag(config=True)
@@ -230,7 +236,7 @@ class AdvectionDiffusionOptions(AdaptOptions):
     loc = List(trait=Float, default_value=[3.75, 0.5],
                help="Important locations, written as a list.").tag(config=True)
 
-    def directory(self):
+    def di(self):
         return 'plots/advection-diffusion/' + self.approach + '/'
 
 

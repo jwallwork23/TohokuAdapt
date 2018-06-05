@@ -3,7 +3,7 @@ from thetis.callback import DiagnosticCallback, FunctionalCallback, GaugeCallbac
 
 from .interpolation import *
 from .misc import indicator
-from .options import Options
+from .options import TohokuOptions, Options
 from .timeseries import gaugeTV
 
 
@@ -22,7 +22,7 @@ class SWCallback(FunctionalCallback):
         """
         from firedrake import assemble
 
-        self.op = Options()
+        self.op = TohokuOptions()
         dt = solver_obj.options.timestep
 
         def objectiveSW():
@@ -33,7 +33,7 @@ class SWCallback(FunctionalCallback):
             mesh = solver_obj.fields.solution_2d.function_space().mesh()
             ks = Function(VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1))
             k0, k1 = ks.split()
-            iA = indicator(mesh, radii=self.op.radius, op=self.op)
+            iA = self.op.indicator(mesh)
             # File("plots/" + self.op.mode + "/indicator.pvd").write(iA)
             k1.assign(iA)
             kt = Constant(0.)
@@ -56,7 +56,7 @@ class MirroredSWCallback(FunctionalCallback):
         """
         from firedrake import assemble
 
-        self.op = Options()
+        self.op = TohokuOptions()
         dt = solver_obj.options.timestep
 
         def objectiveSW():
@@ -67,7 +67,8 @@ class MirroredSWCallback(FunctionalCallback):
             mesh = solver_obj.fields.solution_2d.function_space().mesh()
             ks = Function(VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1))
             k0, k1 = ks.split()
-            k1.assign(indicator(mesh, mirror=True, radii=self.op.radius, op=self.op))
+            iA = self.op.indicator(mesh)
+            k1.assign(iA)   # TODO: need select mirrored version
             kt = Constant(0.)
             if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:      # Slightly smooth transition
                 kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * dt else 0.5)
@@ -88,7 +89,7 @@ class ObjectiveSWCallback(FunctionalCallback):
         """
         from firedrake_adjoint import assemble
 
-        self.op = Options()
+        self.op = TohokuOptions()
         self.mirror = False
         dt = solver_obj.options.timestep
 
@@ -100,7 +101,8 @@ class ObjectiveSWCallback(FunctionalCallback):
             mesh = solver_obj.fields.solution_2d.function_space().mesh()
             ks = Function(VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1))
             k0, k1 = ks.split()
-            k1.assign(indicator(mesh, radii=self.op.radius, mirror=self.mirror, op=self.op))
+            iA = self.op.indicator(mesh)
+            k1.assign(iA)
             kt = Constant(0.)
             if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:
                 kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * dt else 0.5)
