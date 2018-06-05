@@ -12,7 +12,7 @@ from utils.setup import problemDomain, RossbyWaveSolution
 from utils.misc import indexString, peakAndDistance
 
 
-__all__ = ["fixedMeshAD", "hessianBasedAD", "fixedMesh", "hessianBased", "DWP", "DWR"]
+__all__ = ["fixedMeshAD", "hessianBasedAD", "tsunami"]
 
 
 def weakResidualAD(c, c_, w, op=Options(mode='advection-diffusion')):
@@ -651,7 +651,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
         return quantities
 
 
-def DWR(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
+def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, **kwargs):
     op = kwargs.get('op')
     regen = kwargs.get('regen')
 
@@ -1003,3 +1003,12 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
         quantities['adaptSolveTimer'] = adaptSolveTimer
 
         return quantities
+
+
+def tsunami(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
+    op = kwargs.get('op')
+    regen = kwargs.get('regen')
+    mirror = kwargs.get('mirror')
+    solvers = {'fixedMesh': fixedMesh, 'hessianBased': hessianBased, 'DWP': DWP, 'DWR': DWR}
+
+    return solvers[op.approach](mesh, u0, eta0, b, BCs, f, regen=regen, mirror=mirror, op=op)

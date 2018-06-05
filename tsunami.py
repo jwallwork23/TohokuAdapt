@@ -7,7 +7,7 @@ import numpy as np
 
 from utils.options import Options
 from utils.setup import problemDomain
-from utils.solvers import fixedMesh, hessianBased, DWP, DWR
+from utils.solvers import tsunami
 
 
 now = datetime.datetime.now()
@@ -29,13 +29,11 @@ parser.add_argument("-mirror", help="Use a 'mirrored' region of interest")
 parser.add_argument("-nAdapt", help="Number of mesh adaptation steps")
 args = parser.parse_args()
 
-solvers = {'fixedMesh': fixedMesh, 'hessianBased': hessianBased, 'DWP': DWP, 'DWR': DWR}
 approach = args.a
 if approach is None:
     approach = 'fixedMesh'
 else:
-    assert approach in solvers.keys()
-solver = solvers[approach]
+    assert approach in ('fixedMesh', 'hessianBased', 'DWP', 'DWR')
 if args.t is None:
     mode = 'tohoku'
 else:
@@ -94,8 +92,7 @@ else:
 Jlist = np.zeros(len(resolutions))
 for i in resolutions:
     mesh, u0, eta0, b, BCs, f = problemDomain(i, op=op)
-    quantities = solver(mesh, u0, eta0, b, BCs, f,
-                        regen=bool(args.regen), mirror=bool(args.mirror), op=op)
+    quantities = tsunami(mesh, u0, eta0, b, BCs, f,  regen=bool(args.regen), mirror=bool(args.mirror), op=op)
     PETSc.Sys.Print("Mode: %s Approach: %s. Run: %d" % (mode, approach, i), comm=COMM_WORLD)
     rel = np.abs(op.J - quantities['J_h']) / np.abs(op.J)
     if op.mode == "rossby-wave":
