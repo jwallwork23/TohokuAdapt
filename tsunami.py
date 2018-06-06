@@ -109,7 +109,7 @@ for i in resolutions:
     mesh, u0, eta0, b, BCs, f = problemDomain(i, op=op)
     quantities = tsunami(mesh, u0, eta0, b, BCs, f,  regen=bool(args.regen), mirror=bool(args.mirror), op=op)
     PETSc.Sys.Print("Mode: %s Approach: %s. Run: %d" % (mode, approach, i), comm=COMM_WORLD)
-    rel = np.abs(op.J() - quantities['J_h']) / np.abs(op.J())
+    rel = np.abs(op.J - quantities['J_h']) / np.abs(op.J)
     if op.mode == "rossby-wave":
         quantities["Mirrored OF error"] = np.abs(op.J_mirror - quantities['J_h mirrored']) / np.abs(op.J_mirror)
     PETSc.Sys.Print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs OF error: %.4e"

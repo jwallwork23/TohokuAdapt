@@ -27,7 +27,7 @@ def peakAndDistance(f, op=Options()):
     return peak, val
 
 
-def indicator(mesh, xy=None, mirror=False, radii=None, op=Options()):
+def indicator(mesh, xy=None, mirror=False, radii=None, op=Options()):       # TODO: Update AD and remove this
     """
     :arg mesh: mesh to use.
     :arg xy: Custom selection for indicator region.

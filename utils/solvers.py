@@ -174,7 +174,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
         assert float(physical_constants['g_grav'].dat.data) == op.g
     except:
         physical_constants['g_grav'].assign(op.g)
-    # V = op.mixedSpace(mesh)
+    # V = op.mixedSpace(mesh)                   # TODO: Parallelise this (and below)
     # if op.mode == 'rossby-wave':            # Analytic final-time state
     #     peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
 
@@ -224,7 +224,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
         quantities['P02'] = cb3.getVals()
         quantities['P06'] = cb4.getVals()
 
-    # # Measure error using metrics, as in Huang et al.
+    # # Measure error using metrics, as in Huang et al.     # TODO: Parallelise this (and above)
     # if op.mode == 'rossby-wave':
     #     peak, distance = peakAndDistance(solver_obj.fields.solution_2d.split()[1], op=op)
     #     quantities['peak'] = peak/peak_a

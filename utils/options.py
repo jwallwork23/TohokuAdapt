@@ -127,9 +127,6 @@ class TohokuOptions(AdaptOptions):
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
     viscosity = NonNegativeFloat(1e-3, help="Planetary rotation rate").tag(config=True)
 
-    def J(self):    # TODO: Move this somewhere else - too specific
-        return {'off': 1.324e+13, 'f': 1.309e+13, 'beta': 1.288e+13, 'sin': 1.305e+13}[self.coriolis]
-
     def gaugeLocation(self, gauge):
         return {"P02": (38.5002, 142.5016), "P06": (38.6340, 142.5838),
                 "801": (38.2, 141.7), "802": (39.3, 142.1), "803": (38.9, 141.8), "804": (39.7, 142.2),
@@ -146,6 +143,7 @@ class TohokuOptions(AdaptOptions):
                  help="Radius of indicator function around location of interest.").tag(config=True)
     loc = List(trait=Float, default_value=[37.4213, 141.0281],
                help="Important locations, written as a list.").tag(config=True)
+    J = Float(1.335e+12, help="Objective functional value on a fine mesh").tag(config=True)
 
 
 class RossbyWaveOptions(AdaptOptions):
@@ -168,9 +166,6 @@ class RossbyWaveOptions(AdaptOptions):
     coriolis = Unicode('beta', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
     g = PositiveFloat(1., help="Gravitational acceleration").tag(config=True)
 
-    def J(self, mirror=False):    # TODO: Move this somewhere else - too specific
-        return 1729e-06 if mirror else 5.3333
-
     def di(self):
         return 'plots/rossby-wave/' + self.approach + '/'
 
@@ -179,6 +174,7 @@ class RossbyWaveOptions(AdaptOptions):
                  help="Radius of indicator function around location of interest.").tag(config=True)
     loc = List(trait=Float, default_value=[-15., 0.],
                help="Important locations, written as a list.").tag(config=True)
+    J = Float(5.3333, help="Objective functional value on a fine mesh").tag(config=True)
 
 
 class GaussianOptions(AdaptOptions):
@@ -194,15 +190,12 @@ class GaussianOptions(AdaptOptions):
     Tend = PositiveFloat(3., help="End time of period of interest").tag(config=True)
     hmin = PositiveFloat(1e-4, help="Minimum element size").tag(config=True)
     hmax = PositiveFloat(1., help="Maximum element size").tag(config=True)
-    minNorm = PositiveFloat(1e-6).tag(config=True)  # TODO: Not sure about this
-    maxScaling = PositiveFloat(5e9).tag(config=True)  # TODO: Not sure about this
+    minNorm = PositiveFloat(1e-6).tag(config=True)      # TODO: Not sure about this
+    maxScaling = PositiveFloat(5e9).tag(config=True)    # TODO: Not sure about this
 
     # Physical parameters
     coriolis = Unicode('beta', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
     g = PositiveFloat(9.81, help="Gravitational acceleration").tag(config=True)
-
-    def J(self):    # TODO: Move this somewhere else - too specific
-        return 1.6160e-4
 
     def di(self):
         return 'plots/shallow-water/' + self.approach + '/'
@@ -212,6 +205,7 @@ class GaussianOptions(AdaptOptions):
                  help="Radius of indicator function around location of interest.").tag(config=True)
     loc = List(trait=Float, default_value=[0., np.pi],
                help="Important locations, written as a list.").tag(config=True)
+    J = Float(1.6160e-4, help="Objective functional value on a fine mesh").tag(config=True)
 
 
 class AdvectionDiffusionOptions(AdaptOptions):
