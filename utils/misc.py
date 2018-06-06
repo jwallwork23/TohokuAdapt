@@ -5,7 +5,7 @@ import numpy as np
 from .options import Options
 
 
-__all__ = ["indexString", "peakAndDistance", "indicator"]
+__all__ = ["indexString", "peakAndDistance", "indicator", "bdyRegion"]
 
 
 def indexString(index):
@@ -36,12 +36,11 @@ def indicator(mesh, xy=None, mirror=False, radii=None, op=Options()):       # TO
     :param op: options parameter class.
     :return: ('Smoothened') indicator function for region A.
     """
-    P1 = FunctionSpace(mesh, "DG", 1)
 
     # Define extent of region A
     if xy is None:
         xy = op.xy2 if mirror else op.xy
-    iA = Function(P1, name="Region of interest")
+    iA = Function(FunctionSpace(mesh, "DG", 1), name="Region of interest")
 
     if radii is not None:
         if len(np.shape(radii)) == 0:
@@ -70,3 +69,25 @@ def indicator(mesh, xy=None, mirror=False, radii=None, op=Options()):       # TO
     iA.interpolate(expr)
 
     return iA
+
+
+def bdyRegion(mesh, bdyTag, scale):
+
+    P1 = FunctionSpace(mesh, "CG", 1)
+    iA = Function(P1, name="Boundary region")
+    bc = DirichletBC(P1, 0, bdyTag)
+    coords = mesh.coordinates.dat.data
+
+    xy  = []
+    for i in bc.nodes:
+        xy.append(coords[i])
+
+    e = "exp(-(pow(x[0] - %f, 2) + pow(x[1] - %f, 2)) / %f)" % (xy[0][0], xy[0][1], scale)
+    for i in range(1, len(xy)):
+        e += "+ exp(-(pow(x[0] - %f, 2) + pow(x[1] - %f, 2)) / %f)" % (xy[i][0], xy[i][1], scale)
+    expr = Expression(e + " > 1 ? 1 : " + e)
+
+    iA.interpolate(expr)
+
+    return iA
+
