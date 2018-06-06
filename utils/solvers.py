@@ -543,8 +543,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(interp(mesh, epsilon))
                 M = isotropicMetric(errEst, invert=False, op=op)
                 if op.gradate:
-                    M_ = isotropicMetric(interp(mesh, H0), bdy=True, op=op)  # Initial boundary metric
-                    M = metricIntersection(M, M_, bdy=True)
+                    M_ = isotropicMetric(interp(mesh, H0), bdy='on_boundary', op=op)  # Initial boundary metric
+                    M = metricIntersection(M, M_, bdy='on_boundary')
                     metricGradation(M, op=op)
 
                 # Adapt mesh and interpolate variables
@@ -651,7 +651,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
         return quantities
 
 
-def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, **kwargs):
+def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, **kwargs):     # TODO: Store optimal mesh, 'intersected' over all rm steps
     op = kwargs.get('op')
     regen = kwargs.get('regen')
 
@@ -897,8 +897,8 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, **kwargs):
                 errEst = Function(FunctionSpace(mesh_H, "CG", 1)).assign(interp(mesh_H, epsilon))
                 M = isotropicMetric(errEst, invert=False, op=op)
                 if op.gradate:
-                    M_ = isotropicMetric(interp(mesh_H, H0), bdy=True, op=op)   # Initial boundary metric
-                    M = metricIntersection(M, M_, bdy=True)
+                    M_ = isotropicMetric(interp(mesh_H, H0), bdy='on_boundary', op=op)   # Initial boundary metric
+                    M = metricIntersection(M, M_, bdy='on_boundary')
                     metricGradation(M, op=op)
 
                 # Adapt mesh and interpolate variables

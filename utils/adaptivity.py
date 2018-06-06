@@ -188,12 +188,13 @@ def normaliseIndicator(f, op=Options()):
     return f
 
 
-def isotropicMetric(f, bdy=False, op=Options()):
+def isotropicMetric(f, bdy=None, invert=True, op=Options()):
     """
     Given a scalar error indicator field `f`, construct an associated isotropic metric field.
     
     :arg f: function to adapt to.
-    :param bdy: when True, only values of `f` on the domain boundary contribute towards the metric.
+    :param bdy: specify domain boundary to compute metric on.
+    :param invert: when True, the inverse square of field `f` is considered, as in anisotropic mesh adaptivity.
     :param op: Options class object providing min/max cell size values.
     :return: isotropic metric corresponding to `f`.
     """
@@ -210,13 +211,20 @@ def isotropicMetric(f, bdy=False, op=Options()):
     # Establish metric
     V = TensorFunctionSpace(mesh, "CG", 1)
     M = Function(V)
-    for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(len(g.dat.data)):
+    for i in DirichletBC(V, 0, bdy).nodes if bdy is not None else range(len(g.dat.data)):
         if scalar:
-            alpha = 1. / max(hmin2, min(pow(g.dat.data[i], 2), hmax2))
+            if invert:
+                alpha = 1. / max(hmin2, min(pow(g.dat.data[i], 2), hmax2))
+            else:
+                alpha = max(1. / hmax2, min(g.dat.data[i], 1. / hmin2))
             beta = alpha
         else:
-            alpha = 1. / max(hmin2, min(pow(g.dat.data[i, 0], 2), hmax2))
-            beta = 1. / max(hmin2, min(pow(g.dat.data[i, 1], 2), hmax2))
+            if invert:
+                alpha = 1. / max(hmin2, min(pow(g.dat.data[i, 0], 2), hmax2))
+                beta = 1. / max(hmin2, min(pow(g.dat.data[i, 1], 2), hmax2))
+            else:
+                alpha = max(1. / hmax2, min(g.dat.data[i, 0], 1. / hmin2))
+                beta = max(1. / hmax2, min(g.dat.data[i, 1], 1. / hmin2))
         M.dat.data[i][0, 0] = alpha
         M.dat.data[i][1, 1] = beta
 
@@ -355,20 +363,20 @@ def localMetricIntersection(M1, M2):
     return np.transpose(sqM1) * v * [[max(lam[0], 1), 0], [0, max(lam[1], 1)]] * np.transpose(v) * sqM1
 
 
-def metricIntersection(M1, M2, bdy=False):
+def metricIntersection(M1, M2, bdy=None):
     """
     Intersect a metric field, i.e. intersect (globally) over all local metrics.
     
     :arg M1: first metric to be intersected.
     :arg M2: second metric to be intersected.
-    :param bdy: when True, intersection with M2 only contributes on the domain boundary.
+    :param bdy: specify domain boundary to intersect over.
     :return: intersection of metrics M1 and M2.
     """
     V = M1.function_space()
     assert V == M2.function_space()
     M = Function(V).assign(M1)
     mesh = V.mesh()
-    for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(mesh.topology.num_vertices()):
+    for i in DirichletBC(V, 0, bdy).nodes if bdy is not None else range(mesh.topology.num_vertices()):
         M.dat.data[i] = localMetricIntersection(M1.dat.data[i], M2.dat.data[i])
         # print('#### metricIntersection DEBUG: det(Mi) = ', la.det(M1.dat.data[i]))
     return M

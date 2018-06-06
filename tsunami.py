@@ -69,7 +69,8 @@ elif mode == 'shallow-water':
     op = GaussianOptions(approach=approach)
 else:
     raise NotImplementedError
-op.gradate = True if approach in ('DWP', 'DWR') and mode == 'tohoku' else False
+# op.gradate = True if approach in ('DWP', 'DWR') and mode == 'tohoku' else False
+op.gradate = False
 op.plotpvd = True if args.o else False
 op.nAdapt = 1 if args.nAdapt is None else int(args.nAdapt)
 op.orderChange =  orderChange
