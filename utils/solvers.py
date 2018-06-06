@@ -183,6 +183,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
     options = solver_obj.options
     options.element_family = op.family
     options.use_nonlinear_equations = True
+    options.horizontal_viscosity = op.viscosity
     options.use_grad_div_viscosity_term = True              # Symmetric viscous stress
     options.use_lax_friedrichs_velocity = False             # TODO: This is a temporary fix
     options.coriolis_frequency = f
@@ -531,6 +532,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
         elev_2d.interpolate(eta0)
         uv_2d.interpolate(u0)
         quantities = {}
+        bdy = 200 if op.mode == 'tohoku' else 'on_boundary'
         while cnt < op.cntT():
             adaptTimer = clock()
             for l in range(op.nAdapt):                                  # TODO: Test this functionality
@@ -543,8 +545,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(interp(mesh, epsilon))
                 M = isotropicMetric(errEst, invert=False, op=op)
                 if op.gradate:
-                    M_ = isotropicMetric(interp(mesh, H0), bdy='on_boundary', op=op)  # Initial boundary metric
-                    M = metricIntersection(M, M_, bdy='on_boundary')
+                    M_ = isotropicMetric(interp(mesh, H0), bdy=bdy, op=op)  # Initial boundary metric
+                    M = metricIntersection(M, M_, bdy=bdy)
                     metricGradation(M, op=op)
 
                 # Adapt mesh and interpolate variables
@@ -885,6 +887,7 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, **kwargs):     # TODO: Store optima
         elev_2d.interpolate(eta0)
         uv_2d.interpolate(u0)
         quantities = {}
+        bdy = 200 if op.mode == 'tohoku' else 'on_boundary'
         while cnt < op.cntT():
             adaptTimer = clock()
             for l in range(op.nAdapt):                          # TODO: Test this functionality
@@ -897,12 +900,15 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, **kwargs):     # TODO: Store optima
                 errEst = Function(FunctionSpace(mesh_H, "CG", 1)).assign(interp(mesh_H, epsilon))
                 M = isotropicMetric(errEst, invert=False, op=op)
                 if op.gradate:
-                    M_ = isotropicMetric(interp(mesh_H, H0), bdy='on_boundary', op=op)   # Initial boundary metric
-                    M = metricIntersection(M, M_, bdy='on_boundary')
+                    M_ = isotropicMetric(interp(mesh_H, H0), bdy=bdy, op=op)   # Initial boundary metric
+                    M = metricIntersection(M, M_, bdy=bdy)
                     metricGradation(M, op=op)
+                    # File('plots/tohoku/metric.pvd').write(M)
 
                 # Adapt mesh and interpolate variables
                 mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
+                # File('plots/tohoku/mesh.pvd').write(mesh_H.coordinates)
+                # exit(0)
 
             elev_2d, uv_2d = interp(mesh_H, elev_2d, uv_2d)
             b, BCs, f = problemDomain(mesh=mesh_H, op=op)[3:]           # TODO: Find a different way to reset these

@@ -1,4 +1,5 @@
 from thetis import *
+from thetis import FiredrakeConstant as Constant
 from thetis.configuration import *
 from firedrake import Expression
 
@@ -31,6 +32,8 @@ class AdaptOptions(FrozenConfigurable):
     timestepper = Unicode('CrankNicolson', help="Time integration scheme used.").tag(config=True)
     normOrder = NonNegativeInteger(2, help="Degree p of Lp norm used.")
     family = Unicode('dg-dg', help="Mixed finite element family, from {'dg-dg', 'dg-cg'}.").tag(config=True)
+
+    viscosity = FiredrakeScalarExpression(None, allow_none=True, help="Planetary rotation rate").tag(config=True)
 
     def cntT(self):
         return int(np.ceil(self.Tend / self.dt))  # Final timestep index
@@ -125,7 +128,6 @@ class TohokuOptions(AdaptOptions):
     coriolis = Unicode('sin', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
     g = PositiveFloat(9.81, help="Gravitational acceleration").tag(config=True)
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
-    viscosity = NonNegativeFloat(1e-3, help="Planetary rotation rate").tag(config=True)
 
     def gaugeLocation(self, gauge):
         return {"P02": (38.5002, 142.5016), "P06": (38.6340, 142.5838),

@@ -27,6 +27,7 @@ parser.add_argument("-o", help="Output data")
 parser.add_argument("-regen", help="Regenerate error estimates from saved data")
 parser.add_argument("-mirror", help="Use a 'mirrored' region of interest")
 parser.add_argument("-nAdapt", help="Number of mesh adaptation steps")
+parser.add_argument("-gradate", help="Gradate metric")
 args = parser.parse_args()
 
 approach = args.a
@@ -50,17 +51,6 @@ if bool(args.mirror):
     assert mode in ('shallow-water', 'rossby-wave')
 coriolis = args.c if args.c is not None else 'f'
 
-# # Choose mode and set parameter values
-# op = Options(mode=mode,
-#              approach=approach,
-#              gradate=True if approach in ('DWP', 'DWR') and mode == 'tohoku' else False,
-#              plotpvd=True if args.o else False,
-#              coriolis=coriolis,
-#              nAdapt=1 if args.nAdapt is None else int(args.nAdapt),
-#              orderChange=orderChange,
-#              refinedSpace=True if args.r else False,
-#              bAdapt=bool(args.b) if args.b is not None else False)
-
 if mode == 'tohoku':
     op = TohokuOptions(approach=approach)
 elif mode == 'rossby-wave':
@@ -69,8 +59,7 @@ elif mode == 'shallow-water':
     op = GaussianOptions(approach=approach)
 else:
     raise NotImplementedError
-# op.gradate = True if approach in ('DWP', 'DWR') and mode == 'tohoku' else False
-op.gradate = False
+op.gradate = bool(args.gradate) if args.gradate is not None else False
 op.plotpvd = True if args.o else False
 op.nAdapt = 1 if args.nAdapt is None else int(args.nAdapt)
 op.orderChange =  orderChange
