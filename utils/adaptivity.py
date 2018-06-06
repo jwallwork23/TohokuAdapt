@@ -188,13 +188,12 @@ def normaliseIndicator(f, op=Options()):
     return f
 
 
-def isotropicMetric(f, bdy=False, invert=True, op=Options()):
+def isotropicMetric(f, bdy=False, op=Options()):
     """
     Given a scalar error indicator field `f`, construct an associated isotropic metric field.
     
     :arg f: function to adapt to.
     :param bdy: when True, only values of `f` on the domain boundary contribute towards the metric.
-    :param invert: when True, the inverse square of field `f` is considered, as in anisotropic mesh adaptivity.
     :param op: Options class object providing min/max cell size values.
     :return: isotropic metric corresponding to `f`.
     """
@@ -213,18 +212,11 @@ def isotropicMetric(f, bdy=False, invert=True, op=Options()):
     M = Function(V)
     for i in DirichletBC(V, 0, 'on_boundary').nodes if bdy else range(len(g.dat.data)):
         if scalar:
-            if invert:
-                alpha = 1. / max(hmin2, min(pow(g.dat.data[i], 2), hmax2))
-            else:
-                alpha = max(1. / hmax2, min(g.dat.data[i], 1. / hmin2))
+            alpha = 1. / max(hmin2, min(pow(g.dat.data[i], 2), hmax2))
             beta = alpha
         else:
-            if invert:
-                alpha = 1. / max(hmin2, min(pow(g.dat.data[i, 0], 2), hmax2))
-                beta = 1. / max(hmin2, min(pow(g.dat.data[i, 1], 2), hmax2))
-            else:
-                alpha = max(1. / hmax2, min(g.dat.data[i, 0], 1. / hmin2))
-                beta = max(1. / hmax2, min(g.dat.data[i, 1], 1. / hmin2))
+            alpha = 1. / max(hmin2, min(pow(g.dat.data[i, 0], 2), hmax2))
+            beta = 1. / max(hmin2, min(pow(g.dat.data[i, 1], 2), hmax2))
         M.dat.data[i][0, 0] = alpha
         M.dat.data[i][1, 1] = beta
 

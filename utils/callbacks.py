@@ -2,7 +2,6 @@ from thetis_adjoint import *
 from thetis.callback import DiagnosticCallback, FunctionalCallback, GaugeCallback
 
 from .interpolation import *
-from .misc import indicator
 from .options import TohokuOptions, Options
 from .timeseries import gaugeTV
 
@@ -22,7 +21,7 @@ class SWCallback(FunctionalCallback):
         """
         from firedrake import assemble
 
-        self.op = TohokuOptions()
+        self.op = TohokuOptions()   # TODO: Make more general
         dt = solver_obj.options.timestep
 
         def objectiveSW():
@@ -34,7 +33,7 @@ class SWCallback(FunctionalCallback):
             ks = Function(VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1))
             k0, k1 = ks.split()
             iA = self.op.indicator(mesh)
-            # File("plots/" + self.op.mode + "/indicator.pvd").write(iA)
+            File("plots/" + self.op.mode + "/indicator.pvd").write(iA)
             k1.assign(iA)
             kt = Constant(0.)
             if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:      # Slightly smooth transition
@@ -56,7 +55,7 @@ class MirroredSWCallback(FunctionalCallback):
         """
         from firedrake import assemble
 
-        self.op = TohokuOptions()
+        self.op = TohokuOptions()   # TODO: Make more general
         dt = solver_obj.options.timestep
 
         def objectiveSW():
@@ -89,7 +88,7 @@ class ObjectiveSWCallback(FunctionalCallback):
         """
         from firedrake_adjoint import assemble
 
-        self.op = TohokuOptions()
+        self.op = TohokuOptions()   # TODO: Make more general
         self.mirror = False
         dt = solver_obj.options.timestep
 

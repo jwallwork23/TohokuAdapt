@@ -115,7 +115,7 @@ class TohokuOptions(AdaptOptions):
     nVerT = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
     dt = PositiveFloat(5., help="Timestep").tag(config=True)
     Tstart = PositiveFloat(300., help="Start time of period of interest").tag(config=True)
-    Tend = PositiveFloat(1500., help="End time of period of interest").tag(config=True)
+    Tend = PositiveFloat(1800., help="End time of period of interest").tag(config=True)
     hmin = PositiveFloat(10., help="Minimum element size").tag(config=True)
     hmax = PositiveFloat(1e5, help="Maximum element size").tag(config=True)
     minNorm = PositiveFloat(1.).tag(config=True)    # TODO: Not sure about this
@@ -141,7 +141,7 @@ class TohokuOptions(AdaptOptions):
     # Region of importance
     radii = List(trait=Float, default_value=[50e3],
                  help="Radius of indicator function around location of interest.").tag(config=True)
-    loc = List(trait=Float, default_value=[37.4213, 141.0281],
+    loc = List(trait=Float, default_value=list(from_latlon(37.4213, 141.0281)[:2]),
                help="Important locations, written as a list.").tag(config=True)
     J = Float(1.335e+12, help="Objective functional value on a fine mesh").tag(config=True)
 
