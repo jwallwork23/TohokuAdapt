@@ -61,8 +61,6 @@ coriolis = args.c if args.c is not None else 'f'
 #              refinedSpace=True if args.r else False,
 #              bAdapt=bool(args.b) if args.b is not None else False)
 
-# TODO...
-
 if mode == 'tohoku':
     op = TohokuOptions(approach=approach)
 elif mode == 'rossby-wave':
@@ -77,8 +75,6 @@ op.nAdapt = 1 if args.nAdapt is None else int(args.nAdapt)
 op.orderChange =  orderChange
 op.refinedSpace = bool(args.r) if args.r is not None else False
 op.bAdapt = bool(args.b) if args.b is not None else False
-
-# TODO...
 
 # Establish filenames
 filename = 'outdata/' + mode + '/' + approach

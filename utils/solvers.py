@@ -174,9 +174,9 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
         assert float(physical_constants['g_grav'].dat.data) == op.g
     except:
         physical_constants['g_grav'].assign(op.g)
-    V = op.mixedSpace(mesh)
-    if op.mode == 'rossby-wave':            # Analytic final-time state
-        peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
+    # V = op.mixedSpace(mesh)
+    # if op.mode == 'rossby-wave':            # Analytic final-time state
+    #     peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
 
     # Initialise solver
     solver_obj = solver2d.FlowSolver2d(mesh, b)
@@ -224,12 +224,12 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
         quantities['P02'] = cb3.getVals()
         quantities['P06'] = cb4.getVals()
 
-    # Measure error using metrics, as in Huang et al.
-    if op.mode == 'rossby-wave':
-        peak, distance = peakAndDistance(solver_obj.fields.solution_2d.split()[1], op=op)
-        quantities['peak'] = peak/peak_a
-        quantities['dist'] = distance/distance_a
-        quantities['spd'] = distance /(op.Tend * 0.4)
+    # # Measure error using metrics, as in Huang et al.
+    # if op.mode == 'rossby-wave':
+    #     peak, distance = peakAndDistance(solver_obj.fields.solution_2d.split()[1], op=op)
+    #     quantities['peak'] = peak/peak_a
+    #     quantities['dist'] = distance/distance_a
+    #     quantities['spd'] = distance /(op.Tend * 0.4)
 
     # Output mesh statistics and solver times
     quantities['meanElements'] = mesh.num_cells()
