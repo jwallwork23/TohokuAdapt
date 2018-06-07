@@ -50,26 +50,25 @@ class AdaptOptions(FrozenConfigurable):
         return int(self.rm / self.ndump)
 
     def indicator(self, mesh):
-        try:
-            P1 = FunctionSpace(mesh, "DG", 1)
-            iA = Function(P1, name="Region of interest")
+        # try:
+        P1 = FunctionSpace(mesh, "DG", 1)
+        iA = Function(P1, name="Region of interest")
 
-            if np.shape(self.radii)[0] == 1:
-                expr = Expression("pow(x[0] - x0, 2) + pow(x[1] - y0, 2) < r + eps ? 1 : 0",
-                                  x0=self.loc[0], y0=self.loc[1], r=pow(self.radii, 2), eps=1e-10)
-            elif np.shape(self.radii)[0] > 1:
-                assert len(self.loc)/2 == len(self.radii)
-                print(self.loc, self.radii)
-                e = "(pow(x[0] - %f, 2) + pow(x[1] - %f, 2) < %f + %f)" \
-                    % (self.loc[0], self.loc[1], pow(self.radii[0], 2), 1e-10)
-                for i in range(1, len(self.radii)):     # TODO: Should be an OR operator here
-                    e += "&& (pow(x[0] - %f, 2) + pow(x[1] - %f, 2) < %f + %f)" \
-                         % (self.loc[2*i], self.loc[2*i+1], pow(self.radii[i], 2), 1e-10)
-                expr = Expression(e)
-            else:
-                raise ValueError("Indicator function radii input not recognised.")
-        except:
-            raise ValueError("Radius or location of region of importance not currently given.")
+        if np.shape(self.radii)[0] == 1:
+            expr = Expression("pow(x[0] - x0, 2) + pow(x[1] - y0, 2) < r + eps ? 1 : 0",
+                              x0=self.loc[0], y0=self.loc[1], r=pow(self.radii[0], 2), eps=1e-10)
+        elif np.shape(self.radii)[0] > 1:
+            assert len(self.loc)/2 == len(self.radii)
+            e = "(pow(x[0] - %f, 2) + pow(x[1] - %f, 2) < %f + %f)" \
+                % (self.loc[0], self.loc[1], pow(self.radii[0], 2), 1e-10)
+            for i in range(1, len(self.radii)):     # TODO: Should be an OR operator here
+                e += "|| (pow(x[0] - %f, 2) + pow(x[1] - %f, 2) < %f + %f)" \
+                     % (self.loc[2*i], self.loc[2*i+1], pow(self.radii[i], 2), 1e-10)
+            expr = Expression(e)
+        else:
+            raise ValueError("Indicator function radii input not recognised.")
+        # except:
+        #     raise ValueError("Radius or location of region of importance not currently given.")
 
         iA.interpolate(expr)
 
