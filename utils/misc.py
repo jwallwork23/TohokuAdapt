@@ -71,7 +71,7 @@ def indicator(mesh, xy=None, mirror=False, radii=None, op=Options()):       # TO
     return iA
 
 
-def bdyRegion(mesh, bdyTag, scale):
+def bdyRegion(mesh, bdyTag, scale, sponge=False):
 
     P1 = FunctionSpace(mesh, "CG", 1)
     iA = Function(P1, name="Boundary region")
@@ -85,7 +85,10 @@ def bdyRegion(mesh, bdyTag, scale):
     e = "exp(-(pow(x[0] - %f, 2) + pow(x[1] - %f, 2)) / %f)" % (xy[0][0], xy[0][1], scale)
     for i in range(1, len(xy)):
         e += "+ exp(-(pow(x[0] - %f, 2) + pow(x[1] - %f, 2)) / %f)" % (xy[i][0], xy[i][1], scale)
-    expr = Expression(e + " > 1 ? 1 : " + e)
+    if sponge:
+        expr = Expression(e + " > 1 ? 1e-3 : 0")    # TODO: smoothen this
+    else:
+        expr = Expression(e + " > 1 ? 1 : " + e)
 
     iA.interpolate(expr)
 

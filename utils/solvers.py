@@ -9,7 +9,7 @@ from utils.interpolation import interp, mixedPairInterp
 from utils.misc import indicator, indexString, peakAndDistance
 from utils.options import Options
 from utils.setup import problemDomain, RossbyWaveSolution
-from utils.misc import indexString, peakAndDistance
+from utils.misc import indexString, peakAndDistance, bdyRegion
 
 
 __all__ = ["fixedMeshAD", "hessianBasedAD", "tsunami"]
@@ -166,7 +166,7 @@ def hessianBasedAD(mesh, phi0, BCs, w, op=Options(mode='advection-diffusion', ap
 from thetis import *
 
 
-def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
+def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
     op = kwargs.get('op')
 
     # Initialise domain and physical parameters
@@ -174,7 +174,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
         assert float(physical_constants['g_grav'].dat.data) == op.g
     except:
         physical_constants['g_grav'].assign(op.g)
-    # V = op.mixedSpace(mesh)                   # TODO: Parallelise this (and below)
+    # V = op.mixedSpace(mesh)                               # TODO: Parallelise this (and below)
     # if op.mode == 'rossby-wave':            # Analytic final-time state
     #     peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
 
@@ -183,7 +183,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
     options = solver_obj.options
     options.element_family = op.family
     options.use_nonlinear_equations = True
-    options.horizontal_viscosity = op.viscosity
+    options.horizontal_viscosity = nu
     options.use_grad_div_viscosity_term = True              # Symmetric viscous stress
     options.use_lax_friedrichs_velocity = False             # TODO: This is a temporary fix
     options.coriolis_frequency = f
@@ -240,7 +240,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
     return quantities
 
 
-def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
+def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
     op = kwargs.get('op')
 
     # Initialise domain and physical parameters
@@ -306,6 +306,8 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
         adapOpt = adapSolver.options
         adapOpt.element_family = op.family
         adapOpt.use_nonlinear_equations = True
+        if nu is not None:
+            adapOpt.horizontal_viscosity = interp(mesh, nu)
         adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
         adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
         adapOpt.simulation_export_time = op.dt * op.ndump
@@ -398,7 +400,7 @@ import pyadjoint
 from fenics_adjoint.solving import SolveBlock                                       # For extracting adjoint solutions
 
 
-def DWP(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
+def DWP(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
     op = kwargs.get('op')
     regen = kwargs.get('regen')
 
@@ -446,6 +448,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
         options = solver_obj.options
         options.element_family = op.family
         options.use_nonlinear_equations = True
+        options.horizontal_viscosity = nu
         options.use_grad_div_viscosity_term = True                      # Symmetric viscous stress
         options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
         options.coriolis_frequency = f
@@ -563,6 +566,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = True
+            if nu is not None:
+                adapOpt.horizontal_viscosity = interp(mesh, nu)
             adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
             adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump
@@ -653,7 +658,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
         return quantities
 
 
-def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, **kwargs):     # TODO: Store optimal mesh, 'intersected' over all rm steps
+def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Store optimal mesh, 'intersected' over all rm steps
     op = kwargs.get('op')
     regen = kwargs.get('regen')
 
@@ -723,6 +728,7 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, **kwargs):     # TODO: Store optima
         options = solver_obj.options
         options.element_family = op.family
         options.use_nonlinear_equations = True
+        options.horizontal_viscosity = nu
         options.use_grad_div_viscosity_term = True                      # Symmetric viscous stress
         options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
         options.coriolis_frequency = f
@@ -921,6 +927,8 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, **kwargs):     # TODO: Store optima
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = True
+            if nu is not None:
+                adapOpt.horizontal_viscosity = interp(mesh_H, nu)
             adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
             adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump

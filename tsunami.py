@@ -96,8 +96,8 @@ else:
     resolutions = [0 if args.level is None else int(args.level)]
 Jlist = np.zeros(len(resolutions))
 for i in resolutions:
-    mesh, u0, eta0, b, BCs, f = problemDomain(i, op=op)
-    quantities = tsunami(mesh, u0, eta0, b, BCs, f,  regen=bool(args.regen), mirror=bool(args.mirror), op=op)
+    mesh, u0, eta0, b, BCs, f, nu = problemDomain(i, op=op)
+    quantities = tsunami(mesh, u0, eta0, b, BCs=BCs, f=f, nu=nu, regen=bool(args.regen), mirror=bool(args.mirror), op=op)
     PETSc.Sys.Print("Mode: %s Approach: %s. Run: %d" % (mode, approach, i), comm=COMM_WORLD)
     rel = np.abs(op.J - quantities['J_h']) / np.abs(op.J)
     # if op.mode == "rossby-wave":

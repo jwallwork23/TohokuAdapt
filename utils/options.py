@@ -33,8 +33,6 @@ class AdaptOptions(FrozenConfigurable):
     normOrder = NonNegativeInteger(2, help="Degree p of Lp norm used.")
     family = Unicode('dg-dg', help="Mixed finite element family, from {'dg-dg', 'dg-cg'}.").tag(config=True)
 
-    viscosity = FiredrakeScalarExpression(None, allow_none=True, help="Planetary rotation rate").tag(config=True)
-
     def cntT(self):
         return int(np.ceil(self.Tend / self.dt))  # Final timestep index
 

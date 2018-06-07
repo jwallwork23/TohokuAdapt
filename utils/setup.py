@@ -227,6 +227,7 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
                 beta = 2 * op.Omega * np.cos(np.radians(op.latFukushima)) / earth_radius(op.latFukushima)
                 for i, v in zip(range(len(mesh.coordinates.dat.data)), mesh.coordinates.dat.data):
                     f.dat.data[i] = f0 + beta * v[1]
+        nu = Function(P1).assign(1e-3)
 
     elif op.mode == 'shallow-water':
         n = pow(2, level)
@@ -240,6 +241,7 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
         b = Function(P1).assign(0.1)
         BCs = {}
         f = Function(P1)
+        nu = None
     elif op.mode == 'rossby-wave':
         n = pow(2, level-1)
         lx = 48
@@ -255,6 +257,7 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
         u0, eta0 = q.split()
         BCs = {1: {'uv': Constant(0.)}, 2: {'uv': Constant(0.)}, 3: {'uv': Constant(0.)}, 4: {'uv': Constant(0.)}}
         f = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
+        nu = None
     elif op.mode == 'advection-diffusion':
         if mesh is None:
             mesh = RectangleMesh(4 * level, level, 4, 1)
@@ -270,11 +273,11 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
                         % (mesh.comm.rank, mesh.num_cells(), mesh.num_vertices()), comm=COMM_SELF)
 
     if hierarchy:
-        return mesh, u0, eta0, b, BCs, f, mh
+        return mesh, u0, eta0, b, BCs, f, nu, mh
     elif op.mode == 'advection-diffusion':
         return mesh, phi0, BCs, w
     else:
-        return mesh, u0, eta0, b, BCs, f
+        return mesh, u0, eta0, b, BCs, f, nu
 
 
 class RossbyWaveSolution:
