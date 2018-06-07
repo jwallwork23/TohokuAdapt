@@ -212,7 +212,7 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
                 depth = - eta0vec[i] - interpolatorBath(p[1], p[0])
                 # b_vec[i] = depth if op.wd else max(depth, 30)
                 b_vec[i] = max(depth, 30)   # Post-process the bathymetry to have a minimum depth of 30m
-        BCs = {}
+        BCs = {200: {'un': 0}}
 
         # Establish Coriolis parameter
         f = Function(P1)

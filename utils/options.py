@@ -54,14 +54,15 @@ class AdaptOptions(FrozenConfigurable):
             P1 = FunctionSpace(mesh, "DG", 1)
             iA = Function(P1, name="Region of interest")
 
-            if len(np.shape(self.radii)) == 0:
+            if np.shape(self.radii)[0] == 1:
                 expr = Expression("pow(x[0] - x0, 2) + pow(x[1] - y0, 2) < r + eps ? 1 : 0",
                                   x0=self.loc[0], y0=self.loc[1], r=pow(self.radii, 2), eps=1e-10)
-            elif len(np.shape(self.radii)) == 1:
+            elif np.shape(self.radii)[0] > 1:
                 assert len(self.loc)/2 == len(self.radii)
+                print(self.loc, self.radii)
                 e = "(pow(x[0] - %f, 2) + pow(x[1] - %f, 2) < %f + %f)" \
                     % (self.loc[0], self.loc[1], pow(self.radii[0], 2), 1e-10)
-                for i in range(1, len(self.radii)):
+                for i in range(1, len(self.radii)):     # TODO: Should be an OR operator here
                     e += "&& (pow(x[0] - %f, 2) + pow(x[1] - %f, 2) < %f + %f)" \
                          % (self.loc[2*i], self.loc[2*i+1], pow(self.radii[i], 2), 1e-10)
                 expr = Expression(e)
@@ -127,10 +128,13 @@ class TohokuOptions(AdaptOptions):
     g = PositiveFloat(9.81, help="Gravitational acceleration").tag(config=True)
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
 
-    def gaugeLocation(self, gauge):
-        return {"P02": (38.5002, 142.5016), "P06": (38.6340, 142.5838),
-                "801": (38.2, 141.7), "802": (39.3, 142.1), "803": (38.9, 141.8), "804": (39.7, 142.2),
-                "806": (37.0, 141.2), "Fukushima": (37.4213, 141.0281)}[gauge]
+    def lat(self, gauge):
+        return {"P02": 38.5002, "P06": 38.6340, "801": 38.2, "802": 39.3, "803": 38.9, "804": 39.7, "806": 37.0,
+                "Fukushima": 37.4213, "Tokyo": 35.6895}[gauge]
+
+    def lon(self, gauge):
+        return {"P02": 142.5016, "P06": 142.5838, "801": 141.7, "802": 142.1, "803": 141.8, "804": 142.2, "806": 141.2,
+                "Fukushima": 141.0281, "Tokyo": 139.6917}[gauge]
 
     def meshSize(self, i):
         return (5918, 7068, 8660, 10988, 14160, 19082, 27280, 41730, 72602, 160586, 681616)[i]

@@ -351,6 +351,8 @@ def metricGradation(M, op=Options()):   # TODO: Implement this in pyop2
                 verTag[iVer2] = i+1
                 correction = True
 
+    return M
+
 
 def localMetricIntersection(M1, M2):
     """

@@ -101,6 +101,7 @@ class ObjectiveSWCallback(FunctionalCallback):
             ks = Function(VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1))
             k0, k1 = ks.split()
             iA = self.op.indicator(mesh)
+            File("plots/" + self.op.mode + "/indicator.pvd").write(iA)
             k1.assign(iA)
             kt = Constant(0.)
             if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:

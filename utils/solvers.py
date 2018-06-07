@@ -894,6 +894,7 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Sto
         uv_2d.interpolate(u0)
         quantities = {}
         bdy = 200 if op.mode == 'tohoku' else 'on_boundary'
+        # bdy = 'on_boundary'
         while cnt < op.cntT():
             adaptTimer = clock()
             for l in range(op.nAdapt):                          # TODO: Test this functionality
@@ -907,14 +908,14 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Sto
                 M = isotropicMetric(errEst, invert=False, op=op)
                 if op.gradate:
                     # br = Function(P1).interpolate(bdyRegion(mesh_H, 200, 5e8))
-                    # ass = assemble(interp(mesh_H, H0) * br / assemble(br * dx))
+                    # ass = assemble(interp(mesh_H, H0) * br / assemble(100 * br * dx))
                     # File('plots/tohoku/bdyRegion.pvd').write(ass)
                     # M_ = isotropicMetric(ass, op=op)
                     # M = metricIntersection(M, M_)
 
                     M_ = isotropicMetric(interp(mesh_H, H0), bdy=bdy, op=op)   # Initial boundary metric
                     M = metricIntersection(M, M_, bdy=bdy)
-                    metricGradation(M, op=op)
+                    M = metricGradation(M, op=op)
                     # File('plots/tohoku/metric.pvd').write(M)
 
                 # Adapt mesh and interpolate variables
