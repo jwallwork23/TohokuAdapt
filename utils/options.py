@@ -129,11 +129,13 @@ class TohokuOptions(AdaptOptions):
 
     def lat(self, gauge):
         return {"P02": 38.5002, "P06": 38.6340, "801": 38.2, "802": 39.3, "803": 38.9, "804": 39.7, "806": 37.0,
-                "Fukushima": 37.4213, "Tokyo": 35.6895}[gauge]
+                "Fukushima Daiichi": 37.4213, "Onagawa": 38.3995, "Fukushima Daini": 37.3166, "Tokai": 36.4664,
+                "Hamaoka": 34.6229, "Tohoku": 41.1880, "Tokyo": 35.6895}[gauge]
 
     def lon(self, gauge):
         return {"P02": 142.5016, "P06": 142.5838, "801": 141.7, "802": 142.1, "803": 141.8, "804": 142.2, "806": 141.2,
-                "Fukushima": 141.0281, "Tokyo": 139.6917}[gauge]
+                "Fukushima Daiichi": 141.0281, "Onagawa": 141.5008, "Fukushima Daini": 141.0249, "Tokai": 140.6067,
+                "Hamaoka": 138.1433, "Tohoku": 141.3903, "Tokyo": 139.6917}[gauge]
 
     def meshSize(self, i):
         return (5918, 7068, 8660, 10988, 14160, 19082, 27280, 41730, 72602, 160586, 681616)[i]
