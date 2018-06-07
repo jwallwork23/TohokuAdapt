@@ -150,7 +150,7 @@ else:
 
     from .conversion import earth_radius, get_latitude, vectorlonlat_to_utm
     from .interpolation import interp
-    from .misc import indicator
+    from .misc import indicator, bdyRegion
     from .options import Options
 
 
@@ -228,6 +228,8 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
                 for i, v in zip(range(len(mesh.coordinates.dat.data)), mesh.coordinates.dat.data):
                     f.dat.data[i] = f0 + beta * v[1]
         nu = Function(P1).assign(1e-3)
+        # nu = Function(P1).interpolate(bdyRegion(mesh, 100, 1e9, sponge=True))
+        # File('plots/tohoku/spongy.pvd').write(nu)
 
     elif op.mode == 'shallow-water':
         n = pow(2, level)

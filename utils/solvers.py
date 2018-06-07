@@ -296,7 +296,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
 
         if cnt != 0 or op.adaptField == 'f':
             elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
-            b, BCs, f = problemDomain(mesh=mesh, op=op)[3:]     # TODO: find a different way to reset these
+            b, BCs, f, nu = problemDomain(mesh=mesh, op=op)[3:]     # TODO: find a different way to reset these
             uv_2d.rename('uv_2d')
             elev_2d.rename('elev_2d')
         adaptTimer = clock() - adaptTimer
@@ -556,7 +556,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
                 mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
 
             elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
-            b, BCs, f = problemDomain(mesh=mesh, op=op)[3:]             # TODO: find a different way to reset these
+            b, BCs, f, nu = problemDomain(mesh=mesh, op=op)[3:]             # TODO: find a different way to reset these
             uv_2d.rename('uv_2d')
             elev_2d.rename('elev_2d')
             adaptTimer = clock() - adaptTimer
@@ -712,7 +712,7 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Sto
 
     # Initialise parameters and counters
     nEle = mesh_H.num_cells()
-    op.nVerT = mesh_H.num_vertices() *  op.rescaling  # Target #Vertices
+    op.nVerT = mesh_H.num_vertices() * op.rescaling  # Target #Vertices
     mM = [nEle, nEle]  # Min/max #Elements
     Sn = nEle
     t = 0.
@@ -906,6 +906,12 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Sto
                 errEst = Function(FunctionSpace(mesh_H, "CG", 1)).assign(interp(mesh_H, epsilon))
                 M = isotropicMetric(errEst, invert=False, op=op)
                 if op.gradate:
+                    # br = Function(P1).interpolate(bdyRegion(mesh_H, 200, 5e8))
+                    # ass = assemble(interp(mesh_H, H0) * br / assemble(br * dx))
+                    # File('plots/tohoku/bdyRegion.pvd').write(ass)
+                    # M_ = isotropicMetric(ass, op=op)
+                    # M = metricIntersection(M, M_)
+
                     M_ = isotropicMetric(interp(mesh_H, H0), bdy=bdy, op=op)   # Initial boundary metric
                     M = metricIntersection(M, M_, bdy=bdy)
                     metricGradation(M, op=op)
@@ -917,7 +923,7 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Sto
                 # exit(0)
 
             elev_2d, uv_2d = interp(mesh_H, elev_2d, uv_2d)
-            b, BCs, f = problemDomain(mesh=mesh_H, op=op)[3:]           # TODO: Find a different way to reset these
+            b, BCs, f, nu = problemDomain(mesh=mesh_H, op=op)[3:]           # TODO: Find a different way to reset these
             uv_2d.rename('uv_2d')
             elev_2d.rename('elev_2d')
             adaptTimer = clock() - adaptTimer
