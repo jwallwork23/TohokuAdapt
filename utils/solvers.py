@@ -215,15 +215,15 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
     solver_obj.iterate()
     solverTimer = clock() - solverTimer
     quantities['J_h'] = cb1.quadrature()          # Evaluate objective functional
-    quantities['Integrand'] = cb1.getVals()
+    quantities['Integrand'] = cb1.get_vals()
     if op.mode != 'tohoku':
         quantities['J_h mirrored'] = cb2.quadrature()
-        quantities['Integrand-mirrored'] = cb2.getVals()
+        quantities['Integrand-mirrored'] = cb2.get_vals()
     else:
         quantities['TV P02'] = cb3.totalVariation()
         quantities['TV P06'] = cb4.totalVariation()
-        quantities['P02'] = cb3.getVals()
-        quantities['P06'] = cb4.getVals()
+        quantities['P02'] = cb3.get_vals()
+        quantities['P06'] = cb4.get_vals()
 
     # # Measure error using metrics, as in Huang et al.     # TODO: Parallelise this (and above)
     # if op.mode == 'rossby-wave':
@@ -358,13 +358,13 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
         adapSolver.iterate()
         solverTimer = clock() - solverTimer
         quantities['J_h'] = cb1.quadrature()  # Evaluate objective functional
-        quantities['Integrand'] = cb1.getVals()
+        quantities['Integrand'] = cb1.get_vals()
         if op.mode != 'tohoku':
             quantities['J_h mirrored'] = cb2.quadrature()
-            quantities['Integrand-mirrored'] = cb2.getVals()
+            quantities['Integrand-mirrored'] = cb2.get_vals()
         else:
-            quantities['P02'] = cb3.getVals()
-            quantities['P06'] = cb4.getVals()
+            quantities['P02'] = cb3.get_vals()
+            quantities['P06'] = cb4.get_vals()
             quantities['TV P02'] = cb3.totalVariation()
             quantities['TV P06'] = cb4.totalVariation()
 
@@ -618,13 +618,13 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
             adapSolver.iterate()
             solverTimer = clock() - solverTimer
             quantities['J_h'] = cb1.quadrature()  # Evaluate objective functional
-            quantities['Integrand'] = cb1.getVals()
+            quantities['Integrand'] = cb1.get_vals()
             if op.mode != 'tohoku':
                 quantities['J_h mirrored'] = cb2.quadrature()
-                quantities['Integrand-mirrored'] = cb2.getVals()
+                quantities['Integrand-mirrored'] = cb2.get_vals()
             else:
-                quantities['P02'] = cb3.getVals()
-                quantities['P06'] = cb4.getVals()
+                quantities['P02'] = cb3.get_vals()
+                quantities['P06'] = cb4.get_vals()
                 quantities['TV P02'] = cb3.totalVariation()
                 quantities['TV P06'] = cb4.totalVariation()
 
@@ -986,13 +986,13 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Sto
             adapSolver.iterate()
             solverTimer = clock() - solverTimer
             quantities['J_h'] = cb1.quadrature()  # Evaluate objective functional
-            quantities['Integrand'] = cb1.getVals()
+            quantities['Integrand'] = cb1.get_vals()
             if op.mode != 'tohoku':
                 quantities['J_h mirrored'] = cb2.quadrature()
-                quantities['Integrand-mirrored'] = cb2.getVals()
+                quantities['Integrand-mirrored'] = cb2.get_vals()
             else:
-                quantities['P02'] = cb3.getVals()
-                quantities['P06'] = cb4.getVals()
+                quantities['P02'] = cb3.get_vals()
+                quantities['P06'] = cb4.get_vals()
                 quantities['TV P02'] = cb3.totalVariation()
                 quantities['TV P06'] = cb4.totalVariation()
 

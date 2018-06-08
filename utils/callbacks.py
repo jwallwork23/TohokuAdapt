@@ -1,5 +1,5 @@
 from thetis_adjoint import *
-from thetis.callback import DiagnosticCallback, FunctionalCallback, GaugeCallback
+from thetis.callback import DiagnosticCallback, FunctionalCallback
 
 from .interpolation import *
 from .options import TohokuOptions, Options
@@ -539,3 +539,40 @@ class RefinedResidualCallback(EnrichedErrorCallback):
             return res_u, res_e
 
         super(RefinedResidualCallback, self).__init__(residualSW, solver_obj, enriched_space, **kwargs)
+
+
+class GaugeCallback(DiagnosticCallback):    # TODO: This is probably superfluous. Could just use DetectorsCallback?
+    """Base class for callbacks that evaluate a scalar quantity at a particular gauge location over all time.
+    Evaluations are based around the initial value being zero."""
+    variable_names = ['current value', 'gauge values']
+
+    def __init__(self, scalar_callback, solver_obj, **kwargs):
+        """
+        Creates gauge callback object
+
+        :arg scalar_callback: Python function that takes the solver object as an argument and
+            returns a single point value of a field related to the fluid state.
+        :arg solver_obj: Thetis solver object
+        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
+        """
+        kwargs.setdefault('export_to_hdf5', False)
+        kwargs.setdefault('append_to_log', False)
+        super(GaugeCallback, self).__init__(solver_obj, **kwargs)
+        self.scalar_callback = scalar_callback
+        self.init_value = scalar_callback()
+        self.gauge_values = [0.]
+        self.ix = 0
+
+    def __call__(self):
+        value = self.scalar_callback()
+        if self.ix != 0:
+            self.gauge_values.append(value - self.init_value)
+        self.ix += 1
+        return value, self.gauge_values
+
+    def getVals(self):
+        return self.gauge_values
+
+    def message_str(self, *args):
+        line = '{0:s} value {1:11.4e}'.format(self.name, args[1])
+        return line

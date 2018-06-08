@@ -148,7 +148,7 @@ class TohokuOptions(AdaptOptions):
                  help="Radius of indicator function around location of interest.").tag(config=True)
     loc = List(trait=Float, default_value=list(from_latlon(37.4213, 141.0281)[:2]),
                help="Important locations, written as a list.").tag(config=True)
-    J = Float(1.335e+12, help="Objective functional value on a fine mesh").tag(config=True)
+    J = Float(1.3347e+12, help="Objective functional value on a fine mesh").tag(config=True)
 
 
 class RossbyWaveOptions(AdaptOptions):
