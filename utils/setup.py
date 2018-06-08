@@ -148,7 +148,7 @@ else:
     from scipy.io.netcdf import NetCDFFile
     from time import clock
 
-    from .conversion import earth_radius, get_latitude, vectorlonlat_to_utm
+    from .conversion import earth_radius, to_latlon, vectorlonlat_to_utm
     from .interpolation import interp
     from .misc import indicator, bdyRegion
     from .options import Options
@@ -218,7 +218,8 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
         f = Function(P1)
         if op.coriolis == 'sin':
             for i, v in zip(range(len(mesh.coordinates.dat.data)), mesh.coordinates.dat.data):
-                f.dat.data[i] = 2 * op.Omega * np.sin(np.radians(get_latitude(v[0], v[1], 54, northern=True)))
+                f.dat.data[i] = 2 * op.Omega * \
+                                np.sin(np.radians(to_latlon(v[0], v[1], 54, northern=True, force_longitude=True)[0]))
         elif op.coriolis in ('beta', 'f'):
             f0 = 2 * op.Omega * np.sin(np.radians(op.latFukushima))
             if op.coriolis == 'f':

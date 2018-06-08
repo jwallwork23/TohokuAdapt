@@ -237,8 +237,7 @@ def vectorlonlat_to_utm(latitude, longitude, force_zone_number):
     y = np.zeros((len(latitude)))
     assert (len(x) == len(y))
     for i in range(len(x)):
-        x[i], y[i], zn, zl = from_latlon(latitude[i], longitude[i], force_zone_number=force_zone_number)
-        # print 'Coords ', x[i], y[i], 'Zone ', zn, zl      # For debugging purposes
+        x[i], y[i] = from_latlon(latitude[i], longitude[i], force_zone_number=force_zone_number)
     return x, y
 
 
