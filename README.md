@@ -16,7 +16,7 @@ adaptivity:
     * Some generic functions may be found in ``misc``.
     * Default parameters are specified using ``options``.
     * Meshes of the physical domain, bathymetry and initial and boundary conditions are generated using ``setup``.
-    * Mesh adaptive solvers can be found in ``solvers``.
+    * Fixed mesh and mesh adaptive solvers can be found in ``solvers``.
     * Time series and error estimate data can be stored and plotted using ``timeseries``.
 * Some basic tests for the mesh adaptivity functionalities above are provided in ``basic-tests.py``.
 * A ``resources`` directory, containing bathymetry and coastline data for the ocean domain surrounding Fukushima. Mesh
@@ -34,6 +34,7 @@ The following meshing strategies are implemented, with a number of other approac
     * calculate total variations between timeseries using ``quick-difference``; 
     * integrate timeseries using ``quick-integrate``; 
     * plot error curves and CPU timings against element count using ``quick-plot``.
+* A more complex region of interest is considered in ``demo-script``, involving a union of disc regions.
 * An additional test case is provided by the ``advection-diffusion`` script.
     
 ### User instructions

@@ -146,7 +146,7 @@ class TohokuOptions(AdaptOptions):
     # Region of importance
     radii = List(trait=Float, default_value=[50e3],
                  help="Radius of indicator function around location of interest.").tag(config=True)
-    loc = List(trait=Float, default_value=list(from_latlon(37.4213, 141.0281)[:2]),
+    loc = List(trait=Float, default_value=list(from_latlon(37.4213, 141.0281)),
                help="Important locations, written as a list.").tag(config=True)
     J = Float(1.3347e+12, help="Objective functional value on a fine mesh").tag(config=True)
 
@@ -375,7 +375,7 @@ class Options:
                       'beta': 1.288e+13,
                       'sin': 1.305e+13}[self.coriolis]  # (to 4.s.f.) On mesh of 158,596 elements
             # self.xy = [490e3, 640e3, 4160e3, 4360e3]
-            self.xy = from_latlon(self.latFukushima, self.lonFukushima, force_zone_number=54)[:2]
+            self.xy = from_latlon(self.latFukushima, self.lonFukushima, force_zone_number=54)
             self.xy2 = [0., 0., 0., 0.]
             self.radius = 50e3          # NOTE: P02 and P06 do not fall within this radius. 806 does
             # self.radius = None
@@ -484,7 +484,7 @@ class Options:
         :param gauge: Tide / pressure gauge name, from {P02, P06, 801, 802, 803, 804, 806}.
         :return: UTM coordinate for chosen gauge.
         """
-        E, N = from_latlon(self.glatlon[gauge][0], self.glatlon[gauge][1], force_zone_number=54)[:2]
+        E, N = from_latlon(self.glatlon[gauge][0], self.glatlon[gauge][1], force_zone_number=54)
         return E, N
 
 

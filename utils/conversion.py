@@ -6,7 +6,7 @@ import numpy as np
 class OutOfRangeError(ValueError):
     pass
 
-__all__ = ["to_latlon", "from_latlon", "get_latitude", "latitude_to_zone_letter", "latlon_to_zone_number",
+__all__ = ["to_latlon", "from_latlon", "latitude_to_zone_letter", "latlon_to_zone_number",
            "zone_number_to_central_longitude", "earth_radius", "vectorlonlat_to_utm"]
 
 K0 = 0.9996
@@ -116,27 +116,14 @@ def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, f
     return math.degrees(latitude), math.degrees(longitude) + zone_number_to_central_longitude(zone_number)
 
 
-def get_latitude(easting, northing, zone_number, zone_letter=None, northern=None):
-    """
-    Convert UTM coordinates to latitude alone.
-
-    :arg easting: eastward-measured Cartesian geographic distance.
-    :arg northing: northward-measured Cartesian geographic distance.
-    :arg zone_number: UTM zone number (increasing eastward).
-    :param zone_letter: UTM zone letter (increasing alphabetically northward).
-    :param northern: specify northern or southern hemisphere.
-    :return: latitude coordinate.
-    """
-    return to_latlon(easting, northing, zone_number, zone_letter, northern, force_longitude=True)[0]
-
-
-def from_latlon(latitude, longitude, force_zone_number=None):
+def from_latlon(latitude, longitude, force_zone_number=None, zone_info=False):
     """
     Convert latitude-longitude coordinates to UTM, courtesy of Tobias Bieniek, 2012.
     
     :arg latitude: northward anglular position, origin at the Equator.
     :arg longitude: eastward angular position, with origin at the Greenwich Meridian.
     :param force_zone_number: force coordinates to fall within a particular UTM zone.
+    :param zone_info: output zone letter and number.
     :return: UTM coordinate 4-tuple.
     """
     if not -80.0 <= latitude <= 84.0:
@@ -184,7 +171,10 @@ def from_latlon(latitude, longitude, force_zone_number=None):
     if latitude < 0:
         northing += 10000000
 
-    return easting, northing, zone_number, zone_letter
+    if zone_info:
+        return easting, northing, zone_number, zone_letter
+    else:
+        return easting, northing
 
 
 def latitude_to_zone_letter(latitude):

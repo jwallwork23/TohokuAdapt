@@ -33,3 +33,4 @@ utils/forms.py
 
 # Test scripts
 paralleltest.py
+dt_test.py
