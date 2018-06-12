@@ -160,8 +160,8 @@ class RossbyWaveOptions(AdaptOptions):
     rm = NonNegativeInteger(48, help="Timesteps per mesh adaptation").tag(config=True)
     nVerT = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
     dt = PositiveFloat(0.05, help="Timestep").tag(config=True)
-    Tstart = PositiveFloat(10., help="Start time of period of interest").tag(config=True)
-    Tend = PositiveFloat(36., help="End time of period of interest").tag(config=True)
+    Tstart = PositiveFloat(30., help="Start time of period of interest").tag(config=True)
+    Tend = PositiveFloat(120., help="End time of period of interest").tag(config=True)
     hmin = PositiveFloat(1e-3, help="Minimum element size").tag(config=True)
     hmax = PositiveFloat(10., help="Maximum element size").tag(config=True)
     minNorm = PositiveFloat(1e-4).tag(config=True)  # TODO: Not sure about this
@@ -175,11 +175,12 @@ class RossbyWaveOptions(AdaptOptions):
         return 'plots/rossby-wave/' + self.approach + '/'
 
     # Region of importance
-    radii = List(trait=Float, default_value=[np.sqrt(3)],
+    radii = List(trait=Float, default_value=[np.sqrt(3), np.sqrt(3)],
                  help="Radius of indicator function around location of interest.").tag(config=True)
-    loc = List(trait=Float, default_value=[-15., 0.],
+    loc = List(trait=Float, default_value=[0., 0., -48., 0.],
                help="Important locations, written as a list.").tag(config=True)
     J = Float(5.3333, help="Objective functional value on a fine mesh").tag(config=True)
+    J_mirror = Float(5.3333, help="Objective functional value for mirrored problem on a fine mesh").tag(config=True)
 
 
 class GaussianOptions(AdaptOptions):

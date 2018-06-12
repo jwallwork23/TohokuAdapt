@@ -246,11 +246,15 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
         f = Function(P1)
         nu = None
     elif op.mode == 'rossby-wave':
-        n = pow(2, level-1)
-        lx = 48
-        ly = 24
         if mesh is None:
-            mesh = RectangleMesh(lx * n, ly * n, lx, ly)
+            n = pow(2, level - 1)
+            ly = 24
+            if op.approach == 'fixedMesh':
+                lx = 48
+                mesh = PeriodicRectangleMesh(int(lx * n), int(ly * n), lx, ly, direction="x")
+            else:
+                lx = 160
+                mesh = RectangleMesh(int(lx * n), int(ly * n), lx, ly)
             xy = Function(mesh.coordinates)
             xy.dat.data[:, :] -= [lx / 2, ly / 2]
             mesh.coordinates.assign(xy)
