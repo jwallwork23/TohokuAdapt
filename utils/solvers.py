@@ -207,6 +207,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
     solver_obj.bnd_functions['shallow_water'] = BCs
 
     # Solve and extract timeseries / functionals
+    quantities = {}
     solverTimer = clock()
     solver_obj.iterate()
     solverTimer = clock() - solverTimer
