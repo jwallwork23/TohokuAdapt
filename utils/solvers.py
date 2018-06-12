@@ -221,6 +221,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
     # Measure error using metrics, as in Huang et al.     # TODO: Parallelise this (and above)
     if op.mode == 'rossby-wave':
         peak, distance = peakAndDistance(solver_obj.fields.solution_2d.split()[1], op=op)
+        distance += 48. # Account for periodic domain
         quantities['peak'] = peak/peak_a
         quantities['dist'] = distance/distance_a
         quantities['spd'] = distance /(op.Tend * 0.4)
