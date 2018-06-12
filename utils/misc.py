@@ -20,7 +20,8 @@ def peakAndDistance(f, op=Options()):
     mesh = f.function_space().mesh()
     with f.dat.vec_ro as fv:
         peak_i, peak = fv.max()
-    dgCoords = Function(FunctionSpace(mesh, op.space2, op.degree2)).interpolate(mesh.coordinates[0])
+    dgCoords = Function(FunctionSpace(mesh, 'DG' if op.family == 'dg-dg' else 'CG',  1 if op.family == 'dg-dg' else 2))
+    dgCoords.interpolate(mesh.coordinates[0])
     with dgCoords.dat.vec_ro as dv:         # TODO: I think an error may be occurring here-ish in parallel
         val = np.abs(dv.getValue(peak_i))
 

@@ -2,6 +2,7 @@ from firedrake import *
 
 import numpy as np
 from time import clock
+import copy
 
 from utils.adaptivity import *
 from utils.callbacks import *
@@ -168,15 +169,17 @@ from thetis import *
 
 def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
     op = kwargs.get('op')
+    opm = copy.deepcopy(op)
+    opm.loc = -op.loc
 
     # Initialise domain and physical parameters
     try:
         assert float(physical_constants['g_grav'].dat.data) == op.g
     except:
         physical_constants['g_grav'].assign(op.g)
-    # V = op.mixedSpace(mesh)                               # TODO: Parallelise this (and below)
-    # if op.mode == 'rossby-wave':            # Analytic final-time state
-    #     peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
+    V = op.mixedSpace(mesh)                               # TODO: Parallelise this (and below)
+    if op.mode == 'rossby-wave':            # Analytic final-time state
+        peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
 
     # Initialise solver
     solver_obj = solver2d.FlowSolver2d(mesh, b)
@@ -199,7 +202,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
     cb1.op = op
     if op.mode != 'tohoku':
         cb2 = MirroredSWCallback(solver_obj)
-        cb2.op = op
+        cb2.op = opm
         solver_obj.add_callback(cb2, 'timestep')
     else:
         cb3 = P02Callback(solver_obj)
@@ -225,12 +228,12 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
         quantities['P02'] = cb3.get_vals()
         quantities['P06'] = cb4.get_vals()
 
-    # # Measure error using metrics, as in Huang et al.     # TODO: Parallelise this (and above)
-    # if op.mode == 'rossby-wave':
-    #     peak, distance = peakAndDistance(solver_obj.fields.solution_2d.split()[1], op=op)
-    #     quantities['peak'] = peak/peak_a
-    #     quantities['dist'] = distance/distance_a
-    #     quantities['spd'] = distance /(op.Tend * 0.4)
+    # Measure error using metrics, as in Huang et al.     # TODO: Parallelise this (and above)
+    if op.mode == 'rossby-wave':
+        peak, distance = peakAndDistance(solver_obj.fields.solution_2d.split()[1], op=op)
+        quantities['peak'] = peak/peak_a
+        quantities['dist'] = distance/distance_a
+        quantities['spd'] = distance /(op.Tend * 0.4)
 
     # Output mesh statistics and solver times
     quantities['meanElements'] = mesh.num_cells()
@@ -242,6 +245,8 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
 
 def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
     op = kwargs.get('op')
+    opm = copy.deepcopy(op)
+    opm.loc = -op.loc
 
     # Initialise domain and physical parameters
     try:
@@ -331,7 +336,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
         cb1.op = op
         if op.mode != 'tohoku':
             cb2 = MirroredSWCallback(adapSolver)
-            cb2.op = op
+            cb2.op = opm
         else:
             cb3 = P02Callback(adapSolver)
             cb4 = P06Callback(adapSolver)
@@ -402,7 +407,11 @@ from fenics_adjoint.solving import SolveBlock                                   
 
 def DWP(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
     op = kwargs.get('op')
+    if kwargs.get('mirror'):
+        op.loc = -op.loc
     regen = kwargs.get('regen')
+    opm = copy.deepcopy(op)
+    opm.loc = -op.loc
 
     initTimer = clock()
     if op.plotpvd:
@@ -462,7 +471,6 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         cb1 = ObjectiveSWCallback(solver_obj)
         cb1.op = op
-        cb1.mirror = kwargs.get('mirror')
         solver_obj.add_callback(cb1, 'timestep')
         solver_obj.bnd_functions['shallow_water'] = BCs
         initTimer = clock() - initTimer
@@ -591,7 +599,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
             cb1.op = op
             if op.mode != 'tohoku':
                 cb2 = MirroredSWCallback(adapSolver)
-                cb2.op = op
+                cb2.op = opm
             else:
                 cb3 = P02Callback(adapSolver)
                 cb4 = P06Callback(adapSolver)
@@ -660,7 +668,11 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
 
 def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Store optimal mesh, 'intersected' over all rm steps
     op = kwargs.get('op')
+    if kwargs.get('mirror'):
+        op.loc = -op.loc
     regen = kwargs.get('regen')
+    opm = copy.deepcopy(op)
+    opm.loc = -op.loc
 
     initTimer = clock()
     if op.plotpvd:
@@ -742,7 +754,6 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Sto
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         cb1 = ObjectiveSWCallback(solver_obj)
         cb1.op = op
-        cb1.mirror = kwargs.get('mirror')
         solver_obj.add_callback(cb1, 'timestep')
         solver_obj.bnd_functions['shallow_water'] = BCs
         initTimer = clock() - initTimer
@@ -959,7 +970,7 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Sto
             cb1.op = op
             if op.mode != 'tohoku':
                 cb2 = MirroredSWCallback(adapSolver)
-                cb2.op = op
+                cb2.op = opm
             else:
                 cb3 = P02Callback(adapSolver)
                 cb4 = P06Callback(adapSolver)

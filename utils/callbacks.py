@@ -67,7 +67,7 @@ class MirroredSWCallback(FunctionalCallback):
             ks = Function(VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1))
             k0, k1 = ks.split()
             iA = self.op.indicator(mesh)
-            k1.assign(iA)   # TODO: need select mirrored version
+            k1.assign(iA)
             kt = Constant(0.)
             if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:      # Slightly smooth transition
                 kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * dt else 0.5)
