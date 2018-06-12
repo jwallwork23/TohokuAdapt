@@ -7,7 +7,8 @@ import numpy as np
 
 from .conversion import from_latlon
 
-__all__ = ["Options", "TohokuOptions", "RossbyWaveOptions", "GaussianOptions", "AdvectionDiffusionOptions"]
+__all__ = ["Options",   # TODO: Get rid of this class
+           "TohokuOptions", "RossbyWaveOptions", "KelvinWaveOptions", "GaussianOptions", "AdvectionDiffusionOptions"]
 
 
 class AdaptOptions(FrozenConfigurable):

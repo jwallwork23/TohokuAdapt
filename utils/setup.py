@@ -245,7 +245,7 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
         BCs = {}
         f = Function(P1)
         nu = None
-    elif op.mode == 'rossby-wave':
+    elif op.mode in ('rossby-wave', 'kelvin-wave'):
         if mesh is None:
             n = pow(2, level - 1)
             ly = 24
@@ -253,7 +253,7 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
                 lx = 48
                 mesh = PeriodicRectangleMesh(int(lx * n), int(ly * n), lx, ly, direction="x")
             else:
-                lx = 160
+                lx = 160 if approach == 'rossby-wave' else 48
                 mesh = RectangleMesh(int(lx * n), int(ly * n), lx, ly)
             xy = Function(mesh.coordinates)
             xy.dat.data[:, :] -= [lx / 2, ly / 2]
@@ -308,10 +308,10 @@ class RossbyWaveSolution:
         except:
             raise NotImplementedError("Only zeroth and first order analytic solutions considered for this problem.")
         try:
-            assert op.mode == 'rossby-wave'
+            assert op.mode in ('rossby-wave', 'kelvin-wave')
             self.op = op
         except:
-            raise ValueError("Analyic solution only available for 'rossby-wave' test case.")
+            raise ValueError("Analytic solution only available for 'rossby-wave' and 'kelvin-wave' test cases.")
 
     def coeffs(self):
         """

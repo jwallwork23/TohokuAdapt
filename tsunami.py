@@ -5,7 +5,7 @@ import argparse
 import datetime
 import numpy as np
 
-from utils.options import Options, TohokuOptions, GaussianOptions, RossbyWaveOptions
+from utils.options import Options, TohokuOptions, GaussianOptions, RossbyWaveOptions, KelvinWaveOptions
 from utils.setup import problemDomain
 from utils.solvers import tsunami
 
@@ -52,6 +52,8 @@ if mode == 'tohoku':
     op = TohokuOptions(approach=approach)
 elif mode == 'rossby-wave':
     op = RossbyWaveOptions(approach=approach)
+elif mode == 'kelvin-wave':
+    op = KelvinWaveOptions(approach=approach)
 elif mode == 'shallow-water':
     op = GaussianOptions(approach=approach)
 else:
