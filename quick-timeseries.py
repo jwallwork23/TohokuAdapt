@@ -2,13 +2,13 @@ from firedrake import *
 
 import argparse
 
-from utils.options import Options
+from utils.options import TohokuOptions, RossbyWaveOptions, KelvinWaveOptions, GaussianOptions
 from utils.setup import RossbyWaveSolution, problemDomain
 from utils.timeseries import plotTimeseries, compareTimeseries
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("t", help="Choose problem from {'tohoku', 'shallow-water', 'rossby-wave', 'model-verification'}.")
+parser.add_argument("t", help="Choose problem from {'tohoku', 'shallow-water', 'rossby-wave', 'kelvin-wave', 'model-verification'}.")
 parser.add_argument("-a", help="Choose from {'fixedMesh', 'hessianBased', 'DWP', 'DWR'}.")
 parser.add_argument("-r", help="Choose Coriolis parameter from {'off', 'f', 'beta', 'sin'}")
 parser.add_argument("-d", help="Specify a date")
@@ -18,26 +18,31 @@ parser.add_argument("-s", help="Generate rossby-wave analytic solution")
 args = parser.parse_args()
 approach = args.a
 date = args.d
-op = Options(mode=args.t, approach=approach)
-if op.mode == 'model-verification':
+if args.t in ('tohoku', 'model-verification'):
+    op = TohokuOptions(approach=approach)
+elif args.t == 'shallow-water':
+    op = GaussianOptions(approach=approach)
+elif args.t == 'rossby-wave':
+    op = RossbyWaveOptions(approach=approach)
+elif args.t == 'kelvin-wave':
+    op = KelvinWaveOptions(approach=approach)
+if args.t == 'model-verification':
     assert approach is None
 if approach is None and op.mode != 'model-verification':
     approach = 'fixedMesh'
 if op.mode in ('tohoku', 'model-verification'):
     quantities = ['Integrand', 'P02', 'P06']
 else:
-    quantities = ['Integrand', 'Integrand-mirrored']
+    quantities = ['Integrand']
 if bool(args.s):
-    assert op.mode == 'rossby-wave'
-    for q in quantities:
-        if q in ['Integrand', 'Integrand-mirrored']:
-            integrandFile = open('outdata/rossby-wave/analytic_'+q+'.txt', 'w+')
-            rw = RossbyWaveSolution(op.mixedSpace(problemDomain(level=7, op=op)[0]), order=1, op=op)
-            integrand = rw.integrate(bool(q == 'Integrand_mirrored'))
-            integrandFile.writelines(["%s," % val for val in integrand])
-            integrandFile.write("\n")
-            integrandFile.close()
-            fileExt = 'analytic'
+    assert op.mode in ('rossby-wave', 'kelvin-wave')
+    integrandFile = open('outdata/rossby-wave/analytic_Integrand.txt', 'w+')
+    rw = RossbyWaveSolution(op.mixedSpace(problemDomain(level=7, op=op)[0]), order=1, op=op)
+    integrand = rw.integrate()
+    integrandFile.writelines(["%s," % val for val in integrand])
+    integrandFile.write("\n")
+    integrandFile.close()
+    fileExt = 'analytic'
 else:
     fileExt = approach
 if not bool(args.s):
