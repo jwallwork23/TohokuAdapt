@@ -253,7 +253,7 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
                 lx = 48
                 mesh = PeriodicRectangleMesh(int(lx * n), int(ly * n), lx, ly, direction="x")
             else:
-                lx = 160 if approach == 'rossby-wave' else 48
+                lx = 160 if op.mode == 'rossby-wave' else 48
                 mesh = RectangleMesh(int(lx * n), int(ly * n), lx, ly)
             xy = Function(mesh.coordinates)
             xy.dat.data[:, :] -= [lx / 2, ly / 2]
