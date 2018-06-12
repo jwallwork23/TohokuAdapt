@@ -6,7 +6,7 @@ from .options import TohokuOptions, Options
 from .timeseries import gaugeTV
 
 
-__all__ = ["SWCallback", "MirroredSWCallback", "ObjectiveSWCallback", "P02Callback", "P06Callback", "strongResidualSW",
+__all__ = ["SWCallback", "ObjectiveSWCallback", "P02Callback", "P06Callback", "strongResidualSW",
            "ResidualCallback", "EnrichedErrorCallback", "HigherOrderResidualCallback", "RefinedResidualCallback"]
 
 
@@ -42,39 +42,6 @@ class SWCallback(FunctionalCallback):
             return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
 
         super(SWCallback, self).__init__(objectiveSW, solver_obj, **kwargs)
-
-
-class MirroredSWCallback(FunctionalCallback):
-    """Integrates objective functional."""
-    name = 'mirrored objective functional'
-
-    def __init__(self, solver_obj, **kwargs):
-        """
-        :arg solver_obj: Thetis solver object
-        :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
-        """
-        from firedrake import assemble
-
-        self.op = TohokuOptions()   # TODO: Make more general
-        dt = solver_obj.options.timestep
-
-        def objectiveSW():
-            """
-            :param solver_obj: FlowSolver2d object.
-            :return: objective functional value for callbacks.
-            """
-            mesh = solver_obj.fields.solution_2d.function_space().mesh()
-            ks = Function(VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1))
-            k0, k1 = ks.split()
-            iA = self.op.indicator(mesh)
-            k1.assign(iA)
-            kt = Constant(0.)
-            if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:      # Slightly smooth transition
-                kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * dt else 0.5)
-
-            return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
-
-        super(MirroredSWCallback, self).__init__(objectiveSW, solver_obj, **kwargs)
 
 
 class ObjectiveSWCallback(FunctionalCallback):

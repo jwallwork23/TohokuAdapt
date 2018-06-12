@@ -183,6 +183,38 @@ class RossbyWaveOptions(AdaptOptions):
     J_mirror = Float(5.3333, help="Objective functional value for mirrored problem on a fine mesh").tag(config=True)
 
 
+class KelvinWaveOptions(AdaptOptions):
+    name = 'Parameters for the equatorial Kelvin wave test problem'
+    mode = 'kelvin-wave'
+
+    # Solver parameters
+    ndump = NonNegativeInteger(12, help="Timesteps per data dump").tag(config=True)
+    rm = NonNegativeInteger(48, help="Timesteps per mesh adaptation").tag(config=True)
+    nVerT = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
+    dt = PositiveFloat(0.05, help="Timestep").tag(config=True)
+    Tstart = PositiveFloat(10., help="Start time of period of interest").tag(config=True)
+    Tend = PositiveFloat(36., help="End time of period of interest").tag(config=True)
+    hmin = PositiveFloat(1e-3, help="Minimum element size").tag(config=True)
+    hmax = PositiveFloat(10., help="Maximum element size").tag(config=True)
+    minNorm = PositiveFloat(1e-4).tag(config=True)  # TODO: Not sure about this
+    maxScaling = PositiveFloat(5e5).tag(config=True)  # TODO: Not sure about this
+
+    # Physical parameters
+    coriolis = Unicode('beta', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
+    g = PositiveFloat(1., help="Gravitational acceleration").tag(config=True)
+
+    def di(self):
+        return 'plots/kelvin-wave/' + self.approach + '/'
+
+    # Region of importance
+    radii = List(trait=Float, default_value=[np.sqrt(3)],
+                 help="Radius of indicator function around location of interest.").tag(config=True)
+    loc = List(trait=Float, default_value=[15., 0.],
+               help="Important locations, written as a list.").tag(config=True)
+    J = Float(5.3333, help="Objective functional value on a fine mesh").tag(config=True)
+    J_mirror = Float(5.3333, help="Objective functional value for mirrored problem on a fine mesh").tag(config=True)
+
+
 class GaussianOptions(AdaptOptions):
     name = 'Parameters for the shallow water test problem with Gaussian initial condition'
     mode = 'shallow-water'

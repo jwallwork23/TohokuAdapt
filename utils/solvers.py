@@ -387,11 +387,7 @@ from fenics_adjoint.solving import SolveBlock                                   
 
 def DWP(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
     op = kwargs.get('op')
-    if kwargs.get('mirror'):
-        op.loc = [-i for i in op.loc]
     regen = kwargs.get('regen')
-    opm = copy.deepcopy(op)
-    opm.loc = [-i for i in op.loc]
 
     initTimer = clock()
     if op.plotpvd:
@@ -577,44 +573,34 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
             # Evaluate callbacks and iterate
             cb1 = SWCallback(adapSolver)
             cb1.op = op
-            if op.mode != 'tohoku':
-                cb2 = MirroredSWCallback(adapSolver)
-                cb2.op = opm
-            else:
-                cb3 = P02Callback(adapSolver)
-                cb4 = P06Callback(adapSolver)
+            if op.mode == 'tohoku':
+                cb2 = P02Callback(adapSolver)
+                cb3 = P06Callback(adapSolver)
                 if cnt == 0:
-                    initP02 = cb3.init_value
-                    initP06 = cb4.init_value
+                    initP02 = cb2.init_value
+                    initP06 = cb3.init_value
             if cnt != 0:
                 cb1.objective_value = quantities['Integrand']
-                if op.mode != 'tohoku':
-                    cb2.objective_value = quantities['Integrand-mirrored']
-                else:
-                    cb3.gauge_values = quantities['P02']
-                    cb3.init_value = initP02
-                    cb4.gauge_values = quantities['P06']
-                    cb4.init_value = initP06
+                if op.mode == 'tohoku':
+                    cb2.gauge_values = quantities['P02']
+                    cb2.init_value = initP02
+                    cb3.gauge_values = quantities['P06']
+                    cb3.init_value = initP06
             adapSolver.add_callback(cb1, 'timestep')
-            if op.mode != 'tohoku':
+            if op.mode == 'tohoku':
                 adapSolver.add_callback(cb2, 'timestep')
-            else:
                 adapSolver.add_callback(cb3, 'timestep')
-                adapSolver.add_callback(cb4, 'timestep')
             adapSolver.bnd_functions['shallow_water'] = BCs
             solverTimer = clock()
             adapSolver.iterate()
             solverTimer = clock() - solverTimer
             quantities['J_h'] = cb1.quadrature()  # Evaluate objective functional
             quantities['Integrand'] = cb1.get_vals()
-            if op.mode != 'tohoku':
-                quantities['J_h mirrored'] = cb2.quadrature()
-                quantities['Integrand-mirrored'] = cb2.get_vals()
-            else:
-                quantities['P02'] = cb3.get_vals()
-                quantities['P06'] = cb4.get_vals()
-                quantities['TV P02'] = cb3.totalVariation()
-                quantities['TV P06'] = cb4.totalVariation()
+            if op.mode == 'tohoku':
+                quantities['P02'] = cb2.get_vals()
+                quantities['P06'] = cb3.get_vals()
+                quantities['TV P02'] = cb2.totalVariation()
+                quantities['TV P06'] = cb3.totalVariation()
 
             # Get mesh stats
             nEle = mesh.num_cells()
@@ -648,11 +634,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
 
 def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Store optimal mesh, 'intersected' over all rm steps
     op = kwargs.get('op')
-    if kwargs.get('mirror'):
-        op.loc = [-i for i in op.loc]
     regen = kwargs.get('regen')
-    opm = copy.deepcopy(op)
-    opm.loc = [-i for i in op.loc]
 
     initTimer = clock()
     if op.plotpvd:
@@ -948,44 +930,34 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Sto
             # Evaluate callbacks and iterate
             cb1 = SWCallback(adapSolver)
             cb1.op = op
-            if op.mode != 'tohoku':
-                cb2 = MirroredSWCallback(adapSolver)
-                cb2.op = opm
-            else:
-                cb3 = P02Callback(adapSolver)
-                cb4 = P06Callback(adapSolver)
+            if op.mode == 'tohoku':
+                cb2 = P02Callback(adapSolver)
+                cb3 = P06Callback(adapSolver)
                 if cnt == 0:
-                    initP02 = cb3.init_value
-                    initP06 = cb4.init_value
+                    initP02 = cb2.init_value
+                    initP06 = cb3.init_value
             if cnt != 0:
                 cb1.objective_value = quantities['Integrand']
-                if op.mode != 'tohoku':
-                    cb2.objective_value = quantities['Integrand-mirrored']
-                else:
-                    cb3.gauge_values = quantities['P02']
-                    cb3.init_value = initP02
-                    cb4.gauge_values = quantities['P06']
-                    cb4.init_value = initP06
+                if op.mode == 'tohoku':
+                    cb2.gauge_values = quantities['P02']
+                    cb2.init_value = initP02
+                    cb3.gauge_values = quantities['P06']
+                    cb3.init_value = initP06
             adapSolver.add_callback(cb1, 'timestep')
-            if op.mode != 'tohoku':
+            if op.mode == 'tohoku':
                 adapSolver.add_callback(cb2, 'timestep')
-            else:
                 adapSolver.add_callback(cb3, 'timestep')
-                adapSolver.add_callback(cb4, 'timestep')
             adapSolver.bnd_functions['shallow_water'] = BCs
             solverTimer = clock()
             adapSolver.iterate()
             solverTimer = clock() - solverTimer
             quantities['J_h'] = cb1.quadrature()  # Evaluate objective functional
             quantities['Integrand'] = cb1.get_vals()
-            if op.mode != 'tohoku':
-                quantities['J_h mirrored'] = cb2.quadrature()
-                quantities['Integrand-mirrored'] = cb2.get_vals()
-            else:
-                quantities['P02'] = cb3.get_vals()
-                quantities['P06'] = cb4.get_vals()
-                quantities['TV P02'] = cb3.totalVariation()
-                quantities['TV P06'] = cb4.totalVariation()
+            if op.mode == 'tohoku':
+                quantities['P02'] = cb2.get_vals()
+                quantities['P06'] = cb3.get_vals()
+                quantities['TV P02'] = cb2.totalVariation()
+                quantities['TV P06'] = cb3.totalVariation()
 
             # Get mesh stats
             nEle = mesh_H.num_cells()
@@ -1020,7 +992,6 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Sto
 def tsunami(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
     op = kwargs.get('op')
     regen = kwargs.get('regen')
-    mirror = kwargs.get('mirror')
     solvers = {'fixedMesh': fixedMesh, 'hessianBased': hessianBased, 'DWP': DWP, 'DWR': DWR}
 
-    return solvers[op.approach](mesh, u0, eta0, b, BCs, f, regen=regen, mirror=mirror, op=op)
+    return solvers[op.approach](mesh, u0, eta0, b, BCs, f, regen=regen, op=op)

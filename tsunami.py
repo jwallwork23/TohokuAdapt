@@ -25,7 +25,6 @@ parser.add_argument("-b", help="Intersect metrics with bathymetry")
 parser.add_argument("-c", help="Type of Coriolis coefficient to use, from {'off', 'f', 'beta', 'sin'}.")
 parser.add_argument("-o", help="Output data")
 parser.add_argument("-regen", help="Regenerate error estimates from saved data")
-parser.add_argument("-mirror", help="Use a 'mirrored' region of interest")
 parser.add_argument("-nAdapt", help="Number of mesh adaptation steps")
 parser.add_argument("-gradate", help="Gradate metric")
 args = parser.parse_args()
@@ -47,8 +46,6 @@ if args.r:
     assert not args.ho
 if args.b is not None:
     assert approach == 'hessianBased'
-if bool(args.mirror):
-    assert mode in ('shallow-water', 'rossby-wave')
 coriolis = args.c if args.c is not None else 'f'
 
 if mode == 'tohoku':
@@ -83,8 +80,6 @@ extensions = ['Integrand']
 if mode == 'tohoku':
     extensions.append('P02')
     extensions.append('P06')
-else:
-    extensions.append('Integrand-mirrored')
 for e in extensions:
     files[e] = open(filename + e + '.txt', 'w+')
 
@@ -97,15 +92,13 @@ else:
 Jlist = np.zeros(len(resolutions))
 for i in resolutions:
     mesh, u0, eta0, b, BCs, f, nu = problemDomain(i, op=op)
-    quantities = tsunami(mesh, u0, eta0, b, BCs=BCs, f=f, nu=nu, regen=bool(args.regen), mirror=bool(args.mirror), op=op)
+    quantities = tsunami(mesh, u0, eta0, b, BCs=BCs, f=f, nu=nu, regen=bool(args.regen), op=op)
     PETSc.Sys.Print("Mode: %s Approach: %s. Run: %d" % (mode, approach, i), comm=COMM_WORLD)
     rel = np.abs(op.J - quantities['J_h']) / np.abs(op.J)
-    if op.mode == "rossby-wave":
-        quantities["Mirrored OF error"] = np.abs(op.J_mirror - quantities['J_h mirrored']) / np.abs(op.J_mirror)
     PETSc.Sys.Print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs OF error: %.4e"
           % (i, quantities['meanElements'], quantities['J_h'], quantities['solverTimer'], rel), comm=COMM_WORLD)
     errorFile.write('%d, %.4e' % (quantities['meanElements'], rel))
-    for tag in ("peak", "dist", "spd", "TV P02", "TV P06", "J_h mirrored", "Mirrored OF error"):
+    for tag in ("peak", "dist", "spd", "TV P02", "TV P06"):
         if tag in quantities:
             errorFile.write(", %.4e" % quantities[tag])
     errorFile.write(", %.1f, %.4e\n" % (quantities['solverTimer'], quantities['J_h']))
