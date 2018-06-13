@@ -233,7 +233,7 @@ def strongResidualSW(solver_obj, UV_new, ELEV_new, UV_old, ELEV_old, Ve=None, op
     using Crank-Nicolson timestepping.
 
     :param op: option parameters object.
-    :return: strong residual for shallow water equations at current timestep.
+    :return: two components of strong residual on element interiors, along with the element boundary residual.
     """
 
     # Collect fields and parameters
@@ -269,7 +269,7 @@ def strongResidualSW(solver_obj, UV_new, ELEV_new, UV_old, ELEV_old, Ve=None, op
     elev_2d = 0.5 * (elev_old + elev_new)   # related only to the spatial discretisation
     H = b + elev_2d
 
-    # Construct residual        # TODO: How to consider boundary integrals resulting from IBP?
+    # Momentum equation residual on element interiors
     res_u = (uv_new - uv_old) / Dt + g * grad(elev_2d)
     if solver_obj.options.use_nonlinear_equations:
         res_u += dot(uv_2d, nabla_grad(uv_2d))
@@ -283,9 +283,13 @@ def strongResidualSW(solver_obj, UV_new, ELEV_new, UV_old, ELEV_old, Ve=None, op
         else:
             res_u -= div(nu * grad(uv_2d))
 
+    # Continuity equation residual on element interiors
     res_e = (elev_new - elev_old) / Dt + div(H * uv_2d)
 
-    return res_u, res_e
+    # Element boundary residual
+    res_b = Constant(0.5) * H * inner(uv_2d, FacetNormal(uv_2d.function_space().mesh()))
+
+    return res_u, res_e, res_b
 
 
 class ErrorCallback(DiagnosticCallback):
