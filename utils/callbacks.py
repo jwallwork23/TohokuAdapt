@@ -1,7 +1,6 @@
 from thetis_adjoint import *
 from thetis.callback import DiagnosticCallback, FunctionalCallback
 
-from .interpolation import *
 from .options import TohokuOptions, Options
 from .timeseries import gaugeTV
 
@@ -191,13 +190,6 @@ def strongResidualSW(solver_obj, UV_new, ELEV_new, UV_old, ELEV_old, Ve=None, op
         elev_new.interpolate(ELEV_new)
         b = solver_obj.fields.bathymetry_2d
         f = solver_obj.options.coriolis_frequency
-    elif op.refinedSpace:
-        uv_old, elev_old, uv_new, elev_new = interp(Ve.mesh(), UV_old, ELEV_old, UV_new, ELEV_new)
-        b = interp(Ve.mesh(), solver_obj.fields.bathymetry_2d)
-        if nu is not None:
-            nu = interp(Ve.mesh(), nu)
-        if solver_obj.options.coriolis_frequency is not None:
-            f = interp(Ve.mesh(), solver_obj.options.coriolis_frequency)
     else:
         uv_old = UV_old
         uv_new = UV_new
