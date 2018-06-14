@@ -107,7 +107,7 @@ class GaugeCallback(DiagnosticCallback):    # TODO: This is probably superfluous
         self.ix += 1
         return value, self.gauge_values
 
-    def getVals(self):
+    def get_vals(self):
         return self.gauge_values
 
     def message_str(self, *args):
