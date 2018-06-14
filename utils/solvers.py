@@ -797,7 +797,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Store
                 residuals['bdyElevation'].append(bres_e)
                 if k % op.dumpsPerRemesh() == op.dumpsPerRemesh()-1:
 
-                    # L-inf
+                    # L-inf     # TODO: This is grossly inefficient
                     rho_u.interpolate(residuals['Velocity'][0])
                     rho_e.interpolate(residuals['Elevation'][0])
                     brho_u.interpolate(residuals['bdyVelocity'][0])
@@ -847,11 +847,11 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Store
                     if op.orderChange:                  # TODO: Replace adj with difference
                         duale_u.interpolate(dual_u)     # TODO: ... between higher order adj and adj on comp. mesh.
                         duale_e.interpolate(dual_e)     # TODO: ... h.o. interpolation should be patchwise.
-                        epsilon.interpolate(assemble(v * (inner(rho, duale) + brho * duale_e) * dx))
+                        epsilon.interpolate(assemble(v * (inner(rho, duale) + inner(brho, duale)) * dx))
                                                                           # ^ Would be subtract with no L-inf
                         # TODO: Also include method of difference quotients
                     else:
-                        epsilon.interpolate(assemble(v * (inner(rho, dual) + brho * dual_e) * dx))
+                        epsilon.interpolate(assemble(v * (inner(rho, dual) + inner(brho, dual)) * dx))
                     epsilon = normaliseIndicator(epsilon, op=op)         # ^ Would be subtract with no L-inf
                     epsilon.rename("Error indicator")
                     with DumbCheckpoint(op.di() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_CREATE) as saveErr:
