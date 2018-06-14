@@ -847,14 +847,14 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Sto
                     if op.orderChange:                  # TODO: Make this the only option! Replace adj with difference
                         duale_u.interpolate(dual_u)     # TODO: ... between higher order adj and adj on comp. mesh.
                         duale_e.interpolate(dual_e)
-                        epsilon.interpolate(assemble(v * inner(rho, duale) * dx + inner(rho_b, duale_e) * dS))
-                    elif op.refinedSpace:                                     # ^ Would be subtract with no L-inf
+                        epsilon.interpolate(assemble(v * (inner(rho, duale) + rho_b * duale_e) * dx))
+                    elif op.refinedSpace:                                 # ^ Would be subtract with no L-inf
                         dual_h_u, dual_h_e = interp(mesh_h, dual_u, dual_e)
                         duale_u.interpolate(dual_h_u)
                         duale_e.interpolate(dual_h_e)
-                        epsilon.interpolate(assemble(v * inner(rho, duale) * dx + inner(rho_b, duale_e) * dS))
-                    else:                                                    # v^ Would be subtract with no L-inf
-                        epsilon.interpolate(assemble(v * inner(rho, dual) * dx + inner(rho_b, dual_e) * dS))
+                        epsilon.interpolate(assemble(v * (inner(rho, duale) + rho_b * duale_e) * dx))
+                    else:                                                # v^ Would be subtract with no L-inf
+                        epsilon.interpolate(assemble(v * (inner(rho, dual) + rho_b * dual_e) * dx))
                     epsilon = normaliseIndicator(epsilon, op=op)
                     epsilon.rename("Error indicator")
                     with DumbCheckpoint(op.di() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_CREATE) as saveErr:

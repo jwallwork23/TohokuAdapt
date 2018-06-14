@@ -290,8 +290,9 @@ def strongResidualSW(solver_obj, UV_new, ELEV_new, UV_old, ELEV_old, Ve=None, op
     # Element boundary residual
     mesh = uv_old.function_space().mesh()
     v = TestFunction(FunctionSpace(mesh, "DG", 0))
-    j = assemble(Constant(0.5) * jump(v * H * uv_2d, n=FacetNormal(mesh)) * dS)
-    res_b = assemble(v * j * dx)
+    j = assemble(jump(Constant(0.5) * v * H * uv_2d, n=FacetNormal(mesh)) * dS) # This gives a P0 field
+    # res_b = assemble(v * j * dx)
+    res_b = j
 
     return res_u, res_e, res_b
 
