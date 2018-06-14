@@ -25,7 +25,6 @@ class AdaptOptions(FrozenConfigurable):
     maxAnisotropy = PositiveFloat(100., help="Maximum tolerated anisotropy.").tag(config=True)
     nAdapt = NonNegativeInteger(1, help="Number of mesh adaptations per remeshing.").tag(config=True)
     orderChange = NonNegativeInteger(0, help="Change in polynomial degree for residual approximation.").tag(config=True)
-    refinedSpace = Bool(False, help="Refine space too compute errors and residuals.").tag(config=True)
     adaptField = Unicode('s', help="Adaptation field of interest, from {'s', 'f', 'b'}.").tag(config=True)
     normalisation = Unicode('lp', help="Normalisation approach, from {'lp', 'manual'}.").tag(config=True)
     hessMeth = Unicode('dL2', help="Hessian recovery technique, from {'dL2', 'parts'}.").tag(config=True)
@@ -290,7 +289,6 @@ class Options:
                  maxGrowth=1.4,
                  nAdapt=1,
                  orderChange=0,
-                 refinedSpace=False,
                  coriolis='sin',
                  rescaling=0.85,
                  ndump=None,
@@ -313,7 +311,6 @@ class Options:
         :param nAdapt: number of mesh adaptions per mesh regeneration.
         :param nVerT: target number of vertices.
         :param orderChange: change in polynomial degree for residual approximation.
-        :param refinedSpace: refine space too compute errors and residuals.
         """
 
         # Model parameters
@@ -455,12 +452,11 @@ class Options:
             raise ValueError('Invalid anisotropy value %.1f. a > 0 is required.' % maxAnisotropy)
 
         # Misc options
-        for i in (gradate, plotpvd, refinedSpace, bAdapt):
+        for i in (gradate, plotpvd, bAdapt):
             assert(isinstance(i, bool))
         self.gradate = gradate
         self.bAdapt = bAdapt
         self.plotpvd = plotpvd
-        self.refinedSpace = refinedSpace
         try:
             assert (maxGrowth > 1)
             self.maxGrowth = maxGrowth
@@ -481,10 +477,6 @@ class Options:
         self.nAdapt = nAdapt
         self.orderChange = orderChange
         self.nVerT = nVerT
-        if self.refinedSpace:
-            assert self.orderChange == 0
-        if self.orderChange != 0:
-            assert not self.refinedSpace
 
         self.viscosity = 1e-3
 

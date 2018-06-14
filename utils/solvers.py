@@ -632,7 +632,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
         return quantities
 
 
-def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Store optimal mesh, 'intersected' over all rm steps
+def DWR(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Store optimal mesh, 'intersected' over all rm steps
     op = kwargs.get('op')
     regen = kwargs.get('regen')
 
@@ -647,12 +647,12 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Sto
         assert (float(physical_constants['g_grav'].dat.data) == op.g)
     except:
         physical_constants['g_grav'].assign(op.g)
-    V = op.mixedSpace(mesh_H)
+    V = op.mixedSpace(mesh)
     q = Function(V)
     uv_2d, elev_2d = q.split()    # Needed to load data into
     uv_2d.rename('uv_2d')
     elev_2d.rename('elev_2d')
-    P1 = FunctionSpace(mesh_H, "CG", 1)
+    P1 = FunctionSpace(mesh, "CG", 1)
     if op.mode == 'rossby-wave':    # Analytic final-time state
         peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
 
@@ -663,20 +663,14 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Sto
     dual_e.rename("Adjoint elevation")
 
     if op.orderChange:
-        Ve = op.mixedSpace(mesh_H, enrich=True)
+        Ve = op.mixedSpace(mesh, enrich=True)
         duale = Function(Ve)
         duale_u, duale_e = duale.split()
         epsilon = Function(P1, name="Error indicator")
-    elif op.refinedSpace:                   # Define variables on an iso-P2 refined space
-        mesh_h = isoP2(mesh_H)
-        Ve = op.mixedSpace(mesh_h)
-        duale = Function(Ve)
-        duale_u, duale_e = duale.split()
-        epsilon = Function(FunctionSpace(mesh_h, "CG", 1), name="Error indicator")
     else:                                   # Copy standard variables to mimic enriched space labels
         Ve = V
         epsilon = Function(P1, name="Error indicator")
-    v = TestFunction(FunctionSpace(mesh_h if op.refinedSpace else mesh_H, "DG", 0)) # For forming error indicators
+    v = TestFunction(FunctionSpace(mesh, "DG", 0)) # For forming error indicators
     rho = Function(Ve)
     rho_u, rho_e = rho.split()
     rho_u.rename("Momentum error")
@@ -687,20 +681,20 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Sto
     temp_b = Function(Ve.sub(1))
 
     # Initialise parameters and counters
-    nEle = mesh_H.num_cells()
-    op.nVerT = mesh_H.num_vertices() * op.rescaling  # Target #Vertices
+    nEle = mesh.num_cells()
+    op.nVerT = mesh.num_vertices() * op.rescaling  # Target #Vertices
     mM = [nEle, nEle]  # Min/max #Elements
     Sn = nEle
     t = 0.
 
     # Get initial boundary metric
     if op.gradate:
-        H0 = Function(P1).interpolate(CellSize(mesh_H))
+        H0 = Function(P1).interpolate(CellSize(mesh))
 
     if not regen:
 
         # Solve fixed mesh primal problem to get residuals and adjoint solutions
-        solver_obj = solver2d.FlowSolver2d(mesh_H, b)
+        solver_obj = solver2d.FlowSolver2d(mesh, b)
         options = solver_obj.options
         options.element_family = op.family
         options.use_nonlinear_equations = True
@@ -844,18 +838,15 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Sto
                         loadAdj.load(dual_u)
                         loadAdj.load(dual_e)
                         loadAdj.close()
-                    if op.orderChange:                  # TODO: Make this the only option! Replace adj with difference
+                    if op.orderChange:                  # TODO: Replace adj with difference
                         duale_u.interpolate(dual_u)     # TODO: ... between higher order adj and adj on comp. mesh.
-                        duale_e.interpolate(dual_e)
+                        duale_e.interpolate(dual_e)     # TODO: ... h.o. interpolation should be patchwise.
                         epsilon.interpolate(assemble(v * (inner(rho, duale) + rho_b * duale_e) * dx))
-                    elif op.refinedSpace:                                 # ^ Would be subtract with no L-inf
-                        dual_h_u, dual_h_e = interp(mesh_h, dual_u, dual_e)
-                        duale_u.interpolate(dual_h_u)
-                        duale_e.interpolate(dual_h_e)
-                        epsilon.interpolate(assemble(v * (inner(rho, duale) + rho_b * duale_e) * dx))
-                    else:                                                # v^ Would be subtract with no L-inf
+                                                                          # ^ Would be subtract with no L-inf
+                        # TODO: Also include method of difference quotients
+                    else:
                         epsilon.interpolate(assemble(v * (inner(rho, dual) + rho_b * dual_e) * dx))
-                    epsilon = normaliseIndicator(epsilon, op=op)
+                    epsilon = normaliseIndicator(epsilon, op=op)         # ^ Would be subtract with no L-inf
                     epsilon.rename("Error indicator")
                     with DumbCheckpoint(op.di() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_CREATE) as saveErr:
                         saveErr.store(epsilon)
@@ -887,38 +878,38 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Sto
                 with DumbCheckpoint(op.di() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_READ) as loadErr:
                     loadErr.load(epsilon)
                     loadErr.close()
-                errEst = Function(FunctionSpace(mesh_H, "CG", 1)).assign(interp(mesh_H, epsilon))
+                errEst = Function(FunctionSpace(mesh, "CG", 1)).assign(interp(mesh, epsilon))
                 M = isotropicMetric(errEst, invert=False, op=op)
                 if op.gradate:
-                    # br = Function(P1).interpolate(bdyRegion(mesh_H, 200, 5e8))
-                    # ass = assemble(interp(mesh_H, H0) * br / assemble(100 * br * dx))
+                    # br = Function(P1).interpolate(bdyRegion(mesh, 200, 5e8))
+                    # ass = assemble(interp(mesh, H0) * br / assemble(100 * br * dx))
                     # File('plots/tohoku/bdyRegion.pvd').write(ass)
                     # M_ = isotropicMetric(ass, op=op)
                     # M = metricIntersection(M, M_)
 
-                    M_ = isotropicMetric(interp(mesh_H, H0), bdy=bdy, op=op)   # Initial boundary metric
+                    M_ = isotropicMetric(interp(mesh, H0), bdy=bdy, op=op)   # Initial boundary metric
                     M = metricIntersection(M, M_, bdy=bdy)
                     M = metricGradation(M, op=op)
                     # File('plots/tohoku/metric.pvd').write(M)
 
                 # Adapt mesh and interpolate variables
-                mesh_H = AnisotropicAdaptation(mesh_H, M).adapted_mesh
-                # File('plots/tohoku/mesh.pvd').write(mesh_H.coordinates)
+                mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
+                # File('plots/tohoku/mesh.pvd').write(mesh.coordinates)
                 # exit(0)
 
-            elev_2d, uv_2d = interp(mesh_H, elev_2d, uv_2d)
-            b, BCs, f, nu = problemDomain(mesh=mesh_H, op=op)[3:]           # TODO: Find a different way to reset these
+            elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
+            b, BCs, f, nu = problemDomain(mesh=mesh, op=op)[3:]           # TODO: Find a different way to reset these
             uv_2d.rename('uv_2d')
             elev_2d.rename('elev_2d')
             adaptTimer = clock() - adaptTimer
 
             # Solver object and equations
-            adapSolver = solver2d.FlowSolver2d(mesh_H, b)
+            adapSolver = solver2d.FlowSolver2d(mesh, b)
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = True
             if nu is not None:
-                adapOpt.horizontal_viscosity = interp(mesh_H, nu)
+                adapOpt.horizontal_viscosity = interp(mesh, nu)
             adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
             adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump
@@ -970,7 +961,7 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Sto
                 quantities['TV P06'] = cb3.totalVariation()
 
             # Get mesh stats
-            nEle = mesh_H.num_cells()
+            nEle = mesh.num_cells()
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
             cnt += op.rm
