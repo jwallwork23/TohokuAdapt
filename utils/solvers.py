@@ -675,10 +675,12 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Store
     rho_u, rho_e = rho.split()
     rho_u.rename("Momentum error")
     rho_e.rename("Continuity error")
-    rho_b = Function(Ve.sub(1), name="Boundary error")
+    brho = Function(Ve, name="Boundary error")
+    brho_u, brho_e = brho.split()
     temp = Function(Ve)
     temp_u, temp_e = temp.split()
-    temp_b = Function(Ve.sub(1))
+    btemp = Function(Ve)
+    btemp_u, btemp_e = btemp.split()
 
     # Initialise parameters and counters
     nEle = mesh.num_cells()
@@ -787,32 +789,39 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Store
                     loadPrev.load(elev_old, name="Previous elevation")
                     loadPrev.close()
                 tic = clock()
-                err_u, err_e, err_b = strongResidualSW(solver_obj, uv_2d, elev_2d, uv_old, elev_old, Ve, op=op)
+                err_u, err_e, bres_u, bres_e = strongResidualSW(solver_obj, uv_2d, elev_2d, uv_old, elev_old, Ve, op=op)
                 print("Residual computation: %.2fs" % (clock()- tic))
                 residuals['Velocity'].append(err_u)
                 residuals['Elevation'].append(err_e)
-                residuals['Boundary'].append(err_b)
+                residuals['bdyVelocity'].append(bres_u)
+                residuals['bdyElevation'].append(bres_e)
                 if k % op.dumpsPerRemesh() == op.dumpsPerRemesh()-1:
 
                     # L-inf
                     rho_u.interpolate(residuals['Velocity'][0])
                     rho_e.interpolate(residuals['Elevation'][0])
-                    # rho_b.interpolate(residuals['Boundary'][0])
+                    brho_u.interpolate(residuals['bdyVelocity'][0])
+                    brho_e.interpolate(residuals['bdyElevation'][0])
                     rho_u.dat.data[:] = np.abs(rho_u.dat.data)
                     rho_e.dat.data[:] = np.abs(rho_e.dat.data)
-                    # rho_b.dat.data[:] = np.abs(rho_b.dat.data)
+                    brho_u.dat.data[:] = np.abs(brho_u.dat.data)
+                    brho_e.dat.data[:] = np.abs(brho_e.dat.data)
                     for i in range(1, len(residuals['Velocity'])):
                         temp_u.interpolate(residuals['Velocity'][i])
                         temp_e.interpolate(residuals['Elevation'][i])
-                        # temp_b.interpolate(residuals['Boundary'][i])
+                        btemp_u.interpolate(residuals['bdyVelocity'][i])
+                        btemp_e.interpolate(residuals['bdyElevation'][i])
                         temp_u.dat.data[:] = np.abs(temp_u.dat.data)
                         temp_e.dat.data[:] = np.abs(temp_e.dat.data)
-                        # temp_b.dat.data[:] = np.abs(temp_b.dat.data)
+                        btemp_u.dat.data[:] = np.abs(btemp_u.dat.data)
+                        btemp_e.dat.data[:] = np.abs(btemp_e.dat.data)
                         for j in range(len(temp_e.dat.data)):
                             rho_u.dat.data[j, 0] = max(temp_u.dat.data[j, 0], rho_u.dat.data[j, 0])
                             rho_u.dat.data[j, 1] = max(temp_u.dat.data[j, 1], rho_u.dat.data[j, 1])
                             rho_e.dat.data[j] = max(temp_e.dat.data[j], rho_e.dat.data[j])
-                            # rho_b.dat.data[j] = max(temp_b.dat.data[j], rho_b.dat.data[j])
+                            brho_u.dat.data[j, 0] = max(btemp_u.dat.data[j, 0], brho_u.dat.data[j, 0])
+                            brho_u.dat.data[j, 1] = max(btemp_u.dat.data[j, 1], brho_u.dat.data[j, 1])
+                            brho_e.dat.data[j] = max(btemp_e.dat.data[j], brho_e.dat.data[j])
 
                     # # L1
                     # err_u = op.dt * sum(abs(residuals['Velocity'][i] + residuals['Velocity'][i - 1]) for i in range(1, op.dumpsPerRemesh()))
@@ -825,10 +834,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Store
                     # rho_u.interpolate(err_u)
                     # rho_e.interpolate(err_e)
 
-                    rho_b = op.dt * sum(abs(residuals['Boundary'][i] + residuals['Boundary'][i - 1]) for i in
-                                        range(1, op.dumpsPerRemesh()))
-
-                    residuals = {'Velocity': [], 'Elevation': [], 'Boundary': []}
+                    residuals = {'Velocity': [], 'Elevation': [], 'bdyVelocity': [], 'bdyElevation': []}
                     if op.plotpvd:
                         residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * (k+1)))
 
@@ -841,11 +847,11 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Store
                     if op.orderChange:                  # TODO: Replace adj with difference
                         duale_u.interpolate(dual_u)     # TODO: ... between higher order adj and adj on comp. mesh.
                         duale_e.interpolate(dual_e)     # TODO: ... h.o. interpolation should be patchwise.
-                        epsilon.interpolate(assemble(v * (inner(rho, duale) + rho_b * duale_e) * dx))
+                        epsilon.interpolate(assemble(v * (inner(rho, duale) + brho * duale_e) * dx))
                                                                           # ^ Would be subtract with no L-inf
                         # TODO: Also include method of difference quotients
                     else:
-                        epsilon.interpolate(assemble(v * (inner(rho, dual) + rho_b * dual_e) * dx))
+                        epsilon.interpolate(assemble(v * (inner(rho, dual) + brho * dual_e) * dx))
                     epsilon = normaliseIndicator(epsilon, op=op)         # ^ Would be subtract with no L-inf
                     epsilon.rename("Error indicator")
                     with DumbCheckpoint(op.di() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_CREATE) as saveErr:
