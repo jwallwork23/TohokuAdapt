@@ -33,7 +33,7 @@ class SWCallback(FunctionalCallback):
             ks = Function(VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1))
             k0, k1 = ks.split()
             iA = self.op.indicator(mesh)
-            File("plots/" + self.op.mode + "/indicator.pvd").write(iA)
+            # File("plots/" + self.op.mode + "/indicator.pvd").write(iA)
             k1.assign(iA)
             kt = Constant(0.)
             if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:      # Slightly smooth transition
@@ -68,7 +68,7 @@ class ObjectiveSWCallback(FunctionalCallback):
             ks = Function(VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1))
             k0, k1 = ks.split()
             iA = self.op.indicator(mesh)
-            File("plots/" + self.op.mode + "/indicator.pvd").write(iA)
+            # File("plots/" + self.op.mode + "/indicator.pvd").write(iA)
             k1.assign(iA)
             kt = Constant(0.)
             if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:
@@ -227,6 +227,7 @@ class P06Callback(GaugeCallback):
 #
 #     return res_u, res_e
 
+
 def strongResidualSW(solver_obj, UV_new, ELEV_new, UV_old, ELEV_old, Ve=None, op=Options()):
     """
     Construct the strong residual for the semi-discrete shallow water equations at the current timestep,
@@ -287,7 +288,10 @@ def strongResidualSW(solver_obj, UV_new, ELEV_new, UV_old, ELEV_old, Ve=None, op
     res_e = (elev_new - elev_old) / Dt + div(H * uv_2d)
 
     # Element boundary residual
-    res_b = Constant(0.5) * H * inner(uv_2d, FacetNormal(uv_2d.function_space().mesh()))
+    mesh = uv_old.function_space().mesh()
+    v = TestFunction(FunctionSpace(mesh, "DG", 0))
+    j = assemble(Constant(0.5) * jump(v * H * uv_2d, n=FacetNormal(mesh)) * dS)
+    res_b = assemble(v * j * dx)
 
     return res_u, res_e, res_b
 

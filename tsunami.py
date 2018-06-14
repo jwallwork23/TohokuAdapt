@@ -27,6 +27,7 @@ parser.add_argument("-o", help="Output data")
 parser.add_argument("-regen", help="Regenerate error estimates from saved data")
 parser.add_argument("-nAdapt", help="Number of mesh adaptation steps")
 parser.add_argument("-gradate", help="Gradate metric")
+parser.add_argument("-field", help="Field for Hessian based adaptation, from {'s', 'f', 'b'}.")
 args = parser.parse_args()
 
 approach = args.a
@@ -64,6 +65,7 @@ op.nAdapt = 1 if args.nAdapt is None else int(args.nAdapt)
 op.orderChange =  orderChange
 op.refinedSpace = bool(args.r) if args.r is not None else False
 op.bAdapt = bool(args.b) if args.b is not None else False
+op.adaptField = args.field if args.field is not None else 's'
 
 # Establish filenames
 filename = 'outdata/' + mode + '/' + approach

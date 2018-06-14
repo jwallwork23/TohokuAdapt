@@ -265,7 +265,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
         P1 = FunctionSpace(mesh, "CG", 1)
 
         if op.adaptField != 's':
-            height = Function(P1).assign(elev_2d)
+            height = Function(P1).interpolate(elev_2d)
         if op.adaptField != 'f':
             spd = Function(P1).interpolate(sqrt(dot(uv_2d, uv_2d)))
         for l in range(op.nAdapt):                  # TODO: Test this functionality
@@ -803,22 +803,22 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Sto
                     # L-inf
                     rho_u.interpolate(residuals['Velocity'][0])
                     rho_e.interpolate(residuals['Elevation'][0])
-                    rho_b.interpolate(residuals['Boundary'][0])
+                    # rho_b.interpolate(residuals['Boundary'][0])
                     rho_u.dat.data[:] = np.abs(rho_u.dat.data)
                     rho_e.dat.data[:] = np.abs(rho_e.dat.data)
-                    rho_b.dat.data[:] = np.abs(rho_b.dat.data)
+                    # rho_b.dat.data[:] = np.abs(rho_b.dat.data)
                     for i in range(1, len(residuals['Velocity'])):
                         temp_u.interpolate(residuals['Velocity'][i])
                         temp_e.interpolate(residuals['Elevation'][i])
-                        temp_b.interpolate(residuals['Boundary'][i])
+                        # temp_b.interpolate(residuals['Boundary'][i])
                         temp_u.dat.data[:] = np.abs(temp_u.dat.data)
                         temp_e.dat.data[:] = np.abs(temp_e.dat.data)
-                        temp_b.dat.data[:] = np.abs(temp_b.dat.data)
+                        # temp_b.dat.data[:] = np.abs(temp_b.dat.data)
                         for j in range(len(temp_e.dat.data)):
                             rho_u.dat.data[j, 0] = max(temp_u.dat.data[j, 0], rho_u.dat.data[j, 0])
                             rho_u.dat.data[j, 1] = max(temp_u.dat.data[j, 1], rho_u.dat.data[j, 1])
                             rho_e.dat.data[j] = max(temp_e.dat.data[j], rho_e.dat.data[j])
-                            rho_b.dat.data[j] = max(temp_b.dat.data[j], rho_b.dat.data[j])
+                            # rho_b.dat.data[j] = max(temp_b.dat.data[j], rho_b.dat.data[j])
 
                     # # L1
                     # err_u = op.dt * sum(abs(residuals['Velocity'][i] + residuals['Velocity'][i - 1]) for i in range(1, op.dumpsPerRemesh()))
@@ -831,10 +831,12 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Sto
                     # rho_u.interpolate(err_u)
                     # rho_e.interpolate(err_e)
 
+                    rho_b = op.dt * sum(abs(residuals['Boundary'][i] + residuals['Boundary'][i - 1]) for i in
+                                        range(1, op.dumpsPerRemesh()))
 
                     residuals = {'Velocity': [], 'Elevation': [], 'Boundary': []}
                     if op.plotpvd:
-                        residualFile.write(rho_u, rho_e, rho_b, time=float(op.dt * op.rm * (k+1)))
+                        residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * (k+1)))
 
                     # Load adjoint data and form indicators
                     indexStr = indexString(int((k+1)/op.dumpsPerRemesh()-1))
@@ -844,15 +846,15 @@ def DWR(mesh_H, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Sto
                         loadAdj.close()
                     if op.orderChange:                  # TODO: Make this the only option! Replace adj with difference
                         duale_u.interpolate(dual_u)     # TODO: ... between higher order adj and adj on comp. mesh.
-                        duale_e.interpolate(dual_e)     # TODO: Also need boundary residuals
-                        epsilon.interpolate(assemble(v * inner(rho, duale) * dx) + assemble(inner(rho_b, duale_e) * dS))
-                    elif op.refinedSpace:                                      # ^ Would be subtract with no L-inf
+                        duale_e.interpolate(dual_e)
+                        epsilon.interpolate(assemble(v * inner(rho, duale) * dx + inner(rho_b, duale_e) * dS))
+                    elif op.refinedSpace:                                     # ^ Would be subtract with no L-inf
                         dual_h_u, dual_h_e = interp(mesh_h, dual_u, dual_e)
                         duale_u.interpolate(dual_h_u)
                         duale_e.interpolate(dual_h_e)
-                        epsilon.interpolate(assemble(v * inner(rho, duale) * dx) + assemble(inner(rho_b, duale_e) * dS))
-                    else:                                                     # v^ Would be subtract with no L-inf
-                        epsilon.interpolate(assemble(v * inner(rho, dual) * dx) + assemble(inner(rho_b, dual_e) * dS))
+                        epsilon.interpolate(assemble(v * inner(rho, duale) * dx + inner(rho_b, duale_e) * dS))
+                    else:                                                    # v^ Would be subtract with no L-inf
+                        epsilon.interpolate(assemble(v * inner(rho, dual) * dx + inner(rho_b, dual_e) * dS))
                     epsilon = normaliseIndicator(epsilon, op=op)
                     epsilon.rename("Error indicator")
                     with DumbCheckpoint(op.di() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_CREATE) as saveErr:

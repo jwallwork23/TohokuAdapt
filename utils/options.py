@@ -24,7 +24,6 @@ class AdaptOptions(FrozenConfigurable):
     maxGrowth = PositiveFloat(1.4, help="Metric gradation scaling parameter.").tag(config=True)
     maxAnisotropy = PositiveFloat(100., help="Maximum tolerated anisotropy.").tag(config=True)
     nAdapt = NonNegativeInteger(1, help="Number of mesh adaptations per remeshing.").tag(config=True)
-    rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
     orderChange = NonNegativeInteger(0, help="Change in polynomial degree for residual approximation.").tag(config=True)
     refinedSpace = Bool(False, help="Refine space too compute errors and residuals.").tag(config=True)
     adaptField = Unicode('s', help="Adaptation field of interest, from {'s', 'f', 'b'}.").tag(config=True)
@@ -122,6 +121,7 @@ class TohokuOptions(AdaptOptions):
     hmax = PositiveFloat(1e5, help="Maximum element size").tag(config=True)
     minNorm = PositiveFloat(1.).tag(config=True)    # TODO: Not sure about this
     maxScaling = PositiveFloat(5e5).tag(config=True)  # TODO: Not sure about this
+    rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
 
     # Physical parameters
     coriolis = Unicode('sin', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
@@ -167,6 +167,8 @@ class RossbyWaveOptions(AdaptOptions):
     hmax = PositiveFloat(10., help="Maximum element size").tag(config=True)
     minNorm = PositiveFloat(1e-4).tag(config=True)  # TODO: Not sure about this
     maxScaling = PositiveFloat(5e5).tag(config=True)  # TODO: Not sure about this
+    rescaling = PositiveFloat(0.255, help="Scaling parameter for target number of vertices.").tag(config=True)
+    # Here ``rescaling`` is adjusted based on using oversized domain to account for periodicity
 
     # Physical parameters
     coriolis = Unicode('beta', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
@@ -199,6 +201,7 @@ class KelvinWaveOptions(AdaptOptions):
     hmax = PositiveFloat(10., help="Maximum element size").tag(config=True)
     minNorm = PositiveFloat(1e-4).tag(config=True)  # TODO: Not sure about this
     maxScaling = PositiveFloat(5e5).tag(config=True)  # TODO: Not sure about this
+    rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
 
     # Physical parameters
     coriolis = Unicode('beta', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
@@ -231,6 +234,7 @@ class GaussianOptions(AdaptOptions):
     hmax = PositiveFloat(1., help="Maximum element size").tag(config=True)
     minNorm = PositiveFloat(1e-6).tag(config=True)      # TODO: Not sure about this
     maxScaling = PositiveFloat(5e9).tag(config=True)    # TODO: Not sure about this
+    rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
 
     # Physical parameters
     coriolis = Unicode('beta', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
