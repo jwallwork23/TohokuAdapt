@@ -221,8 +221,9 @@ def strongResidualSW(solver_obj, UV_new, ELEV_new, UV_old, ELEV_old, Ve=None, op
     # Element boundary residual
     mesh = uv_old.function_space().mesh()
     v = TestFunction(FunctionSpace(mesh, "DG", 0))
-    n = FacetNormal(mesh)       # TODO: Can't integrate vector field
-    bres_u = assemble(jump(Constant(0.5) * g * v * elev_2d, n=n) * dS)  # This gives a vector P0 field
+    n = FacetNormal(mesh)
+    # bres_u = assemble(jump(Constant(0.5) * g * v * elev_2d, n=n) * dS)  # This gives a vector P0 field
+    bres_u = Function(VectorFunctionSpace(mesh, "DG", 1))       # TODO: Fix this (Can't integrate vector field)
     bres_e = assemble(jump(Constant(0.5) * v * H * uv_2d, n=n) * dS)    # This gives a scalar P0 field
 
     return res_u, res_e, bres_u, bres_e

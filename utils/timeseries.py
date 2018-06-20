@@ -344,7 +344,7 @@ def errorVsElements(mode='tohoku',
                 plt.hlines(op.J, 4e3, 2e5, colors='k', linestyles='solid', label=r'681,616 elements')
                 plt.axhspan(op.J-5e10, op.J+5e10, alpha=0.5, color='gray')
 
-        plt.legend(loc=1)
+        plt.legend(loc=4)
         plt.xlabel(r'Mean element count')
         plt.ylabel(errorlabels[m])
         plt.savefig(di + errornames[m] + 'VsElements' + today + '.pdf', bbox_inches='tight')
@@ -360,7 +360,7 @@ def errorVsElements(mode='tohoku',
                 plt.hlines(op.J, 8e1, 2e3, colors='k', linestyles='solid', label=r'681,616 elements')
                 plt.axhspan(op.J-5e10, op.J+5e10, alpha=0.5, color='gray')
         plt.gcf()
-        plt.legend(loc=1)
+        plt.legend(loc=4)
         plt.xlabel(r'CPU time (s)')
         plt.ylabel(errorlabels[m])
         plt.savefig(di + errornames[m] + 'VsTimings' + today + '.pdf', bbox_inches='tight')

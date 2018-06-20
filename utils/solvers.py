@@ -275,7 +275,14 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
                 M = steadyMetric(height, op=op)
             if op.adaptField != 'f' and cnt != 0:   # Can't adapt to zero velocity
                 M2 = steadyMetric(spd, op=op)
-                M = metricIntersection(M, M2) if op.adaptField == 'b' else M2
+                if op.adaptField != 'b':
+                    M = M2
+                else:
+                    try:
+                        M = metricIntersection(M, M2)
+                    except:
+                        print("WARNING: null fluid speed metric")
+                        M = metricIntersection(M2, M)
             if op.bAdapt and not (op.adaptField != 'f' and cnt == 0):
                 M2 = steadyMetric(b, op=op)
                 M = M2 if op.adaptField != 'f' and cnt == 0. else metricIntersection(M, M2)     # TODO: Convex combination?

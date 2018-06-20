@@ -377,9 +377,12 @@ def metricIntersection(M1, M2, bdy=None):
     V = M1.function_space()
     assert V == M2.function_space()
     M = Function(V).assign(M1)
-    mesh = V.mesh()
-    for i in DirichletBC(V, 0, bdy).nodes if bdy is not None else range(mesh.topology.num_vertices()):
+    cnt = 0
+    for i in DirichletBC(V, 0, bdy).nodes if bdy is not None else range(V.mesh().num_vertices()):
         M.dat.data[i] = localMetricIntersection(M1.dat.data[i], M2.dat.data[i])
+        if la.det(M.dat.data[i]) > 1.001 * la.det(M1.dat.data[i]):
+            cnt += 1
+            print("#### WARNING %d: Intersection is decreasing area" % cnt)
         # print('#### metricIntersection DEBUG: det(Mi) = ', la.det(M1.dat.data[i]))
     return M
 
