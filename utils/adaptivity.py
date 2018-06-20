@@ -361,8 +361,9 @@ def localMetricIntersection(M1, M2):
     # print('#### localMetricIntersection DEBUG: attempting to compute sqrtm of matrix with determinant ', la.det(M1))
     sqM1 = sla.sqrtm(M1)
     sqiM1 = la.inv(sqM1)    # Note inverse and square root commute whenever both are defined
-    lam, v = la.eig(np.transpose(sqiM1) * M2 * sqiM1)
-    return np.transpose(sqM1) * v * [[max(lam[0], 1), 0], [0, max(lam[1], 1)]] * np.transpose(v) * sqM1
+    lam, v = la.eig(np.dot(np.transpose(sqiM1), np.dot(M2, sqiM1)))
+    M12 = np.dot(v, np.dot([[max(lam[0], 1), 0], [0, max(lam[1], 1)]], np.transpose(v)))
+    return np.dot(np.transpose(sqM1), np.dot(M12, sqM1))
 
 
 def metricIntersection(M1, M2, bdy=None):
