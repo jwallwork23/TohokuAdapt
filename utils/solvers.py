@@ -541,7 +541,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
                 if op.gradate:
                     M_ = isotropicMetric(interp(mesh, H0), bdy=bdy, op=op)  # Initial boundary metric
                     M = metricIntersection(M, M_, bdy=bdy)
-                    metricGradation(M, op=op)
+                    # metricGradation(M, op=op)
 
                 # Adapt mesh and interpolate variables
                 mesh = AnisotropicAdaptation(mesh, M).adapted_mesh

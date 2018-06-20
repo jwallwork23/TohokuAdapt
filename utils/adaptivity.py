@@ -166,7 +166,7 @@ def steadyMetric(f, H=None, op=Options()):
     return M
 
 
-def normaliseIndicator(f, op=Options()):
+def normaliseIndicator(f, op=Options()):        # TODO: What if metric is constant?
     """
     Normalise error indicator `f` using procedure defined by `op`.
     
@@ -276,7 +276,9 @@ def metricGradation(M, op=Options()):   # TODO: Implement this in pyop2
     ln_beta = np.log(op.maxGrowth)
 
     # Get vertices and edges of mesh
-    mesh = M.function_space().mesh()
+    V = M.function_space()
+    M_grad = Function(V).assign(M)
+    mesh = V.mesh()
     plex = mesh._plex
     vStart, vEnd = plex.getDepthStratum(0)  # Vertices
     eStart, eEnd = plex.getDepthStratum(1)  # Edges
@@ -303,8 +305,8 @@ def metricGradation(M, op=Options()):   # TODO: Implement this in pyop2
                 continue
 
             # Assemble local metrics and calculate edge lengths
-            met1 = M.dat.data[iVer1]
-            met2 = M.dat.data[iVer2]
+            met1 = M_grad.dat.data[iVer1]
+            met2 = M_grad.dat.data[iVer2]
             v12[0] = xy[iVer2][0] - xy[iVer1][0]
             v12[1] = xy[iVer2][1] - xy[iVer1][1]
             v21[0] = - v12[0]
@@ -332,10 +334,10 @@ def metricGradation(M, op=Options()):   # TODO: Implement this in pyop2
                    + np.abs(met1[1, 1] - redMet1[1, 1])
             diff /= (np.abs(met1[0, 0]) + np.abs(met1[0, 1]) + np.abs(met1[1, 1]))
             if diff > 1e-3:
-                M.dat.data[iVer1][0, 0] = redMet1[0, 0]
-                M.dat.data[iVer1][0, 1] = redMet1[0, 1]
-                M.dat.data[iVer1][1, 0] = redMet1[1, 0]
-                M.dat.data[iVer1][1, 1] = redMet1[1, 1]
+                M_grad.dat.data[iVer1][0, 0] = redMet1[0, 0]
+                M_grad.dat.data[iVer1][0, 1] = redMet1[0, 1]
+                M_grad.dat.data[iVer1][1, 0] = redMet1[1, 0]
+                M_grad.dat.data[iVer1][1, 1] = redMet1[1, 1]
                 verTag[iVer1] = i+1
                 correction = True
 
@@ -344,14 +346,14 @@ def metricGradation(M, op=Options()):   # TODO: Implement this in pyop2
                    + np.abs(met2[1, 1] - redMet2[1, 1])
             diff /= (np.abs(met2[0, 0]) + np.abs(met2[0, 1]) + np.abs(met2[1, 1]))
             if diff > 1e-3:
-                M.dat.data[iVer2][0, 0] = redMet2[0, 0]
-                M.dat.data[iVer2][0, 1] = redMet2[0, 1]
-                M.dat.data[iVer2][1, 0] = redMet2[1, 0]
-                M.dat.data[iVer2][1, 1] = redMet2[1, 1]
+                M_grad.dat.data[iVer2][0, 0] = redMet2[0, 0]
+                M_grad.dat.data[iVer2][0, 1] = redMet2[0, 1]
+                M_grad.dat.data[iVer2][1, 0] = redMet2[1, 0]
+                M_grad.dat.data[iVer2][1, 1] = redMet2[1, 1]
                 verTag[iVer2] = i+1
                 correction = True
 
-    return M
+    return M_grad
 
 
 def localMetricIntersection(M1, M2):
@@ -378,12 +380,8 @@ def metricIntersection(M1, M2, bdy=None):
     V = M1.function_space()
     assert V == M2.function_space()
     M = Function(V).assign(M1)
-    cnt = 0
     for i in DirichletBC(V, 0, bdy).nodes if bdy is not None else range(V.mesh().num_vertices()):
         M.dat.data[i] = localMetricIntersection(M1.dat.data[i], M2.dat.data[i])
-        if la.det(M.dat.data[i]) > 1.001 * la.det(M1.dat.data[i]):
-            cnt += 1
-            print("#### WARNING %d: Intersection is decreasing area" % cnt)
         # print('#### metricIntersection DEBUG: det(Mi) = ', la.det(M1.dat.data[i]))
     return M
 
