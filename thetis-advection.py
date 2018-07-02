@@ -51,7 +51,7 @@ options.simulation_export_time = t_export
 options.simulation_end_time = t_end
 options.output_directory = outputdir
 options.horizontal_velocity_scale = u_mag
-options.check_volume_conservation_2d = True
+# options.check_tracer_conservation = True
 options.fields_to_export = ['uv_2d', 'elev_2d', 'tracer_2d']
 options.solve_tracer = True
 options.tracer_only = True      # Need use tracer-only branch to use this functionality
@@ -75,4 +75,5 @@ solver_obj.bnd_functions['shallow_water']['uv'][2] = uv_init
 
 # Solve
 solver_obj.assign_initial_conditions(elev=elev_init, uv=uv_init)
+assert(options.timestep < min(solver_obj.compute_time_step().dat.data))     # Check CFL condition
 solver_obj.iterate()
