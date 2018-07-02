@@ -19,6 +19,7 @@
 plots/
 resources/meshes/
 resources/GMT/
+resources/channel/
 utils/.idea/
 outdata/
 
@@ -34,3 +35,5 @@ utils/forms.py
 # Test scripts
 paralleltest.py
 dt_test.py
+channel2d_tracer.py
+advection-test.py
