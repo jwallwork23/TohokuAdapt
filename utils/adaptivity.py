@@ -263,7 +263,7 @@ def anisoRefine(M, direction=0):
     return M
 
 
-def metricGradation(M, op=Options()):   # TODO: Implement this in pyop2
+def metricGradation(M, iso=False, op=Options()):   # TODO: Implement this in pyop2
     """
     Perform anisotropic metric gradation in the method described in Alauzet 2010, using linear interpolation. Python
     code found here is based on the C code of Nicolas Barral's function ``DMPlexMetricGradation2d_Internal``, found in 
@@ -312,26 +312,27 @@ def metricGradation(M, op=Options()):   # TODO: Implement this in pyop2
             v21[0] = - v12[0]
             v21[1] = - v12[1]
 
-            # if op.iso:
-            #     eta2_12 = 1. / pow(1 + (v12[0] * v12[0] + v12[1] * v12[1]) * ln_beta / met1[0, 0], 2)
-            #     eta2_21 = 1. / pow(1 + (v21[0] * v21[0] + v21[1] * v21[1]) * ln_beta / met2[0, 0], 2)
-            #     # print('#### metricGradation DEBUG: 1,1 entries ', met1[0, 0], met2[0, 0])
-            #     print('#### metricGradation DEBUG: scale factors', eta2_12, eta2_21)
-            #     redMet1 = eta2_21 * met2
-            #     redMet2 = eta2_12 * met1
-            # else:
+            if iso:     # TODO: This does not currently work
+                eta2_12 = 1. / pow(1 + (v12[0] * v12[0] + v12[1] * v12[1]) * ln_beta / met1[0, 0], 2)
+                eta2_21 = 1. / pow(1 + (v21[0] * v21[0] + v21[1] * v21[1]) * ln_beta / met2[0, 0], 2)
+                # print('#### metricGradation DEBUG: 1,1 entries ', met1[0, 0], met2[0, 0])
+                # print('#### metricGradation DEBUG: scale factors', eta2_12, eta2_21)
+                redMet1 = eta2_21 * met2
+                redMet2 = eta2_12 * met1
+            else:
 
-            # Intersect metric with a scaled 'grown' metric to get reduced metric
-            eta2_12 = 1. / pow(1 + symmetricProduct(met1, v12) * ln_beta, 2)
-            eta2_21 = 1. / pow(1 + symmetricProduct(met2, v21) * ln_beta, 2)
-            # print('#### metricGradation DEBUG: scale factors', eta2_12, eta2_21)
-            # print('#### metricGradation DEBUG: determinants', la.det(met1), la.det(met2))
-            redMet1 = localMetricIntersection(met1, eta2_21 * met2)
-            redMet2 = localMetricIntersection(met2, eta2_12 * met1)
+                # Intersect metric with a scaled 'grown' metric to get reduced metric
+                eta2_12 = 1. / pow(1 + symmetricProduct(met1, v12) * ln_beta, 2)
+                eta2_21 = 1. / pow(1 + symmetricProduct(met2, v21) * ln_beta, 2)
+                # print('#### metricGradation DEBUG: scale factors', eta2_12, eta2_21)
+                # print('#### metricGradation DEBUG: determinants', la.det(met1), la.det(met2))
+                redMet1 = localMetricIntersection(met1, eta2_21 * met2)
+                redMet2 = localMetricIntersection(met2, eta2_12 * met1)
 
             # Calculate difference in order to ascertain whether the metric is modified
-            diff = np.abs(met1[0, 0] - redMet1[0, 0]) + np.abs(met1[0, 1] - redMet1[0, 1]) \
-                   + np.abs(met1[1, 1] - redMet1[1, 1])
+            diff = np.abs(met1[0, 0] - redMet1[0, 0])
+            diff += np.abs(met1[0, 1] - redMet1[0, 1])
+            diff += np.abs(met1[1, 1] - redMet1[1, 1])
             diff /= (np.abs(met1[0, 0]) + np.abs(met1[0, 1]) + np.abs(met1[1, 1]))
             if diff > 1e-3:
                 M_grad.dat.data[iVer1][0, 0] = redMet1[0, 0]
@@ -342,8 +343,9 @@ def metricGradation(M, op=Options()):   # TODO: Implement this in pyop2
                 correction = True
 
             # Repeat above process using other reduced metric
-            diff = np.abs(met2[0, 0] - redMet2[0, 0]) + np.abs(met2[0, 1] - redMet2[0, 1]) \
-                   + np.abs(met2[1, 1] - redMet2[1, 1])
+            diff = np.abs(met2[0, 0] - redMet2[0, 0])
+            diff += np.abs(met2[0, 1] - redMet2[0, 1])
+            diff += np.abs(met2[1, 1] - redMet2[1, 1])
             diff /= (np.abs(met2[0, 0]) + np.abs(met2[0, 1]) + np.abs(met2[1, 1]))
             if diff > 1e-3:
                 M_grad.dat.data[iVer2][0, 0] = redMet2[0, 0]
