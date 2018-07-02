@@ -13,6 +13,11 @@
 
 from thetis import *
 
+from utils.callbacks import AdvectionCallback
+from utils.options import AdvectionOptions
+
+
+op = AdvectionOptions()
 
 # # Parameter choice 1: pure advection
 # n = 5
@@ -44,40 +49,35 @@ from thetis import *
 # diffusivity = 1e-3
 # source = True
 
-# Parameter choice 4 (TELEMAC-2D point discharge without diffusion)
-n = 2
-bell_r0 = 0.457
-bell_x0 = 1.
-bell_y0 = 5.
-t_end = 50.
-dt = 0.1
-diffusivity = 0.
-source = True
-
-# # Parameter choice 5 (TELEMAC-2D point discharge with diffusion)
+# # Parameter choice 4 (TELEMAC-2D point discharge without diffusion)
 # n = 2
 # bell_r0 = 0.457
 # bell_x0 = 1.
 # bell_y0 = 5.
 # t_end = 50.
 # dt = 0.1
-# diffusivity = 0.1
+# diffusivity = 0.
 # source = True
+
+# Parameter choice 5 (TELEMAC-2D point discharge with diffusion)
+n = 2
+bell_r0 = 0.457
+bell_x0 = 1.
+bell_y0 = 5.
+t_end = 50.
+dt = 0.1
+diffusivity = 0.1
+source = True
 
 outputdir = 'plots/channel2d_tracer'
 lx = 50
 ly = 10
 mesh2d = RectangleMesh(lx * n, ly * n, lx, ly)
-print_output('Number of elements '+str(mesh2d.num_cells()))
-print_output('Number of nodes '+str(mesh2d.num_vertices()))
+print_output('Number of elements %d' % mesh2d.num_cells())
+print_output('Number of nodes %d' % mesh2d.num_vertices())
 
 u_mag = Constant(1.0)   # (Estimate of) max advective velocity used to estimate time step
 t_export = 1.           # Export interval in seconds
-
-# Objective functional parameters
-x0 = 25.
-y0 = 7.5
-r = 0.5
 
 # Bathymetry
 P1_2d = FunctionSpace(mesh2d, 'CG', 1)
@@ -121,7 +121,12 @@ solver_obj.bnd_functions['shallow_water']['uv']= {1: uv_init}
 solver_obj.bnd_functions['shallow_water']['uv'][2] = uv_init
 # solver_obj.bnd_functions['tracer'] = {1: Function(P1_2d)}
 
-# Solve
 solver_obj.assign_initial_conditions(elev=elev_init, uv=uv_init, tracer=q_init)
 assert(options.timestep < min(solver_obj.compute_time_step().dat.data))     # Check CFL condition
+
+# Establish callbacks and solve
+cb1 = AdvectionCallback(solver_obj)
+cb1.op = op
+solver_obj.add_callback(cb1, 'timestep')
 solver_obj.iterate()
+print_output('Objective value = %.4f' % cb1.quadrature())

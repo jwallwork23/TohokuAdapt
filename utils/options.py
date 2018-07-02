@@ -8,7 +8,7 @@ import numpy as np
 from .conversion import from_latlon
 
 __all__ = ["Options",   # TODO: Get rid of this class
-           "TohokuOptions", "RossbyWaveOptions", "KelvinWaveOptions", "GaussianOptions", "AdvectionDiffusionOptions"]
+           "TohokuOptions", "RossbyWaveOptions", "KelvinWaveOptions", "GaussianOptions", "AdvectionOptions"]
 
 
 class AdaptOptions(FrozenConfigurable):
@@ -250,26 +250,26 @@ class GaussianOptions(AdaptOptions):
     J = Float(1.6160e-4, help="Objective functional value on a fine mesh").tag(config=True)
 
 
-class AdvectionDiffusionOptions(AdaptOptions):
+class AdvectionOptions(AdaptOptions):
     name = 'Parameters for advection diffusion test problem'
     mode = 'advection-diffusion'
 
     # Solver parameters
-    ndump = NonNegativeInteger(5, help="Timesteps per data dump").tag(config=True)
-    rm = NonNegativeInteger(10, help="Timesteps per mesh adaptation").tag(config=True)
+    ndump = NonNegativeInteger(10, help="Timesteps per data dump").tag(config=True)
+    rm = NonNegativeInteger(20, help="Timesteps per mesh adaptation").tag(config=True)
     nVerT = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
-    dt = PositiveFloat(0.05, help="Timestep").tag(config=True)
-    Tstart = PositiveFloat(0.4, help="Start time of period of interest").tag(config=True)
-    Tend = PositiveFloat(2.4, help="End time of period of interest").tag(config=True)
+    dt = PositiveFloat(0.1, help="Timestep").tag(config=True)
+    Tstart = PositiveFloat(10., help="Start time of period of interest").tag(config=True)
+    Tend = PositiveFloat(50., help="End time of period of interest").tag(config=True)
     hmin = PositiveFloat(1e-4, help="Minimum element size").tag(config=True)
-    hmax = PositiveFloat(1., help="Maximum element size").tag(config=True)
+    hmax = PositiveFloat(10., help="Maximum element size").tag(config=True)
     minNorm = PositiveFloat(1e-5).tag(config=True)  # TODO: Not sure about this
     maxScaling = PositiveFloat(5e5).tag(config=True)  # TODO: Not sure about this
 
     # Region of importance
-    radii = List(trait=Float, default_value=[0.2],
+    radii = List(trait=Float, default_value=[0.5],
                  help="Radius of indicator function around location of interest.").tag(config=True)
-    loc = List(trait=Float, default_value=[3.75, 0.5],
+    loc = List(trait=Float, default_value=[25., 7.5],
                help="Important locations, written as a list.").tag(config=True)
 
     def di(self):
