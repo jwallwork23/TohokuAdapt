@@ -1,7 +1,17 @@
 # Pure tracer advection using Thetis
 # ==============================================
+#
+# Emulates TELEMAC-2D 'point discharge with diffusion 23-tradif' validation
+# experiment conducted by D. Lebris, July 2015.
+#
+# Imposes initial and boundary conditions for the shallow water equations such
+# that the free surface displacement is zero and fluid velocity is a constant
+# 1 m/s. Tracer concentration is initially zero and has a source equivalent to
+# 1 m^3/s (in the 3D case).
+#
+# Code structure is based on `channel2d_tracer` by A. Angeloudis.
 
-from scipy.interpolate import interp1d
+
 from thetis import *
 import math
 
@@ -11,32 +21,13 @@ mesh2d = RectangleMesh(100, 20, 50., 10.)
 print_output('Number of elements '+str(mesh2d.num_cells()))
 print_output('Number of nodes '+str(mesh2d.num_vertices()))
 
-# total duration in seconds
-t_end = 500.
-# estimate of max advective velocity used to estimate time step
-u_mag = Constant(1.0)
-# export interval in seconds
-t_export = 10.
+t_end = 500.            # Total duration in seconds
+u_mag = Constant(1.0)   # (Estimate of) max advective velocity used to estimate time step
+t_export = 10.          # Export interval in seconds
 
-# bathymetry
+# Bathymetry
 P1_2d = FunctionSpace(mesh2d, 'CG', 1)
 bathymetry_2d = Function(P1_2d, name='Bathymetry')
-
-# depth_oce = 20.0
-# depth_riv = 5.0  # 5.0 closed
-# bath_x = np.array([0, 100e3])
-# bath_v = np.array([depth_oce, depth_riv])
-#
-#
-# def bath(x, y, z):
-#     padval = 1e20
-#     x0 = np.hstack(([-padval], bath_x, [padval]))
-#     vals0 = np.hstack(([bath_v[0]], bath_v, [bath_v[-1]]))
-#     return interp1d(x0, vals0)(x)
-#
-#
-# x_func = Function(P1_2d).interpolate(Expression('x[0]'))
-# bathymetry_2d.dat.data[:] = bath(x_func.dat.data, 0, 0)
 bathymetry_2d.assign(1.)
 
 
@@ -46,10 +37,9 @@ bell_r0 = 0.457; bell_x0 = 1.; bell_y0 = 5.
 bell = conditional(ge(0.25*(1+cos(math.pi*min_value(sqrt(pow(x-bell_x0, 2) + pow(y-bell_y0, 2))/bell_r0, 1.0))),0.),
                    0.25*(1+cos(math.pi*min_value(sqrt(pow(x-bell_x0, 2) + pow(y-bell_y0, 2))/bell_r0, 1.0))), 0. )
 q_source = Function(P1_2d).interpolate(0.0 + bell)
-# q_source = Function(P1_2d).assign(1.0)
 
 
-# --- create solver ---
+# --- Create solver ---
 solver_obj = solver2d.FlowSolver2d(mesh2d, bathymetry_2d)
 options = solver_obj.options
 options.simulation_export_time = t_export
@@ -63,27 +53,17 @@ options.use_lax_friedrichs_tracer = False
 options.tracer_source_2d = q_source
 options.timestepper_type = 'CrankNicolson'
 options.timestep = 0.1
-# # initial conditions, piecewise linear function
-# elev_x = np.array([0, 30e3, 100e3])
-# elev_v = np.array([6, 0, 0])
 
-
-# def elevation(x, y, z, x_array, val_array):
-#     padval = 1e20
-#     x0 = np.hstack(([-padval], x_array, [padval]))
-#     vals0 = np.hstack(([val_array[0]], val_array, [val_array[-1]]))
-#     return interp1d(x0, vals0)(x)
-#
-#
-# x_func = Function(P1_2d).interpolate(Expression('x[0]'))
+# Initial conditions
 elev_init = Function(P1_2d)
-# elev_init.dat.data[:] = elevation(x_func.dat.data, 0, 0, elev_x, elev_v)
-
 uv_init = Function(VectorFunctionSpace(mesh2d, "CG", 1))
 uv_init.interpolate(Expression([1., 0.]))
 
-solver_obj.bnd_functions = {'shallow_water': {'uv': {1: uv_init, 2: uv_init}}, 'tracer': {}}  # TODO
+# Boundary conditions
+solver_obj.bnd_functions = {'shallow_water': {'uv': {1: uv_init, 2: uv_init}}, 'tracer': {}}
+# solver_obj.bnd_functions['tracer'] = {1: Function(P1_2d)}     # TODO
 
-solver_obj.assign_initial_conditions(elev=elev_init, uv=uv_init)
 
+# Solve
+solver_obj.assign_initial_conditions(elev=elev_init, uv=uv_init, tracer=q_init)
 solver_obj.iterate()
