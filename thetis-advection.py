@@ -7,7 +7,7 @@ import math
 
 
 outputdir = 'plots/channel2d_tracer'
-mesh2d = PeriodicRectangleMesh(100, 20, 50., 10., direction='x')
+mesh2d = RectangleMesh(100, 20, 50., 10.)
 print_output('Number of elements '+str(mesh2d.num_cells()))
 print_output('Number of nodes '+str(mesh2d.num_vertices()))
 
@@ -45,8 +45,8 @@ x, y = SpatialCoordinate(mesh2d)
 bell_r0 = 0.457; bell_x0 = 1.; bell_y0 = 5.
 bell = conditional(ge(0.25*(1+cos(math.pi*min_value(sqrt(pow(x-bell_x0, 2) + pow(y-bell_y0, 2))/bell_r0, 1.0))),0.),
                    0.25*(1+cos(math.pi*min_value(sqrt(pow(x-bell_x0, 2) + pow(y-bell_y0, 2))/bell_r0, 1.0))), 0. )
-q_init = Function(P1_2d).interpolate(0.0 + bell)
-# q_init = Function(P1_2d).assign(1.0)
+q_source = Function(P1_2d).interpolate(0.0 + bell)
+# q_source = Function(P1_2d).assign(1.0)
 
 
 # --- create solver ---
@@ -60,7 +60,7 @@ options.check_volume_conservation_2d = True
 options.fields_to_export = ['uv_2d', 'elev_2d', 'tracer_2d']
 options.solve_tracer = True
 options.use_lax_friedrichs_tracer = False
-options.tracer_source_2d = q_init
+options.tracer_source_2d = q_source
 options.timestepper_type = 'CrankNicolson'
 options.timestep = 0.1
 # # initial conditions, piecewise linear function
@@ -82,6 +82,8 @@ elev_init = Function(P1_2d)
 uv_init = Function(VectorFunctionSpace(mesh2d, "CG", 1))
 uv_init.interpolate(Expression([1., 0.]))
 
-solver_obj.assign_initial_conditions(elev=elev_init, uv=uv_init, tracer=q_init)
+solver_obj.bnd_functions = {'shallow_water': {'uv': {1: uv_init, 2: uv_init}}, 'tracer': {}}  # TODO
+
+solver_obj.assign_initial_conditions(elev=elev_init, uv=uv_init)
 
 solver_obj.iterate()
