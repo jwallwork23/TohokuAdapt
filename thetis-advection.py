@@ -10,6 +10,8 @@
 # 1 m^3/s (in the 3D case).
 #
 # Code structure is based on `channel2d_tracer` by A. Angeloudis.
+#
+# Currently requires `tracer-only` branch of Thetis: https://github.com/thetisproject/thetis/tree/tracer-only
 
 
 from thetis import *
@@ -17,8 +19,7 @@ import math
 
 
 outputdir = 'plots/channel2d_tracer'
-# mesh2d = RectangleMesh(100, 20, 50., 10.)
-mesh2d = PeriodicRectangleMesh(100, 20, 50., 10., direction='x')
+mesh2d = RectangleMesh(100, 20, 50., 10.)
 print_output('Number of elements '+str(mesh2d.num_cells()))
 print_output('Number of nodes '+str(mesh2d.num_vertices()))
 
@@ -38,6 +39,11 @@ bell = conditional(ge(0.25*(1+cos(math.pi*min_value(sqrt(pow(x-bell_x0, 2) + pow
                    0.25*(1+cos(math.pi*min_value(sqrt(pow(x-bell_x0, 2) + pow(y-bell_y0, 2))/bell_r0, 1.0))), 0. )
 q_source = Function(P1_2d).interpolate(0.0 + bell)
 
+# Objective functional parameters
+x0 = 25.
+y0 = 7.5
+r = 0.5
+
 # --- Create solver ---
 solver_obj = solver2d.FlowSolver2d(mesh2d, bathymetry_2d)
 options = solver_obj.options
@@ -48,27 +54,25 @@ options.horizontal_velocity_scale = u_mag
 options.check_volume_conservation_2d = True
 options.fields_to_export = ['uv_2d', 'elev_2d', 'tracer_2d']
 options.solve_tracer = True
-options.horizontal_diffusivity = Constant(0.1)
+options.tracer_only = True      # Need use tracer-only branch to use this functionality
+# options.horizontal_diffusivity = Constant(0.1)
 options.use_lax_friedrichs_tracer = False
 options.tracer_source_2d = q_source
 options.timestepper_type = 'CrankNicolson'
 options.timestep = 0.1
+# options.use_nonlinear_equations = False
 
 # Initial conditions
 elev_init = Function(P1_2d)
 uv_init = Function(VectorFunctionSpace(mesh2d, "CG", 1))
 uv_init.interpolate(Expression([1., 0.]))
 
-# Boundary conditions   # TODO
+# Boundary conditions
 solver_obj.bnd_functions = {'shallow_water': {}, 'tracer': {}}
-# solver_obj.bnd_functions['shallow_water']['uv']= {1: uv_init}
-# solver_obj.bnd_functions['shallow_water']['uv'][2] = uv_init
+solver_obj.bnd_functions['shallow_water']['uv']= {1: uv_init}
+solver_obj.bnd_functions['shallow_water']['uv'][2] = uv_init
 # solver_obj.bnd_functions['tracer'] = {1: Function(P1_2d)}
-
-# def fix_velocity(t):
-#     solver_obj.fields.solution_2d.split()[0].interpolate(uv_init)
 
 # Solve
 solver_obj.assign_initial_conditions(elev=elev_init, uv=uv_init)
-# solver_obj.iterate(update_forcings=fix_velocity)
 solver_obj.iterate()
