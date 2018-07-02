@@ -12,37 +12,56 @@
 
 
 from thetis import *
-import math
 
 
-# Parameter choice 1
-n = 5
-bell_r0 = 2.
-bell_x0 = 5.
-bell_y0 = 5.
-t_end = 40.
-dt = 0.01
-diffusivity = 1e-3
-source = False
-
-# # Parameter choice 2 (TELEMAC-2D point discharge without diffusion)
-# n = 2
-# bell_r0 = 0.457
-# bell_x0 = 1.
+# # Parameter choice 1: pure advection
+# n = 5
+# bell_r0 = 2.
+# bell_x0 = 5.
 # bell_y0 = 5.
-# t_end = 50.
-# dt = 0.1
+# t_end = 40.
+# dt = 0.01
 # diffusivity = 0.
+# source = False
+
+# # Parameter choice 2: advection and diffusion
+# n = 5
+# bell_r0 = 2.
+# bell_x0 = 5.
+# bell_y0 = 5.
+# t_end = 40.
+# dt = 0.01
+# diffusivity = 1e-3
+# source = False
+
+# # Parameter choice 3: advection and diffusion with a constant source
+# n = 5
+# bell_r0 = 2.
+# bell_x0 = 5.
+# bell_y0 = 5.
+# t_end = 40.
+# dt = 0.01
+# diffusivity = 1e-3
 # source = True
 
-# # Parameter choice 3 (TELEMAC-2D point discharge with diffusion)
+# Parameter choice 4 (TELEMAC-2D point discharge without diffusion)
+n = 2
+bell_r0 = 0.457
+bell_x0 = 1.
+bell_y0 = 5.
+t_end = 50.
+dt = 0.1
+diffusivity = 0.
+source = True
+
+# # Parameter choice 5 (TELEMAC-2D point discharge with diffusion)
 # n = 2
 # bell_r0 = 0.457
 # bell_x0 = 1.
 # bell_y0 = 5.
 # t_end = 50.
 # dt = 0.1
-# diffusivity = 0.5
+# diffusivity = 0.1
 # source = True
 
 outputdir = 'plots/channel2d_tracer'
@@ -67,8 +86,8 @@ bathymetry_2d.assign(1.)
 
 # Tracer initial field
 x, y = SpatialCoordinate(mesh2d)
-bell = conditional(ge(0.25*(1+cos(math.pi*min_value(sqrt(pow(x-bell_x0, 2) + pow(y-bell_y0, 2))/bell_r0, 1.0))),0.),
-                   0.25*(1+cos(math.pi*min_value(sqrt(pow(x-bell_x0, 2) + pow(y-bell_y0, 2))/bell_r0, 1.0))), 0. )
+bell = conditional(ge(0.25*(1+cos(pi*min_value(sqrt(pow(x-bell_x0, 2) + pow(y-bell_y0, 2))/bell_r0, 1.0))),0.),
+                   0.25*(1+cos(pi*min_value(sqrt(pow(x-bell_x0, 2) + pow(y-bell_y0, 2))/bell_r0, 1.0))), 0. )
 q_init = Function(P1_2d).interpolate(0.0 + bell)
 
 # --- Create solver ---
@@ -78,7 +97,6 @@ options.simulation_export_time = t_export
 options.simulation_end_time = t_end
 options.output_directory = outputdir
 options.horizontal_velocity_scale = u_mag
-options.check_tracer_conservation = True
 options.fields_to_export = ['uv_2d', 'elev_2d', 'tracer_2d']
 options.solve_tracer = True
 options.tracer_only = True              # Need use tracer-only branch to use this functionality
@@ -86,6 +104,8 @@ options.horizontal_diffusivity = Constant(diffusivity)
 options.use_lax_friedrichs_tracer = False
 if source:
     options.tracer_source_2d = q_init
+else:
+    options.check_tracer_conservation = True
 options.timestepper_type = 'CrankNicolson'
 options.timestep = dt
 # options.use_nonlinear_equations = False
