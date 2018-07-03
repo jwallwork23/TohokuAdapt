@@ -59,14 +59,12 @@ op = AdvectionOptions()
 # op.diffusivity.assign(0.)
 
 # Parameter choice 5 (TELEMAC-2D point discharge with diffusion)
-# level = 1
-level = 4
+level = 1
 op.bell_r0 = 0.457
 op.bell_x0 = 1.5
 op.bell_y0 = 5.
 op.Tend = 50.
-# op.dt = 0.1
-op.dt = 0.005
+op.dt = 0.1
 op.diffusivity.assign(0.1)
 
 # Setup domain
