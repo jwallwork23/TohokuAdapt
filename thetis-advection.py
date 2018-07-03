@@ -52,7 +52,7 @@ op = AdvectionOptions()
 # # Parameter choice 4 (TELEMAC-2D point discharge without diffusion)
 # n = 2
 # bell_r0 = 0.457
-# bell_x0 = 1.
+# bell_x0 = 1.5
 # bell_y0 = 5.
 # t_end = 50.
 # dt = 0.1
@@ -62,7 +62,7 @@ op = AdvectionOptions()
 # Parameter choice 5 (TELEMAC-2D point discharge with diffusion)
 n = 2
 bell_r0 = 0.457
-bell_x0 = 1.
+bell_x0 = 1.5
 bell_y0 = 5.
 t_end = 50.
 dt = 0.1
@@ -88,7 +88,8 @@ bathymetry_2d.assign(1.)
 x, y = SpatialCoordinate(mesh2d)
 bell = conditional(ge(0.25*(1+cos(pi*min_value(sqrt(pow(x-bell_x0, 2) + pow(y-bell_y0, 2))/bell_r0, 1.0))),0.),
                    0.25*(1+cos(pi*min_value(sqrt(pow(x-bell_x0, 2) + pow(y-bell_y0, 2))/bell_r0, 1.0))), 0. )
-q_init = Function(P1_2d).interpolate(0.0 + bell)
+q_source = Function(P1_2d).interpolate(0.0 + bell)
+print_output("Souce volume = %.4f" % assemble(q_source * dx))
 
 # --- Create solver ---
 solver_obj = solver2d.FlowSolver2d(mesh2d, bathymetry_2d)
@@ -103,7 +104,7 @@ options.tracer_only = True              # Need use tracer-only branch to use thi
 options.horizontal_diffusivity = Constant(diffusivity)
 options.use_lax_friedrichs_tracer = False
 if source:
-    options.tracer_source_2d = q_init
+    options.tracer_source_2d = q_source
 else:
     options.check_tracer_conservation = True
 options.timestepper_type = 'CrankNicolson'
@@ -121,7 +122,10 @@ solver_obj.bnd_functions['shallow_water']['uv']= {1: uv_init}
 solver_obj.bnd_functions['shallow_water']['uv'][2] = uv_init
 # solver_obj.bnd_functions['tracer'] = {1: Function(P1_2d)}
 
-solver_obj.assign_initial_conditions(elev=elev_init, uv=uv_init, tracer=q_init)
+if source:
+    solver_obj.assign_initial_conditions(elev=elev_init, uv=uv_init)
+else:
+    solver_obj.assign_initial_conditions(elev=elev_init, uv=uv_init, tracer=q_source)
 assert(options.timestep < min(solver_obj.compute_time_step().dat.data))     # Check CFL condition
 
 # Establish callbacks and solve
@@ -129,4 +133,4 @@ cb1 = AdvectionCallback(solver_obj)
 cb1.op = op
 solver_obj.add_callback(cb1, 'timestep')
 solver_obj.iterate()
-print_output('Objective value = %.4f' % cb1.quadrature())
+print_output('Objective value = %.4f' % cb1.get_val())
