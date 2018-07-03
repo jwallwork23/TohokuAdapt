@@ -281,7 +281,7 @@ def problemDomain(level=0, mesh=None, b=None, op=Options(mode='tohoku')):
         eta0 = Function(P1)
         BCs = {}
         BCs[1] = {'tracer': Constant(0.)}
-        diffusivity = op.diffusivity
+        diffusivity = Constant(op.diffusivity)
 
     if newmesh:
         PETSc.Sys.Print("Setting up mesh across %d processes" % COMM_WORLD.size)

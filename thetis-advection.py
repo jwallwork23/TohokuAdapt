@@ -15,87 +15,77 @@ from thetis import *
 
 from utils.callbacks import AdvectionCallback
 from utils.options import AdvectionOptions
+from utils.setup import problemDomain
 
 
 op = AdvectionOptions()
 
 # # Parameter choice 1: pure advection
-# n = 5
-# bell_r0 = 2.
-# bell_x0 = 5.
-# bell_y0 = 5.
-# t_end = 40.
-# dt = 0.01
-# diffusivity = 0.
-# source = False
+# level = 2
+# op.bell_r0 = 2.
+# op.bell_x0 = 5.
+# op.bell_y0 = 5.
+# op.Tend = 40.
+# op.dt = 0.01
+# op.diffusivity.assign(0.)
+# source = None
 
 # # Parameter choice 2: advection and diffusion
-# n = 5
-# bell_r0 = 2.
-# bell_x0 = 5.
-# bell_y0 = 5.
-# t_end = 40.
-# dt = 0.01
-# diffusivity = 1e-3
-# source = False
+# level = 2
+# op.bell_r0 = 2.
+# op.bell_x0 = 5.
+# op.bell_y0 = 5.
+# op.Tend = 40.
+# op.dt = 0.01
+# op.diffusivity.assign(1e-3)
+# source = None
 
 # # Parameter choice 3: advection and diffusion with a constant source
-# n = 5
-# bell_r0 = 2.
-# bell_x0 = 5.
-# bell_y0 = 5.
-# t_end = 40.
-# dt = 0.01
-# diffusivity = 1e-3
-# source = True
+# level = 2
+# op.bell_r0 = 2.
+# op.bell_x0 = 5.
+# op.bell_y0 = 5.
+# op.Tend = 40.
+# op.dt = 0.01
+# op.diffusivity.assign(1e-3)
 
 # # Parameter choice 4 (TELEMAC-2D point discharge without diffusion)
-# n = 2
-# bell_r0 = 0.457
-# bell_x0 = 1.5
-# bell_y0 = 5.
-# t_end = 50.
-# dt = 0.1
-# diffusivity = 0.
-# source = True
+# level = 1
+# op.bell_r0 = 0.457
+# op.bell_x0 = 1.5
+# op.bell_y0 = 5.
+# op.Tend = 50.
+# op.dt = 0.1
+# op.diffusivity.assign(0.)
 
 # Parameter choice 5 (TELEMAC-2D point discharge with diffusion)
-n = 2
-bell_r0 = 0.457
-bell_x0 = 1.5
-bell_y0 = 5.
-t_end = 50.
-dt = 0.1
-diffusivity = 0.1
-source = True
+# level = 1
+level = 4
+op.bell_r0 = 0.457
+op.bell_x0 = 1.5
+op.bell_y0 = 5.
+op.Tend = 50.
+# op.dt = 0.1
+op.dt = 0.005
+op.diffusivity.assign(0.1)
 
-outputdir = 'plots/channel2d_tracer'
-lx = 50
-ly = 10
-mesh2d = RectangleMesh(lx * n, ly * n, lx, ly)
-print_output('Number of elements %d' % mesh2d.num_cells())
-print_output('Number of nodes %d' % mesh2d.num_vertices())
+# Setup domain
+mesh, u0, eta0, b, BCs, source, diffusivity = problemDomain(level, op=op)
+
+outputdir = 'plots/advection-diffusion/fixedMesh'
+print_output('Number of elements %d' % mesh.num_cells())
+print_output('Number of nodes %d' % mesh.num_vertices())
 
 u_mag = Constant(1.0)   # (Estimate of) max advective velocity used to estimate time step
 t_export = 1.           # Export interval in seconds
 
-# Bathymetry
-P1_2d = FunctionSpace(mesh2d, 'CG', 1)
-bathymetry_2d = Function(P1_2d, name='Bathymetry')
-bathymetry_2d.assign(1.)
-
-# Tracer initial field
-x, y = SpatialCoordinate(mesh2d)
-bell = conditional(ge(0.25*(1+cos(pi*min_value(sqrt(pow(x-bell_x0, 2) + pow(y-bell_y0, 2))/bell_r0, 1.0))),0.),
-                   0.25*(1+cos(pi*min_value(sqrt(pow(x-bell_x0, 2) + pow(y-bell_y0, 2))/bell_r0, 1.0))), 0. )
-q_source = Function(P1_2d).interpolate(0.0 + bell)
-print_output("Souce volume = %.4f" % assemble(q_source * dx))
+print_output("Souce volume = %.4f" % assemble(source * dx))
 
 # --- Create solver ---
-solver_obj = solver2d.FlowSolver2d(mesh2d, bathymetry_2d)
+solver_obj = solver2d.FlowSolver2d(mesh, b)
 options = solver_obj.options
 options.simulation_export_time = t_export
-options.simulation_end_time = t_end
+options.simulation_end_time = op.Tend
 options.output_directory = outputdir
 options.horizontal_velocity_scale = u_mag
 options.fields_to_export = ['uv_2d', 'elev_2d', 'tracer_2d']
@@ -103,30 +93,17 @@ options.solve_tracer = True
 options.tracer_only = True              # Need use tracer-only branch to use this functionality
 options.horizontal_diffusivity = Constant(diffusivity)
 options.use_lax_friedrichs_tracer = False
-if source:
-    options.tracer_source_2d = q_source
-else:
-    options.check_tracer_conservation = True
+options.tracer_source_2d = source
 options.timestepper_type = 'CrankNicolson'
-options.timestep = dt
+options.timestep = op.dt
 # options.use_nonlinear_equations = False
 
-# Initial conditions
-elev_init = Function(P1_2d)
-uv_init = Function(VectorFunctionSpace(mesh2d, "CG", 1))
-uv_init.interpolate(Expression([1., 0.]))
-
-# Boundary conditions
-solver_obj.bnd_functions = {'shallow_water': {}, 'tracer': {}}
-# solver_obj.bnd_functions['shallow_water']['uv']= {1: uv_init}
-# solver_obj.bnd_functions['shallow_water']['uv'][2] = uv_init
-solver_obj.bnd_functions[1] = {'tracer': Constant(0.)}
-
-if source:
-    solver_obj.assign_initial_conditions(elev=elev_init, uv=uv_init)
-else:
-    solver_obj.assign_initial_conditions(elev=elev_init, uv=uv_init, tracer=q_source)
-assert(options.timestep < min(solver_obj.compute_time_step().dat.data))     # Check CFL condition
+solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
+try:
+    cdt = min(solver_obj.compute_time_step().dat.data)
+    assert(options.timestep < cdt)     # Check CFL condition
+except:
+    raise ValueError("Chosen timestep %.2fs is smaller than recommended timestep %.2fs" % (options.timestep, cdt))
 
 # Establish callbacks and solve
 cb1 = AdvectionCallback(solver_obj)
