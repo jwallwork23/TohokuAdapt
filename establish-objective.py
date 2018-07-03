@@ -5,10 +5,10 @@ import math
 
 from utils.callbacks import SWCallback
 from utils.setup import problemDomain
-from utils.options import Options
+from utils.options import TohokuOptions
 
 
-def getObjective(level=0, mesh=None, b=None, op=Options()):
+def getObjective(level=0, mesh=None, b=None, op=TohokuOptions()):
 
     # Initialise domain and physical parameters
     try:
@@ -53,7 +53,7 @@ def getObjective(level=0, mesh=None, b=None, op=Options()):
 
 if __name__ == "__main__":
 
-    op = Options(mode='tohoku')
+    op = TohokuOptions()
     mesh = Mesh("resources/meshes/wd_Tohoku0.msh")
     # coarse_bathy = problemDomain(mesh=mesh, op=op)[3]
     coarse_bathy = Function(FunctionSpace(mesh, "CG", 1)).assign(3000.)

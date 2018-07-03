@@ -8,7 +8,7 @@ import numpy as np
 from utils.adaptivity import *
 from utils.interpolation import interp
 from utils.misc import indicator
-from utils.options import Options
+from utils.options import Options   # TODO: Remove this old version
 
 
 now = datetime.datetime.now()
@@ -62,7 +62,7 @@ def hessian(subset, space):
         plt.xlabel("Element count")
         plt.ylabel("L2 error in Hessian")
         for hessMeth in ('dL2', 'parts'):
-            op = Options(mode=None,
+            op = Options(mode=None,    # TODO: Remove this old version
                          approach='hessianBased')
             op.hessMeth = hessMeth
             op.di = 'plots/adapt-tests/'
@@ -134,7 +134,7 @@ def adapts(scale, space, indy):
         r = 0.8
     elif indy == 'uncentred':
         raise NotImplementedError               # Test 4: an uncentred disc     TODO
-    op = Options(mode=None, approach='hessianBased')
+    op = Options(mode=None, approach='hessianBased')       # TODO: Remove this old version
     op.hmin = 1e-10
     op.hmax = 1
     # op.normalisation = 'manual'             # TODO: Make this selectable
@@ -209,7 +209,7 @@ def directionalRefine(eps=1e-4):
         for dir in (0, 1):
             n = pow(2, j)
             mesh = UnitSquareMesh(n, n)
-            op = Options(mode=None, hmin=1e-8, hmax=1)
+            op = Options(mode=None, hmin=1e-8, hmax=1)   # TODO: Remove this old version
             op.nVerT = mesh.num_vertices() * op.rescaling
             M_ = isotropicMetric(Function(FunctionSpace(mesh, space, 1)).interpolate(CellSize(mesh)), op=op)
             M = anisoRefine(M_, direction=dir)

@@ -2,7 +2,7 @@ from firedrake import *
 
 import argparse
 
-from utils.options import TohokuOptions, RossbyWaveOptions, KelvinWaveOptions, GaussianOptions
+from utils.options import *
 from utils.setup import RossbyWaveSolution, problemDomain
 from utils.timeseries import plotTimeseries, compareTimeseries
 
@@ -26,6 +26,8 @@ elif args.t == 'rossby-wave':
     op = RossbyWaveOptions(approach=approach)
 elif args.t == 'kelvin-wave':
     op = KelvinWaveOptions(approach=approach)
+elif args.t == 'advection-diffusion':
+    op = AdvectionOptions(approach=approach)
 if args.t == 'model-verification':
     assert approach is None
 if approach is None and op.mode != 'model-verification':

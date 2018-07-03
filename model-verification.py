@@ -4,11 +4,11 @@ from firedrake.petsc import PETSc
 from time import clock
 
 from utils.callbacks import SWCallback, P02Callback, P06Callback
-from utils.options import Options
+from utils.options import TohokuOptions
 from utils.setup import problemDomain
 
 
-def solverSW(mesh, u0, eta0, b, BCs={}, f=None, op=Options()):
+def solverSW(mesh, u0, eta0, b, BCs={}, f=None, op=TohokuOptions()):
 
     # Get solver parameter values and construct solver
     solver_obj = solver2d.FlowSolver2d(mesh, b)
@@ -69,8 +69,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     for c in ("off", "f", "beta", "sin"):
-        op = Options(plotpvd=True if args.o else False,
-                     coriolis=c)
+        op = TohokuOptions(plotpvd=True if args.o else False,
+                     coriolis=c)        # TODO: This won't currently work
         tag = 'rotational=' + c
         filename = 'outdata/model-verification/' + tag + '_' + date
         errorfile = open(filename + '.txt', 'w+')

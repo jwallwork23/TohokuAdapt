@@ -143,6 +143,7 @@ else:
     from thetis import *
     from thetis_adjoint import *
     from firedrake.petsc import PETSc
+    from firedrake import Expression
 
     import scipy.interpolate as si
     from scipy.io.netcdf import NetCDFFile
@@ -151,10 +152,10 @@ else:
     from .conversion import earth_radius, to_latlon, vectorlonlat_to_utm
     from .interpolation import interp
     from .misc import indicator, bdyRegion
-    from .options import Options
+    from .options import RossbyWaveOptions, TohokuOptions
 
 
-def problemDomain(level=0, mesh=None, b=None, op=Options(mode='tohoku')):
+def problemDomain(level=0, mesh=None, b=None, op=TohokuOptions()):
     """
     Set up problem domain.
     
@@ -300,7 +301,7 @@ class RossbyWaveSolution:
     
     Hermite polynomials taken from the Matlab code found at https://marine.rutgers.edu/po/tests/soliton/hermite.txt
     """
-    def __init__(self, function_space, order=1, op=Options(mode='rossby-wave')):
+    def __init__(self, function_space, order=1, op=RossbyWaveOptions()):
         """
         :arg function_space: mixed FunctionSpace in which to construct the Hermite polynomials.
         """

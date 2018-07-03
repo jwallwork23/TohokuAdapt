@@ -1,6 +1,6 @@
 import argparse
 
-from utils.options import TohokuOptions, RossbyWaveOptions
+from utils.options import *
 from utils.timeseries import errorVsElements
 
 
@@ -13,4 +13,6 @@ if args.mode in ("tohoku", "model-verification"):
     op = TohokuOptions()
 elif args.mode == "rossby-wave":
     op = RossbyWaveOptions()
+elif args.mode == "advection-diffusion":
+    op = AdvectionOptions()
 errorVsElements(args.mode, bootstrapping=bool(args.b), date=args.d, op=op)
