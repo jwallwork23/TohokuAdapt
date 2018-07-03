@@ -59,12 +59,14 @@ op = AdvectionOptions()
 # op.diffusivity.assign(0.)
 
 # Parameter choice 5 (TELEMAC-2D point discharge with diffusion)
-level = 1
+# level = 1
+level = 3
 op.bell_r0 = 0.457
 op.bell_x0 = 1.5
 op.bell_y0 = 5.
 op.Tend = 50.
-op.dt = 0.1
+# op.dt = 0.1
+op.dt = 0.01
 op.diffusivity.assign(0.1)
 
 # Setup domain
@@ -95,6 +97,7 @@ options.tracer_source_2d = source
 options.timestepper_type = 'CrankNicolson'
 options.timestep = op.dt
 # options.use_nonlinear_equations = False
+options.no_exports = True
 
 solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
 try:

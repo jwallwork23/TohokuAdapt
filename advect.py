@@ -1,4 +1,5 @@
-from thetis_adjoint import *
+from thetis import *
+# from thetis_adjoint import *
 from firedrake.petsc import PETSc
 
 import argparse
