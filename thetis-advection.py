@@ -118,9 +118,9 @@ uv_init.interpolate(Expression([1., 0.]))
 
 # Boundary conditions
 solver_obj.bnd_functions = {'shallow_water': {}, 'tracer': {}}
-solver_obj.bnd_functions['shallow_water']['uv']= {1: uv_init}
-solver_obj.bnd_functions['shallow_water']['uv'][2] = uv_init
-# solver_obj.bnd_functions['tracer'] = {1: Function(P1_2d)}
+# solver_obj.bnd_functions['shallow_water']['uv']= {1: uv_init}
+# solver_obj.bnd_functions['shallow_water']['uv'][2] = uv_init
+solver_obj.bnd_functions[1] = {'tracer': Constant(0.)}
 
 if source:
     solver_obj.assign_initial_conditions(elev=elev_init, uv=uv_init)

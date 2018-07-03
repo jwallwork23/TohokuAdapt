@@ -154,14 +154,13 @@ else:
     from .options import Options
 
 
-def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='tohoku')):
+def problemDomain(level=0, mesh=None, b=None, op=Options(mode='tohoku')):
     """
     Set up problem domain.
     
     :arg level: refinement level, where 0 is coarsest.
     :param mesh: user specified mesh, if already generated.
     :param b: user specified bathymetry, if already generated.
-    :param hierarchy: extract 5 level MeshHierarchy.
     :param op: options parameter object.
     :return: associated mesh, initial conditions, bathymetry field, boundary conditions and Coriolis parameter. 
     """
@@ -172,11 +171,9 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
             # ms = MeshSetup(level, op.wd)
             ms = MeshSetup(level, False)
             mesh = Mesh(ms.dirName + ms.meshName + '.msh')
-        if hierarchy:
-            mh = MeshHierarchy(mesh, 5)
         meshCoords = mesh.coordinates.dat.data
         P1 = FunctionSpace(mesh, 'CG', 1)
-        eta0 = Function(P1, name='Initial free surface displacement')
+        eta0 = Function(P1)
         u0 = Function(VectorFunctionSpace(mesh, "CG", 1))
         if getBathy:
             b = Function(P1, name='Bathymetry profile')
@@ -267,22 +264,30 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
         nu = None
     elif op.mode == 'advection-diffusion':
         if mesh is None:
-            mesh = RectangleMesh(4 * level, level, 4, 1)
+            lx = 50
+            ly = 10
+            mesh = RectangleMesh(lx * level, ly * level, lx, ly)
         x, y = SpatialCoordinate(mesh)
         P1 = FunctionSpace(mesh, "CG", 1)
-        phi0 = Function(P1).interpolate(exp(- (pow(x - 0.5, 2) + pow(y - 0.5, 2)) / 0.04))
+        bell = conditional(
+            ge(0.25 * (
+            1 + cos(pi * min_value(sqrt(pow(x - op.bell_x0, 2) + pow(y - op.bell_y0, 2)) / op.bell_r0, 1.0))), 0.),
+            0.25 * (1 + cos(pi * min_value(sqrt(pow(x - op.bell_x0, 2) + pow(y - op.bell_y0, 2)) / op.bell_r0, 1.0))),
+            0.)
+        source = Function(P1).interpolate(0. + bell)  # Tracer source function
+        b = Function(P1).assign(1.)
+        u0 = Function(VectorFunctionSpace(mesh, "CG", 1)).interpolate(Expression([1., 0.]))
+        eta0 = Function(P1)
         BCs = DirichletBC(P1, 0, 'on_boundary')
-        w = Function(VectorFunctionSpace(mesh, "CG", 1), name='Wind field').interpolate(Expression([1, 0]))
+        nu = op.diffusivity
 
     if newmesh:
         PETSc.Sys.Print("Setting up mesh across %d processes" % COMM_WORLD.size)
         PETSc.Sys.Print("  rank %d owns %d elements and can access %d vertices" \
                         % (mesh.comm.rank, mesh.num_cells(), mesh.num_vertices()), comm=COMM_SELF)
 
-    if hierarchy:
-        return mesh, u0, eta0, b, BCs, f, nu, mh
-    elif op.mode == 'advection-diffusion':
-        return mesh, phi0, BCs, w
+    if op.mode == 'advection-diffusion':
+        return mesh, u0, eta0, b, BCs, source, nu
     else:
         return mesh, u0, eta0, b, BCs, f, nu
 
