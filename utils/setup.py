@@ -225,9 +225,9 @@ def problemDomain(level=0, mesh=None, b=None, op=Options(mode='tohoku')):
                 beta = 2 * op.Omega * np.cos(np.radians(op.latFukushima)) / earth_radius(op.latFukushima)
                 for i, v in zip(range(len(mesh.coordinates.dat.data)), mesh.coordinates.dat.data):
                     f.dat.data[i] = f0 + beta * v[1]
-        nu = Function(P1).assign(1e-3)
-        # nu = Function(P1).interpolate(bdyRegion(mesh, 100, 1e9, sponge=True))
-        # File('plots/tohoku/spongy.pvd').write(nu)
+        diffusivity = Function(P1).assign(1e-3)
+        # diffusivity = Function(P1).interpolate(bdyRegion(mesh, 100, 1e9, sponge=True))
+        # File('plots/tohoku/spongy.pvd').write(diffusivity)
 
     elif op.mode == 'shallow-water':
         n = pow(2, level)
@@ -241,7 +241,7 @@ def problemDomain(level=0, mesh=None, b=None, op=Options(mode='tohoku')):
         b = Function(P1).assign(0.1)
         BCs = {}
         f = Function(P1)
-        nu = None
+        diffusivity = None
     elif op.mode in ('rossby-wave', 'kelvin-wave'):
         if mesh is None:
             n = pow(2, level - 1)
@@ -261,12 +261,13 @@ def problemDomain(level=0, mesh=None, b=None, op=Options(mode='tohoku')):
         u0, eta0 = q.split()
         BCs = {1: {'uv': Constant(0.)}, 2: {'uv': Constant(0.)}, 3: {'uv': Constant(0.)}, 4: {'uv': Constant(0.)}}
         f = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
-        nu = None
+        diffusivity = None
     elif op.mode == 'advection-diffusion':
+        n = pow(2, level)
         if mesh is None:
             lx = 50
             ly = 10
-            mesh = RectangleMesh(lx * level, ly * level, lx, ly)
+            mesh = RectangleMesh(lx * n, ly * n, lx, ly)
         x, y = SpatialCoordinate(mesh)
         P1 = FunctionSpace(mesh, "CG", 1)
         bell = conditional(
@@ -278,8 +279,9 @@ def problemDomain(level=0, mesh=None, b=None, op=Options(mode='tohoku')):
         b = Function(P1).assign(1.)
         u0 = Function(VectorFunctionSpace(mesh, "CG", 1)).interpolate(Expression([1., 0.]))
         eta0 = Function(P1)
-        BCs = DirichletBC(P1, 0, 'on_boundary')
-        nu = op.diffusivity
+        BCs = {}
+        BCs[1] = {'tracer': Constant(0.)}
+        diffusivity = op.diffusivity
 
     if newmesh:
         PETSc.Sys.Print("Setting up mesh across %d processes" % COMM_WORLD.size)
@@ -287,9 +289,9 @@ def problemDomain(level=0, mesh=None, b=None, op=Options(mode='tohoku')):
                         % (mesh.comm.rank, mesh.num_cells(), mesh.num_vertices()), comm=COMM_SELF)
 
     if op.mode == 'advection-diffusion':
-        return mesh, u0, eta0, b, BCs, source, nu
+        return mesh, u0, eta0, b, BCs, source, diffusivity
     else:
-        return mesh, u0, eta0, b, BCs, f, nu
+        return mesh, u0, eta0, b, BCs, f, diffusivity
 
 
 class RossbyWaveSolution:

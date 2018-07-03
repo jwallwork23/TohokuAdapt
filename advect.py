@@ -1,20 +1,20 @@
-from thetis_adjoint import *
+# from thetis_adjoint import *
+from thetis import *
 from firedrake.petsc import PETSc
 
 import argparse
 import datetime
 import numpy as np
 
-from utils.options import TohokuOptions, GaussianOptions, RossbyWaveOptions, KelvinWaveOptions
+from utils.options import AdvectionOptions
 from utils.setup import problemDomain
-from utils.sw_solvers import tsunami
+from utils.ad_solvers import advect
 
 
 now = datetime.datetime.now()
 date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
 parser = argparse.ArgumentParser()
-parser.add_argument("t", help="Choose test problem from {'shallow-water', 'rossby-wave'} (default 'tohoku')")
 parser.add_argument("-a", help="Choose adaptive approach from {'hessianBased', 'DWP', 'DWR'} (default 'fixedMesh')")
 parser.add_argument("-low", help="Lower bound for mesh resolution range")
 parser.add_argument("-high", help="Upper bound for mesh resolution range")
@@ -35,10 +35,6 @@ if approach is None:
     approach = 'fixedMesh'
 else:
     assert approach in ('fixedMesh', 'hessianBased', 'DWP', 'DWR')
-if args.t is None:
-    mode = 'tohoku'
-else:
-    mode = args.t
 orderChange = 0
 if args.ho:
     assert not args.r
@@ -49,16 +45,7 @@ if args.b is not None:
     assert approach == 'hessianBased'
 coriolis = args.c if args.c is not None else 'f'
 
-if mode == 'tohoku':
-    op = TohokuOptions(approach=approach)
-elif mode == 'rossby-wave':
-    op = RossbyWaveOptions(approach=approach)
-elif mode == 'kelvin-wave':
-    op = KelvinWaveOptions(approach=approach)
-elif mode == 'shallow-water':
-    op = GaussianOptions(approach=approach)
-else:
-    raise NotImplementedError
+op = AdvectionOptions(approach=approach)
 op.gradate = bool(args.gradate) if args.gradate is not None else False
 op.plotpvd = True if args.o else False
 op.nAdapt = 1 if args.nAdapt is None else int(args.nAdapt)
@@ -67,7 +54,7 @@ op.bAdapt = bool(args.b) if args.b is not None else False
 op.adaptField = args.field if args.field is not None else 's'
 
 # Establish filenames
-filename = 'outdata/' + mode + '/' + approach
+filename = 'outdata/advection-diffusion/' + approach
 if args.ho:
     op.orderChange = 1
     filename += '_ho'
@@ -78,13 +65,6 @@ if args.b:
     filename += '_b'
 filename += '_' + date
 errorFile = open(filename + '.txt', 'w+')
-files = {}
-extensions = []
-if mode == 'tohoku':
-    extensions.append('P02')
-    extensions.append('P06')
-for e in extensions:
-    files[e] = open(filename + e + '.txt', 'w+')
 
 # Get data and save to disk
 if args.low is not None or args.high is not None:
@@ -94,9 +74,9 @@ else:
     resolutions = [0 if args.level is None else int(args.level)]
 Jlist = np.zeros(len(resolutions))
 for i in resolutions:
-    mesh, u0, eta0, b, BCs, f, diffusivity = problemDomain(i, op=op)
-    quantities = tsunami(mesh, u0, eta0, b, BCs=BCs, f=f, diffusivity=diffusivity, regen=bool(args.regen), op=op)
-    PETSc.Sys.Print("Mode: %s Approach: %s. Run: %d" % (mode, approach, i), comm=COMM_WORLD)
+    mesh, u0, eta0, b, BCs, source, diffusivity = problemDomain(i, op=op)
+    quantities = advect(mesh, u0, eta0, b, BCs=BCs, source=source, diffusivity=diffusivity, regen=bool(args.regen), op=op)
+    PETSc.Sys.Print("Mode: %s Approach: %s. Run: %d" % ('advection-diffusion', approach, i), comm=COMM_WORLD)
     rel = np.abs(op.J - quantities['J_h']) / np.abs(op.J)
     PETSc.Sys.Print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs OF error: %.4e"
           % (i, quantities['meanElements'], quantities['J_h'], quantities['solverTimer'], rel), comm=COMM_WORLD)
@@ -105,11 +85,6 @@ for i in resolutions:
         if tag in quantities:
             errorFile.write(", %.4e" % quantities[tag])
     errorFile.write(", %.1f, %.4e\n" % (quantities['solverTimer'], quantities['J_h']))
-    for tag in files:
-        files[tag].writelines(["%s," % val for val in quantities[tag]])
-        files[tag].write("\n")
     if approach in ("DWP", "DWR"):
         PETSc.Sys.Print("Time for final run: %.1fs" % quantities['adaptSolveTimer'], comm=COMM_WORLD)
-for tag in files:
-    files[tag].close()
 errorFile.close()

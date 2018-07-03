@@ -12,10 +12,7 @@ from utils.setup import problemDomain
 __all__ = ["advect"]
 
 
-default_BC = {'shallow_water': {}, 'tracer': {}}
-
-
-def fixedMesh(mesh, u0, eta0, b, BCs=default_BC, source=None, diffusivity=None, **kwargs):
+def fixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
 
     # Initialise solver
@@ -61,7 +58,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs=default_BC, source=None, diffusivity=None, 
     return quantities
 
 
-def advect(mesh, u0, eta0, b, BCs=default_BC, source=None, **kwargs):
+def advect(mesh, u0, eta0, b, BCs={}, source=None, **kwargs):
     op = kwargs.get('op')
     regen = kwargs.get('regen')
     solvers = {'fixedMesh': fixedMesh}
