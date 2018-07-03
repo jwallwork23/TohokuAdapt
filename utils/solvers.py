@@ -16,7 +16,7 @@ from utils.misc import indexString, peakAndDistance, bdyRegion
 __all__ = ["fixedMeshAD", "hessianBasedAD", "tsunami"]
 
 
-def weakResidualAD(c, c_, w, op=Options(mode='advection-diffusion')):
+def weakResidualAD(c, c_, w, op=Options(mode='advection-diffusion')):   # TODO: Remove this
     """
     :arg c: concentration solution at current timestep. 
     :arg c_: concentration at previous timestep.
@@ -35,7 +35,7 @@ def weakResidualAD(c, c_, w, op=Options(mode='advection-diffusion')):
 
 
 def fixedMeshAD(mesh, phi0, BCs, w, op=Options(mode='advection-diffusion', approach="fixedMesh")):
-    forwardFile = File(op.di + "fixedMesh.pvd")
+    forwardFile = File(op.di + "fixedMesh.pvd") # TODO: replace with Thetis version
 
     # Initialise FunctionSpaces and variables
     V = FunctionSpace(mesh, "CG", 1)
@@ -81,7 +81,7 @@ def fixedMeshAD(mesh, phi0, BCs, w, op=Options(mode='advection-diffusion', appro
 
 
 def hessianBasedAD(mesh, phi0, BCs, w, op=Options(mode='advection-diffusion', approach="hessianBased")):
-    forwardFile = File(op.di + "hessianBased.pvd")
+    forwardFile = File(op.di + "hessianBased.pvd")  # TODO: replace with Thetis version
 
     # Initialise FunctionSpaces and variables
     V = FunctionSpace(mesh, "CG", 1)
@@ -211,8 +211,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
     solverTimer = clock()
     solver_obj.iterate()
     solverTimer = clock() - solverTimer
-    quantities['J_h'] = cb1.quadrature()          # Evaluate objective functional
-    quantities['Integrand'] = cb1.get_vals()
+    quantities['J_h'] = cb1.get_val()          # Evaluate objective functional
     if op.mode == 'tohoku':
         quantities['TV P02'] = cb2.totalVariation()
         quantities['TV P06'] = cb3.totalVariation()
@@ -338,7 +337,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
                 initP02 = cb2.init_value
                 initP06 = cb3.init_value
         if cnt != 0:
-            cb1.objective_value = quantities['Integrand']
+            cb1.old_value = quantities['J_h']
             if op.mode == 'tohoku':
                 cb2.gauge_values = quantities['P02']
                 cb2.init_value = initP02
@@ -352,8 +351,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
         solverTimer = clock()
         adapSolver.iterate()
         solverTimer = clock() - solverTimer
-        quantities['J_h'] = cb1.quadrature()  # Evaluate objective functional
-        quantities['Integrand'] = cb1.get_vals()
+        quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
         if op.mode == 'tohoku':
             quantities['P02'] = cb2.get_vals()
             quantities['P06'] = cb3.get_vals()
@@ -461,7 +459,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
         primalTimer = clock()
         solver_obj.iterate()
         primalTimer = clock() - primalTimer
-        J = cb1.quadrature()                        # Assemble objective functional for adjoint computation
+        J = cb1.get_val()                        # Assemble objective functional for adjoint computation
         print('Primal run complete. Solver time: %.3fs' % primalTimer)
 
         # Compute gradient
@@ -587,7 +585,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
                     initP02 = cb2.init_value
                     initP06 = cb3.init_value
             if cnt != 0:
-                cb1.objective_value = quantities['Integrand']
+                cb1.old_value = quantities['J_h']
                 if op.mode == 'tohoku':
                     cb2.gauge_values = quantities['P02']
                     cb2.init_value = initP02
@@ -601,8 +599,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
             solverTimer = clock()
             adapSolver.iterate()
             solverTimer = clock() - solverTimer
-            quantities['J_h'] = cb1.quadrature()  # Evaluate objective functional
-            quantities['Integrand'] = cb1.get_vals()
+            quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
             if op.mode == 'tohoku':
                 quantities['P02'] = cb2.get_vals()
                 quantities['P06'] = cb3.get_vals()
@@ -751,7 +748,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Store
             t += op.dt * op.ndump
             options.simulation_end_time = t + (op.ndump - 0.5) * op.dt
 
-        J = cb1.quadrature()                        # Assemble objective functional for adjoint computation
+        J = cb1.get_val()                        # Assemble objective functional for adjoint computation
         print('Primal run complete. Solver time: %.3fs' % primalTimer)
 
         # Compute gradient
@@ -951,7 +948,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Store
                     initP02 = cb2.init_value
                     initP06 = cb3.init_value
             if cnt != 0:
-                cb1.objective_value = quantities['Integrand']
+                cb1.old_value = quantities['J_h']
                 if op.mode == 'tohoku':
                     cb2.gauge_values = quantities['P02']
                     cb2.init_value = initP02
@@ -965,8 +962,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Store
             solverTimer = clock()
             adapSolver.iterate()
             solverTimer = clock() - solverTimer
-            quantities['J_h'] = cb1.quadrature()  # Evaluate objective functional
-            quantities['Integrand'] = cb1.get_vals()
+            quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
             if op.mode == 'tohoku':
                 quantities['P02'] = cb2.get_vals()
                 quantities['P06'] = cb3.get_vals()

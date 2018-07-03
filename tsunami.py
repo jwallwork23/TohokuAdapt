@@ -79,7 +79,7 @@ if args.b:
 filename += '_' + date
 errorFile = open(filename + '.txt', 'w+')
 files = {}
-extensions = ['Integrand']
+extensions = []
 if mode == 'tohoku':
     extensions.append('P02')
     extensions.append('P06')
