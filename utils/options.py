@@ -270,6 +270,7 @@ class AdvectionOptions(AdaptOptions):
     bell_x0 = Float(1.5, help="x-coordinate corresponding to tracer source centre").tag(config=True)
     bell_y0 = Float(5., help="y-coordinate corresponding to tracer source centre").tag(config=True)
     bell_r0 = Float(0.5, help="Radius of tracer source").tag(config=True)
+    u_mag = NonNegativeFloat(1., help="(Estimate of) maximum advective speed").tag(config=True)
 
     # Region of importance
     radii = List(trait=Float, default_value=[0.5],

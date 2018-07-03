@@ -1,173 +1,19 @@
-from firedrake import *
+from thetis import *
 
 import numpy as np
 from time import clock
-import copy
 
 from utils.adaptivity import *
 from utils.callbacks import *
 from utils.interpolation import interp, mixedPairInterp
-from utils.misc import indicator, indexString, peakAndDistance
-from utils.options import Options
 from utils.setup import problemDomain, RossbyWaveSolution
 from utils.misc import indexString, peakAndDistance, bdyRegion
 
 
-__all__ = ["fixedMeshAD", "hessianBasedAD", "tsunami"]
+__all__ = ["tsunami"]
 
 
-def weakResidualAD(c, c_, w, op=Options(mode='advection-diffusion')):   # TODO: Remove this
-    """
-    :arg c: concentration solution at current timestep. 
-    :arg c_: concentration at previous timestep.
-    :arg w: wind field.
-    :param op: Options parameter object.
-    :return: weak residual for advection diffusion equation at current timestep.
-    """
-    if op.timestepper == 'CrankNicolson':
-        cm = 0.5 * (c + c_)
-    else:
-        raise NotImplementedError
-    ct = TestFunction(c.function_space())
-    F = ((c - c_) * ct / Constant(op.dt) + inner(grad(cm), w * ct)) * dx
-    F += Constant(op.viscosity) * inner(grad(cm), grad(ct)) * dx
-    return F
-
-
-def fixedMeshAD(mesh, phi0, BCs, w, op=Options(mode='advection-diffusion', approach="fixedMesh")):
-    forwardFile = File(op.di + "fixedMesh.pvd") # TODO: replace with Thetis version
-
-    # Initialise FunctionSpaces and variables
-    V = FunctionSpace(mesh, "CG", 1)
-    phi = Function(V).assign(phi0)
-    phi.rename('Concentration')
-    phi_next = Function(V, name='Concentration next')
-    nEle = mesh.num_cells()
-    F = weakResidualAD(phi_next, phi, w, op=op)
-
-    t = 0.
-    cnt = 0
-    quantities = {}
-    fullTimer = 0.
-    if op.plotpvd:
-        forwardFile.write(phi, time=t)
-    iA = indicator(mesh, xy=[3., 0.], radii=0.5, op=op)
-    J_list = [assemble(iA * phi * dx)]
-    while t < op.Tend:
-        # Solve problem at current timestep
-        solverTimer = clock()
-        solve(F == 0, phi_next, bcs=BCs)
-        solverTimer = clock() - solverTimer
-        fullTimer += solverTimer
-        phi.assign(phi_next)
-
-        J_list.append(assemble(iA * phi * dx))
-
-        if op.plotpvd and (cnt % op.ndump == 0):
-            forwardFile.write(phi, time=t)
-            print('t = %.1fs' % t)
-        t += op.dt
-        cnt += 1
-
-    J_h = 0.
-    for i in range(1, len(J_list)):
-        J_h += 0.5 * (J_list[i] + J_list[i-1]) * op.dt
-
-    quantities['meanElements'] = nEle
-    quantities['solverTimer'] = fullTimer
-    quantities['J_h'] = J_h
-
-    return quantities
-
-
-def hessianBasedAD(mesh, phi0, BCs, w, op=Options(mode='advection-diffusion', approach="hessianBased")):
-    forwardFile = File(op.di + "hessianBased.pvd")  # TODO: replace with Thetis version
-
-    # Initialise FunctionSpaces and variables
-    V = FunctionSpace(mesh, "CG", 1)
-    phi = Function(V).assign(phi0)
-    phi.rename('Concentration')
-    phi_next = Function(V, name='Concentration next')
-    nEle = mesh.num_cells()
-    F = weakResidualAD(phi_next, phi, w, op=op)
-
-    # Get adaptivity parameters
-    mM = [nEle, nEle]  # Min/max #Elements
-    Sn = nEle
-    op.nVerT = mesh.num_vertices() * op.rescaling  # Target #Vertices
-
-    # Initialise counters
-    t = 0.
-    cnt = 0
-    adaptSolveTimer = 0.
-    quantities = {}
-    iA = indicator(mesh, xy=[3., 0.], radii=0.5, op=op)
-    J_list = [assemble(iA * phi * dx)]
-    while t <= op.Tend:
-        adaptTimer = clock()
-        if cnt % op.rm == 0:
-
-            temp = Function(V).assign(phi)
-            for l in range(op.nAdapt):
-
-                # Construct metric
-                M = steadyMetric(temp, op=op)
-                if op.gradate:
-                    metricGradation(mesh, M)
-
-                # Adapt mesh and interpolate variables
-                mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-                if l < op.nAdapt-1:
-                    temp = interp(mesh, temp)
-
-            phi = interp(mesh, phi)
-            phi.rename("Concentration")
-            V = FunctionSpace(mesh, "CG", 1)
-            phi_next = Function(V)
-            iA = indicator(mesh, xy=[3., 0.], radii=0.5, op=op)
-
-            # Re-establish bilinear form and set boundary conditions
-            BCs, w = problemDomain(mesh=mesh, op=op)[2:]        # TODO: find a different way to reset these
-            F = weakResidualAD(phi_next, phi, w, op=op)
-
-            # Get mesh stats
-            nEle = mesh.num_cells()
-            mM = [min(nEle, mM[0]), max(nEle, mM[1])]
-            Sn += nEle
-
-        # Solve problem at current timestep
-        solverTimer = clock()
-        solve(F == 0, phi_next, bcs=BCs)
-        phi.assign(phi_next)
-        J_list.append(assemble(iA * phi * dx))
-        solverTimer = clock() - solverTimer
-
-        # Print to screen, save data and increment counters
-        if op.plotpvd and (cnt % op.ndump == 0):
-            forwardFile.write(phi, time=t)
-            print('t = %.1fs' % t)
-        t += op.dt
-        cnt += 1
-
-        if cnt % op.rm == 0:
-            av = op.printToScreen(int(cnt / op.rm + 1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.dt)
-            adaptSolveTimer += adaptTimer + solverTimer
-
-    J_h = 0.
-    for i in range(1, len(J_list)):
-        J_h += 0.5 * (J_list[i] + J_list[i - 1]) * op.dt
-
-    quantities['meanElements'] = av
-    quantities['solverTimer'] = adaptSolveTimer
-    quantities['J_h'] = J_h
-
-    return quantities
-
-
-from thetis import *
-
-
-def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
+def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
 
     # Initialise domain and physical parameters
@@ -184,7 +30,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
     options = solver_obj.options
     options.element_family = op.family
     options.use_nonlinear_equations = True
-    options.horizontal_viscosity = nu
+    options.horizontal_viscosity = diffusivity
     options.use_grad_div_viscosity_term = True              # Symmetric viscous stress
     options.use_lax_friedrichs_velocity = False             # TODO: This is a temporary fix
     options.coriolis_frequency = f
@@ -234,7 +80,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
     return quantities
 
 
-def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
+def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
 
     # Initialise domain and physical parameters
@@ -297,7 +143,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
 
         if cnt != 0 or op.adaptField == 'f':
             elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
-            b, BCs, f, nu = problemDomain(mesh=mesh, op=op)[3:]     # TODO: find a different way to reset these
+            b, BCs, f, diffusivity = problemDomain(mesh=mesh, op=op)[3:]     # TODO: find a different way to reset these
             uv_2d.rename('uv_2d')
             elev_2d.rename('elev_2d')
         adaptTimer = clock() - adaptTimer
@@ -307,8 +153,8 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
         adapOpt = adapSolver.options
         adapOpt.element_family = op.family
         adapOpt.use_nonlinear_equations = True
-        if nu is not None:
-            adapOpt.horizontal_viscosity = interp(mesh, nu)
+        if diffusivity is not None:
+            adapOpt.horizontal_viscosity = interp(mesh, diffusivity)
         adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
         adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
         adapOpt.simulation_export_time = op.dt * op.ndump
@@ -390,7 +236,7 @@ import pyadjoint
 from fenics_adjoint.solving import SolveBlock                                       # For extracting adjoint solutions
 
 
-def DWP(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
+def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
     regen = kwargs.get('regen')
 
@@ -438,7 +284,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
         options = solver_obj.options
         options.element_family = op.family
         options.use_nonlinear_equations = True
-        options.horizontal_viscosity = nu
+        options.horizontal_viscosity = diffusivity
         options.use_grad_div_viscosity_term = True                      # Symmetric viscous stress
         options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
         options.coriolis_frequency = f
@@ -545,7 +391,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
                 mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
 
             elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
-            b, BCs, f, nu = problemDomain(mesh=mesh, op=op)[3:]             # TODO: find a different way to reset these
+            b, BCs, f, diffusivity = problemDomain(mesh=mesh, op=op)[3:]             # TODO: find a different way to reset these
             uv_2d.rename('uv_2d')
             elev_2d.rename('elev_2d')
             adaptTimer = clock() - adaptTimer
@@ -555,8 +401,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = True
-            if nu is not None:
-                adapOpt.horizontal_viscosity = interp(mesh, nu)
+            if diffusivity is not None:
+                adapOpt.horizontal_viscosity = interp(mesh, diffusivity)
             adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
             adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump
@@ -636,7 +482,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):
         return quantities
 
 
-def DWR(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Store optimal mesh, 'intersected' over all rm steps
+def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TODO: Store optimal mesh, 'intersected' over all rm steps
     op = kwargs.get('op')
     regen = kwargs.get('regen')
 
@@ -704,7 +550,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Store
         options = solver_obj.options
         options.element_family = op.family
         options.use_nonlinear_equations = True
-        options.horizontal_viscosity = nu
+        options.horizontal_viscosity = diffusivity
         options.use_grad_div_viscosity_term = True                      # Symmetric viscous stress
         options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
         options.coriolis_frequency = f
@@ -908,7 +754,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Store
                 # exit(0)
 
             elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
-            b, BCs, f, nu = problemDomain(mesh=mesh, op=op)[3:]           # TODO: Find a different way to reset these
+            b, BCs, f, diffusivity = problemDomain(mesh=mesh, op=op)[3:]           # TODO: Find a different way to reset these
             uv_2d.rename('uv_2d')
             elev_2d.rename('elev_2d')
             adaptTimer = clock() - adaptTimer
@@ -918,8 +764,8 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, nu=None, **kwargs):     # TODO: Store
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = True
-            if nu is not None:
-                adapOpt.horizontal_viscosity = interp(mesh, nu)
+            if diffusivity is not None:
+                adapOpt.horizontal_viscosity = interp(mesh, diffusivity)
             adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
             adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
             adapOpt.simulation_export_time = op.dt * op.ndump

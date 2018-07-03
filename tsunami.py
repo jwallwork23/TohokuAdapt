@@ -7,7 +7,7 @@ import numpy as np
 
 from utils.options import Options, TohokuOptions, GaussianOptions, RossbyWaveOptions, KelvinWaveOptions
 from utils.setup import problemDomain
-from utils.solvers import tsunami
+from utils.sw_solvers import tsunami
 
 
 now = datetime.datetime.now()
