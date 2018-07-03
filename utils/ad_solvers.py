@@ -65,7 +65,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
     uv_2d, elev_2d = Function(V).split()  # Needed to load data into
     elev_2d.interpolate(eta0)
     uv_2d.interpolate(u0)
-    tracer_2d = Function(FunctionSpace(mesh, "CG", 1)).assign(source)
+    tracer_2d = Function(FunctionSpace(mesh, "CG", 1))
 
     # Initialise parameters and counters
     nEle = mesh.num_cells()
@@ -116,10 +116,14 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         adapOpt.output_directory = op.di()
         if not op.plotpvd:
             adapOpt.no_exports = True
-        if cnt == 0:
-            adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
-        else:
-            adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d, tracer=tracer_2d)
+        adapOpt.horizontal_velocity_scale = op.u_mag
+        adapOpt.fields_to_export = ['uv_2d', 'elev_2d', 'tracer_2d']
+        adapOpt.solve_tracer = True
+        adapOpt.tracer_only = True  # Need use tracer-only branch to use this functionality
+        adapOpt.horizontal_diffusivity = diffusivity
+        adapOpt.use_lax_friedrichs_tracer = False
+        adapOpt.tracer_source_2d = source
+        adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d, tracer=tracer_2d)
         adapSolver.i_export = int(cnt / op.ndump)
         adapSolver.next_export_t = adapSolver.i_export * adapSolver.options.simulation_export_time
         adapSolver.iteration = cnt
@@ -160,9 +164,9 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
     return quantities
 
 
-def advect(mesh, u0, eta0, b, BCs={}, source=None, **kwargs):
+def advect(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
     regen = kwargs.get('regen')
     solvers = {'fixedMesh': fixedMesh, 'hessianBased': hessianBased}
 
-    return solvers[op.approach](mesh, u0, eta0, b, BCs, source, regen=regen, op=op)
+    return solvers[op.approach](mesh, u0, eta0, b, BCs, source, diffusivity, regen=regen, op=op)

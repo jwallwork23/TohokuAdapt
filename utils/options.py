@@ -265,6 +265,7 @@ class AdvectionOptions(AdaptOptions):
     hmax = PositiveFloat(10., help="Maximum element size").tag(config=True)
     minNorm = PositiveFloat(1e-5).tag(config=True)  # TODO: Not sure about this
     maxScaling = PositiveFloat(5e5).tag(config=True)  # TODO: Not sure about this
+    rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
     diffusivity = FiredrakeScalarExpression(
         Constant(0.1), allow_none=True, help="Diffusion coefficient").tag(config=True)
     bell_x0 = Float(1.5, help="x-coordinate corresponding to tracer source centre").tag(config=True)

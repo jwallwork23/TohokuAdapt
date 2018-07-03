@@ -845,9 +845,9 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
         return quantities
 
 
-def tsunami(mesh, u0, eta0, b, BCs={}, f=None, **kwargs):
+def tsunami(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
     regen = kwargs.get('regen')
     solvers = {'fixedMesh': fixedMesh, 'hessianBased': hessianBased, 'DWP': DWP, 'DWR': DWR}
 
-    return solvers[op.approach](mesh, u0, eta0, b, BCs, f, regen=regen, op=op)
+    return solvers[op.approach](mesh, u0, eta0, b, BCs, f, diffusivity, regen=regen, op=op)
