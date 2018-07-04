@@ -87,7 +87,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         for l in range(op.nAdapt):                  # TODO: Test this functionality
 
             # Construct metric
-            if cnt != 0:   # Can't adapt to zero velocity
+            if cnt != 0:   # Can't adapt to zero concentration
                 M = steadyMetric(tracer, op=op)
 
             # Adapt mesh and interpolate variables
@@ -97,8 +97,10 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
                 tracer = interp(mesh, tracer)
 
         if cnt != 0:
-            if op.nAdapt != 0 and op.plotMetric:
-                M.rename("Metric field")
+            if op.plotMetric:
+                if op.nAdapt == 0:
+                    M = steadyMetric(tracer, op=op)
+                M.rename('metric_2d')
                 mFile.write(M, time=t)
 
             elev_2d, uv_2d, tracer_2d = interp(mesh, elev_2d, uv_2d, tracer_2d)

@@ -145,7 +145,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
 
         if cnt != 0 or op.adaptField == 'f':
             if op.nAdapt != 0 and op.plotMetric:
-                M.rename("Metric field")
+                M.rename('metric_2d')
                 mFile.write(M, time=t)
 
             elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
@@ -399,7 +399,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                 mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
 
             if op.nAdapt != 0 and op.plotMetric:
-                M.rename("Metric field")
+                M.rename('metric_2d')
                 mFile.write(M, time=t)
             elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
             b, BCs, f, diffusivity = problemDomain(mesh=mesh, op=op)[3:]             # TODO: find a different way to reset these
@@ -766,7 +766,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                 # exit(0)
 
             if op.nAdapt != 0 and op.plotMetric:
-                M.rename("Metric field")
+                M.rename('metric_2d')
                 mFile.write(M, time=t)
             elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
             b, BCs, f, diffusivity = problemDomain(mesh=mesh, op=op)[3:]           # TODO: Find a different way to reset these

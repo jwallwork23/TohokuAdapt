@@ -285,6 +285,9 @@ class AdvectionOptions(AdaptOptions):
         return 'plots/advection-diffusion/' + self.approach + '/'
 
 
+# TODO: Get rid of old Options parameters below.
+
+
 class Options:
     def __init__(self,
                  mode='tohoku',
