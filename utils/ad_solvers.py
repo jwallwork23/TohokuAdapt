@@ -33,6 +33,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs
     options.fields_to_export = ['uv_2d', 'elev_2d', 'tracer_2d']
     options.solve_tracer = True
     options.tracer_only = True  # Need use tracer-only branch to use this functionality
+    diffusivity = Function(FunctionSpace(mesh, 'CG', 1)).assign(max(diffusivity.dat.data))
     options.horizontal_diffusivity = diffusivity
     options.use_lax_friedrichs_tracer = False
     options.tracer_source_2d = source

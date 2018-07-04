@@ -226,7 +226,7 @@ def problemDomain(level=0, mesh=None, b=None, op=TohokuOptions()):
                 beta = 2 * op.Omega * np.cos(np.radians(op.latFukushima)) / earth_radius(op.latFukushima)
                 for i, v in zip(range(len(mesh.coordinates.dat.data)), mesh.coordinates.dat.data):
                     f.dat.data[i] = f0 + beta * v[1]
-        diffusivity = Function(P1).assign(1e-3)
+        diffusivity = Function(P1).assign(op.diffusivity)
         # diffusivity = Function(P1).interpolate(bdyRegion(mesh, 100, 1e9, sponge=True))
         # File('plots/tohoku/spongy.pvd').write(diffusivity)
 
@@ -282,7 +282,7 @@ def problemDomain(level=0, mesh=None, b=None, op=TohokuOptions()):
         eta0 = Function(P1)
         BCs = {}
         BCs[1] = {'tracer': Constant(0.)}
-        diffusivity = op.diffusivity
+        diffusivity = Function(P1).assign(op.diffusivity)
 
     if newmesh:
         PETSc.Sys.Print("Setting up mesh across %d processes" % COMM_WORLD.size)

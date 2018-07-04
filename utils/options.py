@@ -122,6 +122,7 @@ class TohokuOptions(AdaptOptions):
     minNorm = PositiveFloat(1.).tag(config=True)    # TODO: Not sure about this
     maxScaling = PositiveFloat(5e5).tag(config=True)  # TODO: Not sure about this
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
+    diffusivity = NonNegativeFloat(1e-3, allow_none=True, help="Diffusion coefficient").tag(config=True)
 
     # Physical parameters
     coriolis = Unicode('sin', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
@@ -267,8 +268,7 @@ class AdvectionOptions(AdaptOptions):
     minNorm = PositiveFloat(1e-5).tag(config=True)  # TODO: Not sure about this
     maxScaling = PositiveFloat(5e5).tag(config=True)  # TODO: Not sure about this
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
-    diffusivity = FiredrakeScalarExpression(
-        Constant(0.1), allow_none=True, help="Diffusion coefficient").tag(config=True)
+    diffusivity = NonNegativeFloat(0.1, allow_none=True, help="Diffusion coefficient").tag(config=True)
     bell_x0 = Float(1.5, help="x-coordinate corresponding to tracer source centre").tag(config=True)
     bell_y0 = Float(5., help="y-coordinate corresponding to tracer source centre").tag(config=True)
     bell_r0 = Float(0.457, help="Radius of tracer source").tag(config=True)
