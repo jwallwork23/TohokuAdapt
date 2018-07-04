@@ -120,6 +120,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         adapOpt.simulation_export_time = op.dt * op.ndump
         adapOpt.simulation_end_time = t + op.dt * (op.rm - 0.5)
         adapOpt.timestepper_type = op.timestepper
+        print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters_tracer)
         adapOpt.timestep = op.dt
         adapOpt.output_directory = op.di()
         if not op.plotPVD:
@@ -130,6 +131,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         adapOpt.tracer_only = True  # Need use tracer-only branch to use this functionality
         adapOpt.horizontal_diffusivity = diffusivity
         adapOpt.use_lax_friedrichs_tracer = False
+        # adapOpt.use_lax_friedrichs_tracer = True
         adapOpt.tracer_source_2d = source
         adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d, tracer=tracer_2d)
         adapSolver.i_export = int(cnt / op.ndump)

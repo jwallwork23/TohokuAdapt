@@ -37,6 +37,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     options.simulation_export_time = op.dt * op.ndump
     options.simulation_end_time = op.Tend - 0.5 * op.dt
     options.timestepper_type = op.timestepper
+    print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
     options.timestep = op.dt
     options.output_directory = op.di()
     if not op.plotPVD:
@@ -166,6 +167,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         adapOpt.simulation_export_time = op.dt * op.ndump
         adapOpt.simulation_end_time = t + op.dt * (op.rm - 0.5)
         adapOpt.timestepper_type = op.timestepper
+        print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
         adapOpt.timestep = op.dt
         adapOpt.output_directory = op.di()
         if not op.plotPVD:
@@ -299,6 +301,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         options.simulation_export_time = op.dt * op.rm
         options.simulation_end_time = op.Tend - 0.5 * op.dt
         options.timestepper_type = op.timestepper
+        print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
         options.timestep = op.dt
         options.output_directory = op.di()
         options.export_diagnostics = True
@@ -419,6 +422,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             adapOpt.simulation_export_time = op.dt * op.ndump
             adapOpt.simulation_end_time = t + (op.rm - 0.5) * op.dt
             adapOpt.timestepper_type = op.timestepper
+            print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
             adapOpt.timestep = op.dt
             adapOpt.output_directory = op.di()
             if not op.plotPVD:
@@ -570,6 +574,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
         options.simulation_export_time = op.dt * op.ndump
         options.simulation_end_time = (op.ndump - 0.5) * op.dt
         options.timestepper_type = op.timestepper
+        print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
         options.timestep = op.dt
         options.output_directory = op.di()   # Need this for residual callback
         options.export_diagnostics = True
@@ -786,6 +791,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
             adapOpt.simulation_export_time = op.dt * op.ndump
             adapOpt.simulation_end_time = t + (op.rm - 0.5) * op.dt
             adapOpt.timestepper_type = op.timestepper
+            print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
             adapOpt.timestep = op.dt
             adapOpt.output_directory = op.di()
             if not op.plotPVD:
