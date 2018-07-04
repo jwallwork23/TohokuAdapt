@@ -26,7 +26,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs
     options.timestepper_options.solver_parameters_tracer = op.solver_parameters
     print("Using solver parameters %s" % options.timestepper_options.solver_parameters_tracer)
     options.timestep = op.timestep
-    options.output_directory = op.di()
+    options.output_directory = op.directory()
     if not op.plot_pvd:
         options.no_exports = True
     options.horizontal_velocity_scale = op.u_mag
@@ -61,7 +61,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs
 def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
     if op.plot_metric:
-        mFile = File(op.di() + "Metric2d.pvd")
+        mFile = File(op.directory() + "Metric2d.pvd")
 
     # Initialise domain and physical parameters
     V = op.mixed_space(mesh)
@@ -122,7 +122,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         adapOpt.timestepper_options.solver_parameters_tracer = op.solver_parameters
         print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters_tracer)
         adapOpt.timestep = op.timestep
-        adapOpt.output_directory = op.di()
+        adapOpt.output_directory = op.directory()
         if not op.plot_pvd:
             adapOpt.no_exports = True
         adapOpt.horizontal_velocity_scale = op.u_mag
@@ -184,12 +184,12 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
     regen = kwargs.get('regen')
     if op.plot_metric:
-        mFile = File(op.di() + "Metric2d.pvd")
+        mFile = File(op.directory() + "Metric2d.pvd")
 
     initTimer = clock()
     if op.plot_pvd:
-        errorFile = File(op.di() + "ErrorIndicator2d.pvd")
-        adjointFile = File(op.di() + "Adjoint2d.pvd")
+        errorFile = File(op.directory() + "ErrorIndicator2d.pvd")
+        adjointFile = File(op.directory() + "Adjoint2d.pvd")
 
     # Initialise domain and physical parameters
     P1 = FunctionSpace(mesh, "CG", 1)
@@ -223,7 +223,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         options.timestepper_options.solver_parameters_tracer = op.solver_parameters
         print("Using solver parameters %s" % options.timestepper_options.solver_parameters_tracer)
         options.timestep = op.timestep
-        options.output_directory = op.di()
+        options.output_directory = op.directory()
         options.fields_to_export = ['tracer_2d']
         options.fields_to_export_hdf5 = ['tracer_2d']
         options.solve_tracer = True
@@ -257,7 +257,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         r = N % op.timesteps_per_export                            # Number of extra tape annotations in setup
         for i in range(N - 1, r - 1, -op.timesteps_per_export):
             dual.assign(solve_blocks[i].adj_sol)
-            with DumbCheckpoint(op.di() + 'hdf5/Adjoint2d_' + indexString(int((i - r) / op.timesteps_per_export)), mode=FILE_CREATE) as saveAdj:
+            with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + indexString(int((i - r) / op.timesteps_per_export)), mode=FILE_CREATE) as saveAdj:
                 saveAdj.store(dual)
                 saveAdj.close()
             if op.plot_pvd:
@@ -270,20 +270,20 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         errorTimer = clock()
         for k in range(0, op.final_mesh_index()):  # Loop back over times to generate error estimators
             print('Generating error estimate %d / %d' % (k + 1, op.final_mesh_index()))
-            with DumbCheckpoint(op.di() + 'hdf5/Tracer2d_' + indexString(k), mode=FILE_READ) as loadVel:
+            with DumbCheckpoint(op.directory() + 'hdf5/Tracer2d_' + indexString(k), mode=FILE_READ) as loadVel:
                 loadVel.load(tracer_2d)
                 loadVel.close()
 
             # Load adjoint data and form indicators
             epsilon.interpolate(tracer_2d * dual)
             for i in range(k, min(k + op.final_export() - op.first_export(), op.final_export())):
-                with DumbCheckpoint(op.di() + 'hdf5/Adjoint2d_' + indexString(i), mode=FILE_READ) as loadAdj:
+                with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + indexString(i), mode=FILE_READ) as loadAdj:
                     loadAdj.load(dual)
                     loadAdj.close()
                 epsilon_.interpolate(tracer_2d * dual)
                 epsilon = pointwiseMax(epsilon, epsilon_)
             epsilon = normaliseIndicator(epsilon, op=op)
-            with DumbCheckpoint(op.di() + 'hdf5/ErrorIndicator2d_' + indexString(k), mode=FILE_CREATE) as saveErr:
+            with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + indexString(k), mode=FILE_CREATE) as saveErr:
                 saveErr.store(epsilon)
                 saveErr.close()
             if op.plot_pvd:
@@ -304,7 +304,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
 
                 # Construct metric
                 indexStr = indexString(int(cnt / op.timesteps_per_remesh))
-                with DumbCheckpoint(op.di() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_READ) as loadErr:
+                with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_READ) as loadErr:
                     loadErr.load(epsilon)
                     loadErr.close()
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(interp(mesh, epsilon))
@@ -338,7 +338,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             adapOpt.timestepper_options.solver_parameters_tracer = op.solver_parameters
             print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
             adapOpt.timestep = op.timestep
-            adapOpt.output_directory = op.di()
+            adapOpt.output_directory = op.directory()
             if not op.plot_pvd:
                 adapOpt.no_exports = True
             adapOpt.horizontal_velocity_scale = op.u_mag

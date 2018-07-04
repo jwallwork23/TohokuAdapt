@@ -7,8 +7,7 @@ import numpy as np
 
 from .conversion import from_latlon
 
-__all__ = ["Options",   # TODO: Get rid of this class
-           "TohokuOptions", "RossbyWaveOptions", "KelvinWaveOptions", "GaussianOptions", "AdvectionOptions"]
+__all__ = ["TohokuOptions", "RossbyWaveOptions", "KelvinWaveOptions", "GaussianOptions", "AdvectionOptions"]
 
 
 class AdaptOptions(FrozenConfigurable):
@@ -101,6 +100,9 @@ Percent complete  : %4.1f%%    Adapt time : %4.2fs Solver time : %4.2fs
               (mn, 100 * t / self.end_time, adaptTimer, solverTime, nEle, av, mM[0], mM[1]))
         return av
 
+    def directory(self):
+        return 'plots/' + self.mode + '/' + self.approach + '/'
+
 
 class TohokuOptions(AdaptOptions):
     name = 'Parameters for the Tohoku problem'
@@ -150,9 +152,6 @@ class TohokuOptions(AdaptOptions):
     def meshSize(self, i):
         return (5918, 7068, 8660, 10988, 14160, 19082, 27280, 41730, 72602, 160586, 681616)[i]
 
-    def di(self):
-        return 'plots/tohoku/' + self.approach + '/'
-
     # Region of importance
     radii = List(trait=Float, default_value=[50e3],
                  help="Radius of indicator function around location of interest.").tag(config=True)
@@ -186,9 +185,6 @@ class RossbyWaveOptions(AdaptOptions):
     # Physical parameters
     coriolis = Unicode('beta', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
     g = PositiveFloat(1., help="Gravitational acceleration").tag(config=True)
-
-    def di(self):
-        return 'plots/rossby-wave/' + self.approach + '/'
 
     # Region of importance
     radii = List(trait=Float, default_value=[np.sqrt(3), np.sqrt(3)],
@@ -224,9 +220,6 @@ class KelvinWaveOptions(AdaptOptions):
     coriolis = Unicode('beta', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
     g = PositiveFloat(1., help="Gravitational acceleration").tag(config=True)
 
-    def di(self):
-        return 'plots/kelvin-wave/' + self.approach + '/'
-
     # Region of importance
     radii = List(trait=Float, default_value=[np.sqrt(3)],
                  help="Radius of indicator function around location of interest.").tag(config=True)
@@ -260,9 +253,6 @@ class GaussianOptions(AdaptOptions):
     # Physical parameters
     coriolis = Unicode('beta', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
     g = PositiveFloat(9.81, help="Gravitational acceleration").tag(config=True)
-
-    def di(self):
-        return 'plots/shallow-water/' + self.approach + '/'
 
     # Region of importance
     radii = List(trait=Float, default_value=[np.sqrt(0.3)],
@@ -302,6 +292,3 @@ class AdvectionOptions(AdaptOptions):
     loc = List(trait=Float, default_value=[25., 7.5],
                help="Important locations, written as a list.").tag(config=True)
     J = Float(0.1871, help="Objective functional value on a fine mesh").tag(config=True)    # On 64,000 elements
-
-    def di(self):
-        return 'plots/advection-diffusion/' + self.approach + '/'

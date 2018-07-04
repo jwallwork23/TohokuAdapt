@@ -40,7 +40,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     options.timestepper_options.solver_parameters = op.solver_parameters
     print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
     options.timestep = op.timestep
-    options.output_directory = op.di()
+    options.output_directory = op.directory()
     if not op.plot_pvd:
         options.no_exports = True
     solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
@@ -85,7 +85,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
 def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
     if op.plot_metric:
-        mFile = File(op.di() + "Metric2d.pvd")
+        mFile = File(op.directory() + "Metric2d.pvd")
 
     # Initialise domain and physical parameters
     try:
@@ -171,7 +171,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         adapOpt.timestepper_options.solver_parameters = op.solver_parameters
         print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
         adapOpt.timestep = op.timestep
-        adapOpt.output_directory = op.di()
+        adapOpt.output_directory = op.directory()
         if not op.plot_pvd:
             adapOpt.no_exports = True
         adapOpt.coriolis_frequency = f
@@ -250,12 +250,12 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
     regen = kwargs.get('regen')
     if op.plot_metric:
-        mFile = File(op.di() + "Metric2d.pvd")
+        mFile = File(op.directory() + "Metric2d.pvd")
 
     initTimer = clock()
     if op.plot_pvd:
-        errorFile = File(op.di() + "ErrorIndicator2d.pvd")
-        adjointFile = File(op.di() + "Adjoint2d.pvd")
+        errorFile = File(op.directory() + "ErrorIndicator2d.pvd")
+        adjointFile = File(op.directory() + "Adjoint2d.pvd")
 
     # Initialise domain and physical parameters
     try:
@@ -306,7 +306,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         options.timestepper_options.solver_parameters = op.solver_parameters
         print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
         options.timestep = op.timestep
-        options.output_directory = op.di()
+        options.output_directory = op.directory()
         options.export_diagnostics = True
         options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
@@ -336,7 +336,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         for i in range(N - 1, r - 1, -op.timesteps_per_export):
             dual.assign(solve_blocks[i].adj_sol)
             dual_u, dual_e = dual.split()
-            with DumbCheckpoint(op.di() + 'hdf5/Adjoint2d_' + indexString(int((i - r) / op.timesteps_per_export)), mode=FILE_CREATE) as saveAdj:
+            with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + indexString(int((i - r) / op.timesteps_per_export)), mode=FILE_CREATE) as saveAdj:
                 saveAdj.store(dual_u)
                 saveAdj.store(dual_e)
                 saveAdj.close()
@@ -350,24 +350,24 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         errorTimer = clock()
         for k in range(0, op.final_mesh_index()):  # Loop back over times to generate error estimators
             print('Generating error estimate %d / %d' % (k + 1, op.final_mesh_index()))
-            with DumbCheckpoint(op.di() + 'hdf5/Velocity2d_' + indexString(k), mode=FILE_READ) as loadVel:
+            with DumbCheckpoint(op.directory() + 'hdf5/Velocity2d_' + indexString(k), mode=FILE_READ) as loadVel:
                 loadVel.load(uv_2d)
                 loadVel.close()
-            with DumbCheckpoint(op.di() + 'hdf5/Elevation2d_' + indexString(k), mode=FILE_READ) as loadElev:
+            with DumbCheckpoint(op.directory() + 'hdf5/Elevation2d_' + indexString(k), mode=FILE_READ) as loadElev:
                 loadElev.load(elev_2d)
                 loadElev.close()
 
             # Load adjoint data and form indicators
             epsilon.interpolate(inner(q, dual))
             for i in range(k, min(k + op.final_export() - op.first_export(), op.final_export())):
-                with DumbCheckpoint(op.di() + 'hdf5/Adjoint2d_' + indexString(i), mode=FILE_READ) as loadAdj:
+                with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + indexString(i), mode=FILE_READ) as loadAdj:
                     loadAdj.load(dual_u)
                     loadAdj.load(dual_e)
                     loadAdj.close()
                 epsilon_.interpolate(inner(q, dual))
                 epsilon = pointwiseMax(epsilon, epsilon_)
             epsilon = normaliseIndicator(epsilon, op=op)
-            with DumbCheckpoint(op.di() + 'hdf5/ErrorIndicator2d_' + indexString(k), mode=FILE_CREATE) as saveErr:
+            with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + indexString(k), mode=FILE_CREATE) as saveErr:
                 saveErr.store(epsilon)
                 saveErr.close()
             if op.plot_pvd:
@@ -391,7 +391,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
 
                 # Construct metric
                 indexStr = indexString(int(cnt / op.timesteps_per_remesh))
-                with DumbCheckpoint(op.di() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_READ) as loadErr:
+                with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_READ) as loadErr:
                     loadErr.load(epsilon)
                     loadErr.close()
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(interp(mesh, epsilon))
@@ -428,7 +428,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             adapOpt.timestepper_options.solver_parameters = op.solver_parameters
             print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
             adapOpt.timestep = op.timestep
-            adapOpt.output_directory = op.di()
+            adapOpt.output_directory = op.directory()
             if not op.plot_pvd:
                 adapOpt.no_exports = True
             adapOpt.coriolis_frequency = f
@@ -505,13 +505,13 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
     op = kwargs.get('op')
     regen = kwargs.get('regen')
     if op.plot_metric:
-        mFile = File(op.di() + "Metric2d.pvd")
+        mFile = File(op.directory() + "Metric2d.pvd")
 
     initTimer = clock()
     if op.plot_pvd:
-        residualFile = File(op.di() + "Residual2d.pvd")
-        errorFile = File(op.di() + "ErrorIndicator2d.pvd")
-        adjointFile = File(op.di() + "Adjoint2d.pvd")
+        residualFile = File(op.directory() + "Residual2d.pvd")
+        errorFile = File(op.directory() + "ErrorIndicator2d.pvd")
+        adjointFile = File(op.directory() + "Adjoint2d.pvd")
 
     # Initialise domain and physical parameters
     try:
@@ -581,7 +581,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
         options.timestepper_options.solver_parameters_tracer = op.solver_parameters
         print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
         options.timestep = op.timestep
-        options.output_directory = op.di()   # Need this for residual callback
+        options.output_directory = op.directory()   # Need this for residual callback
         options.export_diagnostics = True
         options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']            # TODO: EXPORT FROM PREVIOUS STEP?
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
@@ -600,7 +600,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                 uv_old, elev_old = solver_obj.timestepper.solution_old.split()
                 uv_old.rename("Previous velocity")
                 elev_old.rename("Previous elevation")
-                with DumbCheckpoint(op.di() + 'hdf5/Previous2d_' + indexString(cnt), mode=FILE_CREATE) as savePrev:
+                with DumbCheckpoint(op.directory() + 'hdf5/Previous2d_' + indexString(cnt), mode=FILE_CREATE) as savePrev:
                     savePrev.store(uv_old)
                     savePrev.store(elev_old)
                     savePrev.close()
@@ -634,7 +634,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
         for i in range(r, N, op.timesteps_per_remesh):        # Iterate r is the first timestep
             dual.assign(solve_blocks[i].adj_sol)
             dual_u, dual_e = dual.split()
-            with DumbCheckpoint(op.di() + 'hdf5/Adjoint2d_' + indexString(int((i - r) / op.timesteps_per_remesh)),  mode=FILE_CREATE) as saveAdj:
+            with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + indexString(int((i - r) / op.timesteps_per_remesh)),  mode=FILE_CREATE) as saveAdj:
                 saveAdj.store(dual_u)
                 saveAdj.store(dual_e)
                 saveAdj.close()
@@ -651,13 +651,13 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                 print('Generating error estimate %d / %d' % (int(k/op.exports_per_remesh()) + 1, int(op.final_index() / op.timesteps_per_remesh)))
 
                 # Generate residuals
-                with DumbCheckpoint(op.di() + 'hdf5/Velocity2d_' + indexString(k), mode=FILE_READ) as loadVel:
+                with DumbCheckpoint(op.directory() + 'hdf5/Velocity2d_' + indexString(k), mode=FILE_READ) as loadVel:
                     loadVel.load(uv_2d, name="uv_2d")
                     loadVel.close()
-                with DumbCheckpoint(op.di() + 'hdf5/Elevation2d_' + indexString(k), mode=FILE_READ) as loadElev:
+                with DumbCheckpoint(op.directory() + 'hdf5/Elevation2d_' + indexString(k), mode=FILE_READ) as loadElev:
                     loadElev.load(elev_2d, name="elev_2d")
                     loadElev.close()
-                with DumbCheckpoint(op.di() + 'hdf5/Previous2d_' + indexString(k), mode=FILE_READ) as loadPrev:
+                with DumbCheckpoint(op.directory() + 'hdf5/Previous2d_' + indexString(k), mode=FILE_READ) as loadPrev:
                     loadPrev.load(uv_old, name="Previous velocity")
                     loadPrev.load(elev_old, name="Previous elevation")
                     loadPrev.close()
@@ -713,7 +713,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
 
                     # Load adjoint data and form indicators
                     indexStr = indexString(int((k+1)/op.exports_per_remesh()-1))
-                    with DumbCheckpoint(op.di() + 'hdf5/Adjoint2d_' + indexStr, mode=FILE_READ) as loadAdj:
+                    with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + indexStr, mode=FILE_READ) as loadAdj:
                         loadAdj.load(dual_u)
                         loadAdj.load(dual_e)
                         loadAdj.close()
@@ -727,7 +727,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                         epsilon.interpolate(assemble(v * (inner(rho, dual) + inner(brho, dual)) * dx))
                     epsilon = normaliseIndicator(epsilon, op=op)         # ^ Would be subtract with no L-inf
                     epsilon.rename("Error indicator")
-                    with DumbCheckpoint(op.di() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_CREATE) as saveErr:
+                    with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_CREATE) as saveErr:
                         saveErr.store(epsilon)
                         saveErr.close()
                     if op.plot_pvd:
@@ -754,7 +754,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
 
                 # Construct metric
                 indexStr = indexString(int(cnt / op.timesteps_per_remesh))
-                with DumbCheckpoint(op.di() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_READ) as loadErr:
+                with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_READ) as loadErr:
                     loadErr.load(epsilon)
                     loadErr.close()
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).assign(interp(mesh, epsilon))
@@ -799,7 +799,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
             adapOpt.timestepper_options.solver_parameters = op.solver_parameters
             print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
             adapOpt.timestep = op.timestep
-            adapOpt.output_directory = op.di()
+            adapOpt.output_directory = op.directory()
             if not op.plot_pvd:
                 adapOpt.no_exports = True
             adapOpt.coriolis_frequency = f

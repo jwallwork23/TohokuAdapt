@@ -21,14 +21,14 @@ def hessianBased(startRes, **kwargs):
     except:
         physical_constants['g_grav'].assign(op.g)
     mesh, u0, eta0, b, BCs, f = problemDomain(startRes, op=op)
-    V = op.mixedSpace(mesh)
+    V = op.mixed_space(mesh)
     uv_2d, elev_2d = Function(V).split()  # Needed to load data into
     elev_2d.interpolate(eta0)
     uv_2d.interpolate(u0)
 
     # Initialise parameters and counters
     nEle = mesh.num_cells()
-    op.nVerT = mesh.num_vertices() * op.rescaling   # Target #Vertices
+    op.target_vertices = mesh.num_vertices() * op.rescaling   # Target #Vertices
     mM = [nEle, nEle]  # Min/max #Elements
     Sn = nEle
     cnt = 0
@@ -76,12 +76,12 @@ def hessianBased(startRes, **kwargs):
         adapOpt.simulation_end_time = endT
         adapOpt.timestepper_type = op.timestepper
         adapOpt.timestep = op.timestep
-        adapOpt.output_directory = op.di
+        adapOpt.output_directory = op.directory()
         adapOpt.export_diagnostics = True
         adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
         adapOpt.coriolis_frequency = f
         field_dict = {'elev_2d': elev_2d, 'uv_2d': uv_2d}
-        e = exporter.ExportManager(op.di + 'hdf5',
+        e = exporter.ExportManager(op.directory() + 'hdf5',
                                    ['elev_2d', 'uv_2d'],
                                    field_dict,
                                    field_metadata,
