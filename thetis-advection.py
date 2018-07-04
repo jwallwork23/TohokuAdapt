@@ -19,87 +19,79 @@ from utils.setup import problemDomain
 
 
 op = AdvectionOptions()
+op.timesteps_per_export = 100
 
-# # Parameter choice 1: pure advection
-# level = 2
-# op.bell_r0 = 2.
-# op.bell_x0 = 5.
-# op.bell_y0 = 5.
-# op.Tend = 40.
-# op.dt = 0.01
-# op.diffusivity.assign(0.)
-# source = None
+# Parameter choice 1: pure advection
+level = 2
+op.bell_r0 = 2.
+op.bell_x0 = 5.
+op.bell_y0 = 5.
+op.end_time = 40.
+op.timestep = 0.01
+op.diffusivity = 0.
+source_off = True
 
 # # Parameter choice 2: advection and diffusion
 # level = 2
 # op.bell_r0 = 2.
 # op.bell_x0 = 5.
 # op.bell_y0 = 5.
-# op.Tend = 40.
-# op.dt = 0.01
-# op.diffusivity.assign(1e-3)
-# source = None
+# op.end_time = 40.
+# op.timestep = 0.01
+# op.diffusivity = 1e-3
+# source_off = True
 
 # # Parameter choice 3: advection and diffusion with a constant source
 # level = 2
 # op.bell_r0 = 2.
 # op.bell_x0 = 5.
 # op.bell_y0 = 5.
-# op.Tend = 40.
-# op.dt = 0.01
-# op.diffusivity.assign(1e-3)
+# op.end_time = 40.
+# op.timestep = 0.01
+# op.diffusivity = 1e-3
 
 # # Parameter choice 4 (TELEMAC-2D point discharge without diffusion)
 # level = 1
 # op.bell_r0 = 0.457
 # op.bell_x0 = 1.5
 # op.bell_y0 = 5.
-# op.Tend = 50.
-# op.dt = 0.1
-# op.diffusivity.assign(0.)
+# op.end_time = 50.
+# op.timestep = 0.1
+# op.diffusivity = 0.
 
-# Parameter choice 5 (TELEMAC-2D point discharge with diffusion)
+# # Parameter choice 5 (TELEMAC-2D point discharge with diffusion)
 # level = 1
-level = 3
-op.bell_r0 = 0.457
-op.bell_x0 = 1.5
-op.bell_y0 = 5.
-op.Tend = 50.
-# op.dt = 0.1
-op.dt = 0.01
-op.diffusivity.assign(0.1)
+# op.bell_r0 = 0.457
+# op.bell_x0 = 1.5
+# op.bell_y0 = 5.
+# op.end_time = 50.
+# op.timestep = 0.1
+# op.diffusivity = 0.1
 
 # Setup domain
 mesh, u0, eta0, b, BCs, source, diffusivity = problemDomain(level, op=op)
-
-outputdir = 'plots/advection-diffusion/fixedMesh'
 print_output('Number of elements %d' % mesh.num_cells())
 print_output('Number of nodes %d' % mesh.num_vertices())
-
-u_mag = Constant(1.0)   # (Estimate of) max advective velocity used to estimate time step
-t_export = 1.           # Export interval in seconds
-
 print_output("Souce volume = %.4f" % assemble(source * dx))
+u_mag = Constant(1.0)   # (Estimate of) max advective velocity used to estimate time step
 
 # --- Create solver ---
 solver_obj = solver2d.FlowSolver2d(mesh, b)
 options = solver_obj.options
-options.simulation_export_time = t_export
-options.simulation_end_time = op.Tend
-options.output_directory = outputdir
+options.simulation_export_time = op.timesteps_per_export * op.timestep
+options.simulation_end_time = op.end_time
+options.output_directory = op.directory()
 options.horizontal_velocity_scale = u_mag
-options.fields_to_export = ['uv_2d', 'elev_2d', 'tracer_2d']
+options.fields_to_export = ['tracer_2d']
 options.solve_tracer = True
 options.tracer_only = True              # Need use tracer-only branch to use this functionality
-options.horizontal_diffusivity = Constant(diffusivity)
+options.horizontal_diffusivity = diffusivity
 options.use_lax_friedrichs_tracer = False
-options.tracer_source_2d = source
+options.tracer_source_2d = None if source_off else source
 options.timestepper_type = 'CrankNicolson'
-options.timestep = op.dt
-# options.use_nonlinear_equations = False
-options.no_exports = True
+options.timestep = op.timestep
 
-solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
+solver_obj.assign_initial_conditions(elev=eta0, uv=u0, tracer=source if source_off else None)
 try:
     cdt = min(solver_obj.compute_time_step().dat.data)
     assert(options.timestep < cdt)     # Check CFL condition
