@@ -5,7 +5,7 @@ import numpy
 from numpy import linalg as la
 from scipy import linalg as sla
 
-from .options import Options
+from .options import TohokuOptions
 
 
 __all__ = ["constructGradient", "constructHessian", "steadyMetric", "isotropicMetric", "isoP2", "anisoRefine",
@@ -33,7 +33,7 @@ def constructGradient(f):
     return g
 
 
-def constructHessian(f, g=None, op=Options()):
+def constructHessian(f, g=None, op=TohokuOptions()):
     """
     Assuming the smooth solution field has been approximated by a function `f` which is P1, all second derivative
     information has been lost. As such, the Hessian of `f` cannot be directly computed. We provide two means of
@@ -48,7 +48,7 @@ def constructHessian(f, g=None, op=Options()):
 
     :arg f: P1 solution field.
     :kwarg g: gradient (if already computed).
-    :param op: Options class object providing min/max cell size values.
+    :param op: TohokuOptions class object providing min/max cell size values.
     :return: reconstructed Hessian associated with ``f``.
     """
     mesh = f.function_space().mesh()
@@ -74,14 +74,14 @@ def constructHessian(f, g=None, op=Options()):
     return H
 
 
-def steadyMetric(f, H=None, op=Options()):
+def steadyMetric(f, H=None, op=TohokuOptions()):
     """
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``computeSteadyMetric``, from 
     ``adapt.py``, 2016.
 
     :arg f: P1 solution field.
     :arg H: reconstructed Hessian associated with `f` (if already computed).
-    :param op: Options class object providing min/max cell size values.
+    :param op: TohokuOptions class object providing min/max cell size values.
     :return: steady metric associated with Hessian H.
     """
     if H is None:
@@ -90,8 +90,8 @@ def steadyMetric(f, H=None, op=Options()):
     mesh = V.mesh()
 
     ia2 = 1. / pow(op.max_anisotropy, 2)     # Inverse square max aspect ratio
-    ihmin2 = 1. / pow(op.hmin, 2)           # Inverse square minimal side-length
-    ihmax2 = 1. / pow(op.hmax, 2)           # Inverse square maximal side-length
+    ih_min2 = 1. / pow(op.h_min, 2)           # Inverse square minimal side-length
+    ih_max2 = 1. / pow(op.h_max, 2)           # Inverse square maximal side-length
     M = Function(V)
 
     if op.normalisation == 'manual':
@@ -108,12 +108,12 @@ def steadyMetric(f, H=None, op=Options()):
             # Find eigenpairs and truncate eigenvalues
             lam, v = la.eig(H_loc)
             v1, v2 = v[0], v[1]
-            lam1 = min(ihmin2, max(ihmax2, abs(lam[0])))
-            lam2 = min(ihmin2, max(ihmax2, abs(lam[1])))
+            lam1 = min(ih_min2, max(ih_max2, abs(lam[0])))
+            lam2 = min(ih_min2, max(ih_max2, abs(lam[1])))
             lam_max = max(lam1, lam2)
             lam1 = max(lam1, ia2 * lam_max)
             lam2 = max(lam2, ia2 * lam_max)
-            if (lam[0] >= 0.9999 * ihmin2) or (lam[1] >= 0.9999 * ihmin2):
+            if (lam[0] >= 0.9999 * ih_min2) or (lam[1] >= 0.9999 * ih_min2):
                 print("WARNING: minimum element size reached as %.2e" % np.sqrt(min(1./lam[0], 1./lam[1])))
 
             # Reconstruct edited Hessian
@@ -150,12 +150,12 @@ def steadyMetric(f, H=None, op=Options()):
             # Find eigenpairs of metric and truncate eigenvalues
             lam, v = la.eig(M.dat.data[i])
             v1, v2 = v[0], v[1]
-            lam1 = min(ihmin2, max(ihmax2, abs(lam[0])))
-            lam2 = min(ihmin2, max(ihmax2, abs(lam[1])))
+            lam1 = min(ih_min2, max(ih_max2, abs(lam[0])))
+            lam2 = min(ih_min2, max(ih_max2, abs(lam[1])))
             lam_max = max(lam1, lam2)
             lam1 = max(lam1, ia2 * lam_max)
             lam2 = max(lam2, ia2 * lam_max)
-            if (lam[0] >= 0.9999 * ihmin2) or (lam[1] >= 0.9999 * ihmin2):
+            if (lam[0] >= 0.9999 * ih_min2) or (lam[1] >= 0.9999 * ih_min2):
                 print("WARNING: minimum element size reached as %.2e" % np.sqrt(min(1./lam[0], 1./lam[1])))
 
             # Reconstruct edited Hessian
@@ -166,7 +166,7 @@ def steadyMetric(f, H=None, op=Options()):
     return M
 
 
-def normaliseIndicator(f, op=Options()):        # TODO: What if metric is constant?
+def normaliseIndicator(f, op=TohokuOptions()):        # TODO: What if metric is constant?
     """
     Normalise error indicator `f` using procedure defined by `op`.
     
@@ -176,11 +176,11 @@ def normaliseIndicator(f, op=Options()):        # TODO: What if metric is consta
     """
     f.dat.data[:] = np.abs(f.dat.data)
     if len(f.ufl_element().value_shape()) == 0:
-        gnorm = max(np.abs(assemble(f * dx)), op.minNorm)           # NOTE this changes in 3D case
+        gnorm = max(np.abs(assemble(f * dx)), op.min_norm)           # NOTE this changes in 3D case
     else:
-        gnorm = max(assemble(sqrt(inner(f, f)) * dx), op.minNorm)   # Equivalent thresholded metric complexity
-    scaleFactor = min(op.target_vertices / gnorm, op.maxScaling)              # Cap error estimate, also computational cost
-    if scaleFactor == op.maxScaling:
+        gnorm = max(assemble(sqrt(inner(f, f)) * dx), op.min_norm)   # Equivalent thresholded metric complexity
+    scaleFactor = min(op.target_vertices / gnorm, op.max_scaling)              # Cap error estimate, also computational cost
+    if scaleFactor == op.max_scaling:
         print("WARNING: maximum scaling for error estimator reached as %.2e" % (op.target_vertices / gnorm))
     # print("#### DEBUG: Complexity = %.4e" % gnorm)
     f.dat.data[:] = np.abs(f.dat.data) * scaleFactor
@@ -188,18 +188,18 @@ def normaliseIndicator(f, op=Options()):        # TODO: What if metric is consta
     return f
 
 
-def isotropicMetric(f, bdy=None, invert=True, op=Options()):
+def isotropicMetric(f, bdy=None, invert=True, op=TohokuOptions()):
     """
     Given a scalar error indicator field `f`, construct an associated isotropic metric field.
     
     :arg f: function to adapt to.
     :param bdy: specify domain boundary to compute metric on.
     :param invert: when True, the inverse square of field `f` is considered, as in anisotropic mesh adaptivity.
-    :param op: Options class object providing min/max cell size values.
+    :param op: TohokuOptions class object providing min/max cell size values.
     :return: isotropic metric corresponding to `f`.
     """
-    hmin2 = pow(op.hmin, 2)
-    hmax2 = pow(op.hmax, 2)
+    h_min2 = pow(op.h_min, 2)
+    h_max2 = pow(op.h_max, 2)
     scalar = len(f.ufl_element().value_shape()) == 0
     mesh = f.function_space().mesh()
     g = Function(FunctionSpace(mesh, "CG", 1) if scalar else VectorFunctionSpace(mesh, "CG", 1))
@@ -214,21 +214,21 @@ def isotropicMetric(f, bdy=None, invert=True, op=Options()):
     for i in DirichletBC(V, 0, bdy).nodes if bdy is not None else range(len(g.dat.data)):
         if scalar:
             if invert:
-                alpha = 1. / max(hmin2, min(pow(g.dat.data[i], 2), hmax2))
+                alpha = 1. / max(h_min2, min(pow(g.dat.data[i], 2), h_max2))
             else:
-                alpha = max(1. / hmax2, min(g.dat.data[i], 1. / hmin2))
+                alpha = max(1. / h_max2, min(g.dat.data[i], 1. / h_min2))
             beta = alpha
         else:
             if invert:
-                alpha = 1. / max(hmin2, min(pow(g.dat.data[i, 0], 2), hmax2))
-                beta = 1. / max(hmin2, min(pow(g.dat.data[i, 1], 2), hmax2))
+                alpha = 1. / max(h_min2, min(pow(g.dat.data[i, 0], 2), h_max2))
+                beta = 1. / max(h_min2, min(pow(g.dat.data[i, 1], 2), h_max2))
             else:
-                alpha = max(1. / hmax2, min(g.dat.data[i, 0], 1. / hmin2))
-                beta = max(1. / hmax2, min(g.dat.data[i, 1], 1. / hmin2))
+                alpha = max(1. / h_max2, min(g.dat.data[i, 0], 1. / h_min2))
+                beta = max(1. / h_max2, min(g.dat.data[i, 1], 1. / h_min2))
         M.dat.data[i][0, 0] = alpha
         M.dat.data[i][1, 1] = beta
 
-        if (alpha >= 0.9999 / hmin2) or (beta >= 0.9999 / hmin2):
+        if (alpha >= 0.9999 / h_min2) or (beta >= 0.9999 / h_min2):
             print("WARNING: minimum element size reached as %.2e" % np.sqrt(min(1./alpha, 1./beta)))
 
     return M
@@ -263,14 +263,14 @@ def anisoRefine(M, direction=0):
     return M
 
 
-def metricGradation(M, iso=False, op=Options()):   # TODO: Implement this in pyop2
+def metricGradation(M, iso=False, op=TohokuOptions()):   # TODO: Implement this in pyop2
     """
     Perform anisotropic metric gradation in the method described in Alauzet 2010, using linear interpolation. Python
     code found here is based on the C code of Nicolas Barral's function ``DMPlexMetricGradation2d_Internal``, found in 
     ``plex-metGradation.c``, 2017.
 
     :arg M: metric to be gradated.
-    :param op: Options class object providing parameter values.
+    :param op: TohokuOptions class object providing parameter values.
     :return: gradated metric.
     """
     ln_beta = np.log(op.max_element_growth)

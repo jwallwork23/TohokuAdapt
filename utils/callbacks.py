@@ -1,7 +1,7 @@
 from thetis_adjoint import *
 from thetis.callback import DiagnosticCallback, ScalarIntegrationCallback
 
-from .options import TohokuOptions, AdvectionOptions, Options
+from .options import TohokuOptions, AdvectionOptions
 from .timeseries import gaugeTV
 
 
@@ -37,8 +37,8 @@ class SWCallback(ScalarIntegrationCallback):
             # File("plots/" + self.op.mode + "/indicator.pvd").write(iA)
             k1.assign(iA)
             kt = Constant(0.)
-            if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:      # Slightly smooth transition
-                kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * dt else 0.5)
+            if solver_obj.simulation_time > self.op.start_time - 0.5 * dt:      # Slightly smooth transition
+                kt.assign(1. if solver_obj.simulation_time > self.op.start_time + 0.5 * dt else 0.5)
 
             return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
 
@@ -70,8 +70,8 @@ class AdvectionCallback(ScalarIntegrationCallback):
             # File("plots/" + self.op.mode + "/indicator.pvd").write(iA)
             ks.assign(iA)
             kt = Constant(0.)
-            if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:      # Slightly smooth transition
-                kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * dt else 0.5)
+            if solver_obj.simulation_time > self.op.start_time - 0.5 * dt:      # Slightly smooth transition
+                kt.assign(1. if solver_obj.simulation_time > self.op.start_time + 0.5 * dt else 0.5)
 
             return assemble(kt * ks * solver_obj.fields.tracer_2d * dx)
 
@@ -105,8 +105,8 @@ class ObjectiveSWCallback(ScalarIntegrationCallback):
             # File("plots/" + self.op.mode + "/indicator.pvd").write(iA)
             k1.assign(iA)
             kt = Constant(0.)
-            if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:
-                kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * dt else 0.5)
+            if solver_obj.simulation_time > self.op.start_time - 0.5 * dt:
+                kt.assign(1. if solver_obj.simulation_time > self.op.start_time + 0.5 * dt else 0.5)
 
             return assemble(kt * inner(ks, solver_obj.fields.solution_2d) * dx)
 
@@ -138,8 +138,8 @@ class ObjectiveAdvectionCallback(ScalarIntegrationCallback):
             # File("plots/" + self.op.mode + "/indicator.pvd").write(iA)
             ks.assign(iA)
             kt = Constant(0.)
-            if solver_obj.simulation_time > self.op.Tstart - 0.5 * dt:      # Slightly smooth transition
-                kt.assign(1. if solver_obj.simulation_time > self.op.Tstart + 0.5 * dt else 0.5)
+            if solver_obj.simulation_time > self.op.start_time - 0.5 * dt:      # Slightly smooth transition
+                kt.assign(1. if solver_obj.simulation_time > self.op.start_time + 0.5 * dt else 0.5)
 
             return assemble(kt * ks * solver_obj.fields.tracer_2d * dx)
 
@@ -200,7 +200,7 @@ class P02Callback(GaugeCallback):
             """
             elev_2d = solver_obj.fields.solution_2d.split()[1]
 
-            return elev_2d.at(Options().gaugeCoord("P02"))
+            return elev_2d.at(TohokuOptions().gauge_coordinates("P02"))
 
         super(P02Callback, self).__init__(extractP02, solver_obj, **kwargs)
 
@@ -226,7 +226,7 @@ class P06Callback(GaugeCallback):
             """
             elev_2d = solver_obj.fields.solution_2d.split()[1]
 
-            return elev_2d.at(Options().gaugeCoord("P06"))
+            return elev_2d.at(TohokuOptions().gauge_coordinates("P06"))
 
         super(P06Callback, self).__init__(extractP06, solver_obj, **kwargs)
 
@@ -234,7 +234,7 @@ class P06Callback(GaugeCallback):
         return gaugeTV(self.gauge_values, gauge="P06")
 
 
-def strongResidualSW(solver_obj, UV_new, ELEV_new, UV_old, ELEV_old, Ve=None, op=Options()):
+def strongResidualSW(solver_obj, UV_new, ELEV_new, UV_old, ELEV_old, Ve=None, op=TohokuOptions()):
     """
     Construct the strong residual for the semi-discrete shallow water equations at the current timestep,
     using Crank-Nicolson timestepping.
@@ -249,7 +249,7 @@ def strongResidualSW(solver_obj, UV_new, ELEV_new, UV_old, ELEV_old, Ve=None, op
     g = physical_constants['g_grav']
 
     # Enrich FE space (if appropriate)
-    if op.orderChange:
+    if op.order_increase:
         uv_old, elev_old = Function(Ve).split()
         uv_new, elev_new = Function(Ve).split()
         uv_old.interpolate(UV_old)

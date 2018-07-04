@@ -21,9 +21,9 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         assert float(physical_constants['g_grav'].dat.data) == op.g
     except:
         physical_constants['g_grav'].assign(op.g)
-    V = op.mixedSpace(mesh)                               # TODO: Parallelise this (and below)
+    V = op.mixed_space(mesh)                               # TODO: Parallelise this (and below)
     if op.mode == 'rossby-wave':            # Analytic final-time state
-        peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
+        peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.end_time).split()[1])
 
     # Initialise solver
     solver_obj = solver2d.FlowSolver2d(mesh, b)
@@ -34,12 +34,12 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     options.use_grad_div_viscosity_term = True              # Symmetric viscous stress
     options.use_lax_friedrichs_velocity = False             # TODO: This is a temporary fix
     options.coriolis_frequency = f
-    options.simulation_export_time = op.dt * op.ndump
-    options.simulation_end_time = op.Tend - 0.5 * op.dt
+    options.simulation_export_time = op.timestep * op.timesteps_per_export
+    options.simulation_end_time = op.end_time - 0.5 * op.timestep
     options.timestepper_type = op.timestepper
     options.timestepper_options.solver_parameters = op.solver_parameters
     print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
-    options.timestep = op.dt
+    options.timestep = op.timestep
     options.output_directory = op.di()
     if not op.plot_pvd:
         options.no_exports = True
@@ -72,7 +72,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         distance += 48. # Account for periodic domain
         quantities['peak'] = peak/peak_a
         quantities['dist'] = distance/distance_a
-        quantities['spd'] = distance /(op.Tend * 0.4)
+        quantities['spd'] = distance /(op.end_time * 0.4)
 
     # Output mesh statistics and solver times
     quantities['meanElements'] = mesh.num_cells()
@@ -92,12 +92,12 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         assert float(physical_constants['g_grav'].dat.data) == op.g
     except:
         physical_constants['g_grav'].assign(op.g)
-    V = op.mixedSpace(mesh)
+    V = op.mixed_space(mesh)
     uv_2d, elev_2d = Function(V).split()  # Needed to load data into
     elev_2d.interpolate(eta0)
     uv_2d.interpolate(u0)
     if op.mode == 'rossby-wave':    # Analytic final-time state
-        peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
+        peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.end_time).split()[1])
 
     # Initialise parameters and counters
     nEle = mesh.num_cells()
@@ -109,7 +109,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
 
     adaptSolveTimer = 0.
     quantities = {}
-    while cnt < op.cntT():
+    while cnt < op.final_index():
         adaptTimer = clock()
         P1 = FunctionSpace(mesh, "CG", 1)
 
@@ -165,18 +165,18 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             adapOpt.horizontal_viscosity = interp(mesh, diffusivity)
         adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
         adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
-        adapOpt.simulation_export_time = op.dt * op.ndump
-        adapOpt.simulation_end_time = t + op.dt * (op.rm - 0.5)
+        adapOpt.simulation_export_time = op.timestep * op.timesteps_per_export
+        adapOpt.simulation_end_time = t + op.timestep * (op.timesteps_per_remesh - 0.5)
         adapOpt.timestepper_type = op.timestepper
         adapOpt.timestepper_options.solver_parameters = op.solver_parameters
         print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
-        adapOpt.timestep = op.dt
+        adapOpt.timestep = op.timestep
         adapOpt.output_directory = op.di()
         if not op.plot_pvd:
             adapOpt.no_exports = True
         adapOpt.coriolis_frequency = f
         adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
-        adapSolver.i_export = int(cnt / op.ndump)
+        adapSolver.i_export = int(cnt / op.timesteps_per_export)
         adapSolver.next_export_t = adapSolver.i_export * adapSolver.options.simulation_export_time
         adapSolver.iteration = cnt
         adapSolver.simulation_time = t
@@ -218,9 +218,9 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         nEle = mesh.num_cells()
         mM = [min(nEle, mM[0]), max(nEle, mM[1])]
         Sn += nEle
-        cnt += op.rm
-        t += op.dt * op.rm
-        av = op.printToScreen(int(cnt/op.rm+1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.dt)
+        cnt += op.timesteps_per_remesh
+        t += op.timestep * op.timesteps_per_remesh
+        av = op.print_to_screen(int(cnt/op.timesteps_per_remesh+1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.timestep)
         adaptSolveTimer += adaptTimer + solverTimer
 
         # Extract fields for next step
@@ -231,7 +231,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         peak, distance = peakAndDistance(elev_2d, op=op)
         quantities['peak'] = peak / peak_a
         quantities['dist'] = distance / distance_a
-        quantities['spd'] = distance / (op.Tend * 0.4)
+        quantities['spd'] = distance / (op.end_time * 0.4)
 
     # Output mesh statistics and solver times
     quantities['meanElements'] = av
@@ -262,14 +262,14 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         assert (float(physical_constants['g_grav'].dat.data) == op.g)
     except:
         physical_constants['g_grav'].assign(op.g)
-    V = op.mixedSpace(mesh)
+    V = op.mixed_space(mesh)
     q = Function(V)
     uv_2d, elev_2d = q.split()  # Needed to load data into
     uv_2d.rename('uv_2d')
     elev_2d.rename('elev_2d')
     P1 = FunctionSpace(mesh, "CG", 1)
     if op.mode == 'rossby-wave':    # Analytic final-time state
-        peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
+        peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.end_time).split()[1])
 
     # Define Functions relating to a posteriori DWR error estimator
     dual = Function(V)
@@ -300,12 +300,12 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         options.use_grad_div_viscosity_term = True                      # Symmetric viscous stress
         options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
         options.coriolis_frequency = f
-        options.simulation_export_time = op.dt * op.rm
-        options.simulation_end_time = op.Tend - 0.5 * op.dt
+        options.simulation_export_time = op.timestep * op.timesteps_per_remesh
+        options.simulation_end_time = op.end_time - 0.5 * op.timestep
         options.timestepper_type = op.timestepper
         options.timestepper_options.solver_parameters = op.solver_parameters
         print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
-        options.timestep = op.dt
+        options.timestep = op.timestep
         options.output_directory = op.di()
         options.export_diagnostics = True
         options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
@@ -332,24 +332,24 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         tape = get_working_tape()
         solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
         N = len(solve_blocks)
-        r = N % op.ndump                            # Number of extra tape annotations in setup
-        for i in range(N - 1, r - 1, -op.ndump):
+        r = N % op.timesteps_per_export                            # Number of extra tape annotations in setup
+        for i in range(N - 1, r - 1, -op.timesteps_per_export):
             dual.assign(solve_blocks[i].adj_sol)
             dual_u, dual_e = dual.split()
-            with DumbCheckpoint(op.di() + 'hdf5/Adjoint2d_' + indexString(int((i - r) / op.ndump)), mode=FILE_CREATE) as saveAdj:
+            with DumbCheckpoint(op.di() + 'hdf5/Adjoint2d_' + indexString(int((i - r) / op.timesteps_per_export)), mode=FILE_CREATE) as saveAdj:
                 saveAdj.store(dual_u)
                 saveAdj.store(dual_e)
                 saveAdj.close()
             if op.plot_pvd:
-                adjointFile.write(dual_u, dual_e, time=op.dt * (i - r))
+                adjointFile.write(dual_u, dual_e, time=op.timestep * (i - r))
         dualTimer = clock() - dualTimer
         print('Dual run complete. Run time: %.3fs' % dualTimer)
 
     with pyadjoint.stop_annotating():
 
         errorTimer = clock()
-        for k in range(0, op.rmEnd()):  # Loop back over times to generate error estimators
-            print('Generating error estimate %d / %d' % (k + 1, op.rmEnd()))
+        for k in range(0, op.final_mesh_index()):  # Loop back over times to generate error estimators
+            print('Generating error estimate %d / %d' % (k + 1, op.final_mesh_index()))
             with DumbCheckpoint(op.di() + 'hdf5/Velocity2d_' + indexString(k), mode=FILE_READ) as loadVel:
                 loadVel.load(uv_2d)
                 loadVel.close()
@@ -359,7 +359,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
 
             # Load adjoint data and form indicators
             epsilon.interpolate(inner(q, dual))
-            for i in range(k, min(k + op.iEnd() - op.iStart(), op.iEnd())):
+            for i in range(k, min(k + op.final_export() - op.first_export(), op.final_export())):
                 with DumbCheckpoint(op.di() + 'hdf5/Adjoint2d_' + indexString(i), mode=FILE_READ) as loadAdj:
                     loadAdj.load(dual_u)
                     loadAdj.load(dual_e)
@@ -385,12 +385,12 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         uv_2d.interpolate(u0)
         quantities = {}
         bdy = 200 if op.mode == 'tohoku' else 'on_boundary'
-        while cnt < op.cntT():
+        while cnt < op.final_index():
             adaptTimer = clock()
             for l in range(op.adaptations):                                  # TODO: Test this functionality
 
                 # Construct metric
-                indexStr = indexString(int(cnt / op.rm))
+                indexStr = indexString(int(cnt / op.timesteps_per_remesh))
                 with DumbCheckpoint(op.di() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_READ) as loadErr:
                     loadErr.load(epsilon)
                     loadErr.close()
@@ -422,18 +422,18 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                 adapOpt.horizontal_viscosity = interp(mesh, diffusivity)
             adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
             adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
-            adapOpt.simulation_export_time = op.dt * op.ndump
-            adapOpt.simulation_end_time = t + (op.rm - 0.5) * op.dt
+            adapOpt.simulation_export_time = op.timestep * op.timesteps_per_export
+            adapOpt.simulation_end_time = t + (op.timesteps_per_remesh - 0.5) * op.timestep
             adapOpt.timestepper_type = op.timestepper
             adapOpt.timestepper_options.solver_parameters = op.solver_parameters
             print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
-            adapOpt.timestep = op.dt
+            adapOpt.timestep = op.timestep
             adapOpt.output_directory = op.di()
             if not op.plot_pvd:
                 adapOpt.no_exports = True
             adapOpt.coriolis_frequency = f
             adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
-            adapSolver.i_export = int(cnt / op.ndump)
+            adapSolver.i_export = int(cnt / op.timesteps_per_export)
             adapSolver.next_export_t = adapSolver.i_export * adapSolver.options.simulation_export_time
             adapSolver.iteration = cnt
             adapSolver.simulation_time = t
@@ -475,9 +475,9 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             nEle = mesh.num_cells()
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
-            cnt += op.rm
-            t += op.rm * op.dt
-            av = op.printToScreen(int(cnt / op.rm + 1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.dt)
+            cnt += op.timesteps_per_remesh
+            t += op.timesteps_per_remesh * op.timestep
+            av = op.print_to_screen(int(cnt / op.timesteps_per_remesh + 1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.timestep)
             adaptSolveTimer += adaptTimer + solverTimer
 
             # Extract fields for next solver block
@@ -488,7 +488,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             peak, distance = peakAndDistance(elev_2d, op=op)
             quantities['peak'] = peak / peak_a
             quantities['dist'] = distance / distance_a
-            quantities['spd'] = distance / (op.Tend * 0.4)
+            quantities['spd'] = distance / (op.end_time * 0.4)
 
         # Output mesh statistics and solver times
         totalTimer = errorTimer + adaptSolveTimer
@@ -518,14 +518,14 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
         assert (float(physical_constants['g_grav'].dat.data) == op.g)
     except:
         physical_constants['g_grav'].assign(op.g)
-    V = op.mixedSpace(mesh)
+    V = op.mixed_space(mesh)
     q = Function(V)
     uv_2d, elev_2d = q.split()    # Needed to load data into
     uv_2d.rename('uv_2d')
     elev_2d.rename('elev_2d')
     P1 = FunctionSpace(mesh, "CG", 1)
     if op.mode == 'rossby-wave':    # Analytic final-time state
-        peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.Tend).split()[1])
+        peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.end_time).split()[1])
 
     # Define Functions relating to a posteriori DWR error estimator
     dual = Function(V)
@@ -534,7 +534,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
     dual_e.rename("Adjoint elevation")
 
     if op.order_increase:
-        Ve = op.mixedSpace(mesh, enrich=True)
+        Ve = op.mixed_space(mesh, enrich=True)
         duale = Function(Ve)
         duale_u, duale_e = duale.split()
         epsilon = Function(P1, name='error_2d')
@@ -575,12 +575,12 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
         options.use_grad_div_viscosity_term = True                      # Symmetric viscous stress
         options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
         options.coriolis_frequency = f
-        options.simulation_export_time = op.dt * op.ndump
-        options.simulation_end_time = (op.ndump - 0.5) * op.dt
+        options.simulation_export_time = op.timestep * op.timesteps_per_export
+        options.simulation_end_time = (op.timesteps_per_export - 0.5) * op.timestep
         options.timestepper_type = op.timestepper
         options.timestepper_options.solver_parameters_tracer = op.solver_parameters
         print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
-        options.timestep = op.dt
+        options.timestep = op.timestep
         options.output_directory = op.di()   # Need this for residual callback
         options.export_diagnostics = True
         options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']            # TODO: EXPORT FROM PREVIOUS STEP?
@@ -594,7 +594,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
 
         cnt = 0
         primalTimer = 0.
-        while solver_obj.simulation_time < op.Tend - 0.5 * op.dt:
+        while solver_obj.simulation_time < op.end_time - 0.5 * op.timestep:
 
             with pyadjoint.stop_annotating():
                 uv_old, elev_old = solver_obj.timestepper.solution_old.split()
@@ -606,7 +606,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                     savePrev.close()
 
                 if cnt != 0:
-                    solver_obj.load_state(cnt, iteration=cnt*op.ndump)
+                    solver_obj.load_state(cnt, iteration=cnt*op.timesteps_per_export)
 
             # Run simulation
             stepTimer = clock()
@@ -614,8 +614,8 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
             stepTimer = clock() - stepTimer
             primalTimer += stepTimer
             cnt += 1
-            t += op.dt * op.ndump
-            options.simulation_end_time = t + (op.ndump - 0.5) * op.dt
+            t += op.timestep * op.timesteps_per_export
+            options.simulation_end_time = t + (op.timesteps_per_export - 0.5) * op.timestep
 
         J = cb1.get_val()                        # Assemble objective functional for adjoint computation
         print('Primal run complete. Solver time: %.3fs' % primalTimer)
@@ -630,16 +630,16 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
         tape = get_working_tape()
         solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
         N = len(solve_blocks)
-        r = N % op.rm                       # Number of extra tape annotations in setup
-        for i in range(r, N, op.rm):        # Iterate r is the first timestep
+        r = N % op.timesteps_per_remesh                       # Number of extra tape annotations in setup
+        for i in range(r, N, op.timesteps_per_remesh):        # Iterate r is the first timestep
             dual.assign(solve_blocks[i].adj_sol)
             dual_u, dual_e = dual.split()
-            with DumbCheckpoint(op.di() + 'hdf5/Adjoint2d_' + indexString(int((i - r) / op.rm)),  mode=FILE_CREATE) as saveAdj:
+            with DumbCheckpoint(op.di() + 'hdf5/Adjoint2d_' + indexString(int((i - r) / op.timesteps_per_remesh)),  mode=FILE_CREATE) as saveAdj:
                 saveAdj.store(dual_u)
                 saveAdj.store(dual_e)
                 saveAdj.close()
             if op.plot_pvd:
-                adjointFile.write(dual_u, dual_e, time=op.dt * (i - r))
+                adjointFile.write(dual_u, dual_e, time=op.timestep * (i - r))
         dualTimer = clock() - dualTimer
         print('Dual run complete. Run time: %.3fs' % dualTimer)
 
@@ -647,8 +647,8 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
 
             residuals = {'Velocity': [], 'Elevation': [], 'Boundary': []}
             errorTimer = clock()
-            for k in range(0, int(op.cntT() / op.ndump)):
-                print('Generating error estimate %d / %d' % (int(k/op.dumpsPerRemesh()) + 1, int(op.cntT() / op.rm)))
+            for k in range(0, int(op.final_index() / op.timesteps_per_export)):
+                print('Generating error estimate %d / %d' % (int(k/op.exports_per_remesh()) + 1, int(op.final_index() / op.timesteps_per_remesh)))
 
                 # Generate residuals
                 with DumbCheckpoint(op.di() + 'hdf5/Velocity2d_' + indexString(k), mode=FILE_READ) as loadVel:
@@ -668,7 +668,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                 residuals['Elevation'].append(err_e)
                 residuals['bdyVelocity'].append(bres_u)
                 residuals['bdyElevation'].append(bres_e)
-                if k % op.dumpsPerRemesh() == op.dumpsPerRemesh()-1:
+                if k % op.exports_per_remesh() == op.exports_per_remesh()-1:
 
                     # L-inf     # TODO: This is grossly inefficient
                     rho_u.interpolate(residuals['Velocity'][0])
@@ -697,22 +697,22 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                             brho_e.dat.data[j] = max(btemp_e.dat.data[j], brho_e.dat.data[j])
 
                     # # L1
-                    # err_u = op.dt * sum(abs(residuals['Velocity'][i] + residuals['Velocity'][i - 1]) for i in range(1, op.dumpsPerRemesh()))
-                    # err_e = op.dt * sum(abs(residuals['Elevation'][i] + residuals['Elevation'][i - 1]) for i in range(1, op.dumpsPerRemesh()))
+                    # err_u = op.timestep * sum(abs(residuals['Velocity'][i] + residuals['Velocity'][i - 1]) for i in range(1, op.exports_per_remesh()))
+                    # err_e = op.timestep * sum(abs(residuals['Elevation'][i] + residuals['Elevation'][i - 1]) for i in range(1, op.exports_per_remesh()))
 
                     # # Time integrate residual over current 'window'
-                    # err_u = op.dt * sum(residuals['Velocity'][i] + residuals['Velocity'][i-1] for i in range(1, op.dumpsPerRemesh()))
-                    # err_e = op.dt * sum(residuals['Elevation'][i] + residuals['Elevation'][i-1] for i in range(1, op.dumpsPerRemesh()))
+                    # err_u = op.timestep * sum(residuals['Velocity'][i] + residuals['Velocity'][i-1] for i in range(1, op.exports_per_remesh()))
+                    # err_e = op.timestep * sum(residuals['Elevation'][i] + residuals['Elevation'][i-1] for i in range(1, op.exports_per_remesh()))
                     #
                     # rho_u.interpolate(err_u)
                     # rho_e.interpolate(err_e)
 
                     residuals = {'Velocity': [], 'Elevation': [], 'bdyVelocity': [], 'bdyElevation': []}
                     if op.plot_pvd:
-                        residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * (k+1)))
+                        residualFile.write(rho_u, rho_e, time=float(op.timestep * op.timesteps_per_remesh * (k+1)))
 
                     # Load adjoint data and form indicators
-                    indexStr = indexString(int((k+1)/op.dumpsPerRemesh()-1))
+                    indexStr = indexString(int((k+1)/op.exports_per_remesh()-1))
                     with DumbCheckpoint(op.di() + 'hdf5/Adjoint2d_' + indexStr, mode=FILE_READ) as loadAdj:
                         loadAdj.load(dual_u)
                         loadAdj.load(dual_e)
@@ -731,7 +731,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                         saveErr.store(epsilon)
                         saveErr.close()
                     if op.plot_pvd:
-                        errorFile.write(epsilon, time=float(op.dt * op.rm * k))
+                        errorFile.write(epsilon, time=float(op.timestep * op.timesteps_per_remesh * k))
             errorTimer = clock() - errorTimer
             print('Errors estimated. Run time: %.3fs' % errorTimer)
 
@@ -748,12 +748,12 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
         quantities = {}
         bdy = 200 if op.mode == 'tohoku' else 'on_boundary'
         # bdy = 'on_boundary'
-        while cnt < op.cntT():
+        while cnt < op.final_index():
             adaptTimer = clock()
             for l in range(op.adaptations):                          # TODO: Test this functionality
 
                 # Construct metric
-                indexStr = indexString(int(cnt / op.rm))
+                indexStr = indexString(int(cnt / op.timesteps_per_remesh))
                 with DumbCheckpoint(op.di() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_READ) as loadErr:
                     loadErr.load(epsilon)
                     loadErr.close()
@@ -793,18 +793,18 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                 adapOpt.horizontal_viscosity = interp(mesh, diffusivity)
             adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
             adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
-            adapOpt.simulation_export_time = op.dt * op.ndump
-            adapOpt.simulation_end_time = t + (op.rm - 0.5) * op.dt
+            adapOpt.simulation_export_time = op.timestep * op.timesteps_per_export
+            adapOpt.simulation_end_time = t + (op.timesteps_per_remesh - 0.5) * op.timestep
             adapOpt.timestepper_type = op.timestepper
             adapOpt.timestepper_options.solver_parameters = op.solver_parameters
             print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
-            adapOpt.timestep = op.dt
+            adapOpt.timestep = op.timestep
             adapOpt.output_directory = op.di()
             if not op.plot_pvd:
                 adapOpt.no_exports = True
             adapOpt.coriolis_frequency = f
             adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
-            adapSolver.i_export = int(cnt / op.ndump)
+            adapSolver.i_export = int(cnt / op.timesteps_per_export)
             adapSolver.next_export_t = adapSolver.i_export * adapSolver.options.simulation_export_time
             adapSolver.iteration = cnt
             adapSolver.simulation_time = t
@@ -846,9 +846,9 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
             nEle = mesh.num_cells()
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
-            cnt += op.rm
-            t += op.rm * op.dt
-            av = op.printToScreen(int(cnt / op.rm + 1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.dt)
+            cnt += op.timesteps_per_remesh
+            t += op.timesteps_per_remesh * op.timestep
+            av = op.print_to_screen(int(cnt / op.timesteps_per_remesh + 1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.timestep)
             adaptSolveTimer += adaptTimer + solverTimer
 
             # Extract fields for next solver block
@@ -859,7 +859,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
             peak, distance = peakAndDistance(elev_2d, op=op)
             quantities['peak'] = peak / peak_a
             quantities['dist'] = distance / distance_a
-            quantities['spd'] = distance / (op.Tend * 0.4)
+            quantities['spd'] = distance / (op.end_time * 0.4)
 
             # Output mesh statistics and solver times
         totalTimer = errorTimer + adaptSolveTimer

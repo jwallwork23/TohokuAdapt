@@ -28,10 +28,10 @@ def getObjective(level=0, mesh=None, b=None, op=TohokuOptions()):
     options.use_grad_div_viscosity_term = True      # Symmetric viscous stress
     options.use_lax_friedrichs_velocity = False     # TODO: This is a temporary fix
     options.coriolis_frequency = f
-    options.simulation_export_time = op.dt * op.ndump
-    options.simulation_end_time = op.Tend
+    options.simulation_export_time = op.timestep * op.timesteps_per_export
+    options.simulation_end_time = op.end_time
     options.timestepper_type = op.timestepper
-    options.timestep = op.dt
+    options.timestep = op.timestep
     options.output_directory = op.di
     # options.no_exports = True
     options.no_exports = False

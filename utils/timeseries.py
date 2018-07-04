@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import datetime
 
-from .options import Options, TohokuOptions
+from .options import TohokuOptions
 
 
 __all__ = ["errorVsElements", "__main__", "plotTimeseries", "compareTimeseries", "timeseriesDifference",
@@ -86,7 +86,7 @@ def readErrors(date, approach, mode='tohoku', bootstrapping=False):
             timing = quantities[-2]
             J_h = quantities[-1]
         if mode == 'model-verification':
-            fixedMeshes = Options().meshSizes
+            fixedMeshes = TohokuOptions().meshSizes
             nEle, J_h, gP02, gP06, timing = line.split(',')
             nEls.append(fixedMeshes[i])
         else:
@@ -143,7 +143,7 @@ def extractData(gauge):
         return range(len(xy)-1), [float(i) for i in xy[:-1]]
 
 
-def plotTimeseries(fileExt, date, quantity='Integrand', realData=False, op=Options()):
+def plotTimeseries(fileExt, date, quantity='Integrand', realData=False, op=TohokuOptions()):
     assert quantity in ('Integrand', 'Integrand-mirrored', 'P02', 'P06')
     filename = 'outdata/' + op.mode + '/' + fileExt + '_' + date + quantity + '.txt'
     filename2 = 'outdata/' + op.mode + '/' + fileExt + '_' + date + '.txt'
@@ -154,7 +154,7 @@ def plotTimeseries(fileExt, date, quantity='Integrand', realData=False, op=Optio
     for line in f:
         separated = line.split(',')
         dat = [float(d) for d in separated[:-1]]    # Ignore carriage return
-        tim = np.linspace(0, op.Tend, len(dat))
+        tim = np.linspace(0, op.end_time, len(dat))
         if op.mode != 'shallow-water':
             plt.plot(tim[::5], dat[::5], label=g.readline().split(',')[0])
         else:
@@ -166,7 +166,7 @@ def plotTimeseries(fileExt, date, quantity='Integrand', realData=False, op=Optio
         if (op.mode == 'tohoku' and quantity in ('P02', 'P06')) or op.mode == 'rossby-wave':
             x, y = extractData(quantity)
             me = 10 if op.mode == 'rossby-wave' else 1
-            plt.plot(np.linspace(0, op.Tend, len(x)), y, label='Gauge data', marker='*', markevery=me, color='black')
+            plt.plot(np.linspace(0, op.end_time, len(x)), y, label='Gauge data', marker='*', markevery=me, color='black')
     plt.xlabel('Time (s)')
     plt.ylabel(quantity+' value')
     plt.legend(loc=2, bbox_to_anchor=(1.05, 1))
@@ -174,7 +174,7 @@ def plotTimeseries(fileExt, date, quantity='Integrand', realData=False, op=Optio
     plt.clf()
 
 
-def timeseriesDifference(fileExt1, date1, fileExt2, date2, quantity='Integrand', op=Options()):
+def timeseriesDifference(fileExt1, date1, fileExt2, date2, quantity='Integrand', op=TohokuOptions()):
     assert quantity in ('Integrand', 'P02', 'P06')
     filename1 = 'outdata/' + op.mode + '/' + fileExt1 + '_' + date1 + quantity + '.txt'
     filename2 = 'outdata/' + op.mode + '/' + fileExt2 + '_' + date2 + quantity + '.txt'
@@ -194,7 +194,7 @@ def timeseriesDifference(fileExt1, date1, fileExt2, date2, quantity='Integrand',
     return ['%.4e' % i for i in errs]
 
 
-def integrateTimeseries(fileExt, date, op=Options()):
+def integrateTimeseries(fileExt, date, op=TohokuOptions()):
     if date is None:
         date = ''
     filename = 'outdata/' + op.mode + '/' + fileExt + '_' + date + 'Integrand.txt'
@@ -203,19 +203,19 @@ def integrateTimeseries(fileExt, date, op=Options()):
     for line in f:
         separated = line.split(',')
         # for j in range(len(separated), 0, -1):
-        #     if j % (op.rm+2) in (op.rm,op.rm+1):
+        #     if j % (op.timesteps_per_remesh+2) in (op.timesteps_per_remesh,op.timesteps_per_remesh+1):
         #         del separated[j]
         dat = [float(d) for d in separated[:-1]]
         print("#### DEBUG: Number of timesteps stored = ", len(dat))
         I = 0
-        dt = op.dt
+        dt = op.timestep
         for i in range(1, len(dat)):
             I += 0.5 * (dat[i] + dat[i-1]) * dt
         integrals.append(I)
     return ['%.4e' % i for i in integrals]
 
 
-def compareTimeseries(date, run, quantity='Integrand', op=Options()):
+def compareTimeseries(date, run, quantity='Integrand', op=TohokuOptions()):
     assert quantity in ('Integrand', 'P02', 'P06')
     approaches = ("fixedMesh", "hessianBased", "DWP", "DWR")
 
@@ -240,7 +240,7 @@ def compareTimeseries(date, run, quantity='Integrand', op=Options()):
                 f.readline()
             separated = f.readline().split(',')
             dat = [float(d) for d in separated[:-1]]  # Ignore carriage return
-            tim = np.linspace(0, op.Tend, len(dat))
+            tim = np.linspace(0, op.end_time, len(dat))
             plt.plot(tim[::5], dat[::5], label=approach)
         except:
             pass

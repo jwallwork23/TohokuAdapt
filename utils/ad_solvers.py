@@ -20,12 +20,12 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs
     options = solver_obj.options
     options.element_family = op.family
     options.use_nonlinear_equations = True
-    options.simulation_export_time = op.dt * op.ndump
-    options.simulation_end_time = op.Tend - 0.5 * op.dt
+    options.simulation_export_time = op.timestep * op.timesteps_per_export
+    options.simulation_end_time = op.end_time - 0.5 * op.timestep
     options.timestepper_type = op.timestepper
     options.timestepper_options.solver_parameters_tracer = op.solver_parameters
     print("Using solver parameters %s" % options.timestepper_options.solver_parameters_tracer)
-    options.timestep = op.dt
+    options.timestep = op.timestep
     options.output_directory = op.di()
     if not op.plot_pvd:
         options.no_exports = True
@@ -64,7 +64,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         mFile = File(op.di() + "Metric2d.pvd")
 
     # Initialise domain and physical parameters
-    V = op.mixedSpace(mesh)
+    V = op.mixed_space(mesh)
     uv_2d, elev_2d = Function(V).split()  # Needed to load data into
     elev_2d.interpolate(eta0)
     uv_2d.interpolate(u0)
@@ -80,7 +80,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
 
     adaptSolveTimer = 0.
     quantities = {}
-    while cnt < op.cntT():
+    while cnt < op.final_index():
         adaptTimer = clock()
         P1 = FunctionSpace(mesh, "CG", 1)
 
@@ -116,12 +116,12 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         adapOpt = adapSolver.options
         adapOpt.element_family = op.family
         adapOpt.use_nonlinear_equations = True
-        adapOpt.simulation_export_time = op.dt * op.ndump
-        adapOpt.simulation_end_time = t + op.dt * (op.rm - 0.5)
+        adapOpt.simulation_export_time = op.timestep * op.timesteps_per_export
+        adapOpt.simulation_end_time = t + op.timestep * (op.timesteps_per_remesh - 0.5)
         adapOpt.timestepper_type = op.timestepper
         adapOpt.timestepper_options.solver_parameters_tracer = op.solver_parameters
         print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters_tracer)
-        adapOpt.timestep = op.dt
+        adapOpt.timestep = op.timestep
         adapOpt.output_directory = op.di()
         if not op.plot_pvd:
             adapOpt.no_exports = True
@@ -135,7 +135,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         # adapOpt.use_lax_friedrichs_tracer = True
         adapOpt.tracer_source_2d = source
         adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d, tracer=tracer_2d)
-        adapSolver.i_export = int(cnt / op.ndump)
+        adapSolver.i_export = int(cnt / op.timesteps_per_export)
         adapSolver.next_export_t = adapSolver.i_export * adapSolver.options.simulation_export_time
         adapSolver.iteration = cnt
         adapSolver.simulation_time = t
@@ -158,9 +158,9 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         nEle = mesh.num_cells()
         mM = [min(nEle, mM[0]), max(nEle, mM[1])]
         Sn += nEle
-        cnt += op.rm
-        t += op.dt * op.rm
-        av = op.printToScreen(int(cnt/op.rm+1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.dt)
+        cnt += op.timesteps_per_remesh
+        t += op.timestep * op.timesteps_per_remesh
+        av = op.adaptation_stats(int(cnt/op.timesteps_per_remesh+1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.timestep)
         adaptSolveTimer += adaptTimer + solverTimer
 
         # Extract fields for next step
@@ -217,12 +217,12 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         options = solver_obj.options
         options.element_family = op.family
         options.use_nonlinear_equations = True
-        options.simulation_export_time = op.dt * op.rm
-        options.simulation_end_time = op.Tend - 0.5 * op.dt
+        options.simulation_export_time = op.timestep * op.timesteps_per_remesh
+        options.simulation_end_time = op.end_time - 0.5 * op.timestep
         options.timestepper_type = op.timestepper
         options.timestepper_options.solver_parameters_tracer = op.solver_parameters
         print("Using solver parameters %s" % options.timestepper_options.solver_parameters_tracer)
-        options.timestep = op.dt
+        options.timestep = op.timestep
         options.output_directory = op.di()
         options.fields_to_export = ['tracer_2d']
         options.fields_to_export_hdf5 = ['tracer_2d']
@@ -254,29 +254,29 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         tape = get_working_tape()
         solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
         N = len(solve_blocks)
-        r = N % op.ndump                            # Number of extra tape annotations in setup
-        for i in range(N - 1, r - 1, -op.ndump):
+        r = N % op.timesteps_per_export                            # Number of extra tape annotations in setup
+        for i in range(N - 1, r - 1, -op.timesteps_per_export):
             dual.assign(solve_blocks[i].adj_sol)
-            with DumbCheckpoint(op.di() + 'hdf5/Adjoint2d_' + indexString(int((i - r) / op.ndump)), mode=FILE_CREATE) as saveAdj:
+            with DumbCheckpoint(op.di() + 'hdf5/Adjoint2d_' + indexString(int((i - r) / op.timesteps_per_export)), mode=FILE_CREATE) as saveAdj:
                 saveAdj.store(dual)
                 saveAdj.close()
             if op.plot_pvd:
-                adjointFile.write(dual, time=op.dt * (i - r))
+                adjointFile.write(dual, time=op.timestep * (i - r))
         dualTimer = clock() - dualTimer
         print('Dual run complete. Run time: %.3fs' % dualTimer)
 
     with pyadjoint.stop_annotating():
 
         errorTimer = clock()
-        for k in range(0, op.rmEnd()):  # Loop back over times to generate error estimators
-            print('Generating error estimate %d / %d' % (k + 1, op.rmEnd()))
+        for k in range(0, op.final_mesh_index()):  # Loop back over times to generate error estimators
+            print('Generating error estimate %d / %d' % (k + 1, op.final_mesh_index()))
             with DumbCheckpoint(op.di() + 'hdf5/Tracer2d_' + indexString(k), mode=FILE_READ) as loadVel:
                 loadVel.load(tracer_2d)
                 loadVel.close()
 
             # Load adjoint data and form indicators
             epsilon.interpolate(tracer_2d * dual)
-            for i in range(k, min(k + op.iEnd() - op.iStart(), op.iEnd())):
+            for i in range(k, min(k + op.final_export() - op.first_export(), op.final_export())):
                 with DumbCheckpoint(op.di() + 'hdf5/Adjoint2d_' + indexString(i), mode=FILE_READ) as loadAdj:
                     loadAdj.load(dual)
                     loadAdj.close()
@@ -298,12 +298,12 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         tracer_2d.assign(0.)
         quantities = {}
         bdy = 'on_boundary'
-        while cnt < op.cntT():
+        while cnt < op.final_index():
             adaptTimer = clock()
             for l in range(op.adaptations):                                  # TODO: Test this functionality
 
                 # Construct metric
-                indexStr = indexString(int(cnt / op.rm))
+                indexStr = indexString(int(cnt / op.timesteps_per_remesh))
                 with DumbCheckpoint(op.di() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_READ) as loadErr:
                     loadErr.load(epsilon)
                     loadErr.close()
@@ -321,7 +321,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                 M.rename('metric_2d')
                 mFile.write(M, time=t)
             u0, eta0, b, BCs, source, diffusivity = problemDomain(mesh=mesh, op=op)[1:] # TODO: find a different way to reset these
-            V = op.mixedSpace(mesh)
+            V = op.mixed_space(mesh)
             uv_2d, elev_2d = Function(V).split()
             elev_2d.interpolate(eta0)
             uv_2d.interpolate(u0)
@@ -332,12 +332,12 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             adapOpt = adapSolver.options
             adapOpt.element_family = op.family
             adapOpt.use_nonlinear_equations = True
-            adapOpt.simulation_export_time = op.dt * op.ndump
-            adapOpt.simulation_end_time = t + (op.rm - 0.5) * op.dt
+            adapOpt.simulation_export_time = op.timestep * op.timesteps_per_export
+            adapOpt.simulation_end_time = t + (op.timesteps_per_remesh - 0.5) * op.timestep
             adapOpt.timestepper_type = op.timestepper
             adapOpt.timestepper_options.solver_parameters_tracer = op.solver_parameters
             print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
-            adapOpt.timestep = op.dt
+            adapOpt.timestep = op.timestep
             adapOpt.output_directory = op.di()
             if not op.plot_pvd:
                 adapOpt.no_exports = True
@@ -350,7 +350,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             adapOpt.use_lax_friedrichs_tracer = False  # TODO: This is a temporary fix
             adapOpt.tracer_source_2d = source
             adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d, tracer=tracer_2d)
-            adapSolver.i_export = int(cnt / op.ndump)
+            adapSolver.i_export = int(cnt / op.timesteps_per_export)
             adapSolver.next_export_t = adapSolver.i_export * adapSolver.options.simulation_export_time
             adapSolver.iteration = cnt
             adapSolver.simulation_time = t
@@ -373,9 +373,9 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             nEle = mesh.num_cells()
             mM = [min(nEle, mM[0]), max(nEle, mM[1])]
             Sn += nEle
-            cnt += op.rm
-            t += op.rm * op.dt
-            av = op.printToScreen(int(cnt / op.rm + 1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.dt)
+            cnt += op.timesteps_per_remesh
+            t += op.timesteps_per_remesh * op.timestep
+            av = op.adaptation_stats(int(cnt / op.timesteps_per_remesh + 1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.timestep)
             adaptSolveTimer += adaptTimer + solverTimer
 
             # Extract fields for next solver block

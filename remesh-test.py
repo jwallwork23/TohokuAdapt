@@ -36,24 +36,24 @@ def hessianBased(startRes, **kwargs):
 
     adaptSolveTimer = 0.
     quantities = {}
-    while cnt < op.cntT:
+    while cnt < op.final_index:
         adaptTimer = clock()
-        for l in range(op.nAdapt):
+        for l in range(op.adaptations):
 
             # Construct metric
-            if op.adaptField != 's':
+            if op.adapt_field != 's':
                 M = steadyMetric(elev_2d, op=op)
             if cnt != 0:  # Can't adapt to zero velocity
-                if op.adaptField != 'f':
+                if op.adapt_field != 'f':
                     spd = Function(FunctionSpace(mesh, "DG", 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
                     M2 = steadyMetric(spd, op=op)
-                    M = metricIntersection(M, M2) if op.adaptField == 'b' else M2
-            if op.bAdapt:
+                    M = metricIntersection(M, M2) if op.adapt_field == 'b' else M2
+            if op.adapt_on_bathymetry:
                 M2 = steadyMetric(b, op=op)
-                M = M2 if op.adaptField != 'f' and cnt == 0. else metricIntersection(M, M2)
+                M = M2 if op.adapt_field != 'f' and cnt == 0. else metricIntersection(M, M2)
 
             # Adapt mesh and interpolate variables
-            if op.bAdapt or cnt != 0 or op.adaptField == 'f':
+            if op.adapt_on_bathymetry or cnt != 0 or op.adapt_field == 'f':
                 mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
                 if cnt != 0:
                     uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
@@ -70,12 +70,12 @@ def hessianBased(startRes, **kwargs):
         adapOpt.use_nonlinear_equations = True
         adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
         adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
-        adapOpt.simulation_export_time = op.dt * op.ndump
+        adapOpt.simulation_export_time = op.timestep * op.timesteps_per_export
         startT = endT
-        endT += op.dt * op.rm
+        endT += op.timestep * op.timesteps_per_remesh
         adapOpt.simulation_end_time = endT
         adapOpt.timestepper_type = op.timestepper
-        adapOpt.timestep = op.dt
+        adapOpt.timestep = op.timestep
         adapOpt.output_directory = op.di
         adapOpt.export_diagnostics = True
         adapOpt.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
@@ -87,7 +87,7 @@ def hessianBased(startRes, **kwargs):
                                    field_metadata,
                                    export_type='hdf5')
         adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
-        adapSolver.i_export = int(cnt / op.ndump)
+        adapSolver.i_export = int(cnt / op.timesteps_per_export)
         adapSolver.iteration = cnt
         adapSolver.simulation_time = startT
         adapSolver.next_export_t = startT + adapOpt.simulation_export_time  # For next export
@@ -111,8 +111,8 @@ def hessianBased(startRes, **kwargs):
         nEle = mesh.num_cells()
         mM = [min(nEle, mM[0]), max(nEle, mM[1])]
         Sn += nEle
-        cnt += op.rm
-        av = op.printToScreen(int(cnt/op.rm+1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.dt)
+        cnt += op.timesteps_per_remesh
+        av = op.adaptation_stats(int(cnt/op.timesteps_per_remesh+1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.timestep)
         adaptSolveTimer += adaptTimer + solverTimer
 
     # Output mesh statistics and solver times
@@ -129,11 +129,11 @@ date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 rm = [12, 24, 48, 72]
 for i in range(3):
     outfile = open("outdata/rossby-wave/rmTest_mesh"+str(i)+'_'+date+'.txt', 'w')
-    for nAdapt in [1, 2, 3, 4]:
+    for adaptations in [1, 2, 3, 4]:
         for j in range(len(rm)):
             op = Options(mode='rossby-wave', approach='hessianBased')
-            op.rm = rm[j]
-            op.nAdapt = nAdapt
+            op.timesteps_per_remesh = rm[j]
+            op.adaptations = adaptations
             q = hessianBased(i, op=op)
             err = np.abs((op.J - q['J_h'])/op.J)
             timer = q['solverTimer']

@@ -2,7 +2,7 @@ from firedrake import *
 
 import numpy as np
 
-from .options import Options
+from .options import TohokuOptions, RossbyWaveOptions
 
 
 __all__ = ["indexString", "peakAndDistance", "indicator", "bdyRegion"]
@@ -16,7 +16,7 @@ def indexString(index):
     return (5 - len(str(index))) * '0' + str(index)
 
 
-def peakAndDistance(f, op=Options()):
+def peakAndDistance(f, op=RossbyWaveOptions()):
     mesh = f.function_space().mesh()
     with f.dat.vec_ro as fv:
         peak_i, peak = fv.max()
@@ -28,7 +28,7 @@ def peakAndDistance(f, op=Options()):
     return peak, val
 
 
-def indicator(mesh, xy=None, mirror=False, radii=None, op=Options()):       # TODO: Update AD and remove this
+def indicator(mesh, xy=None, mirror=False, radii=None, op=TohokuOptions()):       # TODO: Update AD and remove this
     """
     :arg mesh: mesh to use.
     :arg xy: Custom selection for indicator region.

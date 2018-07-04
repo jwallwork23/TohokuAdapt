@@ -20,11 +20,11 @@ def solverSW(mesh, u0, eta0, b, BCs={}, f=None, op=TohokuOptions()):
     options.use_grad_div_viscosity_term = True
     options.use_lax_friedrichs_velocity = False  # TODO: This is a temporary fix in adjoint case
     options.coriolis_frequency = f
-    options.simulation_export_time = 50. if op.plotpvd else 100.
-    options.simulation_end_time = op.Tend
+    options.simulation_export_time = 50. if op.plot_pvd else 100.
+    options.simulation_end_time = op.end_time
     options.timestepper_type = op.timestepper
-    options.timestep = op.dt
-    if op.plotpvd:
+    options.timestep = op.timestep
+    if op.plot_pvd:
         options.output_directory = op.di
     else:
         options.no_exports = True
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     for c in ("off", "f", "beta", "sin"):
-        op = TohokuOptions(plotpvd=True if args.o else False,
+        op = TohokuOptions(plot_pvd=True if args.o else False,
                      coriolis=c)        # TODO: This won't currently work
         tag = 'rotational=' + c
         filename = 'outdata/model-verification/' + tag + '_' + date
