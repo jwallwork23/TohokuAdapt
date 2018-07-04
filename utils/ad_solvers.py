@@ -27,7 +27,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs
     options.timestepper_type = op.timestepper
     options.timestep = op.dt
     options.output_directory = op.di()
-    if not op.plotpvd:
+    if not op.plotPVD:
         options.no_exports = True
     options.horizontal_velocity_scale = op.u_mag
     options.fields_to_export = ['uv_2d', 'elev_2d', 'tracer_2d']
@@ -59,6 +59,8 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs
 
 def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
+    if op.plotMetric:
+        mFile = File(op.di() + "Metric2d.pvd")
 
     # Initialise domain and physical parameters
     V = op.mixedSpace(mesh)
@@ -95,6 +97,10 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
                 tracer = interp(mesh, tracer)
 
         if cnt != 0:
+            if op.nAdapt != 0 and op.plotMetric:
+                M.rename("Metric field")
+                mFile.write(M, time=t)
+
             elev_2d, uv_2d, tracer_2d = interp(mesh, elev_2d, uv_2d, tracer_2d)
             b, BCs, source, diffusivity = problemDomain(mesh=mesh, op=op)[3:]     # TODO: find a different way to reset these
             uv_2d.rename('uv_2d')
@@ -114,7 +120,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         adapOpt.timestepper_type = op.timestepper
         adapOpt.timestep = op.dt
         adapOpt.output_directory = op.di()
-        if not op.plotpvd:
+        if not op.plotPVD:
             adapOpt.no_exports = True
         adapOpt.horizontal_velocity_scale = op.u_mag
         adapOpt.fields_to_export = ['uv_2d', 'elev_2d', 'tracer_2d']

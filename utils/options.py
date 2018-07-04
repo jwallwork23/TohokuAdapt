@@ -20,7 +20,8 @@ class AdaptOptions(FrozenConfigurable):
                        ).tag(config=True)
     gradate = Bool(False, help='Toggle metric gradation.').tag(config=True)
     bAdapt = Bool(False, help='Toggle adaptation based on bathymetry field.').tag(config=True)
-    plotpvd = Bool(False, help='Toggle plotting of fields.').tag(config=True)
+    plotPVD = Bool(False, help='Toggle plotting of fields.').tag(config=True)
+    plotMetric = Bool(False, help='Toggle plotting of metric field.').tag(config=True)
     maxGrowth = PositiveFloat(1.4, help="Metric gradation scaling parameter.").tag(config=True)
     maxAnisotropy = PositiveFloat(100., help="Maximum tolerated anisotropy.").tag(config=True)
     nAdapt = NonNegativeInteger(1, help="Number of mesh adaptations per remeshing.").tag(config=True)
@@ -293,7 +294,7 @@ class Options:
                  maxAnisotropy=100.,
                  gradate=False,
                  bAdapt=False,
-                 plotpvd=False,
+                 plotPVD=False,
                  maxGrowth=1.4,
                  nAdapt=1,
                  orderChange=0,
@@ -312,7 +313,7 @@ class Options:
         :param maxAnisotropy: maximum tolerated aspect ratio.
         :param gradate: Toggle metric gradation.
         :param bAdapt: intersect metrics with Hessian w.r.t. bathymetry.
-        :param plotpvd: toggle saving solution fields to .pvd.
+        :param plotPVD: toggle saving solution fields to .pvd.
         :param maxGrowth: metric gradation scaling parameter.
         :param ndump: Timesteps per data dump.
         :param rm: Timesteps per remesh. (Should be an integer multiple of ndump.)
@@ -460,11 +461,11 @@ class Options:
             raise ValueError('Invalid anisotropy value %.1f. a > 0 is required.' % maxAnisotropy)
 
         # Misc options
-        for i in (gradate, plotpvd, bAdapt):
+        for i in (gradate, plotPVD, bAdapt):
             assert(isinstance(i, bool))
         self.gradate = gradate
         self.bAdapt = bAdapt
-        self.plotpvd = plotpvd
+        self.plotPVD = plotPVD
         try:
             assert (maxGrowth > 1)
             self.maxGrowth = maxGrowth

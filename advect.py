@@ -24,6 +24,7 @@ parser.add_argument("-r", help="Compute errors and residuals in a refined space"
 parser.add_argument("-b", help="Intersect metrics with bathymetry")
 parser.add_argument("-c", help="Type of Coriolis coefficient to use, from {'off', 'f', 'beta', 'sin'}.")
 parser.add_argument("-o", help="Output data")
+parser.add_argument("-m", help="Output metric data")
 parser.add_argument("-regen", help="Regenerate error estimates from saved data")
 parser.add_argument("-nAdapt", help="Number of mesh adaptation steps")
 parser.add_argument("-gradate", help="Gradate metric")
@@ -36,35 +37,30 @@ if approach is None:
 else:
     assert approach in ('fixedMesh', 'hessianBased', 'DWP', 'DWR')
 orderChange = 0
-if args.ho:
-    assert not args.r
-    orderChange = 1
-if args.r:
-    assert not args.ho
-if args.b is not None:
-    assert approach == 'hessianBased'
-coriolis = args.c if args.c is not None else 'f'
-
-op = AdvectionOptions(approach=approach)
-op.gradate = bool(args.gradate) if args.gradate is not None else False
-op.plotpvd = True if args.o else False
-op.nAdapt = 1 if args.nAdapt is None else int(args.nAdapt)
-op.orderChange =  orderChange
-op.bAdapt = bool(args.b) if args.b is not None else False
-op.adaptField = args.field if args.field is not None else 's'
 
 # Establish filenames
 filename = 'outdata/advection-diffusion/' + approach
 if args.ho:
-    op.orderChange = 1
+    assert not args.r
+    orderChange = 1
     filename += '_ho'
 elif args.r:
-    op.refinedSpace = True
+    assert not args.ho
+    refinedSpace = True
     filename += '_r'
 if args.b:
+    assert approach == 'hessianBased'
     filename += '_b'
 filename += '_' + date
 errorFile = open(filename + '.txt', 'w+')
+
+# Set parameters
+op = AdvectionOptions(approach=approach)
+op.gradate = bool(args.gradate)
+op.plotPVD = bool(args.o)
+op.plotMetric = bool(args.m)
+op.nAdapt = 1 if args.nAdapt is None else int(args.nAdapt)
+op.orderChange = orderChange
 
 # Get data and save to disk
 if args.low is not None or args.high is not None:
