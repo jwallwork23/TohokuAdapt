@@ -19,17 +19,17 @@ class AdaptOptions(FrozenConfigurable):
                        help="Mesh adaptive approach considered, from {'fixedMesh', 'hessianBased', 'DWP', 'DWR'}"
                        ).tag(config=True)
     gradate = Bool(False, help='Toggle metric gradation.').tag(config=True)
-    bAdapt = Bool(False, help='Toggle adaptation based on bathymetry field.').tag(config=True)
-    plotPVD = Bool(False, help='Toggle plotting of fields.').tag(config=True)
-    plotMetric = Bool(False, help='Toggle plotting of metric field.').tag(config=True)
-    maxGrowth = PositiveFloat(1.4, help="Metric gradation scaling parameter.").tag(config=True)
-    maxAnisotropy = PositiveFloat(100., help="Maximum tolerated anisotropy.").tag(config=True)
-    nAdapt = NonNegativeInteger(1, help="Number of mesh adaptations per remeshing.").tag(config=True)
-    orderChange = NonNegativeInteger(0, help="Change in polynomial degree for residual approximation.").tag(config=True)
+    adapt_on_bathymetry = Bool(False, help='Toggle adaptation based on bathymetry field.').tag(config=True)
+    plot_pvd = Bool(False, help='Toggle plotting of fields.').tag(config=True)
+    plot_metric = Bool(False, help='Toggle plotting of metric field.').tag(config=True)
+    max_element_growth = PositiveFloat(1.4, help="Metric gradation scaling parameter.").tag(config=True)
+    max_anisotropy = PositiveFloat(100., help="Maximum tolerated anisotropy.").tag(config=True)
+    adaptations = NonNegativeInteger(1, help="Number of mesh adaptations per remeshing.").tag(config=True)
+    order_increase = NonNegativeInteger(0, help="Change in polynomial degree for residual approximation.").tag(config=True)
     normalisation = Unicode('lp', help="Normalisation approach, from {'lp', 'manual'}.").tag(config=True)
-    hessMeth = Unicode('dL2', help="Hessian recovery technique, from {'dL2', 'parts'}.").tag(config=True)
+    hessian_recovery = Unicode('dL2', help="Hessian recovery technique, from {'dL2', 'parts'}.").tag(config=True)
     timestepper = Unicode('CrankNicolson', help="Time integration scheme used.").tag(config=True)
-    normOrder = NonNegativeInteger(2, help="Degree p of Lp norm used.")
+    norm_order = NonNegativeInteger(2, help="Degree p of Lp norm used.")
     family = Unicode('dg-dg', help="Mixed finite element family, from {'dg-dg', 'dg-cg'}.").tag(config=True)
 
     def cntT(self):
@@ -82,8 +82,8 @@ class AdaptOptions(FrozenConfigurable):
         d1 = 1
         d2 = 2 if self.family == 'dg-cg' else 1
         if enrich:
-            d1 += self.orderChange
-            d2 += self.orderChange
+            d1 += self.order_increase
+            d2 += self.order_increase
         return VectorFunctionSpace(mesh, "DG", d1) * FunctionSpace(mesh, "DG" if self.family == 'dg-dg' else "CG", d2)
 
     def printToScreen(self, mn, adaptTimer, solverTime, nEle, Sn, mM, t):
@@ -112,8 +112,8 @@ class TohokuOptions(AdaptOptions):
     # Solver parameters
     ndump = NonNegativeInteger(10, help="Timesteps per data dump").tag(config=True)
     rm = NonNegativeInteger(30, help="Timesteps per mesh aapdaptation").tag(config=True)
-    nVerT = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
-    adaptField = Unicode('s', help="Adaptation field of interest, from {'s', 'f', 'b'}.").tag(config=True)
+    target_vertices = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
+    adapt_field = Unicode('s', help="Adaptation field of interest, from {'s', 'f', 'b'}.").tag(config=True)
     dt = PositiveFloat(5., help="Timestep").tag(config=True)
     Tstart = PositiveFloat(300., help="Start time of period of interest").tag(config=True)
     Tend = PositiveFloat(1800., help="End time of period of interest").tag(config=True)
@@ -163,8 +163,8 @@ class RossbyWaveOptions(AdaptOptions):
     # Solver parameters
     ndump = NonNegativeInteger(12, help="Timesteps per data dump").tag(config=True)
     rm = NonNegativeInteger(48, help="Timesteps per mesh adaptation").tag(config=True)
-    nVerT = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
-    adaptField = Unicode('s', help="Adaptation field of interest, from {'s', 'f', 'b'}.").tag(config=True)
+    target_vertices = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
+    adapt_field = Unicode('s', help="Adaptation field of interest, from {'s', 'f', 'b'}.").tag(config=True)
     dt = PositiveFloat(0.05, help="Timestep").tag(config=True)
     Tstart = PositiveFloat(30., help="Start time of period of interest").tag(config=True)
     Tend = PositiveFloat(120., help="End time of period of interest").tag(config=True)
@@ -201,8 +201,8 @@ class KelvinWaveOptions(AdaptOptions):
     # Solver parameters
     ndump = NonNegativeInteger(12, help="Timesteps per data dump").tag(config=True)
     rm = NonNegativeInteger(48, help="Timesteps per mesh adaptation").tag(config=True)
-    nVerT = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
-    adaptField = Unicode('s', help="Adaptation field of interest, from {'s', 'f', 'b'}.").tag(config=True)
+    target_vertices = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
+    adapt_field = Unicode('s', help="Adaptation field of interest, from {'s', 'f', 'b'}.").tag(config=True)
     dt = PositiveFloat(0.05, help="Timestep").tag(config=True)
     Tstart = PositiveFloat(10., help="Start time of period of interest").tag(config=True)
     Tend = PositiveFloat(36., help="End time of period of interest").tag(config=True)
@@ -238,8 +238,8 @@ class GaussianOptions(AdaptOptions):
     # Solver parameters
     ndump = NonNegativeInteger(6, help="Timesteps per data dump").tag(config=True)
     rm = NonNegativeInteger(12, help="Timesteps per mesh adaptation").tag(config=True)
-    nVerT = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
-    adaptField = Unicode('s', help="Adaptation field of interest, from {'s', 'f', 'b'}.").tag(config=True)
+    target_vertices = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
+    adapt_field = Unicode('s', help="Adaptation field of interest, from {'s', 'f', 'b'}.").tag(config=True)
     dt = PositiveFloat(0.05, help="Timestep").tag(config=True)
     Tstart = PositiveFloat(0.6, help="Start time of period of interest").tag(config=True)
     Tend = PositiveFloat(3., help="End time of period of interest").tag(config=True)
@@ -274,7 +274,7 @@ class AdvectionOptions(AdaptOptions):
     # Solver parameters
     ndump = NonNegativeInteger(10, help="Timesteps per data dump").tag(config=True)
     rm = NonNegativeInteger(20, help="Timesteps per mesh adaptation").tag(config=True)
-    nVerT = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
+    target_vertices = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
     dt = PositiveFloat(0.1, help="Timestep").tag(config=True)
     Tstart = PositiveFloat(10., help="Start time of period of interest").tag(config=True)
     Tend = PositiveFloat(50., help="End time of period of interest").tag(config=True)
@@ -311,18 +311,18 @@ class Options:
                  approach='fixedMesh',
                  family='dg-dg',
                  timestepper='CrankNicolson',
-                 maxAnisotropy=100.,
+                 max_anisotropy=100.,
                  gradate=False,
-                 bAdapt=False,
-                 plotPVD=False,
-                 maxGrowth=1.4,
-                 nAdapt=1,
-                 orderChange=0,
+                 adapt_on_bathymetry=False,
+                 plot_pvd=False,
+                 max_element_growth=1.4,
+                 adaptations=1,
+                 order_increase=0,
                  coriolis='sin',
                  rescaling=0.85,
                  ndump=None,
                  rm=None,
-                 nVerT=1000):
+                 target_vertices=1000):
         """
         :param mode: problem considered.
         :param family: mixed function space family, from {'dg-dg', 'dg-cg'}.
@@ -330,16 +330,16 @@ class Options:
         :param approach: meshing strategy, from {'fixedMesh', 'hessianBased', 'DWP', 'DWR'}.
         :param coriolis: Type of Coriolis term, from {'off', 'f', 'beta', 'sin'}.
         :param rescaling: Scaling parameter for target number of vertices.
-        :param maxAnisotropy: maximum tolerated aspect ratio.
+        :param max_anisotropy: maximum tolerated aspect ratio.
         :param gradate: Toggle metric gradation.
-        :param bAdapt: intersect metrics with Hessian w.r.t. bathymetry.
-        :param plotPVD: toggle saving solution fields to .pvd.
-        :param maxGrowth: metric gradation scaling parameter.
+        :param adapt_on_bathymetry: intersect metrics with Hessian w.r.t. bathymetry.
+        :param plot_pvd: toggle saving solution fields to .pvd.
+        :param max_element_growth: metric gradation scaling parameter.
         :param ndump: Timesteps per data dump.
         :param rm: Timesteps per remesh. (Should be an integer multiple of ndump.)
-        :param nAdapt: number of mesh adaptions per mesh regeneration.
-        :param nVerT: target number of vertices.
-        :param orderChange: change in polynomial degree for residual approximation.
+        :param adaptations: number of mesh adaptions per mesh regeneration.
+        :param target_vertices: target number of vertices.
+        :param order_increase: change in polynomial degree for residual approximation.
         """
 
         # Model parameters
@@ -456,10 +456,10 @@ class Options:
 
         # Adaptivity parameters
         if self.approach == 'hessianBased':
-            self.adaptField = 's'       # Adapt w.r.t 's'peed, 'f'ree surface or 'b'oth.
+            self.adapt_field = 's'       # Adapt w.r.t 's'peed, 'f'ree surface or 'b'oth.
             self.normalisation = 'lp'   # Metric normalisation using Lp norm. 'manual' also available.
-            self.normOrder = 2
-            self.hessMeth = 'dL2'       # Hessian recovery by double L2 projection. 'parts' also available
+            self.norm_order = 2
+            self.hessian_recovery = 'dL2'       # Hessian recovery by double L2 projection. 'parts' also available
         else:
             if self.mode == 'shallow-water':
                 self.maxScaling = 5e9       # TODO: What is the actual interpretation?
@@ -475,20 +475,20 @@ class Options:
             except:
                 raise ValueError('Invalid value of %.3f for scaling parameter. rescaling > 0 is required.' % rescaling)
         try:
-            assert maxAnisotropy > 0
-            self.maxAnisotropy = maxAnisotropy
+            assert max_anisotropy > 0
+            self.max_anisotropy = max_anisotropy
         except:
-            raise ValueError('Invalid anisotropy value %.1f. a > 0 is required.' % maxAnisotropy)
+            raise ValueError('Invalid anisotropy value %.1f. a > 0 is required.' % max_anisotropy)
 
         # Misc options
-        for i in (gradate, plotPVD, bAdapt):
+        for i in (gradate, plot_pvd, adapt_on_bathymetry):
             assert(isinstance(i, bool))
         self.gradate = gradate
-        self.bAdapt = bAdapt
-        self.plotPVD = plotPVD
+        self.adapt_on_bathymetry = adapt_on_bathymetry
+        self.plot_pvd = plot_pvd
         try:
-            assert (maxGrowth > 1)
-            self.maxGrowth = maxGrowth
+            assert (max_element_growth > 1)
+            self.max_element_growth = max_element_growth
         except:
             raise ValueError('Invalid value for growth parameter.')
         if self.mode is not None and self.approach is not None:
@@ -497,15 +497,15 @@ class Options:
             self.di = 'plots/'
 
         # Timestepping and (more) adaptivity parameters
-        for i in (orderChange, nVerT, nAdapt):
+        for i in (order_increase, target_vertices, adaptations):
             assert isinstance(i, int)
         if ndump is not None:
             self.ndump = ndump
         if rm is not None:
             self.rm = rm
-        self.nAdapt = nAdapt
-        self.orderChange = orderChange
-        self.nVerT = nVerT
+        self.adaptations = adaptations
+        self.order_increase = order_increase
+        self.target_vertices = target_vertices
 
         self.viscosity = 1e-3
 
@@ -555,8 +555,8 @@ class Options:
         deg1 = self.degree1
         deg2 = self.degree2
         if enrich:
-            deg1 += self.orderChange
-            deg2 += self.orderChange
+            deg1 += self.order_increase
+            deg2 += self.order_increase
         return VectorFunctionSpace(mesh, self.space1, deg1) * FunctionSpace(mesh, self.space2, deg2)
 
 

@@ -25,7 +25,7 @@ parser.add_argument("-b", help="Intersect metrics with bathymetry")
 parser.add_argument("-o", help="Output data")
 parser.add_argument("-m", help="Output metric data")
 parser.add_argument("-regen", help="Regenerate error estimates from saved data")
-parser.add_argument("-nAdapt", help="Number of mesh adaptation steps")
+parser.add_argument("-n", help="Number of mesh adaptation steps")
 parser.add_argument("-gradate", help="Gradate metric")
 parser.add_argument("-field", help="Field for Hessian based adaptation, from {'s', 'f', 'b'}.")
 parser.add_argument("-snes_view", help="Use PETSc snes view.")
@@ -40,13 +40,13 @@ if args.t is None:
     mode = 'tohoku'
 else:
     mode = args.t
-orderChange = 0
+order_increase = 0
 
 # Establish filenames
 filename = 'outdata/' + mode + '/' + approach
 if args.ho:
     assert not args.r
-    orderChange = 1
+    order_increase = 1
     filename += '_ho'
 elif args.r:
     assert not args.ho
@@ -77,12 +77,12 @@ elif mode == 'shallow-water':
 else:
     raise NotImplementedError
 op.gradate = bool(args.gradate)
-op.plotPVD = bool(args.o)
-op.plotMetric = bool(args.m)
-op.nAdapt = 1 if args.nAdapt is None else int(args.nAdapt)
-op.orderChange = orderChange
-op.bAdapt = bool(args.b)
-op.adaptField = args.field if args.field is not None else 's'
+op.plot_pvd = bool(args.o)
+op.plot_metric = bool(args.m)
+op.adaptations = 1 if args.n is None else int(args.n)
+op.order_increase = order_increase
+op.adapt_on_bathymetry = bool(args.b)
+op.adapt_field = args.field if args.field is not None else 's'
 if bool(args.snes_view):
     op.solver_parameters['snes_view'] = True
 

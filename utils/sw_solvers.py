@@ -41,7 +41,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
     options.timestep = op.dt
     options.output_directory = op.di()
-    if not op.plotPVD:
+    if not op.plot_pvd:
         options.no_exports = True
     solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
     cb1 = SWCallback(solver_obj)
@@ -84,7 +84,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
 
 def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
-    if op.plotMetric:
+    if op.plot_metric:
         mFile = File(op.di() + "Metric2d.pvd")
 
     # Initialise domain and physical parameters
@@ -101,7 +101,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
 
     # Initialise parameters and counters
     nEle = mesh.num_cells()
-    op.nVerT = mesh.num_vertices() * op.rescaling   # Target #Vertices
+    op.target_vertices = mesh.num_vertices() * op.rescaling   # Target #Vertices
     mM = [nEle, nEle]  # Min/max #Elements
     Sn = nEle
     cnt = 0
@@ -113,18 +113,18 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         adaptTimer = clock()
         P1 = FunctionSpace(mesh, "CG", 1)
 
-        if op.adaptField != 's':
+        if op.adapt_field != 's':
             height = Function(P1).interpolate(elev_2d)
-        if op.adaptField != 'f':
+        if op.adapt_field != 'f':
             spd = Function(P1).interpolate(sqrt(dot(uv_2d, uv_2d)))
-        for l in range(op.nAdapt):                  # TODO: Test this functionality
+        for l in range(op.adaptations):                  # TODO: Test this functionality
 
             # Construct metric
-            if op.adaptField != 's':
+            if op.adapt_field != 's':
                 M = steadyMetric(height, op=op)
-            if op.adaptField != 'f' and cnt != 0:   # Can't adapt to zero velocity
+            if op.adapt_field != 'f' and cnt != 0:   # Can't adapt to zero velocity
                 M2 = steadyMetric(spd, op=op)
-                if op.adaptField != 'b':
+                if op.adapt_field != 'b':
                     M = M2
                 else:
                     try:
@@ -132,21 +132,21 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                     except:
                         print("WARNING: null fluid speed metric")
                         M = metricIntersection(M2, M)
-            if op.bAdapt and not (op.adaptField != 'f' and cnt == 0):
+            if op.adapt_on_bathymetry and not (op.adapt_field != 'f' and cnt == 0):
                 M2 = steadyMetric(b, op=op)
-                M = M2 if op.adaptField != 'f' and cnt == 0. else metricIntersection(M, M2)     # TODO: Convex combination?
+                M = M2 if op.adapt_field != 'f' and cnt == 0. else metricIntersection(M, M2)     # TODO: Convex combination?
 
             # Adapt mesh and interpolate variables
-            if op.bAdapt or cnt != 0 or op.adaptField == 'f':
+            if op.adapt_on_bathymetry or cnt != 0 or op.adapt_field == 'f':
                 mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-            if l < op.nAdapt-1:
-                if op.adaptField != 's':
+            if l < op.adaptations-1:
+                if op.adapt_field != 's':
                     height = interp(mesh, height)
-                if op.adaptField != 'f':
+                if op.adapt_field != 'f':
                     spd = interp(mesh, spd)
 
-        if cnt != 0 or op.adaptField == 'f':
-            if op.nAdapt != 0 and op.plotMetric:
+        if cnt != 0 or op.adapt_field == 'f':
+            if op.adaptations != 0 and op.plot_metric:
                 M.rename('metric_2d')
                 mFile.write(M, time=t)
 
@@ -172,7 +172,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
         adapOpt.timestep = op.dt
         adapOpt.output_directory = op.di()
-        if not op.plotPVD:
+        if not op.plot_pvd:
             adapOpt.no_exports = True
         adapOpt.coriolis_frequency = f
         adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
@@ -249,11 +249,11 @@ from fenics_adjoint.solving import SolveBlock                                   
 def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
     regen = kwargs.get('regen')
-    if op.plotMetric:
+    if op.plot_metric:
         mFile = File(op.di() + "Metric2d.pvd")
 
     initTimer = clock()
-    if op.plotPVD:
+    if op.plot_pvd:
         errorFile = File(op.di() + "ErrorIndicator2d.pvd")
         adjointFile = File(op.di() + "Adjoint2d.pvd")
 
@@ -281,7 +281,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
 
     # Initialise parameters and counters
     nEle = mesh.num_cells()
-    op.nVerT = mesh.num_vertices() * op.rescaling  # Target #Vertices
+    op.target_vertices = mesh.num_vertices() * op.rescaling  # Target #Vertices
     mM = [nEle, nEle]  # Min/max #Elements
     Sn = nEle
 
@@ -340,7 +340,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                 saveAdj.store(dual_u)
                 saveAdj.store(dual_e)
                 saveAdj.close()
-            if op.plotPVD:
+            if op.plot_pvd:
                 adjointFile.write(dual_u, dual_e, time=op.dt * (i - r))
         dualTimer = clock() - dualTimer
         print('Dual run complete. Run time: %.3fs' % dualTimer)
@@ -370,7 +370,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             with DumbCheckpoint(op.di() + 'hdf5/ErrorIndicator2d_' + indexString(k), mode=FILE_CREATE) as saveErr:
                 saveErr.store(epsilon)
                 saveErr.close()
-            if op.plotPVD:
+            if op.plot_pvd:
                 errorFile.write(epsilon, time=float(k))
         errorTimer = clock() - errorTimer
         print('Errors estimated. Run time: %.3fs' % errorTimer)
@@ -387,7 +387,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         bdy = 200 if op.mode == 'tohoku' else 'on_boundary'
         while cnt < op.cntT():
             adaptTimer = clock()
-            for l in range(op.nAdapt):                                  # TODO: Test this functionality
+            for l in range(op.adaptations):                                  # TODO: Test this functionality
 
                 # Construct metric
                 indexStr = indexString(int(cnt / op.rm))
@@ -404,7 +404,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                 # Adapt mesh and interpolate variables
                 mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
 
-            if op.nAdapt != 0 and op.plotMetric:
+            if op.adaptations != 0 and op.plot_metric:
                 M.rename('metric_2d')
                 mFile.write(M, time=t)
             elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
@@ -429,7 +429,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
             adapOpt.timestep = op.dt
             adapOpt.output_directory = op.di()
-            if not op.plotPVD:
+            if not op.plot_pvd:
                 adapOpt.no_exports = True
             adapOpt.coriolis_frequency = f
             adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
@@ -504,11 +504,11 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
 def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TODO: Store optimal mesh, 'intersected' over all rm steps
     op = kwargs.get('op')
     regen = kwargs.get('regen')
-    if op.plotMetric:
+    if op.plot_metric:
         mFile = File(op.di() + "Metric2d.pvd")
 
     initTimer = clock()
-    if op.plotPVD:
+    if op.plot_pvd:
         residualFile = File(op.di() + "Residual2d.pvd")
         errorFile = File(op.di() + "ErrorIndicator2d.pvd")
         adjointFile = File(op.di() + "Adjoint2d.pvd")
@@ -533,7 +533,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
     dual_u.rename("Adjoint velocity")
     dual_e.rename("Adjoint elevation")
 
-    if op.orderChange:
+    if op.order_increase:
         Ve = op.mixedSpace(mesh, enrich=True)
         duale = Function(Ve)
         duale_u, duale_e = duale.split()
@@ -555,7 +555,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
 
     # Initialise parameters and counters
     nEle = mesh.num_cells()
-    op.nVerT = mesh.num_vertices() * op.rescaling  # Target #Vertices
+    op.target_vertices = mesh.num_vertices() * op.rescaling  # Target #Vertices
     mM = [nEle, nEle]  # Min/max #Elements
     Sn = nEle
     t = 0.
@@ -638,7 +638,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                 saveAdj.store(dual_u)
                 saveAdj.store(dual_e)
                 saveAdj.close()
-            if op.plotPVD:
+            if op.plot_pvd:
                 adjointFile.write(dual_u, dual_e, time=op.dt * (i - r))
         dualTimer = clock() - dualTimer
         print('Dual run complete. Run time: %.3fs' % dualTimer)
@@ -708,7 +708,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                     # rho_e.interpolate(err_e)
 
                     residuals = {'Velocity': [], 'Elevation': [], 'bdyVelocity': [], 'bdyElevation': []}
-                    if op.plotPVD:
+                    if op.plot_pvd:
                         residualFile.write(rho_u, rho_e, time=float(op.dt * op.rm * (k+1)))
 
                     # Load adjoint data and form indicators
@@ -717,7 +717,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                         loadAdj.load(dual_u)
                         loadAdj.load(dual_e)
                         loadAdj.close()
-                    if op.orderChange:                  # TODO: Replace adj with difference
+                    if op.order_increase:                  # TODO: Replace adj with difference
                         duale_u.interpolate(dual_u)     # TODO: ... between higher order adj and adj on comp. mesh.
                         duale_e.interpolate(dual_e)     # TODO: ... h.o. interpolation should be patchwise.
                         epsilon.interpolate(assemble(v * (inner(rho, duale) + inner(brho, duale)) * dx))
@@ -730,7 +730,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                     with DumbCheckpoint(op.di() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_CREATE) as saveErr:
                         saveErr.store(epsilon)
                         saveErr.close()
-                    if op.plotPVD:
+                    if op.plot_pvd:
                         errorFile.write(epsilon, time=float(op.dt * op.rm * k))
             errorTimer = clock() - errorTimer
             print('Errors estimated. Run time: %.3fs' % errorTimer)
@@ -750,7 +750,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
         # bdy = 'on_boundary'
         while cnt < op.cntT():
             adaptTimer = clock()
-            for l in range(op.nAdapt):                          # TODO: Test this functionality
+            for l in range(op.adaptations):                          # TODO: Test this functionality
 
                 # Construct metric
                 indexStr = indexString(int(cnt / op.rm))
@@ -775,7 +775,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                 # File('plots/tohoku/mesh.pvd').write(mesh.coordinates)
                 # exit(0)
 
-            if op.nAdapt != 0 and op.plotMetric:
+            if op.adaptations != 0 and op.plot_metric:
                 M.rename('metric_2d')
                 mFile.write(M, time=t)
             elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
@@ -800,7 +800,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
             print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
             adapOpt.timestep = op.dt
             adapOpt.output_directory = op.di()
-            if not op.plotPVD:
+            if not op.plot_pvd:
                 adapOpt.no_exports = True
             adapOpt.coriolis_frequency = f
             adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)

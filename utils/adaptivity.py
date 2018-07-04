@@ -56,11 +56,11 @@ def constructHessian(f, g=None, op=Options()):
     H = Function(V)
     tau = TestFunction(V)
     nhat = FacetNormal(mesh)  # Normal vector
-    if op.hessMeth == 'parts':
+    if op.hessian_recovery == 'parts':
         Lh = (inner(tau, H) + inner(div(tau), grad(f))) * dx
         Lh -= (tau[0, 1] * nhat[1] * f.dx(0) + tau[1, 0] * nhat[0] * f.dx(1)) * ds
         Lh -= (tau[0, 0] * nhat[1] * f.dx(0) + tau[1, 1] * nhat[0] * f.dx(1)) * ds  # Term not in Firedrake tutorial
-    elif op.hessMeth == 'dL2':
+    elif op.hessian_recovery == 'dL2':
         if g is None:
             g = constructGradient(f)
         Lh = (inner(tau, H) + inner(div(tau), g)) * dx
@@ -89,7 +89,7 @@ def steadyMetric(f, H=None, op=Options()):
     V = H.function_space()
     mesh = V.mesh()
 
-    ia2 = 1. / pow(op.maxAnisotropy, 2)     # Inverse square max aspect ratio
+    ia2 = 1. / pow(op.max_anisotropy, 2)     # Inverse square max aspect ratio
     ihmin2 = 1. / pow(op.hmin, 2)           # Inverse square minimal side-length
     ihmax2 = 1. / pow(op.hmax, 2)           # Inverse square maximal side-length
     M = Function(V)
@@ -100,7 +100,7 @@ def steadyMetric(f, H=None, op=Options()):
         for i in range(mesh.topology.num_vertices()):
 
             # Generate local Hessian
-            H_loc = H.dat.data[i] * op.nVerT / max(np.sqrt(assemble(f * f * dx)), f_min)    # Avoid round-off error
+            H_loc = H.dat.data[i] * op.target_vertices / max(np.sqrt(assemble(f * f * dx)), f_min)    # Avoid round-off error
             mean_diag = 0.5 * (H_loc[0][1] + H_loc[1][0])
             H_loc[0][1] = mean_diag
             H_loc[1][0] = mean_diag
@@ -142,10 +142,10 @@ def steadyMetric(f, H=None, op=Options()):
             M.dat.data[i][0, 1] = lam1 * v1[0] * v1[1] + lam2 * v2[0] * v2[1]
             M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
             M.dat.data[i][1, 1] = lam1 * v1[1] * v1[1] + lam2 * v2[1] * v2[1]
-            M.dat.data[i] *= pow(det, -1. / (2 * op.normOrder + 2))
-            detH.dat.data[i] = pow(det, op.normOrder / (2. * op.normOrder + 2))
+            M.dat.data[i] *= pow(det, -1. / (2 * op.norm_order + 2))
+            detH.dat.data[i] = pow(det, op.norm_order / (2. * op.norm_order + 2))
 
-        M *= op.nVerT / assemble(detH * dx)    # Scale by the target number of vertices and Hessian complexity
+        M *= op.target_vertices / assemble(detH * dx)    # Scale by the target number of vertices and Hessian complexity
         for i in range(mesh.topology.num_vertices()):
             # Find eigenpairs of metric and truncate eigenvalues
             lam, v = la.eig(M.dat.data[i])
@@ -179,9 +179,9 @@ def normaliseIndicator(f, op=Options()):        # TODO: What if metric is consta
         gnorm = max(np.abs(assemble(f * dx)), op.minNorm)           # NOTE this changes in 3D case
     else:
         gnorm = max(assemble(sqrt(inner(f, f)) * dx), op.minNorm)   # Equivalent thresholded metric complexity
-    scaleFactor = min(op.nVerT / gnorm, op.maxScaling)              # Cap error estimate, also computational cost
+    scaleFactor = min(op.target_vertices / gnorm, op.maxScaling)              # Cap error estimate, also computational cost
     if scaleFactor == op.maxScaling:
-        print("WARNING: maximum scaling for error estimator reached as %.2e" % (op.nVerT / gnorm))
+        print("WARNING: maximum scaling for error estimator reached as %.2e" % (op.target_vertices / gnorm))
     # print("#### DEBUG: Complexity = %.4e" % gnorm)
     f.dat.data[:] = np.abs(f.dat.data) * scaleFactor
 
@@ -273,7 +273,7 @@ def metricGradation(M, iso=False, op=Options()):   # TODO: Implement this in pyo
     :param op: Options class object providing parameter values.
     :return: gradated metric.
     """
-    ln_beta = np.log(op.maxGrowth)
+    ln_beta = np.log(op.max_element_growth)
 
     # Get vertices and edges of mesh
     V = M.function_space()
