@@ -220,7 +220,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         Sn += nEle
         cnt += op.timesteps_per_remesh
         t += op.timestep * op.timesteps_per_remesh
-        av = op.print_to_screen(int(cnt/op.timesteps_per_remesh+1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.timestep)
+        av = op.adaptation_stats(int(cnt/op.timesteps_per_remesh+1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.timestep)
         adaptSolveTimer += adaptTimer + solverTimer
 
         # Extract fields for next step
@@ -477,7 +477,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             Sn += nEle
             cnt += op.timesteps_per_remesh
             t += op.timesteps_per_remesh * op.timestep
-            av = op.print_to_screen(int(cnt / op.timesteps_per_remesh + 1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.timestep)
+            av = op.adaptation_stats(int(cnt / op.timesteps_per_remesh + 1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.timestep)
             adaptSolveTimer += adaptTimer + solverTimer
 
             # Extract fields for next solver block
@@ -848,7 +848,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
             Sn += nEle
             cnt += op.timesteps_per_remesh
             t += op.timesteps_per_remesh * op.timestep
-            av = op.print_to_screen(int(cnt / op.timesteps_per_remesh + 1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.timestep)
+            av = op.adaptation_stats(int(cnt / op.timesteps_per_remesh + 1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.timestep)
             adaptSolveTimer += adaptTimer + solverTimer
 
             # Extract fields for next solver block

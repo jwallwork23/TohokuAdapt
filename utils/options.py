@@ -41,11 +41,11 @@ class AdaptOptions(FrozenConfigurable):
         return int(self.final_index() / self.timesteps_per_export)  # Final exported timestep of period of interest
 
     def final_mesh_index(self):
-        return int(self.final_index() / self.rm)  # Final mesh index
+        return int(self.final_index() / self.timesteps_per_remesh)  # Final mesh index
 
     def exports_per_remesh(self):
-        assert self.rm % self.timesteps_per_export == 0
-        return int(self.rm / self.timesteps_per_export)
+        assert self.timesteps_per_remesh % self.timesteps_per_export == 0
+        return int(self.timesteps_per_remesh / self.timesteps_per_export)
 
     def indicator(self, mesh):
         P1 = FunctionSpace(mesh, "DG", 1)

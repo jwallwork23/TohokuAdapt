@@ -16,18 +16,18 @@ date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 parser = argparse.ArgumentParser()
 parser.add_argument("t", help="Choose test problem from {'shallow-water', 'rossby-wave'} (default 'tohoku')")
 parser.add_argument("-a", help="Choose adaptive approach from {'hessianBased', 'DWP', 'DWR'} (default 'fixedMesh')")
+parser.add_argument("-b", help="Intersect metrics with bathymetry")
+parser.add_argument("-f", help="Field for Hessian based adaptation, from {'s', 'f', 'b'}.")
+parser.add_argument("-g", help="Gradate metric")
+parser.add_argument("-ho", help="Compute errors and residuals in a higher order space")
+parser.add_argument("-m", help="Output metric data")
+parser.add_argument("-n", help="Number of mesh adaptation steps")
+parser.add_argument("-o", help="Output data")
+parser.add_argument("-r", help="Compute errors and residuals in a refined space")
 parser.add_argument("-low", help="Lower bound for mesh resolution range")
 parser.add_argument("-high", help="Upper bound for mesh resolution range")
 parser.add_argument("-level", help="Single mesh resolution")
-parser.add_argument("-ho", help="Compute errors and residuals in a higher order space")
-parser.add_argument("-r", help="Compute errors and residuals in a refined space")
-parser.add_argument("-b", help="Intersect metrics with bathymetry")
-parser.add_argument("-o", help="Output data")
-parser.add_argument("-m", help="Output metric data")
 parser.add_argument("-regen", help="Regenerate error estimates from saved data")
-parser.add_argument("-n", help="Number of mesh adaptation steps")
-parser.add_argument("-gradate", help="Gradate metric")
-parser.add_argument("-field", help="Field for Hessian based adaptation, from {'s', 'f', 'b'}.")
 parser.add_argument("-snes_view", help="Use PETSc snes view.")
 args = parser.parse_args()
 
@@ -76,13 +76,13 @@ elif mode == 'shallow-water':
     op = GaussianOptions(approach=approach)
 else:
     raise NotImplementedError
-op.gradate = bool(args.gradate)
+op.gradate = bool(args.g)
 op.plot_pvd = bool(args.o)
 op.plot_metric = bool(args.m)
 op.adaptations = 1 if args.n is None else int(args.n)
 op.order_increase = order_increase
 op.adapt_on_bathymetry = bool(args.b)
-op.adapt_field = args.field if args.field is not None else 's'
+op.adapt_field = args.f if args.f is not None else 's'
 if bool(args.snes_view):
     op.solver_parameters['snes_view'] = True
 
