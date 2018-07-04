@@ -119,6 +119,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         adapOpt.simulation_export_time = op.timestep * op.timesteps_per_export
         adapOpt.simulation_end_time = t + op.timestep * (op.timesteps_per_remesh - 0.5)
         adapOpt.timestepper_type = op.timestepper
+        # op.solver_parameters['snes_max_it'] = 1000
         adapOpt.timestepper_options.solver_parameters_tracer = op.solver_parameters
         print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters_tracer)
         adapOpt.timestep = op.timestep
@@ -132,7 +133,6 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         adapOpt.tracer_only = True  # Need use tracer-only branch to use this functionality
         adapOpt.horizontal_diffusivity = diffusivity
         adapOpt.use_lax_friedrichs_tracer = False                   # TODO: This is a temporary fix
-        # adapOpt.use_lax_friedrichs_tracer = True
         adapOpt.tracer_source_2d = source
         adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d, tracer=tracer_2d)
         adapSolver.i_export = int(cnt / op.timesteps_per_export)
@@ -252,10 +252,12 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         # Extract adjoint solutions
         dualTimer = clock()
         tape = get_working_tape()
+        # tape.visualise(open_in_browser=True)
         solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
         N = len(solve_blocks)
         r = N % op.timesteps_per_export                            # Number of extra tape annotations in setup
         for i in range(N - 1, r - 1, -op.timesteps_per_export):
+            print("Adjoint index %d" % i)
             dual.assign(solve_blocks[i].adj_sol)
             with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + indexString(int((i - r) / op.timesteps_per_export)), mode=FILE_CREATE) as saveAdj:
                 saveAdj.store(dual)
