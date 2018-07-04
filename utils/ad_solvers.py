@@ -23,6 +23,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs
     options.simulation_export_time = op.dt * op.ndump
     options.simulation_end_time = op.Tend - 0.5 * op.dt
     options.timestepper_type = op.timestepper
+    options.timestepper_options.solver_parameters_tracer = op.solver_parameters
     print("Using solver parameters %s" % options.timestepper_options.solver_parameters_tracer)
     options.timestep = op.dt
     options.output_directory = op.di()
@@ -118,6 +119,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         adapOpt.simulation_export_time = op.dt * op.ndump
         adapOpt.simulation_end_time = t + op.dt * (op.rm - 0.5)
         adapOpt.timestepper_type = op.timestepper
+        adapOpt.timestepper_options.solver_parameters_tracer = op.solver_parameters
         print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters_tracer)
         adapOpt.timestep = op.dt
         adapOpt.output_directory = op.di()
@@ -218,6 +220,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         options.simulation_export_time = op.dt * op.rm
         options.simulation_end_time = op.Tend - 0.5 * op.dt
         options.timestepper_type = op.timestepper
+        options.timestepper_options.solver_parameters_tracer = op.solver_parameters
         print("Using solver parameters %s" % options.timestepper_options.solver_parameters_tracer)
         options.timestep = op.dt
         options.output_directory = op.di()
@@ -332,6 +335,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             adapOpt.simulation_export_time = op.dt * op.ndump
             adapOpt.simulation_end_time = t + (op.rm - 0.5) * op.dt
             adapOpt.timestepper_type = op.timestepper
+            adapOpt.timestepper_options.solver_parameters_tracer = op.solver_parameters
             print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
             adapOpt.timestep = op.dt
             adapOpt.output_directory = op.di()
@@ -391,6 +395,6 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
 def advect(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
     regen = kwargs.get('regen')
-    solvers = {'fixedMesh': fixedMesh, 'hessianBased': hessianBased}
+    solvers = {'fixedMesh': fixedMesh, 'hessianBased': hessianBased, 'DWP': DWP}
 
     return solvers[op.approach](mesh, u0, eta0, b, BCs, source, diffusivity, regen=regen, op=op)

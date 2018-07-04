@@ -123,6 +123,9 @@ class TohokuOptions(AdaptOptions):
     maxScaling = PositiveFloat(5e5).tag(config=True)  # TODO: Not sure about this
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
     diffusivity = NonNegativeFloat(1e-3, allow_none=True, help="Diffusion coefficient").tag(config=True)
+    solver_parameters = PETScSolverParameters({'ksp_type': 'gmres',
+                                               'pc_type': 'fieldsplit',
+                                               'pc_fieldsplit_type': 'multiplicative'}).tag(config=True)
 
     # Physical parameters
     coriolis = Unicode('sin', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
@@ -171,6 +174,9 @@ class RossbyWaveOptions(AdaptOptions):
     maxScaling = PositiveFloat(5e5).tag(config=True)  # TODO: Not sure about this
     rescaling = PositiveFloat(0.255, help="Scaling parameter for target number of vertices.").tag(config=True)
     # Here ``rescaling`` is adjusted based on using oversized domain to account for periodicity
+    solver_parameters = PETScSolverParameters({'ksp_type': 'gmres',
+                                               'pc_type': 'fieldsplit',
+                                               'pc_fieldsplit_type': 'multiplicative'}).tag(config=True)
 
     # Physical parameters
     coriolis = Unicode('beta', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
@@ -205,6 +211,9 @@ class KelvinWaveOptions(AdaptOptions):
     minNorm = PositiveFloat(1e-4).tag(config=True)  # TODO: Not sure about this
     maxScaling = PositiveFloat(5e5).tag(config=True)  # TODO: Not sure about this
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
+    solver_parameters = PETScSolverParameters({'ksp_type': 'gmres',
+                                               'pc_type': 'fieldsplit',
+                                               'pc_fieldsplit_type': 'multiplicative'}).tag(config=True)
 
     # Physical parameters
     coriolis = Unicode('beta', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
@@ -239,6 +248,9 @@ class GaussianOptions(AdaptOptions):
     minNorm = PositiveFloat(1e-6).tag(config=True)      # TODO: Not sure about this
     maxScaling = PositiveFloat(5e9).tag(config=True)    # TODO: Not sure about this
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
+    solver_parameters = PETScSolverParameters({'ksp_type': 'gmres',
+                                               'pc_type': 'fieldsplit',
+                                               'pc_fieldsplit_type': 'multiplicative'}).tag(config=True)
 
     # Physical parameters
     coriolis = Unicode('beta', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
@@ -276,6 +288,8 @@ class AdvectionOptions(AdaptOptions):
     bell_y0 = Float(5., help="y-coordinate corresponding to tracer source centre").tag(config=True)
     bell_r0 = Float(0.457, help="Radius of tracer source").tag(config=True)
     u_mag = FiredrakeScalarExpression(Constant(1.), help="(Estimate of) maximum advective speed").tag(config=True)
+    solver_parameters = PETScSolverParameters({'ksp_type': 'gmres',
+                                               'pc_type': 'sor'}).tag(config=True)
 
     # Region of importance
     radii = List(trait=Float, default_value=[0.5],

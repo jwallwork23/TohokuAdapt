@@ -124,7 +124,7 @@ class ObjectiveAdvectionCallback(ScalarIntegrationCallback):
         """
         from firedrake_adjoint import assemble
 
-        self.op = AdvectionDiffusionOptions()   # TODO: Make more general
+        self.op = AdvectionOptions()   # TODO: Make more general
         dt = solver_obj.options.timestep
 
         def objectiveAD():

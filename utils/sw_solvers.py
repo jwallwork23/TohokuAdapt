@@ -37,6 +37,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     options.simulation_export_time = op.dt * op.ndump
     options.simulation_end_time = op.Tend - 0.5 * op.dt
     options.timestepper_type = op.timestepper
+    options.timestepper_options.solver_parameters = op.solver_parameters
     print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
     options.timestep = op.dt
     options.output_directory = op.di()
@@ -167,6 +168,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         adapOpt.simulation_export_time = op.dt * op.ndump
         adapOpt.simulation_end_time = t + op.dt * (op.rm - 0.5)
         adapOpt.timestepper_type = op.timestepper
+        adapOpt.timestepper_options.solver_parameters = op.solver_parameters
         print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
         adapOpt.timestep = op.dt
         adapOpt.output_directory = op.di()
@@ -274,7 +276,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     dual_u, dual_e = dual.split()
     dual_u.rename("Adjoint velocity")
     dual_e.rename("Adjoint elevation")
-    epsilon = Function(P1, name="Error indicator")
+    epsilon = Function(P1, name='error_2d')
     epsilon_ = Function(P1)
 
     # Initialise parameters and counters
@@ -301,6 +303,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         options.simulation_export_time = op.dt * op.rm
         options.simulation_end_time = op.Tend - 0.5 * op.dt
         options.timestepper_type = op.timestepper
+        options.timestepper_options.solver_parameters = op.solver_parameters
         print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
         options.timestep = op.dt
         options.output_directory = op.di()
@@ -422,6 +425,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             adapOpt.simulation_export_time = op.dt * op.ndump
             adapOpt.simulation_end_time = t + (op.rm - 0.5) * op.dt
             adapOpt.timestepper_type = op.timestepper
+            adapOpt.timestepper_options.solver_parameters = op.solver_parameters
             print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
             adapOpt.timestep = op.dt
             adapOpt.output_directory = op.di()
@@ -533,10 +537,10 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
         Ve = op.mixedSpace(mesh, enrich=True)
         duale = Function(Ve)
         duale_u, duale_e = duale.split()
-        epsilon = Function(P1, name="Error indicator")
+        epsilon = Function(P1, name='error_2d')
     else:                                   # Copy standard variables to mimic enriched space labels
         Ve = V
-        epsilon = Function(P1, name="Error indicator")
+        epsilon = Function(P1, name='error_2d')
     v = TestFunction(FunctionSpace(mesh, "DG", 0)) # For forming error indicators
     rho = Function(Ve)
     rho_u, rho_e = rho.split()
@@ -574,6 +578,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
         options.simulation_export_time = op.dt * op.ndump
         options.simulation_end_time = (op.ndump - 0.5) * op.dt
         options.timestepper_type = op.timestepper
+        options.timestepper_options.solver_parameters_tracer = op.solver_parameters
         print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
         options.timestep = op.dt
         options.output_directory = op.di()   # Need this for residual callback
@@ -791,6 +796,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
             adapOpt.simulation_export_time = op.dt * op.ndump
             adapOpt.simulation_end_time = t + (op.rm - 0.5) * op.dt
             adapOpt.timestepper_type = op.timestepper
+            adapOpt.timestepper_options.solver_parameters = op.solver_parameters
             print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
             adapOpt.timestep = op.dt
             adapOpt.output_directory = op.di()

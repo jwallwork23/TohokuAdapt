@@ -28,6 +28,7 @@ parser.add_argument("-regen", help="Regenerate error estimates from saved data")
 parser.add_argument("-nAdapt", help="Number of mesh adaptation steps")
 parser.add_argument("-gradate", help="Gradate metric")
 parser.add_argument("-field", help="Field for Hessian based adaptation, from {'s', 'f', 'b'}.")
+parser.add_argument("-snes_view", help="Use PETSc snes view.")
 args = parser.parse_args()
 
 approach = args.a
@@ -60,6 +61,8 @@ op.plotPVD = bool(args.o)
 op.plotMetric = bool(args.m)
 op.nAdapt = 1 if args.nAdapt is None else int(args.nAdapt)
 op.orderChange = orderChange
+if bool(args.snes_view):
+    op.solver_parameters['snes_view'] = True
 
 # Get data and save to disk
 if args.low is not None or args.high is not None:
