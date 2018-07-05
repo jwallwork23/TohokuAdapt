@@ -98,7 +98,7 @@ def hessianBased(startRes, **kwargs):
         cb1 = SWCallback(adapSolver)
         cb1.op = op
         if cnt != 0:
-            cb1.objective_value = quantities['Integrand']
+            cb1.objective_value = quantities['Integrand']   # TODO: This won't work - syntax has changed. Need extract from hdf5
         adapSolver.add_callback(cb1, 'timestep')
         adapSolver.bnd_functions['shallow_water'] = BCs
         solverTimer = clock()

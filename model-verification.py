@@ -1,11 +1,15 @@
 from thetis import *
 from firedrake.petsc import PETSc
+from thetis.callback import DetectorsCallback
 
 from time import clock
+import numpy as np
+import h5py
 
-from utils.callbacks import SWCallback, P02Callback, P06Callback
+from utils.callbacks import SWCallback
 from utils.options import TohokuOptions
 from utils.setup import problemDomain
+from utils.timeseries import gaugeTV
 
 
 def solverSW(mesh, u0, eta0, b, BCs={}, f=None, op=TohokuOptions()):
@@ -33,22 +37,29 @@ def solverSW(mesh, u0, eta0, b, BCs={}, f=None, op=TohokuOptions()):
     cb1 = SWCallback(solver_obj)        # Objective functional computation error
     cb1.op = op
     solver_obj.add_callback(cb1, 'timestep')
-    cb2 = P02Callback(solver_obj)           # Gauge timeseries error P02
+    gauges = ["P02", "P06"]
+    cb2 = DetectorsCallback(solver_obj,
+                            [op.gauge_coordinates(g) for g in gauges],
+                            ['elev_2d' for g in gauges],
+                            'timeseries',
+                            gauges,
+                            export_to_hdf5=True)
     solver_obj.add_callback(cb2, 'timestep')
-    cb3 = P06Callback(solver_obj)           # Gauge timeseries error P06
-    solver_obj.add_callback(cb3, 'timestep')
 
     # Run simulation and extract quantities
     timer = clock()
     solver_obj.iterate()
     timer = clock() - timer
+
     quantities = {}
-    quantities["J_h"] = cb1.quadrature()
-    quantities["Integrand"] = cb1.getVals()
-    quantities["TV P02"] = cb2.totalVariation()
-    quantities["P02"] = cb2.getVals()
-    quantities["TV P06"] = cb3.totalVariation()
-    quantities["P06"] = cb3.getVals()
+    quantities["J_h"] = cb1.get_val()
+    hf = h5py.File(op.directory() + 'diagnostic_timeseries.hdf5', 'r')
+    for g in gauges:
+        quantities[g] = np.array(hf.get(g))
+    hf.close()
+    quantities["Integrand"] = cb1.getVals() # TODO: This won't work
+    quantities["TV P02"] = gaugeTV(quantities["P02"], gauge="P02")
+    quantities["TV P06"] = gaugeTV(quantities["P06"], gauge="P06")
     quantities["Element count"] = mesh.num_cells()
     quantities["Timer"] = timer
 

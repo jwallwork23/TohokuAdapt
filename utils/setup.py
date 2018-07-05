@@ -280,8 +280,7 @@ def problemDomain(level=0, mesh=None, b=None, op=TohokuOptions()):
         b = Function(P1).assign(1.)
         u0 = Function(VectorFunctionSpace(mesh, "CG", 1)).interpolate(Expression([1., 0.]))
         eta0 = Function(P1)
-        BCs = {}
-        BCs[1] = {'tracer': Constant(0.)}
+        BCs = {'shallow water': {}, 'tracer': {1: {'value': Constant(0.)}}}
         diffusivity = Function(P1).assign(op.diffusivity)
 
     if newmesh:

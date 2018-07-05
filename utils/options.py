@@ -146,7 +146,7 @@ class TohokuOptions(AdaptOptions):
         :param gauge: Tide / pressure gauge name, from {P02, P06, 801, 802, 803, 804, 806}.
         :return: UTM coordinate for chosen gauge.
         """
-        E, N = from_latlon(self.lat[gauge], self.lon[gauge], force_zone_number=54)
+        E, N = from_latlon(self.lat(gauge), self.lon(gauge), force_zone_number=54)
         return E, N
 
     def meshSize(self, i):
@@ -279,7 +279,7 @@ class AdvectionOptions(AdaptOptions):
     max_scaling = PositiveFloat(5e5).tag(config=True)  # TODO: Not sure about this
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
     diffusivity = NonNegativeFloat(0.1, allow_none=True, help="Diffusion coefficient").tag(config=True)
-    bell_x0 = Float(1.5, help="x-coordinate corresponding to tracer source centre").tag(config=True)
+    bell_x0 = Float(0.5, help="x-coordinate corresponding to tracer source centre").tag(config=True)
     bell_y0 = Float(5., help="y-coordinate corresponding to tracer source centre").tag(config=True)
     bell_r0 = Float(0.457, help="Radius of tracer source").tag(config=True)
     u_mag = FiredrakeScalarExpression(Constant(1.), help="(Estimate of) maximum advective speed").tag(config=True)

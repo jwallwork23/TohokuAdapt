@@ -1,13 +1,16 @@
 from thetis import *
+from thetis.callback import DetectorsCallback
 
 import numpy as np
 from time import clock
+import h5py
 
 from utils.adaptivity import *
 from utils.callbacks import *
 from utils.interpolation import interp, mixedPairInterp
-from utils.setup import problemDomain, RossbyWaveSolution
 from utils.misc import indexString, peakAndDistance, bdyRegion
+from utils.setup import problemDomain, RossbyWaveSolution
+from utils.timeseries import gaugeTV
 
 
 __all__ = ["tsunami"]
@@ -47,10 +50,14 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     cb1 = SWCallback(solver_obj)
     cb1.op = op
     if op.mode == 'tohoku':
-        cb2 = P02Callback(solver_obj)
-        cb3 = P06Callback(solver_obj)
+        gauges = ["P02", "P06"]
+        cb2 = DetectorsCallback(solver_obj,
+                                [op.gauge_coordinates(g) for g in gauges],
+                                ['elev_2d' for g in gauges],
+                                'timeseries',
+                                gauges,
+                                export_to_hdf5=True)
         solver_obj.add_callback(cb2, 'timestep')
-        solver_obj.add_callback(cb3, 'timestep')
     solver_obj.add_callback(cb1, 'timestep')
     solver_obj.bnd_functions['shallow_water'] = BCs
 
@@ -61,10 +68,12 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     solverTimer = clock() - solverTimer
     quantities['J_h'] = cb1.get_val()          # Evaluate objective functional
     if op.mode == 'tohoku':
-        quantities['TV P02'] = cb2.totalVariation()
-        quantities['TV P06'] = cb3.totalVariation()
-        quantities['P02'] = cb2.get_vals()
-        quantities['P06'] = cb3.get_vals()
+        hf = h5py.File(op.directory() + 'diagnostic_timeseries.hdf5', 'r')
+        for g in gauges:
+            quantities[g] = np.array(hf.get(g))
+        hf.close()
+        quantities["TV P02"] = gaugeTV(quantities["P02"], gauge="P02")  # TODO: Generalise as above
+        quantities["TV P06"] = gaugeTV(quantities["P06"], gauge="P06")
 
     # Measure error using metrics, as in Huang et al.     # TODO: Parallelise this (and above)
     if op.mode == 'rossby-wave':
@@ -187,7 +196,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         cb1 = SWCallback(adapSolver)
         cb1.op = op
         if op.mode == 'tohoku':
-            cb2 = P02Callback(adapSolver)
+            cb2 = P02Callback(adapSolver)   # TODO: Replace this with DetectorsCallback as above
             cb3 = P06Callback(adapSolver)
             if cnt == 0:
                 initP02 = cb2.init_value
@@ -444,7 +453,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             cb1 = SWCallback(adapSolver)
             cb1.op = op
             if op.mode == 'tohoku':
-                cb2 = P02Callback(adapSolver)
+                cb2 = P02Callback(adapSolver)   # TODO: Replace this with DetectorsCallback as above
                 cb3 = P06Callback(adapSolver)
                 if cnt == 0:
                     initP02 = cb2.init_value
@@ -815,7 +824,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
             cb1 = SWCallback(adapSolver)
             cb1.op = op
             if op.mode == 'tohoku':
-                cb2 = P02Callback(adapSolver)
+                cb2 = P02Callback(adapSolver)   # TODO: Replace this with DetectorsCallback as above
                 cb3 = P06Callback(adapSolver)
                 if cnt == 0:
                     initP02 = cb2.init_value

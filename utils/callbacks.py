@@ -1,5 +1,5 @@
 from thetis_adjoint import *
-from thetis.callback import DiagnosticCallback, ScalarIntegrationCallback
+from thetis.callback import DiagnosticCallback, AccumulatorCallback
 
 from .options import TohokuOptions, AdvectionOptions
 from .timeseries import gaugeTV
@@ -11,7 +11,7 @@ __all__ = ["SWCallback", "ObjectiveSWCallback",
            "ResidualCallback", "EnrichedErrorCallback", "HigherOrderResidualCallback"]
 
 
-class SWCallback(ScalarIntegrationCallback):
+class SWCallback(AccumulatorCallback):
     """Integrates objective functional."""
     name = 'SW objective functional'
 
@@ -45,7 +45,7 @@ class SWCallback(ScalarIntegrationCallback):
         super(SWCallback, self).__init__(objectiveSW, solver_obj, **kwargs)
 
 
-class AdvectionCallback(ScalarIntegrationCallback):
+class AdvectionCallback(AccumulatorCallback):
     """Integrates objective functional."""
     name = 'advection objective functional'
 
@@ -78,7 +78,7 @@ class AdvectionCallback(ScalarIntegrationCallback):
         super(AdvectionCallback, self).__init__(objectiveAD, solver_obj, **kwargs)
 
 
-class ObjectiveSWCallback(ScalarIntegrationCallback):
+class ObjectiveSWCallback(AccumulatorCallback):
     """Writes objective functional values to tape."""
     name = 'SW objective tape'
 
@@ -113,7 +113,7 @@ class ObjectiveSWCallback(ScalarIntegrationCallback):
         super(ObjectiveSWCallback, self).__init__(objectiveSW, solver_obj, **kwargs)
 
 
-class ObjectiveAdvectionCallback(ScalarIntegrationCallback):
+class ObjectiveAdvectionCallback(AccumulatorCallback):
     """Writes objective functional values to tape."""
     name = 'advection objective tape'
 
