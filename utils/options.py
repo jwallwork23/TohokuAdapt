@@ -272,7 +272,7 @@ class AdvectionOptions(AdaptOptions):
     target_vertices = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
     timestep = PositiveFloat(0.1, help="Timestep").tag(config=True)
     start_time = PositiveFloat(10., help="Start time of period of interest").tag(config=True)
-    end_time = PositiveFloat(50., help="End time of period of interest").tag(config=True)
+    end_time = PositiveFloat(60., help="End time of period of interest").tag(config=True)
     h_min = PositiveFloat(1e-4, help="Minimum element size").tag(config=True)
     h_max = PositiveFloat(5., help="Maximum element size").tag(config=True)
     min_norm = PositiveFloat(1e-5).tag(config=True)  # TODO: Not sure about this

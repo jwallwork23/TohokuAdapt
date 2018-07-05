@@ -6,7 +6,7 @@ from time import clock
 import h5py
 
 from utils.adaptivity import *
-from utils.callbacks import *
+from utils.callbacks import SWCallback, ObjectiveSWCallback
 from utils.interpolation import interp, mixedPairInterp
 from utils.misc import indexString, peakAndDistance, bdyRegion
 from utils.setup import problemDomain, RossbyWaveSolution
@@ -29,6 +29,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.end_time).split()[1])
 
     # Initialise solver
+    gauges = ["P02", "P06"]
     solver_obj = solver2d.FlowSolver2d(mesh, b)
     options = solver_obj.options
     options.element_family = op.family
@@ -50,10 +51,9 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     cb1 = SWCallback(solver_obj)
     cb1.op = op
     if op.mode == 'tohoku':
-        gauges = ["P02", "P06"]
         cb2 = DetectorsCallback(solver_obj,
                                 [op.gauge_coordinates(g) for g in gauges],
-                                ['elev_2d' for g in gauges],
+                                ['elev_2d'],
                                 'timeseries',
                                 gauges,
                                 export_to_hdf5=True)
@@ -72,8 +72,6 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         for g in gauges:
             quantities[g] = np.array(hf.get(g))
         hf.close()
-        quantities["TV P02"] = gaugeTV(quantities["P02"], gauge="P02")  # TODO: Generalise as above
-        quantities["TV P06"] = gaugeTV(quantities["P06"], gauge="P06")
 
     # Measure error using metrics, as in Huang et al.     # TODO: Parallelise this (and above)
     if op.mode == 'rossby-wave':
@@ -87,6 +85,8 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     quantities['meanElements'] = mesh.num_cells()
     quantities['solverTimer'] = solverTimer
     quantities['adaptSolveTimer'] = 0.
+    for g in gauges:
+        quantities["TV "+g] = gaugeTV(quantities[g], gauge=g)
 
     return quantities
 
@@ -118,6 +118,9 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
 
     adaptSolveTimer = 0.
     quantities = {}
+    gauges = ["P02", "P06"]
+    for g in gauges:
+        quantities[g] = ()
     while cnt < op.final_index():
         adaptTimer = clock()
         P1 = FunctionSpace(mesh, "CG", 1)
@@ -195,33 +198,27 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         # Establish callbacks and iterate
         cb1 = SWCallback(adapSolver)
         cb1.op = op
-        if op.mode == 'tohoku':
-            cb2 = P02Callback(adapSolver)   # TODO: Replace this with DetectorsCallback as above
-            cb3 = P06Callback(adapSolver)
-            if cnt == 0:
-                initP02 = cb2.init_value
-                initP06 = cb3.init_value
         if cnt != 0:
             cb1.old_value = quantities['J_h']
-            if op.mode == 'tohoku':
-                cb2.gauge_values = quantities['P02']
-                cb2.init_value = initP02
-                cb3.gauge_values = quantities['P06']
-                cb3.init_value = initP06
         adapSolver.add_callback(cb1, 'timestep')
         if op.mode == 'tohoku':
+            cb2 = DetectorsCallback(adapSolver,
+                                    [op.gauge_coordinates(g) for g in gauges],
+                                    ['elev_2d'],
+                                    'timeseries',
+                                    gauges,
+                                    export_to_hdf5=True)
             adapSolver.add_callback(cb2, 'timestep')
-            adapSolver.add_callback(cb3, 'timestep')
         adapSolver.bnd_functions['shallow_water'] = BCs
         solverTimer = clock()
         adapSolver.iterate()
         solverTimer = clock() - solverTimer
         quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
         if op.mode == 'tohoku':
-            quantities['P02'] = cb2.get_vals()
-            quantities['P06'] = cb3.get_vals()
-            quantities['TV P02'] = cb2.totalVariation()
-            quantities['TV P06'] = cb3.totalVariation()
+            hf = h5py.File(op.directory() + 'diagnostic_timeseries.hdf5', 'r')
+            for g in gauges:
+                quantities[g] += tuple(hf.get(g))
+            hf.close()
 
         # Get mesh stats
         nEle = mesh.num_cells()
@@ -246,6 +243,8 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     quantities['meanElements'] = av
     quantities['solverTimer'] = adaptSolveTimer
     quantities['adaptSolveTimer'] = adaptSolveTimer
+    for g in gauges:
+        quantities["TV "+g] = gaugeTV(quantities[g], gauge=g)
 
     return quantities
 
@@ -393,6 +392,9 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         elev_2d.interpolate(eta0)
         uv_2d.interpolate(u0)
         quantities = {}
+        gauges = ["P02", "P06"]
+        for g in gauges:
+            quantities[g] = ()
         bdy = 200 if op.mode == 'tohoku' else 'on_boundary'
         while cnt < op.final_index():
             adaptTimer = clock()
@@ -452,33 +454,27 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             # Evaluate callbacks and iterate
             cb1 = SWCallback(adapSolver)
             cb1.op = op
-            if op.mode == 'tohoku':
-                cb2 = P02Callback(adapSolver)   # TODO: Replace this with DetectorsCallback as above
-                cb3 = P06Callback(adapSolver)
-                if cnt == 0:
-                    initP02 = cb2.init_value
-                    initP06 = cb3.init_value
             if cnt != 0:
                 cb1.old_value = quantities['J_h']
-                if op.mode == 'tohoku':
-                    cb2.gauge_values = quantities['P02']
-                    cb2.init_value = initP02
-                    cb3.gauge_values = quantities['P06']
-                    cb3.init_value = initP06
             adapSolver.add_callback(cb1, 'timestep')
             if op.mode == 'tohoku':
+                cb2 = DetectorsCallback(adapSolver,
+                                        [op.gauge_coordinates(g) for g in gauges],
+                                        ['elev_2d'],
+                                        'timeseries',
+                                        gauges,
+                                        export_to_hdf5=True)
                 adapSolver.add_callback(cb2, 'timestep')
-                adapSolver.add_callback(cb3, 'timestep')
             adapSolver.bnd_functions['shallow_water'] = BCs
             solverTimer = clock()
             adapSolver.iterate()
             solverTimer = clock() - solverTimer
             quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
             if op.mode == 'tohoku':
-                quantities['P02'] = cb2.get_vals()
-                quantities['P06'] = cb3.get_vals()
-                quantities['TV P02'] = cb2.totalVariation()
-                quantities['TV P06'] = cb3.totalVariation()
+                hf = h5py.File(op.directory() + 'diagnostic_timeseries.hdf5', 'r')
+                for g in gauges:
+                    quantities[g] += tuple(hf.get(g))
+                hf.close()
 
             # Get mesh stats
             nEle = mesh.num_cells()
@@ -506,6 +502,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         quantities['meanElements'] = av
         quantities['solverTimer'] = totalTimer
         quantities['adaptSolveTimer'] = adaptSolveTimer
+        for g in gauges:
+            quantities["TV " + g] = gaugeTV(quantities[g], gauge=g)
 
         return quantities
 
@@ -755,6 +753,9 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
         elev_2d.interpolate(eta0)
         uv_2d.interpolate(u0)
         quantities = {}
+        gauges = ["P02", "P06"]
+        for g in gauges:
+            quantities[g] = ()
         bdy = 200 if op.mode == 'tohoku' else 'on_boundary'
         # bdy = 'on_boundary'
         while cnt < op.final_index():
@@ -823,33 +824,27 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
             # Evaluate callbacks and iterate
             cb1 = SWCallback(adapSolver)
             cb1.op = op
-            if op.mode == 'tohoku':
-                cb2 = P02Callback(adapSolver)   # TODO: Replace this with DetectorsCallback as above
-                cb3 = P06Callback(adapSolver)
-                if cnt == 0:
-                    initP02 = cb2.init_value
-                    initP06 = cb3.init_value
             if cnt != 0:
                 cb1.old_value = quantities['J_h']
-                if op.mode == 'tohoku':
-                    cb2.gauge_values = quantities['P02']
-                    cb2.init_value = initP02
-                    cb3.gauge_values = quantities['P06']
-                    cb3.init_value = initP06
             adapSolver.add_callback(cb1, 'timestep')
             if op.mode == 'tohoku':
+                cb2 = DetectorsCallback(adapSolver,
+                                        [op.gauge_coordinates(g) for g in gauges],
+                                        ['elev_2d'],
+                                        'timeseries',
+                                        gauges,
+                                        export_to_hdf5=True)
                 adapSolver.add_callback(cb2, 'timestep')
-                adapSolver.add_callback(cb3, 'timestep')
             adapSolver.bnd_functions['shallow_water'] = BCs
             solverTimer = clock()
             adapSolver.iterate()
             solverTimer = clock() - solverTimer
             quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
             if op.mode == 'tohoku':
-                quantities['P02'] = cb2.get_vals()
-                quantities['P06'] = cb3.get_vals()
-                quantities['TV P02'] = cb2.totalVariation()
-                quantities['TV P06'] = cb3.totalVariation()
+                hf = h5py.File(op.directory() + 'diagnostic_timeseries.hdf5', 'r')
+                for g in gauges:
+                    quantities[g] += tuple(hf.get(g))
+                hf.close()
 
             # Get mesh stats
             nEle = mesh.num_cells()
@@ -877,6 +872,8 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
         quantities['meanElements'] = av
         quantities['solverTimer'] = totalTimer
         quantities['adaptSolveTimer'] = adaptSolveTimer
+        for g in gauges:
+            quantities["TV " + g] = gaugeTV(quantities[g], gauge=g)
 
         return quantities
 

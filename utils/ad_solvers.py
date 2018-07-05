@@ -55,6 +55,8 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs
     quantities['solverTimer'] = solverTimer
     quantities['adaptSolveTimer'] = 0.
 
+    # TODO: Extract HDF5 from t=30 and t=60 to take timeseries
+
     # tracer_2d = solver_obj.fields.tracer_2d
     # print(tracer_2d.function_space().ufl_element().family(), tracer_2d.function_space().ufl_element().degree())
 
