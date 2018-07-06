@@ -3,7 +3,7 @@ from thetis import *
 from utils.options import TohokuOptions
 
 
-__all__ = ["sw_strong_residual", "explicit_error", "flux_jump_error"]
+__all__ = ["sw_strong_residual", "explicit_error", "flux_jump_error", "difference_quotient_estimator"]
 
 
 def flux_jump_error(q, v):
@@ -154,7 +154,8 @@ def difference_quotient_estimator(solver_obj, explicit_term, dual, dual_, op=Toh
     #     b_res = ad_boundary_residual(solver_obj)
     # else:
     bres0_a, bres1_a, bres2_a = sw_boundary_residual(solver_obj, dual, dual_)
+    adjoint_term = bres0_a * bres0_a + bres1_a * bres1_a + bres2_a * bres2_a
     dq = Function(P0)
-    dq.interpolate(assemble(v * explicit_term (bres0_a * bres0_a + bres1_a * bres1_a + bres2_a * bres2_a) / sqrt(h) * dx))
+    dq.interpolate(assemble(v * explicit_term * adjoint_term / sqrt(h) * dx))
 
     return dq

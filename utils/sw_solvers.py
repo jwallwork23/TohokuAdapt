@@ -7,7 +7,7 @@ import h5py
 
 from utils.adaptivity import *
 from utils.callbacks import SWCallback, ObjectiveSWCallback
-from utils.error_estimators import explicit_error
+from utils.error_estimators import difference_quotient_estimator, explicit_error
 from utils.interpolation import interp, mixedPairInterp
 from utils.misc import indexString, peakAndDistance, bdyRegion
 from utils.setup import problemDomain, RossbyWaveSolution
@@ -86,8 +86,9 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     quantities['meanElements'] = mesh.num_cells()
     quantities['solverTimer'] = solverTimer
     quantities['adaptSolveTimer'] = 0.
-    for g in gauges:
-        quantities["TV "+g] = gaugeTV(quantities[g], gauge=g)
+    if op.mode == 'tohoku':
+        for g in gauges:
+            quantities["TV "+g] = gaugeTV(quantities[g], gauge=g)
 
     return quantities
 
@@ -244,8 +245,9 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     quantities['meanElements'] = av
     quantities['solverTimer'] = adaptSolveTimer
     quantities['adaptSolveTimer'] = adaptSolveTimer
-    for g in gauges:
-        quantities["TV "+g] = gaugeTV(quantities[g], gauge=g)
+    if op.mode == 'tohoku':
+        for g in gauges:
+            quantities["TV "+g] = gaugeTV(quantities[g], gauge=g)
 
     return quantities
 
@@ -503,8 +505,9 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         quantities['meanElements'] = av
         quantities['solverTimer'] = totalTimer
         quantities['adaptSolveTimer'] = adaptSolveTimer
-        for g in gauges:
-            quantities["TV " + g] = gaugeTV(quantities[g], gauge=g)
+        if op.mode == 'tohoku':
+            for g in gauges:
+                quantities["TV " + g] = gaugeTV(quantities[g], gauge=g)
 
         return quantities
 
@@ -538,13 +541,13 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
     # Define Functions relating to a posteriori DWR error estimator
     dual = Function(V)
     dual_u, dual_e = dual.split()
-    dual_u.rename("Adjoint velocity")
-    dual_e.rename("Adjoint elevation")
+    dual_u.rename('Adjoint velocity')
+    dual_e.rename('Adjoint elevation')
+    epsilon = Function(P1, name='error_2d')
 
-    if op.order_increase:   # TODO
+    if op.order_increase:
         duale = Function(op.mixed_space(mesh, enrich=True))
         duale_u, duale_e = duale.split()
-        epsilon = Function(P1, name='error_2d')
 
     # Initialise parameters and counters
     nEle = mesh.num_cells()
@@ -820,8 +823,9 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
         quantities['meanElements'] = av
         quantities['solverTimer'] = totalTimer
         quantities['adaptSolveTimer'] = adaptSolveTimer
-        for g in gauges:
-            quantities["TV " + g] = gaugeTV(quantities[g], gauge=g)
+        if op.mode == 'tohoku':
+            for g in gauges:
+                quantities["TV " + g] = gaugeTV(quantities[g], gauge=g)
 
         return quantities
 
