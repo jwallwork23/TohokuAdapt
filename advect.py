@@ -16,11 +16,9 @@ date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 parser = argparse.ArgumentParser()
 parser.add_argument("-a", help="Choose adaptive approach from {'hessianBased', 'DWP', 'DWR'} (default 'fixedMesh')")
 parser.add_argument("-g", help="Gradate metric")
-parser.add_argument("-ho", help="Compute errors and residuals in a higher order space")
 parser.add_argument("-m", help="Output metric data")
 parser.add_argument("-n", help="Number of mesh adaptation steps")
 parser.add_argument("-o", help="Output data")
-parser.add_argument("-r", help="Compute errors and residuals in a refined space")
 parser.add_argument("-low", help="Lower bound for mesh resolution range")
 parser.add_argument("-high", help="Upper bound for mesh resolution range")
 parser.add_argument("-level", help="Single mesh resolution")
@@ -33,20 +31,7 @@ if approach is None:
     approach = 'fixedMesh'
 else:
     assert approach in ('fixedMesh', 'hessianBased', 'DWP', 'DWR')
-order_increase = 0
-
-# Establish filenames
-filename = 'outdata/advection-diffusion/' + approach
-if args.ho:
-    assert not args.r
-    order_increase = 1
-    filename += '_ho'
-elif args.r:
-    assert not args.ho
-    refinedSpace = True
-    filename += '_r'
-filename += '_' + date
-errorFile = open(filename + '.txt', 'w+')
+errorFile = open('outdata/advection-diffusion/' + approach + '_' + date + '.txt', 'w+')
 
 # Set parameters
 op = AdvectionOptions(approach=approach)
@@ -54,7 +39,6 @@ op.gradate = bool(args.g)
 op.plot_pvd = bool(args.o)
 op.plot_metric = bool(args.m)
 op.adaptations = 1 if args.n is None else int(args.n)
-op.order_increase = order_increase
 if bool(args.snes_view):
     op.solver_parameters['snes_view'] = True
 

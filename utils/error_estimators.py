@@ -1,7 +1,9 @@
 from thetis import *
 
+from utils.options import TohokuOptions
 
-__all__ = ["sw_strong_residual", "interelement_term", "explicit_error", "flux_jump_error"]
+
+__all__ = ["sw_strong_residual", "explicit_error", "flux_jump_error"]
 
 
 def interelement_term(v, n=None):
@@ -64,41 +66,18 @@ def flux_jump_error(q, v):
     return assemble(v * h * (j0 * j0 + j1 * j1 + j2 * j2) * dx)
 
 
-# TODO: Integrate the below into Thetis
-
-def sw_strong_residual(solver_obj, UV_new, ELEV_new, UV_old, ELEV_old, Ve=None, op=TohokuOptions()):
-    """
-    Construct the strong residual for the semi-discrete shallow water equations at the current timestep,
-    using Crank-Nicolson timestepping.
-
-    :param op: option parameters object.
-    :return: two components of strong residual on element interiors, along with the element boundary residual.
-    """
+def sw_interior_residual(solver_obj, op=TohokuOptions()):
 
     # Collect fields and parameters
     nu = solver_obj.fields.get('viscosity_h')
     Dt = Constant(solver_obj.options.timestep)
     g = physical_constants['g_grav']
-
-    # Enrich FE space (if appropriate)
-    if op.order_increase:
-        uv_old, elev_old = Function(Ve).split()
-        uv_new, elev_new = Function(Ve).split()
-        uv_old.interpolate(UV_old)
-        uv_new.interpolate(UV_new)
-        elev_old.interpolate(ELEV_old)
-        elev_new.interpolate(ELEV_new)
-        b = solver_obj.fields.bathymetry_2d
-        f = solver_obj.options.coriolis_frequency
-    else:
-        uv_old = UV_old
-        uv_new = UV_new
-        elev_old = ELEV_old
-        elev_new = ELEV_new
-        b = solver_obj.fields.bathymetry_2d
-        f = solver_obj.options.coriolis_frequency
-    uv_2d = 0.5 * (uv_old + uv_new)         # Use Crank-Nicolson timestepping so that we isolate errors as being
-    elev_2d = 0.5 * (elev_old + elev_new)   # related only to the spatial discretisation
+    uv_old, elev_old = solver_obj.fields_old.solution_old().split()
+    uv_new, elev_new = solver_obj.fields.solution_2d.split()
+    b = solver_obj.fields.bathymetry_2d
+    f = solver_obj.options.coriolis_frequency
+    uv_2d = 0.5 * (uv_old + uv_new)  # Use Crank-Nicolson timestepping so that we isolate errors as being
+    elev_2d = 0.5 * (elev_old + elev_new)  # related only to the spatial discretisation
     H = b + elev_2d
 
     # Momentum equation residual on element interiors
@@ -118,6 +97,20 @@ def sw_strong_residual(solver_obj, UV_new, ELEV_new, UV_old, ELEV_old, Ve=None, 
     # Continuity equation residual on element interiors
     res_e = (elev_new - elev_old) / Dt + div(H * uv_2d)
 
+    return res_u, res_e
+
+
+def sw_boundary_residual(solver_obj, op=TohokuOptions()):
+
+    # Collect fields and parameters
+    g = physical_constants['g_grav']
+    uv_old, elev_old = solver_obj.fields_old.solution_old().split()
+    uv_new, elev_new = solver_obj.fields.solution_2d.split()
+    b = solver_obj.fields.bathymetry_2d
+    uv_2d = 0.5 * (uv_old + uv_new)  # Use Crank-Nicolson timestepping so that we isolate errors as being
+    elev_2d = 0.5 * (elev_old + elev_new)  # related only to the spatial discretisation
+    H = b + elev_2d
+
     # Element boundary residual
     mesh = uv_old.function_space().mesh()
     v = TestFunction(FunctionSpace(mesh, "DG", 0))
@@ -125,7 +118,21 @@ def sw_strong_residual(solver_obj, UV_new, ELEV_new, UV_old, ELEV_old, Ve=None, 
     # bres_u1 = assemble(jump(Constant(0.5) * g * v * elev_2d, n=n[0]) * dS)
     # bres_u2 = assemble(jump(Constant(0.5) * g * v * elev_2d, n=n[1]) * dS)
     # bres_u = assemble(jump(Constant(0.5) * g * v * elev_2d, n=n) * dS)
-    bres_u = Function(VectorFunctionSpace(mesh, "DG", 1))       # TODO: Fix this (Can't integrate vector field)
-    bres_e = assemble(jump(Constant(0.5) * v * H * uv_2d, n=n) * dS)    # This gives a scalar P0 field
+    bres_u = Function(VectorFunctionSpace(mesh, "DG", 1))  # TODO: Fix this (Can't integrate vector field)
+    bres_e = assemble(jump(Constant(0.5) * v * H * uv_2d, n=n) * dS)  # This gives a scalar P0 field
+
+    return bres_u, bres_e
+
+
+def sw_strong_residual(solver_obj, op=TohokuOptions()):     # TODO: Integrate strong residual machinery into Thetis
+    """
+    Construct the strong residual for the semi-discrete shallow water equations at the current timestep,
+    using Crank-Nicolson timestepping.
+
+    :param op: option parameters object.
+    :return: two components of strong residual on element interiors, along with the element boundary residual.
+    """
+    res_u, res_e = sw_interior_residual(solver_obj, op=op)
+    bres_u, bres_e = sw_boundary_residual(solver_obj, op=op)
 
     return res_u, res_e, bres_u, bres_e

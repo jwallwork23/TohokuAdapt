@@ -7,7 +7,7 @@ import h5py
 
 from utils.adaptivity import *
 from utils.callbacks import SWCallback, ObjectiveSWCallback
-from utils.error_estimators import sw_strong_residual
+from utils.error_
 from utils.interpolation import interp, mixedPairInterp
 from utils.misc import indexString, peakAndDistance, bdyRegion
 from utils.setup import problemDomain, RossbyWaveSolution

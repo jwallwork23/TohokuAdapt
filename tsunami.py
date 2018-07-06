@@ -23,7 +23,6 @@ parser.add_argument("-ho", help="Compute errors and residuals in a higher order 
 parser.add_argument("-m", help="Output metric data")
 parser.add_argument("-n", help="Number of mesh adaptation steps")
 parser.add_argument("-o", help="Output data")
-parser.add_argument("-r", help="Compute errors and residuals in a refined space")
 parser.add_argument("-low", help="Lower bound for mesh resolution range")
 parser.add_argument("-high", help="Upper bound for mesh resolution range")
 parser.add_argument("-level", help="Single mesh resolution")
@@ -40,18 +39,13 @@ if args.t is None:
     mode = 'tohoku'
 else:
     mode = args.t
-order_increase = 0
+order_increase = False
 
 # Establish filenames
 filename = 'outdata/' + mode + '/' + approach
-if args.ho:
-    assert not args.r
-    order_increase = 1
+if args.ho:     # TODO: Difference quotient as alternative
+    order_increase = True
     filename += '_ho'
-elif args.r:
-    assert not args.ho
-    refinedSpace = True
-    filename += '_r'
 if args.b:
     assert approach == 'hessianBased'
     filename += '_b'
