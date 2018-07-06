@@ -1,9 +1,7 @@
 from thetis import *
 
-from utils.options import TohokuOptions
 
-
-__all__ = ["sw_strong_residual", "explicit_error", "flux_jump_error", "difference_quotient_estimator"]
+__all__ = ["explicit_error", "flux_jump_error", "difference_quotient_estimator"]
 
 
 def flux_jump_error(q, v):
@@ -63,6 +61,20 @@ def sw_interior_residual(solver_obj):
     return res_u, res_e
 
 
+def ad_interior_residual(solver_obj):
+    """
+    Evaluate strong residual on element interiors for advection diffusion.
+    """
+    mu = solver_obj.fields.get('diffusion_h')
+    Dt = Constant(solver_obj.options.timestep)
+    tracer_old = solver_obj.timestepper.tracer_old.split()
+    tracer_new = solver_obj.fields.tracer_2d.split()
+    tracer_2d = 0.5 * (tracer_old + tracer_new)
+    u = solver_obj.fields.uv_2d
+
+    return (tracer_new - tracer_old) / Dt + dot(u, grad(tracer_2d)) - mu * div(grad(tracer_2d))
+
+
 def sw_boundary_residual(solver_obj, dual_new=None, dual_old=None):
     """
     Evaluate strong residual across element boundaries for (DG) shallow water. To consider adjoint variables, input
@@ -83,7 +95,7 @@ def sw_boundary_residual(solver_obj, dual_new=None, dual_old=None):
     H = b + elev_2d
 
     # Element boundary residual
-    mesh = uv_old.function_space().mesh()
+    mesh = solver_obj.mesh2d
     P0 = FunctionSpace(mesh, "DG", 0)
     v = TestFunction(P0)
     n = FacetNormal(mesh)
@@ -92,6 +104,31 @@ def sw_boundary_residual(solver_obj, dual_new=None, dual_old=None):
     bres_e = Function(P0).interpolate(assemble(jump(Constant(0.5) * v * H * uv_2d, n=n) * dS))
 
     return bres_u1, bres_u2, bres_e
+
+
+def ad_boundary_residual(solver_obj, dual_new=None, dual_old=None):
+    """
+    Evaluate strong residual across element boundaries for (DG) advection diffusion. To consider adjoint variables, 
+    input these as `dual_new` and `dual_old`.
+    """
+
+    # Collect fields and parameters
+
+    if dual_new is not None and dual_old is not None:
+        tracer_new = dual_new
+        tracer_old = dual_old
+    else:
+        tracer_new = solver_obj.fields.tracer_2d
+        tracer_old = solver_obj.timestepper.tracer_old
+    tracer_2d = 0.5 * (tracer_old + tracer_new)
+
+    # Element boundary residual
+    mesh = solver_obj.mesh2d
+    P0 = FunctionSpace(mesh, "DG", 0)
+    v = TestFunction(P0)
+    n = FacetNormal(mesh)
+
+    return Function(P0).interpolate(assemble(jump(Constant(-1) * v * grad(tracer_2d), n=n) * dS))
 
 
 def sw_strong_residual(solver_obj):     # TODO: Integrate strong residual machinery into Thetis
@@ -108,7 +145,18 @@ def sw_strong_residual(solver_obj):     # TODO: Integrate strong residual machin
     return res_u, res_e, bres_u1, bres_u2, bres_e
 
 
-def explicit_error(solver_obj, op=TohokuOptions()):
+def ad_strong_residual(solver_obj):     # TODO: Integrate strong residual machinery into Thetis
+    """
+    Construct the strong residual for the semi-discrete advection diffusion equation at the current timestep,
+    using Crank-Nicolson timestepping.
+
+    :param op: option parameters object.
+    :return: two components of strong residual on element interiors, along with the element boundary residual.
+    """
+    return ad_interior_residual(solver_obj), ad_boundary_residual(solver_obj)
+
+
+def explicit_error(solver_obj):
     r"""
     Estimate error locally using an a posteriori error indicator [Ainsworth & Oden, 1997], given by
 
@@ -123,38 +171,42 @@ def explicit_error(solver_obj, op=TohokuOptions()):
     :math:`h_K` is the size of mesh element `K`.
 
     :arg solver_obj: Thetis solver object.
-    :param op: AdaptOptions type parameter class.
     :return: explicit error estimator. 
     """
     mesh = solver_obj.mesh2d
     P0 = FunctionSpace(mesh, "DG", 0)
     v = TestFunction(P0)
+    ee = Function(P0)
     h = CellSize(mesh)
 
-    # if op.mode == 'advection-diffusion':
-    #     # TODO
-    # else:
-    res_u, res_e, bres_u1, bres_u2, bres_e = sw_strong_residual(solver_obj)
-    ee = Function(P0)
-    ee.interpolate(assemble(v * (inner(res_u, res_u) + res_e * res_e
-                         + (bres_u1 * bres_u1 + bres_u2 * bres_u2 + bres_e * bres_e) / sqrt(h)) * dx))
+    if solver_obj.options.tracer_only:
+        res, bres = ad_strong_residual(solver_obj)
+        # print("Interior residual norm = %.4e" % assemble(res * res * dx))
+        # print("Boundary residual norm = %.4e" % assemble(bres * bres * dx))
+        ee.interpolate(assemble(v * (res * res + bres * bres / sqrt(h)) * dx))
+    else:
+        res_u, res_e, bres_u1, bres_u2, bres_e = sw_strong_residual(solver_obj)
+        # print("Interior residual norm = %.4e" % assemble((inner(res_u, res_u) + res_e * res_e) * dx))
+        # print("Boundary residual norm = %.4e" % assemble((bres_u1 * bres_u1 + bres_u2 * bres_u2 + res_e * res_e) * dx))
+        ee.interpolate(assemble(v * (inner(res_u, res_u) + res_e * res_e
+                             + (bres_u1 * bres_u1 + bres_u2 * bres_u2 + bres_e * bres_e) / sqrt(h)) * dx))
 
     return ee
 
 
-def difference_quotient_estimator(solver_obj, explicit_term, dual, dual_, op=TohokuOptions()):
+def difference_quotient_estimator(solver_obj, explicit_term, dual, dual_):
 
     mesh = solver_obj.mesh2d
     h = CellSize(mesh)
     P0 = FunctionSpace(mesh, "DG", 0)
     v = TestFunction(P0)
 
-    # if op.mode == 'advection-diffusion':
-    #     res = ad_interior_residual(solver_obj)  # TODO
-    #     b_res = ad_boundary_residual(solver_obj)
-    # else:
-    bres0_a, bres1_a, bres2_a = sw_boundary_residual(solver_obj, dual, dual_)
-    adjoint_term = bres0_a * bres0_a + bres1_a * bres1_a + bres2_a * bres2_a
+    if solver_obj.options.tracer_only:
+        b_res = ad_boundary_residual(solver_obj)
+        adjoint_term = b_res * b_res
+    else:
+        bres0_a, bres1_a, bres2_a = sw_boundary_residual(solver_obj, dual, dual_)
+        adjoint_term = bres0_a * bres0_a + bres1_a * bres1_a + bres2_a * bres2_a
     dq = Function(P0)
     dq.interpolate(assemble(v * explicit_term * adjoint_term / sqrt(h) * dx))
 
