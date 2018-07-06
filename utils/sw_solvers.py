@@ -7,7 +7,7 @@ import h5py
 
 from utils.adaptivity import *
 from utils.callbacks import SWCallback, ObjectiveSWCallback
-from utils.error_
+from utils.error_estimators import explicit_error
 from utils.interpolation import interp, mixedPairInterp
 from utils.misc import indexString, peakAndDistance, bdyRegion
 from utils.setup import problemDomain, RossbyWaveSolution
@@ -541,25 +541,10 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
     dual_u.rename("Adjoint velocity")
     dual_e.rename("Adjoint elevation")
 
-    if op.order_increase:
-        Ve = op.mixed_space(mesh, enrich=True)
-        duale = Function(Ve)
+    if op.order_increase:   # TODO
+        duale = Function(op.mixed_space(mesh, enrich=True))
         duale_u, duale_e = duale.split()
         epsilon = Function(P1, name='error_2d')
-    else:                                   # Copy standard variables to mimic enriched space labels
-        Ve = V
-        epsilon = Function(P1, name='error_2d')
-    v = TestFunction(FunctionSpace(mesh, "DG", 0)) # For forming error indicators
-    rho = Function(Ve)
-    rho_u, rho_e = rho.split()
-    rho_u.rename("Momentum error")
-    rho_e.rename("Continuity error")
-    brho = Function(Ve, name="Boundary error")
-    brho_u, brho_e = brho.split()
-    temp = Function(Ve)
-    temp_u, temp_e = temp.split()
-    btemp = Function(Ve)
-    btemp_u, btemp_e = btemp.split()
 
     # Initialise parameters and counters
     nEle = mesh.num_cells()
@@ -591,7 +576,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
         options.timestep = op.timestep
         options.output_directory = op.directory()   # Need this for residual callback
         options.export_diagnostics = True
-        options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']            # TODO: EXPORT FROM PREVIOUS STEP?
+        options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         cb1 = ObjectiveSWCallback(solver_obj)
         cb1.op = op
@@ -605,13 +590,14 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
         while solver_obj.simulation_time < op.end_time - 0.5 * op.timestep:
 
             with pyadjoint.stop_annotating():
-                uv_old, elev_old = solver_obj.timestepper.solution_old.split()
-                uv_old.rename("Previous velocity")
-                elev_old.rename("Previous elevation")
-                with DumbCheckpoint(op.directory() + 'hdf5/Previous2d_' + indexString(cnt), mode=FILE_CREATE) as savePrev:
-                    savePrev.store(uv_old)
-                    savePrev.store(elev_old)
-                    savePrev.close()
+
+                tic = clock()
+                residual_2d = explicit_error(solver_obj)
+                print("Residual computation: %.2fs" % (clock() - tic))
+                residual_2d.rename("residual_2d")
+                with DumbCheckpoint(op.directory() + 'hdf5/Residual2d_' + indexString(cnt), mode=FILE_CREATE) as saveRes:
+                    saveRes.store(residual_2d)
+                    saveRes.close()
 
                 if cnt != 0:
                     solver_obj.load_state(cnt, iteration=cnt*op.timesteps_per_export)
@@ -653,71 +639,34 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
 
         with pyadjoint.stop_annotating():
 
-            residuals = {'Velocity': [], 'Elevation': [], 'Boundary': []}
+            residuals = []
             errorTimer = clock()
             for k in range(0, int(op.final_index() / op.timesteps_per_export)):
                 print('Generating error estimate %d / %d' % (int(k/op.exports_per_remesh()) + 1, int(op.final_index() / op.timesteps_per_remesh)))
 
-                # Generate residuals
-                with DumbCheckpoint(op.directory() + 'hdf5/Velocity2d_' + indexString(k), mode=FILE_READ) as loadVel:
-                    loadVel.load(uv_2d, name="uv_2d")
-                    loadVel.close()
-                with DumbCheckpoint(op.directory() + 'hdf5/Elevation2d_' + indexString(k), mode=FILE_READ) as loadElev:
-                    loadElev.load(elev_2d, name="elev_2d")
-                    loadElev.close()
-                with DumbCheckpoint(op.directory() + 'hdf5/Previous2d_' + indexString(k), mode=FILE_READ) as loadPrev:
-                    loadPrev.load(uv_old, name="Previous velocity")
-                    loadPrev.load(elev_old, name="Previous elevation")
-                    loadPrev.close()
-                tic = clock()
-                err_u, err_e, bres_u, bres_e = sw_strong_residual(solver_obj)
-                print("Residual computation: %.2fs" % (clock()- tic))
-                residuals['Velocity'].append(err_u)
-                residuals['Elevation'].append(err_e)
-                residuals['bdyVelocity'].append(bres_u)
-                residuals['bdyElevation'].append(bres_e)
+                # Load residuals
+                with DumbCheckpoint(op.directory() + 'hdf5/Residual2d_' + indexString(k), mode=FILE_READ) as loadRes:
+                    loadRes.load(residual_2d, name="residual_2d")
+                    loadRes.close()
+
+                residuals.append(residual_2d)   # TODO: This is grossly inefficient. Just load from HDF5
                 if k % op.exports_per_remesh() == op.exports_per_remesh()-1:
 
-                    # L-inf     # TODO: This is grossly inefficient
-                    rho_u.interpolate(residuals['Velocity'][0])
-                    rho_e.interpolate(residuals['Elevation'][0])
-                    brho_u.interpolate(residuals['bdyVelocity'][0])
-                    brho_e.interpolate(residuals['bdyElevation'][0])
-                    rho_u.dat.data[:] = np.abs(rho_u.dat.data)
-                    rho_e.dat.data[:] = np.abs(rho_e.dat.data)
-                    brho_u.dat.data[:] = np.abs(brho_u.dat.data)
-                    brho_e.dat.data[:] = np.abs(brho_e.dat.data)
-                    for i in range(1, len(residuals['Velocity'])):
-                        temp_u.interpolate(residuals['Velocity'][i])
-                        temp_e.interpolate(residuals['Elevation'][i])
-                        btemp_u.interpolate(residuals['bdyVelocity'][i])
-                        btemp_e.interpolate(residuals['bdyElevation'][i])
-                        temp_u.dat.data[:] = np.abs(temp_u.dat.data)
-                        temp_e.dat.data[:] = np.abs(temp_e.dat.data)
-                        btemp_u.dat.data[:] = np.abs(btemp_u.dat.data)
-                        btemp_e.dat.data[:] = np.abs(btemp_e.dat.data)
-                        for j in range(len(temp_e.dat.data)):
-                            rho_u.dat.data[j, 0] = max(temp_u.dat.data[j, 0], rho_u.dat.data[j, 0])
-                            rho_u.dat.data[j, 1] = max(temp_u.dat.data[j, 1], rho_u.dat.data[j, 1])
-                            rho_e.dat.data[j] = max(temp_e.dat.data[j], rho_e.dat.data[j])
-                            brho_u.dat.data[j, 0] = max(btemp_u.dat.data[j, 0], brho_u.dat.data[j, 0])
-                            brho_u.dat.data[j, 1] = max(btemp_u.dat.data[j, 1], brho_u.dat.data[j, 1])
-                            brho_e.dat.data[j] = max(btemp_e.dat.data[j], brho_e.dat.data[j])
+                    # L-inf
+                    for i in range(1, len(residuals)):
+                        temp = residuals[i]
+                        for j in range(len(temp.dat.data)):   # TODO: Use pointwiseMax?
+                            residual_2d.dat.data[j] = max(temp.dat.data[j], residual_2d.dat.data[j])
 
                     # # L1
-                    # err_u = op.timestep * sum(abs(residuals['Velocity'][i] + residuals['Velocity'][i - 1]) for i in range(1, op.exports_per_remesh()))
-                    # err_e = op.timestep * sum(abs(residuals['Elevation'][i] + residuals['Elevation'][i - 1]) for i in range(1, op.exports_per_remesh()))
+                    # residual_2d.interpolate(op.timestep * sum(abs(residuals[i] + residuals[i-1]) for i in range(1, op.exports_per_remesh())))
 
                     # # Time integrate residual over current 'window'
-                    # err_u = op.timestep * sum(residuals['Velocity'][i] + residuals['Velocity'][i-1] for i in range(1, op.exports_per_remesh()))
-                    # err_e = op.timestep * sum(residuals['Elevation'][i] + residuals['Elevation'][i-1] for i in range(1, op.exports_per_remesh()))
-                    #
-                    # rho_u.interpolate(err_u)
-                    # rho_e.interpolate(err_e)
+                    # residual_2d.interpolate(op.timestep * sum(residuals[i] + residuals[i-1] for i in range(1, op.exports_per_remesh())))
 
-                    residuals = {'Velocity': [], 'Elevation': [], 'bdyVelocity': [], 'bdyElevation': []}
+                    residuals = []
                     if op.plot_pvd:
-                        residualFile.write(rho_u, rho_e, time=float(op.timestep * op.timesteps_per_remesh * (k+1)))
+                        residualFile.write(residual_2d, time=float(op.timestep * op.timesteps_per_remesh * (k+1)))
 
                     # Load adjoint data and form indicators
                     indexStr = indexString(int((k+1)/op.exports_per_remesh()-1))
@@ -725,14 +674,12 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                         loadAdj.load(dual_u)
                         loadAdj.load(dual_e)
                         loadAdj.close()
-                    if op.order_increase:                  # TODO: Replace adj with difference
-                        duale_u.interpolate(dual_u)     # TODO: ... between higher order adj and adj on comp. mesh.
-                        duale_e.interpolate(dual_e)     # TODO: ... h.o. interpolation should be patchwise.
-                        epsilon.interpolate(assemble(v * (inner(rho, duale) + inner(brho, duale)) * dx))
-                                                                          # ^ Would be subtract with no L-inf
-                        # TODO: Also include method of difference quotients
-                    else:
-                        epsilon.interpolate(assemble(v * (inner(rho, dual) + inner(brho, dual)) * dx))
+                    # if op.order_increase:       # TODO: Alternative order increase DWR method
+                    #     duale_u.interpolate(dual_u)
+                    #     duale_e.interpolate(dual_e)
+
+                    # TODO: Get adjoint from previous step
+                    epsilon.interpolate(difference_quotient_estimator(solver_obj, residual_2d, dual, dual, op=op))
                     epsilon = normaliseIndicator(epsilon, op=op)         # ^ Would be subtract with no L-inf
                     epsilon.rename("Error indicator")
                     with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_CREATE) as saveErr:

@@ -142,7 +142,7 @@ def explicit_error(solver_obj, op=TohokuOptions()):
     return ee
 
 
-def difference_quotient_estimator(solver_obj, dual, dual_, op=TohokuOptions()):
+def difference_quotient_estimator(solver_obj, explicit_term, dual, dual_, op=TohokuOptions()):
 
     mesh = solver_obj.mesh2d
     h = CellSize(mesh)
@@ -153,8 +153,6 @@ def difference_quotient_estimator(solver_obj, dual, dual_, op=TohokuOptions()):
     #     res = ad_interior_residual(solver_obj)  # TODO
     #     b_res = ad_boundary_residual(solver_obj)
     # else:
-    res_u, res_e, bres0, bres1, bres2 = sw_strong_residual(solver_obj)
-    explicit_term = explicit_error(mesh, [res_u, res_e], [bres0, bres1, bres2])
     bres0_a, bres1_a, bres2_a = sw_boundary_residual(solver_obj, dual, dual_)
     dq = Function(P0)
     dq.interpolate(assemble(v * explicit_term (bres0_a * bres0_a + bres1_a * bres1_a + bres2_a * bres2_a) / sqrt(h) * dx))
