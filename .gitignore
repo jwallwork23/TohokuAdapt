@@ -29,9 +29,6 @@ outdata/
 
 .README.md.swp
 
-# Old form compilers
-utils/forms.py
-
 # Test scripts
 paralleltest.py
 dt_test.py

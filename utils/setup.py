@@ -151,7 +151,7 @@ else:
 
     from .conversion import earth_radius, to_latlon, vectorlonlat_to_utm
     from .interpolation import interp
-    from .misc import indicator, bdyRegion
+    from .misc import bdyRegion
     from .options import RossbyWaveOptions, TohokuOptions
 
 
@@ -272,9 +272,9 @@ def problemDomain(level=0, mesh=None, b=None, op=TohokuOptions()):
         x, y = SpatialCoordinate(mesh)
         P1 = FunctionSpace(mesh, "CG", 1)
         bell = conditional(
-            ge(0.25 * (
+            ge(5. * (
             1 + cos(pi * min_value(sqrt(pow(x - op.bell_x0, 2) + pow(y - op.bell_y0, 2)) / op.bell_r0, 1.0))), 0.),
-            0.25 * (1 + cos(pi * min_value(sqrt(pow(x - op.bell_x0, 2) + pow(y - op.bell_y0, 2)) / op.bell_r0, 1.0))),
+            5. * (1 + cos(pi * min_value(sqrt(pow(x - op.bell_x0, 2) + pow(y - op.bell_y0, 2)) / op.bell_r0, 1.0))),
             0.)
         source = Function(P1).interpolate(0. + bell)  # Tracer source function
         b = Function(P1).assign(1.)
@@ -473,7 +473,7 @@ class RossbyWaveSolution:
         mesh = self.function_space.mesh()
         ks = Function(VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1))
         k0, k1 = ks.split()
-        k1.assign(indicator(mesh, mirror=mirror, radii=self.op.radius, op=self.op))
+        k1.assign(self.op.indicator(mesh, mirror=mirror))
         kt = Constant(0.)
 
         # Time integrate

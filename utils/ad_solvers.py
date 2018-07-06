@@ -5,6 +5,7 @@ from time import clock
 
 from utils.adaptivity import *
 from utils.callbacks import AdvectionCallback, ObjectiveAdvectionCallback
+from utils.error_estimators import sw_strong_residual
 from utils.interpolation import interp, mixedPairInterp
 from utils.setup import problemDomain
 

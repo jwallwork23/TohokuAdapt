@@ -274,12 +274,12 @@ class AdvectionOptions(AdaptOptions):
     start_time = PositiveFloat(10., help="Start time of period of interest").tag(config=True)
     end_time = PositiveFloat(60., help="End time of period of interest").tag(config=True)
     h_min = PositiveFloat(1e-4, help="Minimum element size").tag(config=True)
-    h_max = PositiveFloat(5., help="Maximum element size").tag(config=True)
+    h_max = PositiveFloat(1., help="Maximum element size").tag(config=True)
     min_norm = PositiveFloat(1e-5).tag(config=True)  # TODO: Not sure about this
     max_scaling = PositiveFloat(5e5).tag(config=True)  # TODO: Not sure about this
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
     diffusivity = NonNegativeFloat(0.1, allow_none=True, help="Diffusion coefficient").tag(config=True)
-    bell_x0 = Float(0.5, help="x-coordinate corresponding to tracer source centre").tag(config=True)
+    bell_x0 = Float(10., help="x-coordinate corresponding to tracer source centre").tag(config=True)
     bell_y0 = Float(5., help="y-coordinate corresponding to tracer source centre").tag(config=True)
     bell_r0 = Float(0.457, help="Radius of tracer source").tag(config=True)
     u_mag = FiredrakeScalarExpression(Constant(1.), help="(Estimate of) maximum advective speed").tag(config=True)

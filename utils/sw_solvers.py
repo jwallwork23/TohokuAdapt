@@ -7,6 +7,7 @@ import h5py
 
 from utils.adaptivity import *
 from utils.callbacks import SWCallback, ObjectiveSWCallback
+from utils.error_estimators import sw_strong_residual
 from utils.interpolation import interp, mixedPairInterp
 from utils.misc import indexString, peakAndDistance, bdyRegion
 from utils.setup import problemDomain, RossbyWaveSolution
@@ -669,7 +670,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                     loadPrev.load(elev_old, name="Previous elevation")
                     loadPrev.close()
                 tic = clock()
-                err_u, err_e, bres_u, bres_e = strongResidualSW(solver_obj, uv_2d, elev_2d, uv_old, elev_old, Ve, op=op)
+                err_u, err_e, bres_u, bres_e = sw_strong_residual(solver_obj, uv_2d, elev_2d, uv_old, elev_old, Ve, op=op)
                 print("Residual computation: %.2fs" % (clock()- tic))
                 residuals['Velocity'].append(err_u)
                 residuals['Elevation'].append(err_e)

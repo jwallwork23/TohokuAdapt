@@ -12,6 +12,7 @@ adaptivity:
     * Hessians and metrics are approximated using ``adaptivity``.
     * Callbacks for assembling objective functionals and extracting timeseries are provided in ``callbacks``.
     * Coordinate transformations are achieved using ``conversion``.
+    * Generate error estimators for mesh adaptivity using ``error_estimators``.
     * Interpolation of functions from an old mesh to a newly adapted mesh is achieved using ``interpolation``.
     * Some generic functions may be found in ``misc``.
     * Default parameters are specified using ``options``.
