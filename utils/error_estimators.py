@@ -21,7 +21,7 @@ def interelement_term(v, n=None):
         return 0.5 * (dot(v('+'), n('+')) - dot(v('-'), n('-')))
 
 
-def explicit_error(mesh, res_int, res_bdy):
+def explicit_error(mesh, res_int, res_bdy, op=TohokuOptions()):
     r"""
     Estimate error locally using an a posteriori error indicator [Ainsworth & Oden, 1997], given by
     
@@ -36,14 +36,23 @@ def explicit_error(mesh, res_int, res_bdy):
     :math:`h_K` is the size of mesh element `K`.
 
     :arg mesh: mesh upon which problem is defined.
-    :arg res_int: residual calculated on element interiors.
-    :arg res_bdy: residual calculated on element boundaries.
+    :arg res_int: residual calculated on element interiors, represented in a list in the sw case.
+    :arg res_bdy: residual calculated on element boundaries, represented in a list in the sw case.
     :return: explicit error estimator. 
     """
     v = TestFunction(FunctionSpace(mesh, "DG", 0))
     h = CellSize(mesh)
 
-    return assemble(v * (inner(res_int, res_int) + inner(res_bdy, res_bdy) / sqrt(h)) * dx)
+    if op.mode == 'advection-diffusion':
+        return assemble(v * (inner(res_int, res_int) + inner(res_bdy, res_bdy) / sqrt(h)) * dx)
+    else:
+        res_u = res_int[0]
+        res_e = res_int[1]
+        bres_u = res_bdy[0]
+        bres_e = res_bdy[1]
+
+        return assemble(v * (inner(res_u, res_u) + res_e * res_e
+                             + (inner(bres_u, bres_u) + bres_e * bres_e) / sqrt(h)) * dx)
 
 
 def flux_jump_error(q, v):
@@ -66,7 +75,7 @@ def flux_jump_error(q, v):
     return assemble(v * h * (j0 * j0 + j1 * j1 + j2 * j2) * dx)
 
 
-def sw_interior_residual(solver_obj, op=TohokuOptions()):
+def sw_interior_residual(solver_obj):
 
     # Collect fields and parameters
     nu = solver_obj.fields.get('viscosity_h')
@@ -76,8 +85,8 @@ def sw_interior_residual(solver_obj, op=TohokuOptions()):
     uv_new, elev_new = solver_obj.fields.solution_2d.split()
     b = solver_obj.fields.bathymetry_2d
     f = solver_obj.options.coriolis_frequency
-    uv_2d = 0.5 * (uv_old + uv_new)  # Use Crank-Nicolson timestepping so that we isolate errors as being
-    elev_2d = 0.5 * (elev_old + elev_new)  # related only to the spatial discretisation
+    uv_2d = 0.5 * (uv_old + uv_new)         # Use Crank-Nicolson timestepping so that we isolate errors as being
+    elev_2d = 0.5 * (elev_old + elev_new)   # related only to the spatial discretisation
     H = b + elev_2d
 
     # Momentum equation residual on element interiors
@@ -100,7 +109,7 @@ def sw_interior_residual(solver_obj, op=TohokuOptions()):
     return res_u, res_e
 
 
-def sw_boundary_residual(solver_obj, op=TohokuOptions()):
+def sw_boundary_residual(solver_obj):   # TODO: Fix this. Also construct adjoint boundary residual.
 
     # Collect fields and parameters
     g = physical_constants['g_grav']
@@ -124,7 +133,7 @@ def sw_boundary_residual(solver_obj, op=TohokuOptions()):
     return bres_u, bres_e
 
 
-def sw_strong_residual(solver_obj, op=TohokuOptions()):     # TODO: Integrate strong residual machinery into Thetis
+def sw_strong_residual(solver_obj):     # TODO: Integrate strong residual machinery into Thetis
     """
     Construct the strong residual for the semi-discrete shallow water equations at the current timestep,
     using Crank-Nicolson timestepping.
@@ -132,7 +141,23 @@ def sw_strong_residual(solver_obj, op=TohokuOptions()):     # TODO: Integrate st
     :param op: option parameters object.
     :return: two components of strong residual on element interiors, along with the element boundary residual.
     """
-    res_u, res_e = sw_interior_residual(solver_obj, op=op)
-    bres_u, bres_e = sw_boundary_residual(solver_obj, op=op)
+    res_u, res_e = sw_interior_residual(solver_obj)
+    bres_u, bres_e = sw_boundary_residual(solver_obj)
 
     return res_u, res_e, bres_u, bres_e
+
+
+def difference_quotient_estimator(solver_obj, adjoint, op=TohokuOptions()):
+
+    mesh = adjoint.function_space().mesh()
+    h = CellSize(mesh)
+
+    # if op.mode == 'advection-diffusion':
+    #     res = ad_interior_residual(solver_obj)  # TODO
+    #     b_res = ad_boundary_residual(solver_obj)
+    # else:
+    res_u, res_e, bres_u, bres_e = sw_strong_residual(solver_obj)
+
+    explicit_term = explicit_error(mesh, [res_u, res_e], [bres_u, bres_e])
+
+    # TODO: Calculate adjoint boundary residual. Then assemble and return estimator

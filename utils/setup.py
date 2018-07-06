@@ -272,9 +272,8 @@ def problemDomain(level=0, mesh=None, b=None, op=TohokuOptions()):
         x, y = SpatialCoordinate(mesh)
         P1 = FunctionSpace(mesh, "CG", 1)
         bell = conditional(
-            ge(5. * (
-            1 + cos(pi * min_value(sqrt(pow(x - op.bell_x0, 2) + pow(y - op.bell_y0, 2)) / op.bell_r0, 1.0))), 0.),
-            5. * (1 + cos(pi * min_value(sqrt(pow(x - op.bell_x0, 2) + pow(y - op.bell_y0, 2)) / op.bell_r0, 1.0))),
+            ge((1 + cos(pi * min_value(sqrt(pow(x - op.bell_x0, 2) + pow(y - op.bell_y0, 2)) / op.bell_r0, 1.0))), 0.),
+            (1 + cos(pi * min_value(sqrt(pow(x - op.bell_x0, 2) + pow(y - op.bell_y0, 2)) / op.bell_r0, 1.0))),
             0.)
         source = Function(P1).interpolate(0. + bell)  # Tracer source function
         b = Function(P1).assign(1.)
