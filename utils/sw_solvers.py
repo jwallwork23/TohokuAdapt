@@ -682,7 +682,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                     #     duale_e.interpolate(dual_e)
 
                     # TODO: Get adjoint from previous step
-                    epsilon.interpolate(difference_quotient_estimator(solver_obj, residual_2d, dual, dual, op=op))
+                    epsilon.interpolate(difference_quotient_estimator(solver_obj, residual_2d, dual, dual))
                     epsilon = normaliseIndicator(epsilon, op=op)         # ^ Would be subtract with no L-inf
                     epsilon.rename("Error indicator")
                     with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_CREATE) as saveErr:
@@ -719,6 +719,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                     loadErr.load(epsilon)
                     loadErr.close()
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).assign(interp(mesh, epsilon))
+                # errEst.dat.data *= 1e3
                 M = isotropicMetric(errEst, invert=False, op=op)
                 if op.gradate:
                     # br = Function(P1).interpolate(bdyRegion(mesh, 200, 5e8))

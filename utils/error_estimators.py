@@ -157,14 +157,14 @@ def explicit_error(solver_obj):
     if solver_obj.options.tracer_only:
         res = ad_interior_residual(solver_obj)
         bres = ad_boundary_residual(solver_obj)
-        # print("Interior residual norm = %.4e" % norm(res))
-        # print("Boundary residual norm = %.4e" % norm(bres))
+        print("Interior residual norm = %.4e" % norm(res))
+        print("Boundary residual norm = %.4e" % norm(bres))
         ee.interpolate(assemble(v * (res * res + bres * bres / sqrt(h)) * dx))
     else:
         res_u, res_e = sw_interior_residual(solver_obj)
         bres_u1, bres_u2, bres_e = sw_boundary_residual(solver_obj)
-        # print("Interior residual norm = %.4e" % assemble((inner(res_u, res_u) + res_e * res_e) * dx))
-        # print("Boundary residual norm = %.4e" % assemble((bres_u1 * bres_u1 + bres_u2 * bres_u2 + res_e * res_e) * dx))
+        print("Interior residual norm = %.4e" % assemble((inner(res_u, res_u) + res_e * res_e) * dx))
+        print("Boundary residual norm = %.4e" % assemble((bres_u1 * bres_u1 + bres_u2 * bres_u2 + res_e * res_e) * dx))
         ee.interpolate(assemble(v * (inner(res_u, res_u) + res_e * res_e
                              + (bres_u1 * bres_u1 + bres_u2 * bres_u2 + bres_e * bres_e) / sqrt(h)) * dx))
 
