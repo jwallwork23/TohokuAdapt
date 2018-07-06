@@ -108,7 +108,7 @@ def sw_strong_residual(solver_obj):     # TODO: Integrate strong residual machin
     return res_u, res_e, bres_u1, bres_u2, bres_e
 
 
-def explicit_error(mesh, res_int, res_bdy, op=TohokuOptions()):
+def explicit_error(solver_obj, op=TohokuOptions()):
     r"""
     Estimate error locally using an a posteriori error indicator [Ainsworth & Oden, 1997], given by
 
@@ -122,30 +122,29 @@ def explicit_error(mesh, res_int, res_bdy, op=TohokuOptions()):
     :math:`\textbf{r}` denotes the strong residual on element boundaries,
     :math:`h_K` is the size of mesh element `K`.
 
-    :arg mesh: mesh upon which problem is defined.
-    :arg res_int: residual calculated on element interiors, represented in a list in the sw case.
-    :arg res_bdy: residual calculated on element boundaries, represented in a list in the sw case.
+    :arg solver_obj: Thetis solver object.
+    :param op: AdaptOptions type parameter class.
     :return: explicit error estimator. 
     """
-    v = TestFunction(FunctionSpace(mesh, "DG", 0))
+    mesh = solver_obj.mesh2d
+    P0 = FunctionSpace(mesh, "DG", 0)
+    v = TestFunction(P0)
     h = CellSize(mesh)
 
-    if op.mode == 'advection-diffusion':
-        return assemble(v * (inner(res_int, res_int) + inner(res_bdy, res_bdy) / sqrt(h)) * dx)
-    else:
-        res_u = res_int[0]
-        res_e = res_int[1]
-        bres_u1 = res_bdy[0]
-        bres_u2 = res_bdy[1]
-        bres_e = res_bdy[2]
+    # if op.mode == 'advection-diffusion':
+    #     # TODO
+    # else:
+    res_u, res_e, bres_u1, bres_u2, bres_e = sw_strong_residual(solver_obj)
+    ee = Function(P0)
+    ee.interpolate(assemble(v * (inner(res_u, res_u) + res_e * res_e
+                         + (bres_u1 * bres_u1 + bres_u2 * bres_u2 + bres_e * bres_e) / sqrt(h)) * dx))
 
-        return assemble(v * (inner(res_u, res_u) + res_e * res_e
-                             + (bres_u1 * bres_u1 + bres_u2 * bres_u2 + bres_e * bres_e) / sqrt(h)) * dx)
+    return ee
 
 
 def difference_quotient_estimator(solver_obj, dual, dual_, op=TohokuOptions()):
 
-    mesh = dual.function_space().mesh()
+    mesh = solver_obj.mesh2d
     h = CellSize(mesh)
     P0 = FunctionSpace(mesh, "DG", 0)
     v = TestFunction(P0)
