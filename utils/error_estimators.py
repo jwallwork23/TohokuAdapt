@@ -128,32 +128,7 @@ def ad_boundary_residual(solver_obj, dual_new=None, dual_old=None):
     v = TestFunction(P0)
     n = FacetNormal(mesh)
 
-    return Function(P0).interpolate(assemble(jump(Constant(-1) * v * grad(tracer_2d), n=n) * dS))
-
-
-def sw_strong_residual(solver_obj):     # TODO: Integrate strong residual machinery into Thetis
-    """
-    Construct the strong residual for the semi-discrete shallow water equations at the current timestep,
-    using Crank-Nicolson timestepping.
-
-    :param op: option parameters object.
-    :return: two components of strong residual on element interiors, along with the element boundary residual.
-    """
-    res_u, res_e = sw_interior_residual(solver_obj)
-    bres_u1, bres_u2, bres_e = sw_boundary_residual(solver_obj)
-
-    return res_u, res_e, bres_u1, bres_u2, bres_e
-
-
-def ad_strong_residual(solver_obj):     # TODO: Integrate strong residual machinery into Thetis
-    """
-    Construct the strong residual for the semi-discrete advection diffusion equation at the current timestep,
-    using Crank-Nicolson timestepping.
-
-    :param op: option parameters object.
-    :return: two components of strong residual on element interiors, along with the element boundary residual.
-    """
-    return ad_interior_residual(solver_obj), ad_boundary_residual(solver_obj)
+    return Function(P0).interpolate(assemble(jump(Constant(-1.) * v * grad(tracer_2d), n=n) * dS))
 
 
 def explicit_error(solver_obj):
@@ -180,12 +155,14 @@ def explicit_error(solver_obj):
     h = CellSize(mesh)
 
     if solver_obj.options.tracer_only:
-        res, bres = ad_strong_residual(solver_obj)
-        # print("Interior residual norm = %.4e" % assemble(res * res * dx))
-        # print("Boundary residual norm = %.4e" % assemble(bres * bres * dx))
+        res = ad_interior_residual(solver_obj)
+        bres = ad_boundary_residual(solver_obj)
+        # print("Interior residual norm = %.4e" % norm(res))
+        # print("Boundary residual norm = %.4e" % norm(bres))
         ee.interpolate(assemble(v * (res * res + bres * bres / sqrt(h)) * dx))
     else:
-        res_u, res_e, bres_u1, bres_u2, bres_e = sw_strong_residual(solver_obj)
+        res_u, res_e = sw_interior_residual(solver_obj)
+        bres_u1, bres_u2, bres_e = sw_boundary_residual(solver_obj)
         # print("Interior residual norm = %.4e" % assemble((inner(res_u, res_u) + res_e * res_e) * dx))
         # print("Boundary residual norm = %.4e" % assemble((bres_u1 * bres_u1 + bres_u2 * bres_u2 + res_e * res_e) * dx))
         ee.interpolate(assemble(v * (inner(res_u, res_u) + res_e * res_e
@@ -209,5 +186,6 @@ def difference_quotient_estimator(solver_obj, explicit_term, dual, dual_):
         adjoint_term = bres0_a * bres0_a + bres1_a * bres1_a + bres2_a * bres2_a
     dq = Function(P0)
     dq.interpolate(assemble(v * explicit_term * adjoint_term / sqrt(h) * dx))
+    # print("Explicit error esimate = %.4e" % norm(dq))
 
     return dq
