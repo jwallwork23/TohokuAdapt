@@ -1,5 +1,4 @@
 from thetis import *
-from thetis.callback import DetectorsCallback
 
 import numpy as np
 from time import clock
@@ -7,7 +6,7 @@ import h5py
 
 from utils.adaptivity import *
 from utils.callbacks import SWCallback, ObjectiveSWCallback
-from utils.error_estimators import difference_quotient_estimator, explicit_error
+from utils.error_estimators import difference_quotient_estimator
 from utils.interpolation import interp, mixedPairInterp
 from utils.misc import indexString, peakAndDistance, bdyRegion
 from utils.setup import problemDomain, RossbyWaveSolution
@@ -52,12 +51,12 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     cb1 = SWCallback(solver_obj)
     cb1.op = op
     if op.mode == 'tohoku':
-        cb2 = DetectorsCallback(solver_obj,
-                                [op.gauge_coordinates(g) for g in gauges],
-                                ['elev_2d'],
-                                'timeseries',
-                                gauges,
-                                export_to_hdf5=True)
+        cb2 = callback.DetectorsCallback(solver_obj,
+                                         [op.gauge_coordinates(g) for g in gauges],
+                                         ['elev_2d'],
+                                         'timeseries',
+                                         gauges,
+                                         export_to_hdf5=True)
         solver_obj.add_callback(cb2, 'timestep')
     solver_obj.add_callback(cb1, 'timestep')
     solver_obj.bnd_functions['shallow_water'] = BCs
@@ -204,12 +203,12 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             cb1.old_value = quantities['J_h']
         adapSolver.add_callback(cb1, 'timestep')
         if op.mode == 'tohoku':
-            cb2 = DetectorsCallback(adapSolver,
-                                    [op.gauge_coordinates(g) for g in gauges],
-                                    ['elev_2d'],
-                                    'timeseries',
-                                    gauges,
-                                    export_to_hdf5=True)
+            cb2 = callback.DetectorsCallback(adapSolver,
+                                             [op.gauge_coordinates(g) for g in gauges],
+                                             ['elev_2d'],
+                                             'timeseries',
+                                             gauges,
+                                             export_to_hdf5=True)
             adapSolver.add_callback(cb2, 'timestep')
         adapSolver.bnd_functions['shallow_water'] = BCs
         solverTimer = clock()
@@ -461,12 +460,12 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                 cb1.old_value = quantities['J_h']
             adapSolver.add_callback(cb1, 'timestep')
             if op.mode == 'tohoku':
-                cb2 = DetectorsCallback(adapSolver,
-                                        [op.gauge_coordinates(g) for g in gauges],
-                                        ['elev_2d'],
-                                        'timeseries',
-                                        gauges,
-                                        export_to_hdf5=True)
+                cb2 = callback.DetectorsCallback(adapSolver,
+                                                 [op.gauge_coordinates(g) for g in gauges],
+                                                 ['elev_2d'],
+                                                 'timeseries',
+                                                 gauges,
+                                                 export_to_hdf5=True)
                 adapSolver.add_callback(cb2, 'timestep')
             adapSolver.bnd_functions['shallow_water'] = BCs
             solverTimer = clock()
@@ -534,6 +533,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
     uv_2d, elev_2d = q.split()    # Needed to load data into
     uv_2d.rename('uv_2d')
     elev_2d.rename('elev_2d')
+    P0 = FunctionSpace(mesh, "DG", 0)
     P1 = FunctionSpace(mesh, "CG", 1)
     if op.mode == 'rossby-wave':    # Analytic final-time state
         peak_a, distance_a = peakAndDistance(RossbyWaveSolution(V, op=op).__call__(t=op.end_time).split()[1])
@@ -544,6 +544,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
     dual_u.rename('Adjoint velocity')
     dual_e.rename('Adjoint elevation')
     epsilon = Function(P1, name='error_2d')
+    residual_2d = Function(P0)
 
     if op.order_increase:
         duale = Function(op.mixed_space(mesh, enrich=True))
@@ -554,7 +555,6 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
     op.target_vertices = mesh.num_vertices() * op.rescaling  # Target #Vertices
     mM = [nEle, nEle]  # Min/max #Elements
     Sn = nEle
-    t = 0.
 
     # Get initial boundary metric
     if op.gradate:
@@ -572,48 +572,27 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
         options.use_lax_friedrichs_velocity = False                     # TODO: This is a temporary fix
         options.coriolis_frequency = f
         options.simulation_export_time = op.timestep * op.timesteps_per_export
-        options.simulation_end_time = (op.timesteps_per_export - 0.5) * op.timestep
+        options.simulation_end_time = op.end_time - 0.5 * op.timestep
         options.timestepper_type = op.timestepper
         options.timestepper_options.solver_parameters_tracer = op.solver_parameters
         print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
         options.timestep = op.timestep
         options.output_directory = op.directory()   # Need this for residual callback
-        options.export_diagnostics = True
-        options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
+        options.export_diagnostics = False
+        # options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         cb1 = ObjectiveSWCallback(solver_obj)
         cb1.op = op
+        cb2 = callback.ExplicitErrorCallback(solver_obj, export_to_hdf5=True)
         solver_obj.add_callback(cb1, 'timestep')
+        solver_obj.add_callback(cb2, 'export')
         solver_obj.bnd_functions['shallow_water'] = BCs
         initTimer = clock() - initTimer
         print('Problem initialised. Setup time: %.3fs' % initTimer)
 
-        cnt = 0
         primalTimer = 0.
-        while solver_obj.simulation_time < op.end_time - 0.5 * op.timestep:
-
-            with pyadjoint.stop_annotating():
-
-                tic = clock()
-                residual_2d = explicit_error(solver_obj)
-                print("Residual computation: %.2fs" % (clock() - tic))
-                residual_2d.rename("residual_2d")
-                with DumbCheckpoint(op.directory() + 'hdf5/Residual2d_' + indexString(cnt), mode=FILE_CREATE) as saveRes:
-                    saveRes.store(residual_2d)
-                    saveRes.close()
-
-                if cnt != 0:
-                    solver_obj.load_state(cnt, iteration=cnt*op.timesteps_per_export)
-
-            # Run simulation
-            stepTimer = clock()
-            solver_obj.iterate()
-            stepTimer = clock() - stepTimer
-            primalTimer += stepTimer
-            cnt += 1
-            t += op.timestep * op.timesteps_per_export
-            options.simulation_end_time = t + (op.timesteps_per_export - 0.5) * op.timestep
-
+        solver_obj.iterate()
+        primalTimer = clock() - primalTimer
         J = cb1.get_val()                        # Assemble objective functional for adjoint computation
         print('Primal run complete. Solver time: %.3fs' % primalTimer)
 
@@ -648,8 +627,8 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                 print('Generating error estimate %d / %d' % (int(k/op.exports_per_remesh()) + 1, int(op.final_index() / op.timesteps_per_remesh)))
 
                 # Load residuals
-                with DumbCheckpoint(op.directory() + 'hdf5/Residual2d_' + indexString(k), mode=FILE_READ) as loadRes:
-                    loadRes.load(residual_2d, name="residual_2d")
+                with DumbCheckpoint(op.directory() + 'hdf5/ExplicitError2d_' + indexString(k), mode=FILE_READ) as loadRes:
+                    loadRes.load(residual_2d, name="explicit error")
                     loadRes.close()
 
                 residuals.append(residual_2d)   # TODO: This is grossly inefficient. Just load from HDF5
@@ -780,12 +759,12 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                 cb1.old_value = quantities['J_h']
             adapSolver.add_callback(cb1, 'timestep')
             if op.mode == 'tohoku':
-                cb2 = DetectorsCallback(adapSolver,
-                                        [op.gauge_coordinates(g) for g in gauges],
-                                        ['elev_2d'],
-                                        'timeseries',
-                                        gauges,
-                                        export_to_hdf5=True)
+                cb2 = callback.DetectorsCallback(adapSolver,
+                                                 [op.gauge_coordinates(g) for g in gauges],
+                                                 ['elev_2d'],
+                                                 'timeseries',
+                                                 gauges,
+                                                 export_to_hdf5=True)
                 adapSolver.add_callback(cb2, 'timestep')
             adapSolver.bnd_functions['shallow_water'] = BCs
             solverTimer = clock()
