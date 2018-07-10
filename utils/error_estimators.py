@@ -1,27 +1,7 @@
 from thetis import *
 
 
-__all__ = ["explicit_error", "flux_jump_error", "difference_quotient_estimator"]
-
-
-def flux_jump_error(q, v):
-    """
-    Estimate error locally by flux jump.
-
-    :arg q: primal approximation at current timestep.
-    :arg v: P0 test function over the same function space.
-    :return: field of local error indicators.
-    """
-    V = q.function_space()
-    mesh = V.mesh()
-    h = CellSize(mesh)
-    n = FacetNormal(mesh)
-    uh, etah = q.split()
-    j0 = assemble(jump(v * grad(uh[0]), n=n) * dS)
-    j1 = assemble(jump(v * grad(uh[1]), n=n) * dS)
-    j2 = assemble(jump(v * grad(etah), n=n) * dS)
-
-    return assemble(v * h * (j0 * j0 + j1 * j1 + j2 * j2) * dx)
+__all__ = ["explicit_error", "difference_quotient_estimator"]
 
 
 def ad_interior_residual(solver_obj):

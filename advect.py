@@ -4,6 +4,7 @@ from firedrake.petsc import PETSc
 import argparse
 import datetime
 import numpy as np
+import matplotlib.pyplot as plt
 
 from utils.options import AdvectionOptions
 from utils.setup import problemDomain
@@ -61,6 +62,14 @@ for i in resolutions:
         if tag in quantities:
             errorFile.write(", %.4e" % quantities[tag])
     errorFile.write(", %.1f, %.4e\n" % (quantities['solverTimer'], quantities['J_h']))
+    print(quantities.keys())
+    for tag in ("h_snapshot_60", "h_snapshot_120", "v_snapshot_60", "v_snapshot_120"):  # TODO: Generalise and adjust axes
+        if tag in quantities:
+            plt.clf()
+            s = quantities[tag]
+            plt.plot(range(len(s)), s)
+            plt.title(tag)
+            plt.show()
     if approach in ("DWP", "DWR"):
         PETSc.Sys.Print("Time for final run: %.1fs" % quantities['adaptSolveTimer'], comm=COMM_WORLD)
 errorFile.close()

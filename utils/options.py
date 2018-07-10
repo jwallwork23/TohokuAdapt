@@ -131,6 +131,9 @@ class TohokuOptions(AdaptOptions):
     g = PositiveFloat(9.81, help="Gravitational acceleration").tag(config=True)
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
 
+    # Data extraction
+    gauges = List(trait=Unicode, default_value=["P02", "P06"], help="Gauges at which to extract timeseries").tag(config=True)
+
     def lat(self, gauge):
         return {"P02": 38.5002, "P06": 38.6340, "801": 38.2, "802": 39.3, "803": 38.9, "804": 39.7, "806": 37.0,
                 "Fukushima Daiichi": 37.4213, "Onagawa": 38.3995, "Fukushima Daini": 37.3166, "Tokai": 36.4664,
@@ -292,3 +295,9 @@ class AdvectionOptions(AdaptOptions):
     loc = List(trait=Float, default_value=[25., 7.5],
                help="Important locations, written as a list.").tag(config=True)
     J = Float(0.1871, help="Objective functional value on a fine mesh").tag(config=True)    # On 64,000 elements
+
+    # Cross sections
+    h_slice = List(trait=Tuple, default_value=[(x, 5.) for x in np.linspace(0.01, 49.99, 101)],
+                   help="List of coordinates corresponding to a horizontal slice of the domain").tag(config=True)
+    v_slice = List(trait=Tuple, default_value=[(30., y) for y in np.linspace(0.002, 9.998, 101)],
+                   help="List of coordinates corresponding to a vertical slice of the domain").tag(config=True)

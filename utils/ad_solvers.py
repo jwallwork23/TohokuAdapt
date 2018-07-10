@@ -2,10 +2,10 @@ from thetis import *
 
 import numpy as np
 from time import clock
+import h5py
 
 from utils.adaptivity import *
 from utils.callbacks import AdvectionCallback, ObjectiveAdvectionCallback
-from utils.error_estimators import sw_strong_residual
 from utils.interpolation import interp, mixedPairInterp
 from utils.setup import problemDomain
 
@@ -16,7 +16,7 @@ __all__ = ["advect"]
 def fixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
 
-    # Initialise solver
+    # Set up solver
     solver_obj = solver2d.FlowSolver2d(mesh, b)
     options = solver_obj.options
     options.element_family = op.family
@@ -42,6 +42,20 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs
     cb1 = AdvectionCallback(solver_obj)
     cb1.op = op
     solver_obj.add_callback(cb1, 'timestep')
+    cb2 = callback.DetectorsCallback(solver_obj,
+                                     op.h_slice,
+                                     ['tracer_2d'],
+                                     'horizontal slice',
+                                     ["h_slice{i:d}".format(i=i) for i in range(len(op.h_slice))],
+                                     export_to_hdf5=True)
+    solver_obj.add_callback(cb2, 'export')
+    # cb3 = callback.DetectorsCallback(solver_obj,
+    #                                  op.v_slice,
+    #                                  ['tracer_2d'],
+    #                                  'vertical slice',
+    #                                  ["v_slice{i:d}".format(i=i) for i in range(len(op.v_slice))],
+    #                                  export_to_hdf5=True)
+    # solver_obj.add_callback(cb3, 'export')
     solver_obj.bnd_functions = BCs
 
     # Solve and extract timeseries / functionals
@@ -50,16 +64,29 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs
     solver_obj.iterate()
     solverTimer = clock() - solverTimer
     quantities['J_h'] = cb1.get_val()          # Evaluate objective functional
+    hf_h = h5py.File(op.directory() + 'diagnostic_horizontal_slice.hdf5', 'r')
+    for x in ["h_slice{i:d}".format(i=i) for i in range(len(op.h_slice))]:
+        vals = np.array(hf_h.get(x))
+        for i in range(len(vals)):
+            tag = 'h_snapshot_{i:d}'.format(i=i)
+            if not tag in quantities.keys():
+                quantities[tag] = []
+            quantities[tag].append(vals[i])
+    hf_h.close()
+    # hf_v = h5py.File(op.directory() + 'diagnostic_vertical_slice.hdf5', 'r')
+    # for y in ["v_slice{i:d}".format(i=i) for i in range(len(op.v_slice))]:
+    #     vals = np.array(hf_h.get(y))
+    #     for i in range(len(vals)):
+    #         tag = 'v_snapshot_{i:d}'.format(i=i)
+    #         if not tag in quantities.keys():
+    #             quantities[tag] = []
+    #         quantities[tag].append(vals[i])
+    # hf_v.close()
 
     # Output mesh statistics and solver times
     quantities['meanElements'] = mesh.num_cells()
     quantities['solverTimer'] = solverTimer
     quantities['adaptSolveTimer'] = 0.
-
-    # TODO: Extract HDF5 from t=30 and t=60 to take timeseries
-
-    # tracer_2d = solver_obj.fields.tracer_2d
-    # print(tracer_2d.function_space().ufl_element().family(), tracer_2d.function_space().ufl_element().degree())
 
     return quantities
 
