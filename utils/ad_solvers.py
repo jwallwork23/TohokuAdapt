@@ -318,7 +318,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                     la.load(dual)
                     la.close()
                 epsilon_.interpolate(tracer_2d * dual)
-                epsilon = pointwiseMax(epsilon, epsilon_)
+                epsilon = pointwise_max(epsilon, epsilon_)
             epsilon = normalise_indicator(epsilon, op=op)
             with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_string(k), mode=FILE_CREATE) as se:
                 se.store(epsilon)
@@ -468,7 +468,6 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     # Define Functions relating to a posteriori DWR error estimator
     dual = Function(P1DG, name='adjoint_2d')
     epsilon = Function(P1, name='error_2d')
-    epsilon_ = Function(P1)
     residual_2d = Function(P0)
 
     if op.order_increase:
@@ -728,6 +727,6 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
 def advect(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
     regen = kwargs.get('regen')
-    solvers = {'FixedMesh': FixedMesh, 'HessianBased': HessianBased, 'DWP': DWP}
+    solvers = {'FixedMesh': FixedMesh, 'HessianBased': HessianBased, 'DWP': DWP, 'DWR': DWR}
 
     return solvers[op.approach](mesh, u0, eta0, b, BCs, source, diffusivity, regen=regen, op=op)

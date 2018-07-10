@@ -62,14 +62,32 @@ for i in resolutions:
         if tag in quantities:
             errorFile.write(", %.4e" % quantities[tag])
     errorFile.write(", %.1f, %.4e\n" % (quantities['solver_timer'], quantities['J_h']))
-    print(quantities.keys())
-    for tag in ("h_snapshot_60", "h_snapshot_120", "v_snapshot_60", "v_snapshot_120"):  # TODO: Generalise and adjust axes
+
+    i_end = op.final_export()
+    for progress in (0.5, 1):
+        tag = "h_snapshot_"+str(int(i_end*progress))        # TODO: This is for non-diffusive case. Consider steady state
         if tag in quantities:
             plt.clf()
             s = quantities[tag]
-            plt.plot(range(len(s)), s)
-            plt.title(tag)
-            plt.show()
+            sl = op.h_slice
+            x = np.linspace(sl[0][0], sl[-1][0], len(sl))
+            plt.plot(x, s)
+            plt.title("Tracer concentration at time %.1fs" % (op.end_time * progress))
+            plt.xlabel("Abcissa (m)")
+            plt.ylabel("Tracer concentraton (g/L)")
+            plt.savefig('outdata/advection-diffusion/'+ tag + '.pdf')
+    for progress in (0.5, 1):
+        tag = "v_snapshot_"+str(int(i_end*progress))
+        if tag in quantities:
+            plt.clf()
+            s = quantities[tag]
+            sl = op.v_slice
+            x = np.linspace(sl[0][0], sl[0][-1], len(sl))
+            plt.plot(x, s)
+            plt.title("Tracer concentration at time %.1fs" % (op.end_time * progress))
+            plt.xlabel("Ordinate (m)")
+            plt.ylabel("Tracer concentration (g/L)")
+            plt.savefig('outdata/advection-diffusion/' + tag + '.pdf')
     if approach in ("DWP", "DWR"):
         PETSc.Sys.Print("Time for final run: %.1fs" % quantities['adapt_solve_timer'], comm=COMM_WORLD)
 errorFile.close()
