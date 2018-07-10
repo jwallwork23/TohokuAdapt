@@ -3,8 +3,8 @@ from firedrake import *
 import argparse
 
 from utils.options import *
-from utils.setup import RossbyWaveSolution, problemDomain
-from utils.timeseries import plotTimeseries, compareTimeseries
+from utils.setup import RossbyWaveSolution, problem_domain
+from utils.timeseries import plot_timeseries, compare_timeseries
 
 
 parser = argparse.ArgumentParser()
@@ -39,7 +39,7 @@ else:
 if bool(args.s):
     assert op.mode in ('rossby-wave', 'kelvin-wave')
     integrandFile = open('outdata/rossby-wave/analytic_Integrand.txt', 'w+')
-    rw = RossbyWaveSolution(op.mixedSpace(problemDomain(level=7, op=op)[0]), order=1, op=op)
+    rw = RossbyWaveSolution(op.mixedSpace(problem_domain(level=7, op=op)[0]), order=1, op=op)
     integrand = rw.integrate()
     integrandFile.writelines(["%s," % val for val in integrand])
     integrandFile.write("\n")
@@ -54,6 +54,6 @@ if not bool(args.s):
     for quantity in quantities:
         if args.c:
             for i in range(6):
-                compareTimeseries(date, i, quantity=quantity, op=op)
+                compare_timeseries(date, i, quantity=quantity, op=op)
         else:
-            plotTimeseries(fileExt, date=date, quantity=quantity, realData=bool(args.g), op=op)
+            plot_timeseries(fileExt, date=date, quantity=quantity, realData=bool(args.g), op=op)

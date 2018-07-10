@@ -6,10 +6,10 @@ import h5py
 from .options import TohokuOptions, RossbyWaveOptions, AdvectionOptions
 
 
-__all__ = ["indexString", "peakAndDistance", "bdyRegion", "extract_slice"]
+__all__ = ["index_string", "peak_and_distance", "boundary_region", "extract_slice"]
 
 
-def indexString(index):
+def index_string(index):
     """
     :arg index: integer form of index.
     :return: five-digit string form of index.
@@ -17,7 +17,7 @@ def indexString(index):
     return (5 - len(str(index))) * '0' + str(index)
 
 
-def peakAndDistance(f, op=RossbyWaveOptions()):
+def peak_and_distance(f, op=RossbyWaveOptions()):
     mesh = f.function_space().mesh()
     with f.dat.vec_ro as fv:
         peak_i, peak = fv.max()
@@ -29,7 +29,7 @@ def peakAndDistance(f, op=RossbyWaveOptions()):
     return peak, val
 
 
-def bdyRegion(mesh, bdyTag, scale, sponge=False):
+def boundary_region(mesh, bdyTag, scale, sponge=False):
 
     bc = DirichletBC(FunctionSpace(mesh, "CG", 1), 0, bdyTag)
     coords = mesh.coordinates.dat.data

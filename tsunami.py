@@ -6,7 +6,7 @@ import datetime
 import numpy as np
 
 from utils.options import TohokuOptions, GaussianOptions, RossbyWaveOptions, KelvinWaveOptions
-from utils.setup import problemDomain
+from utils.setup import problem_domain
 from utils.sw_solvers import tsunami
 
 
@@ -88,22 +88,22 @@ else:
     resolutions = [0 if args.level is None else int(args.level)]
 Jlist = np.zeros(len(resolutions))
 for i in resolutions:
-    mesh, u0, eta0, b, BCs, f, diffusivity = problemDomain(i, op=op)
+    mesh, u0, eta0, b, BCs, f, diffusivity = problem_domain(i, op=op)
     quantities = tsunami(mesh, u0, eta0, b, BCs=BCs, f=f, diffusivity=diffusivity, regen=bool(args.regen), op=op)
     PETSc.Sys.Print("Mode: %s Approach: %s. Run: %d" % (mode, approach, i), comm=COMM_WORLD)
     rel = np.abs(op.J - quantities['J_h']) / np.abs(op.J)
     PETSc.Sys.Print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs OF error: %.4e"
-          % (i, quantities['meanElements'], quantities['J_h'], quantities['solverTimer'], rel), comm=COMM_WORLD)
-    errorFile.write('%d, %.4e' % (quantities['meanElements'], rel))
+          % (i, quantities['mean_elements'], quantities['J_h'], quantities['solver_timer'], rel), comm=COMM_WORLD)
+    errorFile.write('%d, %.4e' % (quantities['mean_elements'], rel))
     for tag in ("peak", "dist", "spd", "TV P02", "TV P06"):
         if tag in quantities:
             errorFile.write(", %.4e" % quantities[tag])
-    errorFile.write(", %.1f, %.4e\n" % (quantities['solverTimer'], quantities['J_h']))
+    errorFile.write(", %.1f, %.4e\n" % (quantities['solver_timer'], quantities['J_h']))
     for tag in files:
         files[tag].writelines(["%s," % val for val in quantities[tag]])
         files[tag].write("\n")
     if approach in ("DWP", "DWR"):
-        PETSc.Sys.Print("Time for final run: %.1fs" % quantities['adaptSolveTimer'], comm=COMM_WORLD)
+        PETSc.Sys.Print("Time for final run: %.1fs" % quantities['adapt_solve_timer'], comm=COMM_WORLD)
 for tag in files:
     files[tag].close()
 errorFile.close()

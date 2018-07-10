@@ -34,3 +34,4 @@ paralleltest.py
 dt_test.py
 channel2d_tracer.py
 advection-test.py
+pure-advection.py

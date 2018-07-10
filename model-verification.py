@@ -3,13 +3,12 @@ from firedrake.petsc import PETSc
 from thetis.callback import DetectorsCallback
 
 from time import clock
-import numpy as np
 import h5py
 
 from utils.callbacks import SWCallback
 from utils.options import TohokuOptions
-from utils.setup import problemDomain
-from utils.timeseries import gaugeTV
+from utils.setup import problem_domain
+from utils.timeseries import gauge_total_variation
 
 
 def solverSW(mesh, u0, eta0, b, BCs={}, f=None, op=TohokuOptions()):
@@ -57,9 +56,8 @@ def solverSW(mesh, u0, eta0, b, BCs={}, f=None, op=TohokuOptions()):
     for g in gauges:
         quantities[g] = np.array(hf.get(g))
     hf.close()
-    quantities["Integrand"] = cb1.getVals() # TODO: This won't work
-    quantities["TV P02"] = gaugeTV(quantities["P02"], gauge="P02")
-    quantities["TV P06"] = gaugeTV(quantities["P06"], gauge="P06")
+    quantities["TV P02"] = gauge_total_variation(quantities["P02"], gauge="P02")
+    quantities["TV P06"] = gauge_total_variation(quantities["P06"], gauge="P06")
     quantities["Element count"] = mesh.num_cells()
     quantities["Timer"] = timer
 
@@ -87,7 +85,6 @@ if __name__ == '__main__':
         errorfile = open(filename + '.txt', 'w+')
         gaugeFileP02 = open(filename + 'P02.txt', 'w+')
         gaugeFileP06 = open(filename + 'P06.txt', 'w+')
-        integrandFile = open(filename + 'Integrand.txt', 'w+')
         op.di = 'plots/model-verification/' + tag + '/'
 
         resolutions = range(11)
@@ -96,14 +93,12 @@ if __name__ == '__main__':
         g6list = np.zeros(len(resolutions))
         for k, i in zip(resolutions, range(len(resolutions))):
             PETSc.Sys.Print("\nStarting run %d... Coriolis frequency: %s\n" % (k, c), comm=COMM_WORLD)
-            mesh, u0, eta0, b, BCs, f = problemDomain(level=k, op=op)
+            mesh, u0, eta0, b, BCs, f, diffusivity = problem_domain(level=k, op=op)
             quantities = solverSW(mesh, u0, eta0, b, BCs, f, op=op)
             gaugeFileP02.writelines(["%s," % val for val in quantities["P02"]])
             gaugeFileP02.write("\n")
             gaugeFileP06.writelines(["%s," % val for val in quantities["P06"]])
             gaugeFileP06.write("\n")
-            integrandFile.writelines(["%s," % val for val in quantities["Integrand"]])
-            integrandFile.write("\n")
             errorfile.write('%d, %.4e, %.4e, %.4e, %.1f\n'
                             % (k, quantities["J_h"], quantities["TV P02"], quantities["TV P06"], quantities["Timer"]))
             PETSc.Sys.Print("\nRun %d... J_h: %.4e TV P02: %.3f, TV P06: %.3f, time: %.1f\n"
@@ -122,4 +117,3 @@ if __name__ == '__main__':
         errorfile.close()
         gaugeFileP02.close()
         gaugeFileP06.close()
-        integrandFile.close()

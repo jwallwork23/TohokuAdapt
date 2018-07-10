@@ -1,7 +1,7 @@
 import argparse
 
 from utils.options import *
-from utils.timeseries import integrateTimeseries
+from utils.timeseries import integrate_timeseries
 
 
 parser = argparse.ArgumentParser()
@@ -36,4 +36,4 @@ elif bool(args.s):
     fileExt = 'analytic'
 else:
     fileExt = approach
-print('Integral = ', integrateTimeseries(fileExt, date=args.d, op=op))
+print('Integral = ', integrate_timeseries(fileExt, date=args.d, op=op))

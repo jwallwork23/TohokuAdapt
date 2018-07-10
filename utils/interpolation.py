@@ -1,7 +1,7 @@
 from thetis import *
 
 
-__all__ = ["interp", "mixedPairInterp"]
+__all__ = ["interp", "mixed_pair_interp"]
 
 
 def interp(mesh, *fields):
@@ -66,7 +66,7 @@ def interp(mesh, *fields):
         return fields_new
 
 
-def mixedPairInterp(mesh, V, *fields):
+def mixed_pair_interp(mesh, V, *fields):
     """
     Interpolate mixed function space pairs onto a new mesh.
 

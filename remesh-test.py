@@ -7,9 +7,9 @@ import datetime
 
 from utils.adaptivity import *
 from utils.callbacks import *
-from utils.interpolation import interp, mixedPairInterp
-from utils.setup import problemDomain, RossbyWaveSolution
-from utils.options import Options
+from utils.interpolation import interp, mixed_pair_interp
+from utils.setup import problem_domain, RossbyWaveSolution
+from utils.options import RossbyWaveOptions
 
 
 def hessianBased(startRes, **kwargs):
@@ -20,7 +20,7 @@ def hessianBased(startRes, **kwargs):
         assert float(physical_constants['g_grav'].dat.data) == op.g
     except:
         physical_constants['g_grav'].assign(op.g)
-    mesh, u0, eta0, b, BCs, f = problemDomain(startRes, op=op)
+    mesh, u0, eta0, b, BCs, f = problem_domain(startRes, op=op)
     V = op.mixed_space(mesh)
     uv_2d, elev_2d = Function(V).split()  # Needed to load data into
     elev_2d.interpolate(eta0)
@@ -34,7 +34,7 @@ def hessianBased(startRes, **kwargs):
     cnt = 0
     endT = 0.
 
-    adaptSolveTimer = 0.
+    adapt_solve_timer = 0.
     quantities = {}
     while cnt < op.final_index:
         adaptTimer = clock()
@@ -42,15 +42,15 @@ def hessianBased(startRes, **kwargs):
 
             # Construct metric
             if op.adapt_field != 's':
-                M = steadyMetric(elev_2d, op=op)
+                M = steady_metric(elev_2d, op=op)
             if cnt != 0:  # Can't adapt to zero velocity
                 if op.adapt_field != 'f':
                     spd = Function(FunctionSpace(mesh, "DG", 1)).interpolate(sqrt(dot(uv_2d, uv_2d)))
-                    M2 = steadyMetric(spd, op=op)
-                    M = metricIntersection(M, M2) if op.adapt_field == 'b' else M2
+                    M2 = steady_metric(spd, op=op)
+                    M = metric_intersection(M, M2) if op.adapt_field == 'b' else M2
             if op.adapt_on_bathymetry:
-                M2 = steadyMetric(b, op=op)
-                M = M2 if op.adapt_field != 'f' and cnt == 0. else metricIntersection(M, M2)
+                M2 = steady_metric(b, op=op)
+                M = M2 if op.adapt_field != 'f' and cnt == 0. else metric_intersection(M, M2)
 
             # Adapt mesh and interpolate variables
             if op.adapt_on_bathymetry or cnt != 0 or op.adapt_field == 'f':
@@ -58,7 +58,7 @@ def hessianBased(startRes, **kwargs):
                 if cnt != 0:
                     uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
                 elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
-                b, BCs, f = problemDomain(mesh=mesh, op=op)[3:]
+                b, BCs, f = problem_domain(mesh=mesh, op=op)[3:]
                 uv_2d.rename('uv_2d')
                 elev_2d.rename('elev_2d')
         adaptTimer = clock() - adaptTimer
@@ -101,9 +101,9 @@ def hessianBased(startRes, **kwargs):
             cb1.objective_value = quantities['Integrand']   # TODO: This won't work - syntax has changed. Need extract from hdf5
         adapSolver.add_callback(cb1, 'timestep')
         adapSolver.bnd_functions['shallow_water'] = BCs
-        solverTimer = clock()
+        solver_timer = clock()
         adapSolver.iterate()
-        solverTimer = clock() - solverTimer
+        solver_timer = clock() - solver_timer
         quantities['J_h'] = cb1.quadrature()  # Evaluate objective functional
         quantities['Integrand'] = cb1.getVals()
 
@@ -112,13 +112,13 @@ def hessianBased(startRes, **kwargs):
         mM = [min(nEle, mM[0]), max(nEle, mM[1])]
         Sn += nEle
         cnt += op.timesteps_per_remesh
-        av = op.adaptation_stats(int(cnt/op.timesteps_per_remesh+1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.timestep)
-        adaptSolveTimer += adaptTimer + solverTimer
+        av = op.adaptation_stats(int(cnt/op.timesteps_per_remesh+1), adaptTimer, solver_timer, nEle, Sn, mM, cnt * op.timestep)
+        adapt_solve_timer += adaptTimer + solver_timer
 
     # Output mesh statistics and solver times
-    quantities['meanElements'] = av
-    quantities['solverTimer'] = adaptSolveTimer
-    quantities['adaptSolveTimer'] = adaptSolveTimer
+    quantities['mean_elements'] = av
+    quantities['solver_timer'] = adapt_solve_timer
+    quantities['adapt_solve_timer'] = adapt_solve_timer
 
     return quantities
 
@@ -131,14 +131,14 @@ for i in range(3):
     outfile = open("outdata/rossby-wave/rmTest_mesh"+str(i)+'_'+date+'.txt', 'w')
     for adaptations in [1, 2, 3, 4]:
         for j in range(len(rm)):
-            op = Options(mode='rossby-wave', approach='hessianBased')
+            op = RossbyWaveOptions(approach='hessianBased')
             op.timesteps_per_remesh = rm[j]
             op.adaptations = adaptations
             q = hessianBased(i, op=op)
             err = np.abs((op.J - q['J_h'])/op.J)
-            timer = q['solverTimer']
+            timer = q['solver_timer']
             print("Mesh %d: rm = %d, #Elements = %d, J_h = %.4f, error = %.4f, Time = %.2fs"
-                  % (i, rm[j], q['meanElements'], q['J_h'], err, timer))
-            outfile.write("%d, %d, %d, %.4f, %.4f, %.2f\n" % (i, rm[j], q['meanElements'], q['J_h'], err, timer))
+                  % (i, rm[j], q['mean_elements'], q['J_h'], err, timer))
+            outfile.write("%d, %d, %d, %.4f, %.4f, %.2f\n" % (i, rm[j], q['mean_elements'], q['J_h'], err, timer))
         outfile.write("\n")
     outfile.close()

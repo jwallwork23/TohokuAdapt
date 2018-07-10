@@ -8,8 +8,8 @@ import datetime
 from .options import TohokuOptions
 
 
-__all__ = ["errorVsElements", "__main__", "plotTimeseries", "compareTimeseries", "timeseriesDifference",
-           "totalVariation", "gaugeTV", "integrateTimeseries"]
+__all__ = ["error_vs_elements", "plot_timeseries", "compare_timeseries", "timeseries_difference",
+           "gauge_total_variation", "integrate_timeseries"]
 
 
 plt.rc('text', usetex=True)
@@ -17,7 +17,7 @@ plt.rc('font', family='serif')
 plt.rc('legend', fontsize='x-large')
 
 
-def totalVariation(data):
+def total_variation(data):
     """
     :arg data: (one-dimensional) timeseries record.
     :return: total variation thereof.
@@ -40,20 +40,20 @@ def totalVariation(data):
     return TV
 
 
-def gaugeTV(data, gauge="P02"):
+def gauge_total_variation(data, gauge="P02"):
     """
     :param data: timeseries to calculate error of.
     :param gauge: gauge considered.
     :return: total variation. 
     """
     N = len(data)
-    spline = extractSpline(gauge)
+    spline = extract_spline(gauge)
     times = np.linspace(0., 25., N)
     errors = [data[i] - spline(times[i]) for i in range(N)]
-    return totalVariation(errors) / totalVariation([spline(times[i]) for i in range(N)])
+    return total_variation(errors) / total_variation([spline(times[i]) for i in range(N)])
 
 
-def readErrors(date, approach, mode='tohoku', bootstrapping=False):
+def read_errors(date, approach, mode='tohoku', bootstrapping=False):
     """
     :arg date: date simulation was run.
     :arg approach: mesh adaptive approach.
@@ -110,7 +110,7 @@ def readErrors(date, approach, mode='tohoku', bootstrapping=False):
     return nEls, err, tim
 
 
-def extractSpline(gauge):
+def extract_spline(gauge):
     measuredFile = open('resources/gauges/'+gauge+'data_25mins.txt', 'r')
     x = []
     y = []
@@ -123,7 +123,7 @@ def extractSpline(gauge):
     return spline
 
 
-def extractData(gauge):
+def extract_data(gauge):
     if gauge in ("P02", "P06"):
         measuredFile = open('resources/gauges/' + gauge + 'data_25mins.txt', 'r')
         x = []
@@ -143,7 +143,7 @@ def extractData(gauge):
         return range(len(xy)-1), [float(i) for i in xy[:-1]]
 
 
-def plotTimeseries(fileExt, date, quantity='Integrand', realData=False, op=TohokuOptions()):
+def plot_timeseries(fileExt, date, quantity='Integrand', realData=False, op=TohokuOptions()):
     assert quantity in ('Integrand', 'Integrand-mirrored', 'P02', 'P06')
     filename = 'outdata/' + op.mode + '/' + fileExt + '_' + date + quantity + '.txt'
     filename2 = 'outdata/' + op.mode + '/' + fileExt + '_' + date + '.txt'
@@ -164,7 +164,7 @@ def plotTimeseries(fileExt, date, quantity='Integrand', realData=False, op=Tohok
     g.close()
     if realData:
         if (op.mode == 'tohoku' and quantity in ('P02', 'P06')) or op.mode == 'rossby-wave':
-            x, y = extractData(quantity)
+            x, y = extract_data(quantity)
             me = 10 if op.mode == 'rossby-wave' else 1
             plt.plot(np.linspace(0, op.end_time, len(x)), y, label='Gauge data', marker='*', markevery=me, color='black')
     plt.xlabel('Time (s)')
@@ -174,7 +174,7 @@ def plotTimeseries(fileExt, date, quantity='Integrand', realData=False, op=Tohok
     plt.clf()
 
 
-def timeseriesDifference(fileExt1, date1, fileExt2, date2, quantity='Integrand', op=TohokuOptions()):
+def timeseries_difference(fileExt1, date1, fileExt2, date2, quantity='Integrand', op=TohokuOptions()):
     assert quantity in ('Integrand', 'P02', 'P06')
     filename1 = 'outdata/' + op.mode + '/' + fileExt1 + '_' + date1 + quantity + '.txt'
     filename2 = 'outdata/' + op.mode + '/' + fileExt2 + '_' + date2 + quantity + '.txt'
@@ -188,13 +188,13 @@ def timeseriesDifference(fileExt1, date1, fileExt2, date2, quantity='Integrand',
         dat2 = [float(d) for d in separated[:-1]]
         try:
             assert np.shape(dat1) == np.shape(dat2)
-            errs.append(totalVariation(np.asarray(dat1) - np.asarray(dat2)))
+            errs.append(total_variation(np.asarray(dat1) - np.asarray(dat2)))
         except:
             pass
     return ['%.4e' % i for i in errs]
 
 
-def integrateTimeseries(fileExt, date, op=TohokuOptions()):
+def integrate_timeseries(fileExt, date, op=TohokuOptions()):
     if date is None:
         date = ''
     filename = 'outdata/' + op.mode + '/' + fileExt + '_' + date + 'Integrand.txt'
@@ -215,7 +215,7 @@ def integrateTimeseries(fileExt, date, op=TohokuOptions()):
     return ['%.4e' % i for i in integrals]
 
 
-def compareTimeseries(date, run, quantity='Integrand', op=TohokuOptions()):
+def compare_timeseries(date, run, quantity='Integrand', op=TohokuOptions()):
     assert quantity in ('Integrand', 'P02', 'P06')
     approaches = ("fixedMesh", "hessianBased", "DWP", "DWR")
 
@@ -251,7 +251,7 @@ def compareTimeseries(date, run, quantity='Integrand', op=TohokuOptions()):
     plt.clf()
 
 
-def errorVsElements(mode='tohoku',
+def error_vs_elements(mode='tohoku',
                     bootstrapping=False,
                     noTinyMeshes=False,
                     date=None,
@@ -311,7 +311,7 @@ def errorVsElements(mode='tohoku',
     for m in range(errortypes):
         for n in range(len(names)):
             try:
-                av, errors, timing = readErrors(dates[n], names[n], mode, bootstrapping=bootstrapping)
+                av, errors, timing = read_errors(dates[n], names[n], mode, bootstrapping=bootstrapping)
                 rel = []
                 for i in errors:
                     rel.append(errors[i][m])

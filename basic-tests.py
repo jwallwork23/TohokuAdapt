@@ -170,7 +170,7 @@ def adapts(scale, space, indy):
                     # Adapt mesh
                     temp = Function(Vs).assign(f)
                     for k in range(nAdapt):
-                        M = steadyMetric(f, op=op)
+                        M = steady_metric(f, op=op)
                         mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
                         if k < nAdapt -1:
                             f = interp(mesh, f)
@@ -204,15 +204,15 @@ def adapts(scale, space, indy):
         plt.clf()
 
 
-def directionalRefine(eps=1e-4):
+def directional_refinement(eps=1e-4):
     for j in range(8):
         for dir in (0, 1):
             n = pow(2, j)
             mesh = UnitSquareMesh(n, n)
             op = Options(mode=None, hmin=1e-8, hmax=1)   # TODO: Remove this old version
             op.nVerT = mesh.num_vertices() * op.rescaling
-            M_ = isotropicMetric(Function(FunctionSpace(mesh, space, 1)).interpolate(CellSize(mesh)), op=op)
-            M = anisoRefine(M_, direction=dir)
+            M_ = isotropic_metric(Function(FunctionSpace(mesh, space, 1)).interpolate(CellSize(mesh)), op=op)
+            M = anisotropic_refinement(M_, direction=dir)
             coords = AnisotropicAdaptation(mesh, M).adapted_mesh.coordinates.dat.data
             x = 0
             y = 0
@@ -245,6 +245,6 @@ if __name__ == "__main__":
     if args.test == 'Hessian':
         hessian(subset, space)
     elif args.test == 'dirRefine':
-        directionalRefine()
+        directional_refinement()
     elif args.test == 'nAdapt':
         adapts(scale, space, indy)

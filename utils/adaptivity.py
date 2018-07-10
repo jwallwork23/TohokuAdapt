@@ -8,12 +8,12 @@ from scipy import linalg as sla
 from .options import TohokuOptions
 
 
-__all__ = ["constructGradient", "constructHessian", "steadyMetric", "isotropicMetric", "isoP2", "anisoRefine",
-           "metricGradation", "localMetricIntersection", "metricIntersection", "metricConvexCombination",
-           "symmetricProduct", "pointwiseMax", "metricComplexity", "normaliseIndicator"]
+__all__ = ["construct_gradient", "construct_hessian", "steady_metric", "isotropic_metric", "iso_P2", "pointwise_max",
+           "anisotropic_refinement", "gradate_metric", "local_metric_intersection", "metric_intersection",
+           "metric_convex_combination", "symmetric_product", "metric_complexity", "normalise_indicator"]
 
 
-def constructGradient(f):
+def construct_gradient(f):
     """
     Assuming the function `f` is P1 (piecewise linear and continuous), direct differentiation will give a gradient which
     is P0 (piecewise constant and discontinuous). Since we would prefer a smooth gradient, an L2 projection gradient 
@@ -33,7 +33,7 @@ def constructGradient(f):
     return g
 
 
-def constructHessian(f, g=None, op=TohokuOptions()):
+def construct_hessian(f, g=None, op=TohokuOptions()):
     """
     Assuming the smooth solution field has been approximated by a function `f` which is P1, all second derivative
     information has been lost. As such, the Hessian of `f` cannot be directly computed. We provide two means of
@@ -62,7 +62,7 @@ def constructHessian(f, g=None, op=TohokuOptions()):
         Lh -= (tau[0, 0] * nhat[1] * f.dx(0) + tau[1, 1] * nhat[0] * f.dx(1)) * ds  # Term not in Firedrake tutorial
     elif op.hessian_recovery == 'dL2':
         if g is None:
-            g = constructGradient(f)
+            g = construct_gradient(f)
         Lh = (inner(tau, H) + inner(div(tau), g)) * dx
         Lh -= (tau[0, 1] * nhat[1] * g[0] + tau[1, 0] * nhat[0] * g[1]) * ds
         Lh -= (tau[0, 0] * nhat[1] * g[0] + tau[1, 1] * nhat[0] * g[1]) * ds
@@ -74,7 +74,7 @@ def constructHessian(f, g=None, op=TohokuOptions()):
     return H
 
 
-def steadyMetric(f, H=None, op=TohokuOptions()):
+def steady_metric(f, H=None, op=TohokuOptions()):
     """
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``computeSteadyMetric``, from 
     ``adapt.py``, 2016.
@@ -85,7 +85,7 @@ def steadyMetric(f, H=None, op=TohokuOptions()):
     :return: steady metric associated with Hessian H.
     """
     if H is None:
-        H = constructHessian(f, op=op)
+        H = construct_hessian(f, op=op)
     V = H.function_space()
     mesh = V.mesh()
 
@@ -166,7 +166,7 @@ def steadyMetric(f, H=None, op=TohokuOptions()):
     return M
 
 
-def normaliseIndicator(f, op=TohokuOptions()):        # TODO: What if metric is constant?
+def normalise_indicator(f, op=TohokuOptions()):        # TODO: What if metric is constant?
     """
     Normalise error indicator `f` using procedure defined by `op`.
     
@@ -188,7 +188,7 @@ def normaliseIndicator(f, op=TohokuOptions()):        # TODO: What if metric is 
     return f
 
 
-def isotropicMetric(f, bdy=None, invert=True, op=TohokuOptions()):
+def isotropic_metric(f, bdy=None, invert=True, op=TohokuOptions()):
     """
     Given a scalar error indicator field `f`, construct an associated isotropic metric field.
     
@@ -234,7 +234,7 @@ def isotropicMetric(f, bdy=None, invert=True, op=TohokuOptions()):
     return M
 
 
-def isoP2(mesh):
+def iso_P2(mesh):
     """
     Uniformly refine a mesh (in each canonical direction) using an iso-P2 refinement. That is, nodes of a quadratic 
     element on the initial mesh become vertices of the new mesh.
@@ -242,7 +242,7 @@ def isoP2(mesh):
     return MeshHierarchy(mesh, 1).__getitem__(1)
 
 
-def anisoRefine(M, direction=0):
+def anisotropic_refinement(M, direction=0):
     """
     (Anisotropically) refine a mesh (or, more precisely, the metric field `M` associated with a mesh) in such a way as 
     to approximately half the element size in a canonical direction (x- or y-), by scaling of the corresponding 
@@ -263,7 +263,7 @@ def anisoRefine(M, direction=0):
     return M
 
 
-def metricGradation(M, iso=False, op=TohokuOptions()):   # TODO: Implement this in pyop2
+def gradate_metric(M, iso=False, op=TohokuOptions()):   # TODO: Implement this in pyop2
     """
     Perform anisotropic metric gradation in the method described in Alauzet 2010, using linear interpolation. Python
     code found here is based on the C code of Nicolas Barral's function ``DMPlexMetricGradation2d_Internal``, found in 
@@ -315,19 +315,19 @@ def metricGradation(M, iso=False, op=TohokuOptions()):   # TODO: Implement this 
             if iso:     # TODO: This does not currently work
                 eta2_12 = 1. / pow(1 + (v12[0] * v12[0] + v12[1] * v12[1]) * ln_beta / met1[0, 0], 2)
                 eta2_21 = 1. / pow(1 + (v21[0] * v21[0] + v21[1] * v21[1]) * ln_beta / met2[0, 0], 2)
-                # print('#### metricGradation DEBUG: 1,1 entries ', met1[0, 0], met2[0, 0])
-                # print('#### metricGradation DEBUG: scale factors', eta2_12, eta2_21)
+                # print('#### gradate_metric DEBUG: 1,1 entries ', met1[0, 0], met2[0, 0])
+                # print('#### gradate_metric DEBUG: scale factors', eta2_12, eta2_21)
                 redMet1 = eta2_21 * met2
                 redMet2 = eta2_12 * met1
             else:
 
                 # Intersect metric with a scaled 'grown' metric to get reduced metric
-                eta2_12 = 1. / pow(1 + symmetricProduct(met1, v12) * ln_beta, 2)
-                eta2_21 = 1. / pow(1 + symmetricProduct(met2, v21) * ln_beta, 2)
-                # print('#### metricGradation DEBUG: scale factors', eta2_12, eta2_21)
-                # print('#### metricGradation DEBUG: determinants', la.det(met1), la.det(met2))
-                redMet1 = localMetricIntersection(met1, eta2_21 * met2)
-                redMet2 = localMetricIntersection(met2, eta2_12 * met1)
+                eta2_12 = 1. / pow(1 + symmetric_product(met1, v12) * ln_beta, 2)
+                eta2_21 = 1. / pow(1 + symmetric_product(met2, v21) * ln_beta, 2)
+                # print('#### gradate_metric DEBUG: scale factors', eta2_12, eta2_21)
+                # print('#### gradate_metric DEBUG: determinants', la.det(met1), la.det(met2))
+                redMet1 = local_metric_intersection(met1, eta2_21 * met2)
+                redMet2 = local_metric_intersection(met2, eta2_12 * met1)
 
             # Calculate difference in order to ascertain whether the metric is modified
             diff = np.abs(met1[0, 0] - redMet1[0, 0])
@@ -358,11 +358,11 @@ def metricGradation(M, iso=False, op=TohokuOptions()):   # TODO: Implement this 
     return M_grad
 
 
-def localMetricIntersection(M1, M2):
+def local_metric_intersection(M1, M2):
     """
     Intersect two metrics `M1` and `M2` defined at a particular point in space.
     """
-    # print('#### localMetricIntersection DEBUG: attempting to compute sqrtm of matrix with determinant ', la.det(M1))
+    # print('#### local_metric_intersection DEBUG: attempting to compute sqrtm of matrix with determinant ', la.det(M1))
     sqM1 = sla.sqrtm(M1)
     sqiM1 = la.inv(sqM1)    # Note inverse and square root commute whenever both are defined
     lam, v = la.eig(np.dot(np.transpose(sqiM1), np.dot(M2, sqiM1)))
@@ -370,7 +370,7 @@ def localMetricIntersection(M1, M2):
     return np.dot(np.transpose(sqM1), np.dot(M12, sqM1))
 
 
-def metricIntersection(M1, M2, bdy=None):
+def metric_intersection(M1, M2, bdy=None):
     """
     Intersect a metric field, i.e. intersect (globally) over all local metrics.
     
@@ -383,12 +383,12 @@ def metricIntersection(M1, M2, bdy=None):
     assert V == M2.function_space()
     M = Function(V).assign(M1)
     for i in DirichletBC(V, 0, bdy).nodes if bdy is not None else range(V.mesh().num_vertices()):
-        M.dat.data[i] = localMetricIntersection(M1.dat.data[i], M2.dat.data[i])
-        # print('#### metricIntersection DEBUG: det(Mi) = ', la.det(M1.dat.data[i]))
+        M.dat.data[i] = local_metric_intersection(M1.dat.data[i], M2.dat.data[i])
+        # print('#### metric_intersection DEBUG: det(Mi) = ', la.det(M1.dat.data[i]))
     return M
 
 
-def metricConvexCombination(M1, M2, alpha=0.5):
+def metric_convex_combination(M1, M2, alpha=0.5):
     """
     Alternatively to intersection, pointwise metric information may be combined using a convex combination. Whilst this
     method does not have as clear an interpretation as metric intersection, it has the benefit that the combination may 
@@ -406,7 +406,7 @@ def metricConvexCombination(M1, M2, alpha=0.5):
     return M
 
 
-def symmetricProduct(A, b):
+def symmetric_product(A, b):
     """
     Compute the product of 2-vector `b` with itself, under the scalar product $b^T A b$ defined by the 2x2 matrix `A`.
     """
@@ -428,7 +428,7 @@ def symmetricProduct(A, b):
             return [bAb(A.dat.data[i], b.dat.data[i]) for i in range(len(A.dat.data))]
 
 
-def pointwiseMax(f, g):
+def pointwise_max(f, g):
     """
     Take the pointwise maximum (in modulus) of arrays `f` and `g`.
     """
@@ -444,7 +444,7 @@ def pointwiseMax(f, g):
     return f
 
 
-def metricComplexity(M):
+def metric_complexity(M):
     """
     Compute the complexity of a metric, which approximates the number of vertices in a mesh adapted based thereupon.
     """

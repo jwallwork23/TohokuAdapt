@@ -1,7 +1,7 @@
 import numpy as np
 
 
-__all__ = ["MeshSetup", "problemDomain", "RossbyWaveSolution", "__main__"]
+__all__ = ["MeshSetup", "problem_domain", "RossbyWaveSolution", "__main__"]
 
 
 class MeshSetup:
@@ -151,11 +151,11 @@ else:
 
     from .conversion import earth_radius, to_latlon, vectorlonlat_to_utm
     from .interpolation import interp
-    from .misc import bdyRegion
+    from .misc import boundary_region
     from .options import RossbyWaveOptions, TohokuOptions
 
 
-def problemDomain(level=0, mesh=None, b=None, op=TohokuOptions()):
+def problem_domain(level=0, mesh=None, b=None, op=TohokuOptions()):
     """
     Set up problem domain.
     
@@ -167,16 +167,16 @@ def problemDomain(level=0, mesh=None, b=None, op=TohokuOptions()):
     """
     newmesh = mesh == None
     if op.mode == 'tohoku':
-        getBathy = b is None
+        get_bathymetry = b is None
         if mesh is None:
             # ms = MeshSetup(level, op.wd)
             ms = MeshSetup(level, False)
             mesh = Mesh(ms.dirName + ms.meshName + '.msh')
-        meshCoords = mesh.coordinates.dat.data
+        mesh_coords = mesh.coordinates.dat.data
         P1 = FunctionSpace(mesh, 'CG', 1)
         eta0 = Function(P1)
         u0 = Function(VectorFunctionSpace(mesh, "CG", 1))
-        if getBathy:
+        if get_bathymetry:
             b = Function(P1, name='Bathymetry profile')
 
         # Read and interpolate initial surface data (courtesy of Saito)
@@ -185,9 +185,9 @@ def problemDomain(level=0, mesh=None, b=None, op=TohokuOptions()):
         lat1 = nc1.variables['lat'][:]
         x1, y1 = vectorlonlat_to_utm(lat1, lon1, force_zone_number=54)      # Our mesh mainly resides in UTM zone 54
         elev1 = nc1.variables['z'][:, :]
-        interpolatorSurf = si.RectBivariateSpline(y1, x1, elev1)
+        surf_interpolator = si.RectBivariateSpline(y1, x1, elev1)
         eta0vec = eta0.dat.data
-        assert meshCoords.shape[0] == eta0vec.shape[0]
+        assert mesh_coords.shape[0] == eta0vec.shape[0]
 
         # Read and interpolate bathymetry data (courtesy of GEBCO)
         nc2 = NetCDFFile('resources/bathymetry/tohoku.nc', mmap=False)
@@ -195,19 +195,19 @@ def problemDomain(level=0, mesh=None, b=None, op=TohokuOptions()):
         lat2 = nc2.variables['lat'][:-1]
         x2, y2 = vectorlonlat_to_utm(lat2, lon2, force_zone_number=54)
         elev2 = nc2.variables['elevation'][:-1, :]
-        if getBathy:
-            interpolatorBath = si.RectBivariateSpline(y2, x2, elev2)
+        if get_bathymetry:
+            bath_interpolator = si.RectBivariateSpline(y2, x2, elev2)
         b_vec = b.dat.data
         try:
-            assert meshCoords.shape[0] == b_vec.shape[0]
+            assert mesh_coords.shape[0] == b_vec.shape[0]
         except:
             b = interp(mesh, b)
 
         # Interpolate data onto initial surface and bathymetry profiles
-        for i, p in enumerate(meshCoords):
-            eta0vec[i] = interpolatorSurf(p[1], p[0])
-            if getBathy:
-                depth = - eta0vec[i] - interpolatorBath(p[1], p[0])
+        for i, p in enumerate(mesh_coords):
+            eta0vec[i] = surf_interpolator(p[1], p[0])
+            if get_bathymetry:
+                depth = - eta0vec[i] - bath_interpolator(p[1], p[0])
                 # b_vec[i] = depth if op.wd else max(depth, 30)
                 b_vec[i] = max(depth, 30)   # Post-process the bathymetry to have a minimum depth of 30m
         BCs = {200: {'un': 0}}
@@ -227,7 +227,7 @@ def problemDomain(level=0, mesh=None, b=None, op=TohokuOptions()):
                 for i, v in zip(range(len(mesh.coordinates.dat.data)), mesh.coordinates.dat.data):
                     f.dat.data[i] = f0 + beta * v[1]
         diffusivity = Function(P1).assign(op.diffusivity)
-        # diffusivity = Function(P1).interpolate(bdyRegion(mesh, 100, 1e9, sponge=True))
+        # diffusivity = Function(P1).interpolate(boundary_region(mesh, 100, 1e9, sponge=True))
         # File('plots/tohoku/spongy.pvd').write(diffusivity)
 
     elif op.mode == 'shallow-water':
@@ -420,7 +420,7 @@ class RossbyWaveSolution:
         """
         return exp(-0.5 * self.y * self.y)
 
-    def zerothOrderTerms(self, t=0.):
+    def zeroth_order_terms(self, t=0.):
         """
         :arg t: current time.
         :return: zeroth order analytic solution for test problem of Huang.
@@ -429,7 +429,7 @@ class RossbyWaveSolution:
                 'v': 2 * self.y * self.dphidx(t) * self.psi(),
                 'eta': self.phi(t) * 0.25 * (3 + 6 * self.y * self.y) * self.psi()}
 
-    def firstOrderTerms(self, t=0.):
+    def first_order_terms(self, t=0.):
         """
         :arg t: current time.
         :return: first order analytic solution for test problem of Huang.
@@ -438,7 +438,7 @@ class RossbyWaveSolution:
         phi = self.phi(t)
         coeffs = self.coeffs()
         polys = self.polynomials()
-        terms = self.zerothOrderTerms(t)
+        terms = self.zeroth_order_terms(t)
         terms['u'] += C * phi * 0.5625 * (3 + 2 * self.y * self.y) * self.psi()     # NOTE: This last psi is not included
         terms['u'] += phi * phi * self.psi() * sum(coeffs['u'][i] * polys[i] for i in range(28))
         terms['v'] += self.dphidx(t) * phi * self.psi() * sum(coeffs['v'][i] * polys[i] for i in range(28))
@@ -495,7 +495,7 @@ class RossbyWaveSolution:
         :arg t: current time.
         :return: semi-analytic solution for Rossby wave test case of Huang.
         """
-        terms = self.zerothOrderTerms(t) if self.order == 0 else self.firstOrderTerms(t)
+        terms = self.zeroth_order_terms(t) if self.order == 0 else self.first_order_terms(t)
 
         q = Function(self.function_space)
         u, eta = q.split()

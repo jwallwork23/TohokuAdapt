@@ -2,12 +2,12 @@ from thetis_adjoint import *
 
 from utils.conversion import from_latlon
 from utils.options import TohokuOptions
-from utils.setup import problemDomain
+from utils.setup import problem_domain
 from utils.solvers import tsunami
 
 # Set up problem
 op = TohokuOptions(approach='DWR')
-mesh, u0, eta0, b, BCs, f, nu = problemDomain(8, op=op)
+mesh, u0, eta0, b, BCs, f, nu = problem_domain(8, op=op)
 
 # Option 1: a delicate and potentially hazardous piece of infrastructure
 op.loc = from_latlon(op.lat("Fukushima Daiichi"), op.lon("Fukushima Daiichi"))

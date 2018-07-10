@@ -8,7 +8,7 @@ from utils.adaptivity import *
 from utils.callbacks import AdvectionCallback, ObjectiveAdvectionCallback
 from utils.interpolation import interp, mixedPairInterp
 from utils.misc import extract_slice
-from utils.setup import problemDomain
+from utils.setup import problem_domain
 
 
 __all__ = ["advect"]
@@ -61,18 +61,18 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs
 
     # Solve and extract timeseries / functionals
     quantities = {}
-    solverTimer = clock()
+    solver_timer = clock()
     solver_obj.iterate()
-    solverTimer = clock() - solverTimer
+    solver_timer = clock() - solver_timer
     quantities['J_h'] = cb1.get_val()          # Evaluate objective functional
 
     extract_slice(quantities, direction='h', op=op)
     # extract_slice(quantities, direction='v', op=op)
 
     # Output mesh statistics and solver times
-    quantities['meanElements'] = mesh.num_cells()
-    quantities['solverTimer'] = solverTimer
-    quantities['adaptSolveTimer'] = 0.
+    quantities['mean_elements'] = mesh.num_cells()
+    quantities['solver_timer'] = solver_timer
+    quantities['adapt_solve_timer'] = 0.
 
     return quantities
 
@@ -97,10 +97,10 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
     cnt = 0
     t = 0.
 
-    adaptSolveTimer = 0.
+    adapt_solve_timer = 0.
     quantities = {}
     while cnt < op.final_index():
-        adaptTimer = clock()
+        adapt_timer = clock()
         P1 = FunctionSpace(mesh, "CG", 1)
 
         tracer = Function(P1).interpolate(tracer_2d)
@@ -108,7 +108,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
 
             # Construct metric
             if cnt != 0:   # Can't adapt to zero concentration
-                M = steadyMetric(tracer, op=op)
+                M = steady_metric(tracer, op=op)
 
             # Adapt mesh and interpolate variables
             if cnt != 0:
@@ -119,16 +119,16 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         if cnt != 0:
             if op.plot_metric:
                 if op.adaptations == 0:
-                    M = steadyMetric(tracer, op=op)
+                    M = steady_metric(tracer, op=op)
                 M.rename('metric_2d')
                 mFile.write(M, time=t)
 
             elev_2d, uv_2d, tracer_2d = interp(mesh, elev_2d, uv_2d, tracer_2d)
-            b, BCs, source, diffusivity = problemDomain(mesh=mesh, op=op)[3:]     # TODO: find a different way to reset these
+            b, BCs, source, diffusivity = problem_domain(mesh=mesh, op=op)[3:]     # TODO: find a different way to reset these
             uv_2d.rename('uv_2d')
             elev_2d.rename('elev_2d')
             tracer_2d.rename('tracer_2d')
-        adaptTimer = clock() - adaptTimer
+        adapt_timer = clock() - adapt_timer
 
         # Solver object and equations
         adapSolver = solver2d.FlowSolver2d(mesh, b)
@@ -182,9 +182,9 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         #                                  export_to_hdf5=True)
         # adapSolver.add_callback(cb3, 'export')
         adapSolver.bnd_functions = BCs
-        solverTimer = clock()
+        solver_timer = clock()
         adapSolver.iterate()
-        solverTimer = clock() - solverTimer
+        solver_timer = clock() - solver_timer
         quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
         extract_slice(quantities, direction='h', op=op)
         # extract_slice(quantities, direction='v', op=op)
@@ -195,17 +195,17 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         Sn += nEle
         cnt += op.timesteps_per_remesh
         t += op.timestep * op.timesteps_per_remesh
-        av = op.adaptation_stats(int(cnt/op.timesteps_per_remesh+1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.timestep)
-        adaptSolveTimer += adaptTimer + solverTimer
+        av = op.adaptation_stats(int(cnt/op.timesteps_per_remesh+1), adapt_timer, solver_timer, nEle, Sn, mM, cnt * op.timestep)
+        adapt_solve_timer += adapt_timer + solver_timer
 
         # Extract fields for next step
         uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
         tracer_2d = adapSolver.fields.tracer_2d
 
     # Output mesh statistics and solver times
-    quantities['meanElements'] = av
-    quantities['solverTimer'] = adaptSolveTimer
-    quantities['adaptSolveTimer'] = adaptSolveTimer
+    quantities['mean_elements'] = av
+    quantities['solver_timer'] = adapt_solve_timer
+    quantities['adapt_solve_timer'] = adapt_solve_timer
 
     return quantities
 
@@ -273,19 +273,19 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         solver_obj.bnd_functions = BCs
         initTimer = clock() - initTimer
         print('Problem initialised. Setup time: %.3fs' % initTimer)
-        primalTimer = clock()
+        primal_timer = clock()
         solver_obj.iterate()
-        primalTimer = clock() - primalTimer
+        primal_timer = clock() - primal_timer
         J = cb1.get_val()                        # Assemble objective functional for adjoint computation
-        print('Primal run complete. Solver time: %.3fs' % primalTimer)
+        print('Primal run complete. Solver time: %.3fs' % primal_timer)
 
         # Compute gradient
-        gradientTimer = clock()
+        gradient_timer = clock()
         compute_gradient(J, Control(diffusivity))
-        gradientTimer = clock() - gradientTimer
+        gradient_timer = clock() - gradient_timer
 
         # Extract adjoint solutions
-        dualTimer = clock()
+        dual_timer = clock()
         tape = get_working_tape()
         # tape.visualise(open_in_browser=True)
         solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
@@ -294,62 +294,62 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         for i in range(N - 1, r - 1, -op.timesteps_per_export):
             print("Adjoint index %d" % i)
             dual.assign(solve_blocks[i].adj_sol)
-            with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + indexString(int((i - r) / op.timesteps_per_export)), mode=FILE_CREATE) as saveAdj:
+            with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_string(int((i - r) / op.timesteps_per_export)), mode=FILE_CREATE) as saveAdj:
                 saveAdj.store(dual)
                 saveAdj.close()
             if op.plot_pvd:
                 adjointFile.write(dual, time=op.timestep * (i - r))
-        dualTimer = clock() - dualTimer
-        print('Dual run complete. Run time: %.3fs' % dualTimer)
+        dual_timer = clock() - dual_timer
+        print('Dual run complete. Run time: %.3fs' % dual_timer)
 
     with pyadjoint.stop_annotating():
 
-        errorTimer = clock()
+        error_timer = clock()
         for k in range(0, op.final_mesh_index()):  # Loop back over times to generate error estimators
             print('Generating error estimate %d / %d' % (k + 1, op.final_mesh_index()))
-            with DumbCheckpoint(op.directory() + 'hdf5/Tracer2d_' + indexString(k), mode=FILE_READ) as loadVel:
+            with DumbCheckpoint(op.directory() + 'hdf5/Tracer2d_' + index_string(k), mode=FILE_READ) as loadVel:
                 loadVel.load(tracer_2d)
                 loadVel.close()
 
             # Load adjoint data and form indicators
             epsilon.interpolate(tracer_2d * dual)
             for i in range(k, min(k + op.final_export() - op.first_export(), op.final_export())):
-                with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + indexString(i), mode=FILE_READ) as loadAdj:
+                with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_string(i), mode=FILE_READ) as loadAdj:
                     loadAdj.load(dual)
                     loadAdj.close()
                 epsilon_.interpolate(tracer_2d * dual)
                 epsilon = pointwiseMax(epsilon, epsilon_)
             epsilon = normaliseIndicator(epsilon, op=op)
-            with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + indexString(k), mode=FILE_CREATE) as saveErr:
+            with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_string(k), mode=FILE_CREATE) as saveErr:
                 saveErr.store(epsilon)
                 saveErr.close()
             if op.plot_pvd:
                 errorFile.write(epsilon, time=float(k))
-        errorTimer = clock() - errorTimer
-        print('Errors estimated. Run time: %.3fs' % errorTimer)
+        error_timer = clock() - error_timer
+        print('Errors estimated. Run time: %.3fs' % error_timer)
 
         # Run adaptive primal run
         cnt = 0
-        adaptSolveTimer = 0.
+        adapt_solve_timer = 0.
         t = 0.
         tracer_2d.assign(0.)
         quantities = {}
         bdy = 'on_boundary'
         while cnt < op.final_index():
-            adaptTimer = clock()
+            adapt_timer = clock()
             for l in range(op.adaptations):                                  # TODO: Test this functionality
 
                 # Construct metric
-                indexStr = indexString(int(cnt / op.timesteps_per_remesh))
+                indexStr = index_string(int(cnt / op.timesteps_per_remesh))
                 with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_READ) as loadErr:
                     loadErr.load(epsilon)
                     loadErr.close()
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(interp(mesh, epsilon))
-                M = isotropicMetric(errEst, invert=False, op=op)
+                M = isotropic_metric(errEst, invert=False, op=op)
                 if op.gradate:
-                    M_ = isotropicMetric(interp(mesh, H0), bdy=bdy, op=op)  # Initial boundary metric
-                    M = metricIntersection(M, M_, bdy=bdy)
-                    metricGradation(M, op=op)
+                    M_ = isotropic_metric(interp(mesh, H0), bdy=bdy, op=op)  # Initial boundary metric
+                    M = metric_intersection(M, M_, bdy=bdy)
+                    gradate_metric(M, op=op)
 
                 # Adapt mesh and interpolate variables
                 mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
@@ -357,12 +357,12 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             if op.adaptations != 0 and op.plot_metric:
                 M.rename('metric_2d')
                 mFile.write(M, time=t)
-            u0, eta0, b, BCs, source, diffusivity = problemDomain(mesh=mesh, op=op)[1:] # TODO: find a different way to reset these
+            u0, eta0, b, BCs, source, diffusivity = problem_domain(mesh=mesh, op=op)[1:] # TODO: find a different way to reset these
             V = op.mixed_space(mesh)
             uv_2d, elev_2d = Function(V).split()
             elev_2d.interpolate(eta0)
             uv_2d.interpolate(u0)
-            adaptTimer = clock() - adaptTimer
+            adapt_timer = clock() - adapt_timer
 
             # Solver object and equations
             adapSolver = solver2d.FlowSolver2d(mesh, b)
@@ -415,9 +415,9 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             #                                  export_to_hdf5=True)
             # adapSolver.add_callback(cb3, 'export')
             adapSolver.bnd_functions = BCs
-            solverTimer = clock()
+            solver_timer = clock()
             adapSolver.iterate()
-            solverTimer = clock() - solverTimer
+            solver_timer = clock() - solver_timer
             quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
             extract_slice(quantities, direction='h', op=op)
             # extract_slice(quantities, direction='v', op=op)
@@ -428,19 +428,19 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             Sn += nEle
             cnt += op.timesteps_per_remesh
             t += op.timesteps_per_remesh * op.timestep
-            av = op.adaptation_stats(int(cnt / op.timesteps_per_remesh + 1), adaptTimer, solverTimer, nEle, Sn, mM, cnt * op.timestep)
-            adaptSolveTimer += adaptTimer + solverTimer
+            av = op.adaptation_stats(int(cnt / op.timesteps_per_remesh + 1), adapt_timer, solver_timer, nEle, Sn, mM, cnt * op.timestep)
+            adapt_solve_timer += adapt_timer + solver_timer
 
             # Extract fields for next solver block
             tracer_2d = adapSolver.fields.tracer_2d
 
         # Output mesh statistics and solver times
-        totalTimer = errorTimer + adaptSolveTimer
+        total_timer = error_timer + adapt_solve_timer
         if not regen:
-            totalTimer += primalTimer + gradientTimer + dualTimer
-        quantities['meanElements'] = av
-        quantities['solverTimer'] = totalTimer
-        quantities['adaptSolveTimer'] = adaptSolveTimer
+            total_timer += primal_timer + gradient_timer + dual_timer
+        quantities['mean_elements'] = av
+        quantities['solver_timer'] = total_timer
+        quantities['adapt_solve_timer'] = adapt_solve_timer
 
         return quantities
 

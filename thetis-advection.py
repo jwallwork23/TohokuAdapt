@@ -15,7 +15,7 @@ from thetis import *
 
 from utils.callbacks import AdvectionCallback
 from utils.options import AdvectionOptions
-from utils.setup import problemDomain
+from utils.setup import problem_domain
 
 
 op = AdvectionOptions()
@@ -69,7 +69,7 @@ source_off = True
 # op.diffusivity = 0.1
 
 # Setup domain
-mesh, u0, eta0, b, BCs, source, diffusivity = problemDomain(level, op=op)
+mesh, u0, eta0, b, BCs, source, diffusivity = problem_domain(level, op=op)
 print_output('Number of elements %d' % mesh.num_cells())
 print_output('Number of nodes %d' % mesh.num_vertices())
 print_output("Souce volume = %.4f" % assemble(source * dx))
