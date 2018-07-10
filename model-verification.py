@@ -11,7 +11,7 @@ from utils.setup import problem_domain
 from utils.timeseries import gauge_total_variation
 
 
-def solverSW(mesh, u0, eta0, b, BCs={}, f=None, op=TohokuOptions()):
+def FixedMesh(mesh, u0, eta0, b, BCs={}, f=None, op=TohokuOptions()):
 
     # Get solver parameter values and construct solver
     solver_obj = solver2d.FlowSolver2d(mesh, b)
@@ -94,7 +94,7 @@ if __name__ == '__main__':
         for k, i in zip(resolutions, range(len(resolutions))):
             PETSc.Sys.Print("\nStarting run %d... Coriolis frequency: %s\n" % (k, c), comm=COMM_WORLD)
             mesh, u0, eta0, b, BCs, f, diffusivity = problem_domain(level=k, op=op)
-            quantities = solverSW(mesh, u0, eta0, b, BCs, f, op=op)
+            quantities = FixedMesh(mesh, u0, eta0, b, BCs, f, op=op)
             gaugeFileP02.writelines(["%s," % val for val in quantities["P02"]])
             gaugeFileP02.write("\n")
             gaugeFileP06.writelines(["%s," % val for val in quantities["P06"]])

@@ -16,7 +16,7 @@ from utils.timeseries import gauge_total_variation
 __all__ = ["tsunami"]
 
 
-def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
+def FixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
 
     # Initialise domain and physical parameters
@@ -91,7 +91,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     return quantities
 
 
-def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
+def HessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
     if op.plot_metric:
         mFile = File(op.directory() + "Metric2d.pvd")
@@ -121,7 +121,7 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     for g in op.gauges:
         quantities[g] = ()
     while cnt < op.final_index():
-        adaptTimer = clock()
+        adapt_timer = clock()
         P1 = FunctionSpace(mesh, "CG", 1)
 
         if op.adapt_field != 's':
@@ -165,52 +165,52 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             b, BCs, f, diffusivity = problem_domain(mesh=mesh, op=op)[3:]     # TODO: find a different way to reset these
             uv_2d.rename('uv_2d')
             elev_2d.rename('elev_2d')
-        adaptTimer = clock() - adaptTimer
+        adapt_timer = clock() - adapt_timer
 
         # Solver object and equations
-        adapSolver = solver2d.FlowSolver2d(mesh, b)
-        adapOpt = adapSolver.options
-        adapOpt.element_family = op.family
-        adapOpt.use_nonlinear_equations = True
+        adaptive_solver_obj = solver2d.FlowSolver2d(mesh, b)
+        adaptive_options = adaptive_solver_obj.options
+        adaptive_options.element_family = op.family
+        adaptive_options.use_nonlinear_equations = True
         if diffusivity is not None:
-            adapOpt.horizontal_viscosity = interp(mesh, diffusivity)
-        adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
-        adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
-        adapOpt.simulation_export_time = op.timestep * op.timesteps_per_export
-        adapOpt.simulation_end_time = t + op.timestep * (op.timesteps_per_remesh - 0.5)
-        adapOpt.timestepper_type = op.timestepper
-        adapOpt.timestepper_options.solver_parameters = op.solver_parameters
-        print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
-        adapOpt.timestep = op.timestep
-        adapOpt.output_directory = op.directory()
+            adaptive_options.horizontal_viscosity = interp(mesh, diffusivity)
+        adaptive_options.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
+        adaptive_options.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
+        adaptive_options.simulation_export_time = op.timestep * op.timesteps_per_export
+        adaptive_options.simulation_end_time = t + op.timestep * (op.timesteps_per_remesh - 0.5)
+        adaptive_options.timestepper_type = op.timestepper
+        adaptive_options.timestepper_options.solver_parameters = op.solver_parameters
+        print("Using solver parameters %s" % adaptive_options.timestepper_options.solver_parameters)
+        adaptive_options.timestep = op.timestep
+        adaptive_options.output_directory = op.directory()
         if not op.plot_pvd:
-            adapOpt.no_exports = True
-        adapOpt.coriolis_frequency = f
-        adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
-        adapSolver.i_export = int(cnt / op.timesteps_per_export)
-        adapSolver.next_export_t = adapSolver.i_export * adapSolver.options.simulation_export_time
-        adapSolver.iteration = cnt
-        adapSolver.simulation_time = t
-        for e in adapSolver.exporters.values():
-            e.set_next_export_ix(adapSolver.i_export)
+            adaptive_options.no_exports = True
+        adaptive_options.coriolis_frequency = f
+        adaptive_solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
+        adaptive_solver_obj.i_export = int(cnt / op.timesteps_per_export)
+        adaptive_solver_obj.next_export_t = adaptive_solver_obj.i_export * adaptive_solver_obj.options.simulation_export_time
+        adaptive_solver_obj.iteration = cnt
+        adaptive_solver_obj.simulation_time = t
+        for e in adaptive_solver_obj.exporters.values():
+            e.set_next_export_ix(adaptive_solver_obj.i_export)
 
         # Establish callbacks and iterate
-        cb1 = SWCallback(adapSolver)
+        cb1 = SWCallback(adaptive_solver_obj)
         cb1.op = op
         if cnt != 0:
             cb1.old_value = quantities['J_h']
-        adapSolver.add_callback(cb1, 'timestep')
+        adaptive_solver_obj.add_callback(cb1, 'timestep')
         if op.mode == 'tohoku':
-            cb2 = callback.DetectorsCallback(adapSolver,
+            cb2 = callback.DetectorsCallback(adaptive_solver_obj,
                                              [op.gauge_coordinates(g) for g in op.gauges],
                                              ['elev_2d'],
                                              'timeseries',
                                              op.gauges,
                                              export_to_hdf5=True)
-            adapSolver.add_callback(cb2, 'timestep')
-        adapSolver.bnd_functions['shallow_water'] = BCs
+            adaptive_solver_obj.add_callback(cb2, 'timestep')
+        adaptive_solver_obj.bnd_functions['shallow_water'] = BCs
         solver_timer = clock()
-        adapSolver.iterate()
+        adaptive_solver_obj.iterate()
         solver_timer = clock() - solver_timer
         quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
         if op.mode == 'tohoku':
@@ -225,11 +225,11 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         Sn += nEle
         cnt += op.timesteps_per_remesh
         t += op.timestep * op.timesteps_per_remesh
-        av = op.adaptation_stats(int(cnt/op.timesteps_per_remesh+1), adaptTimer, solver_timer, nEle, Sn, mM, cnt * op.timestep)
-        adapt_solve_timer += adaptTimer + solver_timer
+        av = op.adaptation_stats(int(cnt/op.timesteps_per_remesh+1), adapt_timer, solver_timer, nEle, Sn, mM, cnt * op.timestep)
+        adapt_solve_timer += adapt_timer + solver_timer
 
         # Extract fields for next step
-        uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
+        uv_2d, elev_2d = adaptive_solver_obj.fields.solution_2d.split()
 
     # Measure error using metrics, as in Huang et al.
     if op.mode == 'rossby-wave':
@@ -262,8 +262,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
 
     initTimer = clock()
     if op.plot_pvd:
-        errorFile = File(op.directory() + "ErrorIndicator2d.pvd")
-        adjointFile = File(op.directory() + "Adjoint2d.pvd")
+        error_file = File(op.directory() + "ErrorIndicator2d.pvd")
+        adjoint_file = File(op.directory() + "Adjoint2d.pvd")
 
     # Initialise domain and physical parameters
     try:
@@ -344,12 +344,12 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         for i in range(N - 1, r - 1, -op.timesteps_per_export):
             dual.assign(solve_blocks[i].adj_sol)
             dual_u, dual_e = dual.split()
-            with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_string(int((i - r) / op.timesteps_per_export)), mode=FILE_CREATE) as saveAdj:
-                saveAdj.store(dual_u)
-                saveAdj.store(dual_e)
-                saveAdj.close()
+            with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_string(int((i - r) / op.timesteps_per_export)), mode=FILE_CREATE) as sa:
+                sa.store(dual_u)
+                sa.store(dual_e)
+                sa.close()
             if op.plot_pvd:
-                adjointFile.write(dual_u, dual_e, time=op.timestep * (i - r))
+                adjoint_file.write(dual_u, dual_e, time=op.timestep * (i - r))
         dual_timer = clock() - dual_timer
         print('Dual run complete. Run time: %.3fs' % dual_timer)
 
@@ -358,28 +358,28 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         error_timer = clock()
         for k in range(0, op.final_mesh_index()):  # Loop back over times to generate error estimators
             print('Generating error estimate %d / %d' % (k + 1, op.final_mesh_index()))
-            with DumbCheckpoint(op.directory() + 'hdf5/Velocity2d_' + index_string(k), mode=FILE_READ) as loadVel:
-                loadVel.load(uv_2d)
-                loadVel.close()
-            with DumbCheckpoint(op.directory() + 'hdf5/Elevation2d_' + index_string(k), mode=FILE_READ) as loadElev:
-                loadElev.load(elev_2d)
-                loadElev.close()
+            with DumbCheckpoint(op.directory() + 'hdf5/Velocity2d_' + index_string(k), mode=FILE_READ) as lv:
+                lv.load(uv_2d)
+                lv.close()
+            with DumbCheckpoint(op.directory() + 'hdf5/Elevation2d_' + index_string(k), mode=FILE_READ) as le:
+                le.load(elev_2d)
+                le.close()
 
             # Load adjoint data and form indicators
             epsilon.interpolate(inner(q, dual))
             for i in range(k, min(k + op.final_export() - op.first_export(), op.final_export())):
-                with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_string(i), mode=FILE_READ) as loadAdj:
-                    loadAdj.load(dual_u)
-                    loadAdj.load(dual_e)
-                    loadAdj.close()
+                with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_string(i), mode=FILE_READ) as la:
+                    la.load(dual_u)
+                    la.load(dual_e)
+                    la.close()
                 epsilon_.interpolate(inner(q, dual))
                 epsilon = pointwise_max(epsilon, epsilon_)
             epsilon = normaliseIndicator(epsilon, op=op)
-            with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_string(k), mode=FILE_CREATE) as saveErr:
-                saveErr.store(epsilon)
-                saveErr.close()
+            with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_string(k), mode=FILE_CREATE) as se:
+                se.store(epsilon)
+                se.close()
             if op.plot_pvd:
-                errorFile.write(epsilon, time=float(k))
+                error_file.write(epsilon, time=float(k))
         error_timer = clock() - error_timer
         print('Errors estimated. Run time: %.3fs' % error_timer)
 
@@ -396,14 +396,14 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             quantities[g] = ()
         bdy = 200 if op.mode == 'tohoku' else 'on_boundary'
         while cnt < op.final_index():
-            adaptTimer = clock()
+            adapt_timer = clock()
             for l in range(op.adaptations):                                  # TODO: Test this functionality
 
                 # Construct metric
-                indexStr = index_string(int(cnt / op.timesteps_per_remesh))
-                with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_READ) as loadErr:
-                    loadErr.load(epsilon)
-                    loadErr.close()
+                index_str = index_string(int(cnt / op.timesteps_per_remesh))
+                with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_str, mode=FILE_READ) as le:
+                    le.load(epsilon)
+                    le.close()
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(interp(mesh, epsilon))
                 M = isotropic_metric(errEst, invert=False, op=op)
                 if op.gradate:
@@ -421,52 +421,52 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             b, BCs, f, diffusivity = problem_domain(mesh=mesh, op=op)[3:]             # TODO: find a different way to reset these
             uv_2d.rename('uv_2d')
             elev_2d.rename('elev_2d')
-            adaptTimer = clock() - adaptTimer
+            adapt_timer = clock() - adapt_timer
 
             # Solver object and equations
-            adapSolver = solver2d.FlowSolver2d(mesh, b)
-            adapOpt = adapSolver.options
-            adapOpt.element_family = op.family
-            adapOpt.use_nonlinear_equations = True
+            adaptive_solver_obj = solver2d.FlowSolver2d(mesh, b)
+            adaptive_options = adaptive_solver_obj.options
+            adaptive_options.element_family = op.family
+            adaptive_options.use_nonlinear_equations = True
             if diffusivity is not None:
-                adapOpt.horizontal_viscosity = interp(mesh, diffusivity)
-            adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
-            adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
-            adapOpt.simulation_export_time = op.timestep * op.timesteps_per_export
-            adapOpt.simulation_end_time = t + (op.timesteps_per_remesh - 0.5) * op.timestep
-            adapOpt.timestepper_type = op.timestepper
-            adapOpt.timestepper_options.solver_parameters = op.solver_parameters
-            print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
-            adapOpt.timestep = op.timestep
-            adapOpt.output_directory = op.directory()
+                adaptive_options.horizontal_viscosity = interp(mesh, diffusivity)
+            adaptive_options.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
+            adaptive_options.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
+            adaptive_options.simulation_export_time = op.timestep * op.timesteps_per_export
+            adaptive_options.simulation_end_time = t + (op.timesteps_per_remesh - 0.5) * op.timestep
+            adaptive_options.timestepper_type = op.timestepper
+            adaptive_options.timestepper_options.solver_parameters = op.solver_parameters
+            print("Using solver parameters %s" % adaptive_options.timestepper_options.solver_parameters)
+            adaptive_options.timestep = op.timestep
+            adaptive_options.output_directory = op.directory()
             if not op.plot_pvd:
-                adapOpt.no_exports = True
-            adapOpt.coriolis_frequency = f
-            adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
-            adapSolver.i_export = int(cnt / op.timesteps_per_export)
-            adapSolver.next_export_t = adapSolver.i_export * adapSolver.options.simulation_export_time
-            adapSolver.iteration = cnt
-            adapSolver.simulation_time = t
-            for e in adapSolver.exporters.values():
-                e.set_next_export_ix(adapSolver.i_export)
+                adaptive_options.no_exports = True
+            adaptive_options.coriolis_frequency = f
+            adaptive_solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
+            adaptive_solver_obj.i_export = int(cnt / op.timesteps_per_export)
+            adaptive_solver_obj.next_export_t = adaptive_solver_obj.i_export * adaptive_solver_obj.options.simulation_export_time
+            adaptive_solver_obj.iteration = cnt
+            adaptive_solver_obj.simulation_time = t
+            for e in adaptive_solver_obj.exporters.values():
+                e.set_next_export_ix(adaptive_solver_obj.i_export)
 
             # Evaluate callbacks and iterate
-            cb1 = SWCallback(adapSolver)
+            cb1 = SWCallback(adaptive_solver_obj)
             cb1.op = op
             if cnt != 0:
                 cb1.old_value = quantities['J_h']
-            adapSolver.add_callback(cb1, 'timestep')
+            adaptive_solver_obj.add_callback(cb1, 'timestep')
             if op.mode == 'tohoku':
-                cb2 = callback.DetectorsCallback(adapSolver,
+                cb2 = callback.DetectorsCallback(adaptive_solver_obj,
                                                  [op.gauge_coordinates(g) for g in op.gauges],
                                                  ['elev_2d'],
                                                  'timeseries',
                                                  op.gauges,
                                                  export_to_hdf5=True)
-                adapSolver.add_callback(cb2, 'timestep')
-            adapSolver.bnd_functions['shallow_water'] = BCs
+                adaptive_solver_obj.add_callback(cb2, 'timestep')
+            adaptive_solver_obj.bnd_functions['shallow_water'] = BCs
             solver_timer = clock()
-            adapSolver.iterate()
+            adaptive_solver_obj.iterate()
             solver_timer = clock() - solver_timer
             quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
             if op.mode == 'tohoku':
@@ -481,11 +481,11 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             Sn += nEle
             cnt += op.timesteps_per_remesh
             t += op.timesteps_per_remesh * op.timestep
-            av = op.adaptation_stats(int(cnt / op.timesteps_per_remesh + 1), adaptTimer, solver_timer, nEle, Sn, mM, cnt * op.timestep)
-            adapt_solve_timer += adaptTimer + solver_timer
+            av = op.adaptation_stats(int(cnt / op.timesteps_per_remesh + 1), adapt_timer, solver_timer, nEle, Sn, mM, cnt * op.timestep)
+            adapt_solve_timer += adapt_timer + solver_timer
 
             # Extract fields for next solver block
-            uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
+            uv_2d, elev_2d = adaptive_solver_obj.fields.solution_2d.split()
 
             # Measure error using metrics, as in Huang et al.
         if op.mode == 'rossby-wave':
@@ -516,9 +516,9 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
 
     initTimer = clock()
     if op.plot_pvd:
-        residualFile = File(op.directory() + "Residual2d.pvd")
-        errorFile = File(op.directory() + "ErrorIndicator2d.pvd")
-        adjointFile = File(op.directory() + "Adjoint2d.pvd")
+        residual_file = File(op.directory() + "Residual2d.pvd")
+        error_file = File(op.directory() + "ErrorIndicator2d.pvd")
+        adjoint_file = File(op.directory() + "Adjoint2d.pvd")
 
     # Initialise domain and physical parameters
     try:
@@ -607,12 +607,12 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
         for i in range(r, N, op.timesteps_per_remesh):        # Iterate r is the first timestep
             dual.assign(solve_blocks[i].adj_sol)
             dual_u, dual_e = dual.split()
-            with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_string(int((i - r) / op.timesteps_per_remesh)),  mode=FILE_CREATE) as saveAdj:
-                saveAdj.store(dual_u)
-                saveAdj.store(dual_e)
-                saveAdj.close()
+            with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_string(int((i - r) / op.timesteps_per_remesh)),  mode=FILE_CREATE) as sa:
+                sa.store(dual_u)
+                sa.store(dual_e)
+                sa.close()
             if op.plot_pvd:
-                adjointFile.write(dual_u, dual_e, time=op.timestep * (i - r))
+                adjoint_file.write(dual_u, dual_e, time=op.timestep * (i - r))
         dual_timer = clock() - dual_timer
         print('Dual run complete. Run time: %.3fs' % dual_timer)
 
@@ -624,9 +624,9 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                 print('Generating error estimate %d / %d' % (int(k/op.exports_per_remesh()) + 1, int(op.final_index() / op.timesteps_per_remesh)))
 
                 # Load residuals
-                with DumbCheckpoint(op.directory() + 'hdf5/ExplicitError2d_' + index_string(k), mode=FILE_READ) as loadRes:
-                    loadRes.load(residual_2d, name="explicit error")
-                    loadRes.close()
+                with DumbCheckpoint(op.directory() + 'hdf5/ExplicitError2d_' + index_string(k), mode=FILE_READ) as lr:
+                    lr.load(residual_2d, name="explicit error")
+                    lr.close()
 
                 residuals.append(residual_2d)   # TODO: This is grossly inefficient. Just load from HDF5
                 if k % op.exports_per_remesh() == op.exports_per_remesh()-1:
@@ -643,14 +643,14 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
 
                     residuals = []
                     if op.plot_pvd:
-                        residualFile.write(residual_2d, time=float(op.timestep * op.timesteps_per_remesh * (k+1)))
+                        residual_file.write(residual_2d, time=float(op.timestep * op.timesteps_per_remesh * (k+1)))
 
                     # Load adjoint data and form indicators
-                    indexStr = index_string(int((k+1)/op.exports_per_remesh()-1))
-                    with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + indexStr, mode=FILE_READ) as loadAdj:
-                        loadAdj.load(dual_u)
-                        loadAdj.load(dual_e)
-                        loadAdj.close()
+                    index_str = index_string(int((k+1)/op.exports_per_remesh()-1))
+                    with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_str, mode=FILE_READ) as la:
+                        la.load(dual_u)
+                        la.load(dual_e)
+                        la.close()
                     # if op.order_increase:       # TODO: Alternative order increase DWR method
                     #     duale_u.interpolate(dual_u)
                     #     duale_e.interpolate(dual_e)
@@ -659,11 +659,11 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                     epsilon.interpolate(difference_quotient_estimator(solver_obj, residual_2d, dual, dual))
                     epsilon = normaliseIndicator(epsilon, op=op)         # ^ Would be subtract with no L-inf
                     epsilon.rename("Error indicator")
-                    with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_CREATE) as saveErr:
-                        saveErr.store(epsilon)
-                        saveErr.close()
+                    with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_str, mode=FILE_CREATE) as se:
+                        se.store(epsilon)
+                        se.close()
                     if op.plot_pvd:
-                        errorFile.write(epsilon, time=float(op.timestep * op.timesteps_per_remesh * k))
+                        error_file.write(epsilon, time=float(op.timestep * op.timesteps_per_remesh * k))
             error_timer = clock() - error_timer
             print('Errors estimated. Run time: %.3fs' % error_timer)
 
@@ -683,14 +683,14 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
         bdy = 200 if op.mode == 'tohoku' else 'on_boundary'
         # bdy = 'on_boundary'
         while cnt < op.final_index():
-            adaptTimer = clock()
+            adapt_timer = clock()
             for l in range(op.adaptations):                          # TODO: Test this functionality
 
                 # Construct metric
-                indexStr = index_string(int(cnt / op.timesteps_per_remesh))
-                with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_READ) as loadErr:
-                    loadErr.load(epsilon)
-                    loadErr.close()
+                index_str = index_string(int(cnt / op.timesteps_per_remesh))
+                with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_str, mode=FILE_READ) as le:
+                    le.load(epsilon)
+                    le.close()
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).assign(interp(mesh, epsilon))
                 # errEst.dat.data *= 1e3
                 M = isotropic_metric(errEst, invert=False, op=op)
@@ -717,52 +717,52 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
             b, BCs, f, diffusivity = problem_domain(mesh=mesh, op=op)[3:]           # TODO: Find a different way to reset these
             uv_2d.rename('uv_2d')
             elev_2d.rename('elev_2d')
-            adaptTimer = clock() - adaptTimer
+            adapt_timer = clock() - adapt_timer
 
             # Solver object and equations
-            adapSolver = solver2d.FlowSolver2d(mesh, b)
-            adapOpt = adapSolver.options
-            adapOpt.element_family = op.family
-            adapOpt.use_nonlinear_equations = True
+            adaptive_solver_obj = solver2d.FlowSolver2d(mesh, b)
+            adaptive_options = adaptive_solver_obj.options
+            adaptive_options.element_family = op.family
+            adaptive_options.use_nonlinear_equations = True
             if diffusivity is not None:
-                adapOpt.horizontal_viscosity = interp(mesh, diffusivity)
-            adapOpt.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
-            adapOpt.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
-            adapOpt.simulation_export_time = op.timestep * op.timesteps_per_export
-            adapOpt.simulation_end_time = t + (op.timesteps_per_remesh - 0.5) * op.timestep
-            adapOpt.timestepper_type = op.timestepper
-            adapOpt.timestepper_options.solver_parameters = op.solver_parameters
-            print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
-            adapOpt.timestep = op.timestep
-            adapOpt.output_directory = op.directory()
+                adaptive_options.horizontal_viscosity = interp(mesh, diffusivity)
+            adaptive_options.use_grad_div_viscosity_term = True                  # Symmetric viscous stress
+            adaptive_options.use_lax_friedrichs_velocity = False                 # TODO: This is a temporary fix
+            adaptive_options.simulation_export_time = op.timestep * op.timesteps_per_export
+            adaptive_options.simulation_end_time = t + (op.timesteps_per_remesh - 0.5) * op.timestep
+            adaptive_options.timestepper_type = op.timestepper
+            adaptive_options.timestepper_options.solver_parameters = op.solver_parameters
+            print("Using solver parameters %s" % adaptive_options.timestepper_options.solver_parameters)
+            adaptive_options.timestep = op.timestep
+            adaptive_options.output_directory = op.directory()
             if not op.plot_pvd:
-                adapOpt.no_exports = True
-            adapOpt.coriolis_frequency = f
-            adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
-            adapSolver.i_export = int(cnt / op.timesteps_per_export)
-            adapSolver.next_export_t = adapSolver.i_export * adapSolver.options.simulation_export_time
-            adapSolver.iteration = cnt
-            adapSolver.simulation_time = t
-            for e in adapSolver.exporters.values():
-                e.set_next_export_ix(adapSolver.i_export)
+                adaptive_options.no_exports = True
+            adaptive_options.coriolis_frequency = f
+            adaptive_solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
+            adaptive_solver_obj.i_export = int(cnt / op.timesteps_per_export)
+            adaptive_solver_obj.next_export_t = adaptive_solver_obj.i_export * adaptive_solver_obj.options.simulation_export_time
+            adaptive_solver_obj.iteration = cnt
+            adaptive_solver_obj.simulation_time = t
+            for e in adaptive_solver_obj.exporters.values():
+                e.set_next_export_ix(adaptive_solver_obj.i_export)
 
             # Evaluate callbacks and iterate
-            cb1 = SWCallback(adapSolver)
+            cb1 = SWCallback(adaptive_solver_obj)
             cb1.op = op
             if cnt != 0:
                 cb1.old_value = quantities['J_h']
-            adapSolver.add_callback(cb1, 'timestep')
+            adaptive_solver_obj.add_callback(cb1, 'timestep')
             if op.mode == 'tohoku':
-                cb2 = callback.DetectorsCallback(adapSolver,
+                cb2 = callback.DetectorsCallback(adaptive_solver_obj,
                                                  [op.gauge_coordinates(g) for g in op.gauges],
                                                  ['elev_2d'],
                                                  'timeseries',
                                                  op.gauges,
                                                  export_to_hdf5=True)
-                adapSolver.add_callback(cb2, 'timestep')
-            adapSolver.bnd_functions['shallow_water'] = BCs
+                adaptive_solver_obj.add_callback(cb2, 'timestep')
+            adaptive_solver_obj.bnd_functions['shallow_water'] = BCs
             solver_timer = clock()
-            adapSolver.iterate()
+            adaptive_solver_obj.iterate()
             solver_timer = clock() - solver_timer
             quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
             if op.mode == 'tohoku':
@@ -777,11 +777,11 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
             Sn += nEle
             cnt += op.timesteps_per_remesh
             t += op.timesteps_per_remesh * op.timestep
-            av = op.adaptation_stats(int(cnt / op.timesteps_per_remesh + 1), adaptTimer, solver_timer, nEle, Sn, mM, cnt * op.timestep)
-            adapt_solve_timer += adaptTimer + solver_timer
+            av = op.adaptation_stats(int(cnt / op.timesteps_per_remesh + 1), adapt_timer, solver_timer, nEle, Sn, mM, cnt * op.timestep)
+            adapt_solve_timer += adapt_timer + solver_timer
 
             # Extract fields for next solver block
-            uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
+            uv_2d, elev_2d = adaptive_solver_obj.fields.solution_2d.split()
 
             # Measure error using metrics, as in Huang et al.
         if op.mode == 'rossby-wave':
@@ -807,6 +807,6 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
 def tsunami(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
     regen = kwargs.get('regen')
-    solvers = {'fixedMesh': fixedMesh, 'hessianBased': hessianBased, 'DWP': DWP, 'DWR': DWR}
+    solvers = {'FixedMesh': FixedMesh, 'HessianBased': HessianBased, 'DWP': DWP, 'DWR': DWR}
 
     return solvers[op.approach](mesh, u0, eta0, b, BCs, f, diffusivity, regen=regen, op=op)

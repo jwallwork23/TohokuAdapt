@@ -2,11 +2,10 @@ from thetis import *
 
 import numpy as np
 from time import clock
-import h5py
 
 from utils.adaptivity import *
 from utils.callbacks import AdvectionCallback, ObjectiveAdvectionCallback
-from utils.interpolation import interp, mixedPairInterp
+from utils.interpolation import interp, mixed_pair_interp
 from utils.misc import extract_slice
 from utils.setup import problem_domain
 
@@ -14,7 +13,7 @@ from utils.setup import problem_domain
 __all__ = ["advect"]
 
 
-def fixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
+def FixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
 
     # Set up solver
@@ -77,7 +76,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs
     return quantities
 
 
-def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
+def HessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
     if op.plot_metric:
         mFile = File(op.directory() + "Metric2d.pvd")
@@ -131,59 +130,59 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         adapt_timer = clock() - adapt_timer
 
         # Solver object and equations
-        adapSolver = solver2d.FlowSolver2d(mesh, b)
-        adapOpt = adapSolver.options
-        adapOpt.element_family = op.family
-        adapOpt.use_nonlinear_equations = True
-        adapOpt.simulation_export_time = op.timestep * op.timesteps_per_export
-        adapOpt.simulation_end_time = t + op.timestep * (op.timesteps_per_remesh - 0.5)
-        adapOpt.timestepper_type = op.timestepper
+        adaptive_solver_obj = solver2d.FlowSolver2d(mesh, b)
+        adaptive_options = adaptive_solver_obj.options
+        adaptive_options.element_family = op.family
+        adaptive_options.use_nonlinear_equations = True
+        adaptive_options.simulation_export_time = op.timestep * op.timesteps_per_export
+        adaptive_options.simulation_end_time = t + op.timestep * (op.timesteps_per_remesh - 0.5)
+        adaptive_options.timestepper_type = op.timestepper
         # op.solver_parameters['snes_max_it'] = 1000
-        adapOpt.timestepper_options.solver_parameters_tracer = op.solver_parameters
-        print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters_tracer)
-        adapOpt.timestep = op.timestep
-        adapOpt.output_directory = op.directory()
+        adaptive_options.timestepper_options.solver_parameters_tracer = op.solver_parameters
+        print("Using solver parameters %s" % adaptive_options.timestepper_options.solver_parameters_tracer)
+        adaptive_options.timestep = op.timestep
+        adaptive_options.output_directory = op.directory()
         if not op.plot_pvd:
-            adapOpt.no_exports = True
-        adapOpt.horizontal_velocity_scale = op.u_mag
-        adapOpt.fields_to_export = ['tracer_2d']
-        adapOpt.fields_to_export_hdf5 = ['tracer_2d']
-        adapOpt.solve_tracer = True
-        adapOpt.tracer_only = True  # Need use tracer-only branch to use this functionality
-        adapOpt.horizontal_diffusivity = diffusivity
-        adapOpt.use_lax_friedrichs_tracer = False                   # TODO: This is a temporary fix
-        adapOpt.tracer_source_2d = source
-        adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d, tracer=tracer_2d)
-        adapSolver.i_export = int(cnt / op.timesteps_per_export)
-        adapSolver.next_export_t = adapSolver.i_export * adapSolver.options.simulation_export_time
-        adapSolver.iteration = cnt
-        adapSolver.simulation_time = t
-        for e in adapSolver.exporters.values():
-            e.set_next_export_ix(adapSolver.i_export)
+            adaptive_options.no_exports = True
+        adaptive_options.horizontal_velocity_scale = op.u_mag
+        adaptive_options.fields_to_export = ['tracer_2d']
+        adaptive_options.fields_to_export_hdf5 = ['tracer_2d']
+        adaptive_options.solve_tracer = True
+        adaptive_options.tracer_only = True  # Need use tracer-only branch to use this functionality
+        adaptive_options.horizontal_diffusivity = diffusivity
+        adaptive_options.use_lax_friedrichs_tracer = False                   # TODO: This is a temporary fix
+        adaptive_options.tracer_source_2d = source
+        adaptive_solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d, tracer=tracer_2d)
+        adaptive_solver_obj.i_export = int(cnt / op.timesteps_per_export)
+        adaptive_solver_obj.next_export_t = adaptive_solver_obj.i_export * adaptive_solver_obj.options.simulation_export_time
+        adaptive_solver_obj.iteration = cnt
+        adaptive_solver_obj.simulation_time = t
+        for e in adaptive_solver_obj.exporters.values():
+            e.set_next_export_ix(adaptive_solver_obj.i_export)
 
         # Establish callbacks and iterate
-        cb1 = AdvectionCallback(adapSolver)
+        cb1 = AdvectionCallback(adaptive_solver_obj)
         cb1.op = op
         if cnt != 0:
             cb1.old_value = quantities['J_h']
-        adapSolver.add_callback(cb1, 'timestep')
-        cb2 = callback.DetectorsCallback(adapSolver,
+        adaptive_solver_obj.add_callback(cb1, 'timestep')
+        cb2 = callback.DetectorsCallback(adaptive_solver_obj,
                                          op.h_slice,
                                          ['tracer_2d'],
                                          'horizontal slice',
                                          ["h_slice{i:d}".format(i=i) for i in range(len(op.h_slice))],
                                          export_to_hdf5=True)
-        adapSolver.add_callback(cb2, 'export')
-        # cb3 = callback.DetectorsCallback(adapSolver,
+        adaptive_solver_obj.add_callback(cb2, 'export')
+        # cb3 = callback.DetectorsCallback(adaptive_solver_obj,
         #                                  op.v_slice,
         #                                  ['tracer_2d'],
         #                                  'vertical slice',
         #                                  ["v_slice{i:d}".format(i=i) for i in range(len(op.v_slice))],
         #                                  export_to_hdf5=True)
-        # adapSolver.add_callback(cb3, 'export')
-        adapSolver.bnd_functions = BCs
+        # adaptive_solver_obj.add_callback(cb3, 'export')
+        adaptive_solver_obj.bnd_functions = BCs
         solver_timer = clock()
-        adapSolver.iterate()
+        adaptive_solver_obj.iterate()
         solver_timer = clock() - solver_timer
         quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
         extract_slice(quantities, direction='h', op=op)
@@ -199,8 +198,8 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         adapt_solve_timer += adapt_timer + solver_timer
 
         # Extract fields for next step
-        uv_2d, elev_2d = adapSolver.fields.solution_2d.split()
-        tracer_2d = adapSolver.fields.tracer_2d
+        uv_2d, elev_2d = adaptive_solver_obj.fields.solution_2d.split()
+        tracer_2d = adaptive_solver_obj.fields.tracer_2d
 
     # Output mesh statistics and solver times
     quantities['mean_elements'] = av
@@ -223,8 +222,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
 
     initTimer = clock()
     if op.plot_pvd:
-        errorFile = File(op.directory() + "ErrorIndicator2d.pvd")
-        adjointFile = File(op.directory() + "Adjoint2d.pvd")
+        error_file = File(op.directory() + "ErrorIndicator2d.pvd")
+        adjoint_file = File(op.directory() + "Adjoint2d.pvd")
 
     # Initialise domain and physical parameters
     P1 = FunctionSpace(mesh, "CG", 1)
@@ -294,11 +293,11 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         for i in range(N - 1, r - 1, -op.timesteps_per_export):
             print("Adjoint index %d" % i)
             dual.assign(solve_blocks[i].adj_sol)
-            with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_string(int((i - r) / op.timesteps_per_export)), mode=FILE_CREATE) as saveAdj:
-                saveAdj.store(dual)
-                saveAdj.close()
+            with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_string(int((i - r) / op.timesteps_per_export)), mode=FILE_CREATE) as sa:
+                sa.store(dual)
+                sa.close()
             if op.plot_pvd:
-                adjointFile.write(dual, time=op.timestep * (i - r))
+                adjoint_file.write(dual, time=op.timestep * (i - r))
         dual_timer = clock() - dual_timer
         print('Dual run complete. Run time: %.3fs' % dual_timer)
 
@@ -307,24 +306,24 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         error_timer = clock()
         for k in range(0, op.final_mesh_index()):  # Loop back over times to generate error estimators
             print('Generating error estimate %d / %d' % (k + 1, op.final_mesh_index()))
-            with DumbCheckpoint(op.directory() + 'hdf5/Tracer2d_' + index_string(k), mode=FILE_READ) as loadVel:
-                loadVel.load(tracer_2d)
-                loadVel.close()
+            with DumbCheckpoint(op.directory() + 'hdf5/Tracer2d_' + index_string(k), mode=FILE_READ) as lv:
+                lv.load(tracer_2d)
+                lv.close()
 
             # Load adjoint data and form indicators
             epsilon.interpolate(tracer_2d * dual)
             for i in range(k, min(k + op.final_export() - op.first_export(), op.final_export())):
-                with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_string(i), mode=FILE_READ) as loadAdj:
-                    loadAdj.load(dual)
-                    loadAdj.close()
+                with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_string(i), mode=FILE_READ) as la:
+                    la.load(dual)
+                    la.close()
                 epsilon_.interpolate(tracer_2d * dual)
                 epsilon = pointwiseMax(epsilon, epsilon_)
             epsilon = normaliseIndicator(epsilon, op=op)
-            with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_string(k), mode=FILE_CREATE) as saveErr:
-                saveErr.store(epsilon)
-                saveErr.close()
+            with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_string(k), mode=FILE_CREATE) as se:
+                se.store(epsilon)
+                se.close()
             if op.plot_pvd:
-                errorFile.write(epsilon, time=float(k))
+                error_file.write(epsilon, time=float(k))
         error_timer = clock() - error_timer
         print('Errors estimated. Run time: %.3fs' % error_timer)
 
@@ -340,10 +339,10 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             for l in range(op.adaptations):                                  # TODO: Test this functionality
 
                 # Construct metric
-                indexStr = index_string(int(cnt / op.timesteps_per_remesh))
-                with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + indexStr, mode=FILE_READ) as loadErr:
-                    loadErr.load(epsilon)
-                    loadErr.close()
+                index_str = index_string(int(cnt / op.timesteps_per_remesh))
+                with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_str, mode=FILE_READ) as le:
+                    le.load(epsilon)
+                    le.close()
                 errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(interp(mesh, epsilon))
                 M = isotropic_metric(errEst, invert=False, op=op)
                 if op.gradate:
@@ -365,58 +364,58 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             adapt_timer = clock() - adapt_timer
 
             # Solver object and equations
-            adapSolver = solver2d.FlowSolver2d(mesh, b)
-            adapOpt = adapSolver.options
-            adapOpt.element_family = op.family
-            adapOpt.use_nonlinear_equations = True
-            adapOpt.simulation_export_time = op.timestep * op.timesteps_per_export
-            adapOpt.simulation_end_time = t + (op.timesteps_per_remesh - 0.5) * op.timestep
-            adapOpt.timestepper_type = op.timestepper
-            adapOpt.timestepper_options.solver_parameters_tracer = op.solver_parameters
-            print("Using solver parameters %s" % adapOpt.timestepper_options.solver_parameters)
-            adapOpt.timestep = op.timestep
-            adapOpt.output_directory = op.directory()
+            adaptive_solver_obj = solver2d.FlowSolver2d(mesh, b)
+            adaptive_options = adaptive_solver_obj.options
+            adaptive_options.element_family = op.family
+            adaptive_options.use_nonlinear_equations = True
+            adaptive_options.simulation_export_time = op.timestep * op.timesteps_per_export
+            adaptive_options.simulation_end_time = t + (op.timesteps_per_remesh - 0.5) * op.timestep
+            adaptive_options.timestepper_type = op.timestepper
+            adaptive_options.timestepper_options.solver_parameters_tracer = op.solver_parameters
+            print("Using solver parameters %s" % adaptive_options.timestepper_options.solver_parameters)
+            adaptive_options.timestep = op.timestep
+            adaptive_options.output_directory = op.directory()
             if not op.plot_pvd:
-                adapOpt.no_exports = True
-            adapOpt.horizontal_velocity_scale = op.u_mag
-            adapOpt.fields_to_export = ['tracer_2d']
-            adapOpt.fields_to_export_hdf5 = ['tracer_2d']
-            adapOpt.solve_tracer = True
-            adapOpt.tracer_only = True  # Need use tracer-only branch to use this functionality
-            adapOpt.horizontal_diffusivity = diffusivity
-            adapOpt.use_lax_friedrichs_tracer = False  # TODO: This is a temporary fix
-            adapOpt.tracer_source_2d = source
-            adapSolver.assign_initial_conditions(elev=elev_2d, uv=uv_2d, tracer=tracer_2d)
-            adapSolver.i_export = int(cnt / op.timesteps_per_export)
-            adapSolver.next_export_t = adapSolver.i_export * adapSolver.options.simulation_export_time
-            adapSolver.iteration = cnt
-            adapSolver.simulation_time = t
-            for e in adapSolver.exporters.values():
-                e.set_next_export_ix(adapSolver.i_export)
+                adaptive_options.no_exports = True
+            adaptive_options.horizontal_velocity_scale = op.u_mag
+            adaptive_options.fields_to_export = ['tracer_2d']
+            adaptive_options.fields_to_export_hdf5 = ['tracer_2d']
+            adaptive_options.solve_tracer = True
+            adaptive_options.tracer_only = True  # Need use tracer-only branch to use this functionality
+            adaptive_options.horizontal_diffusivity = diffusivity
+            adaptive_options.use_lax_friedrichs_tracer = False  # TODO: This is a temporary fix
+            adaptive_options.tracer_source_2d = source
+            adaptive_solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d, tracer=tracer_2d)
+            adaptive_solver_obj.i_export = int(cnt / op.timesteps_per_export)
+            adaptive_solver_obj.next_export_t = adaptive_solver_obj.i_export * adaptive_solver_obj.options.simulation_export_time
+            adaptive_solver_obj.iteration = cnt
+            adaptive_solver_obj.simulation_time = t
+            for e in adaptive_solver_obj.exporters.values():
+                e.set_next_export_ix(adaptive_solver_obj.i_export)
 
             # Evaluate callbacks and iterate
-            cb1 = AdvectionCallback(adapSolver)
+            cb1 = AdvectionCallback(adaptive_solver_obj)
             cb1.op = op
             if cnt != 0:
                 cb1.old_value = quantities['J_h']
-            adapSolver.add_callback(cb1, 'timestep')
-            cb2 = callback.DetectorsCallback(adapSolver,
+            adaptive_solver_obj.add_callback(cb1, 'timestep')
+            cb2 = callback.DetectorsCallback(adaptive_solver_obj,
                                              op.h_slice,
                                              ['tracer_2d'],
                                              'horizontal slice',
                                              ["h_slice{i:d}".format(i=i) for i in range(len(op.h_slice))],
                                              export_to_hdf5=True)
-            adapSolver.add_callback(cb2, 'export')
-            # cb3 = callback.DetectorsCallback(adapSolver,
+            adaptive_solver_obj.add_callback(cb2, 'export')
+            # cb3 = callback.DetectorsCallback(adaptive_solver_obj,
             #                                  op.v_slice,
             #                                  ['tracer_2d'],
             #                                  'vertical slice',
             #                                  ["v_slice{i:d}".format(i=i) for i in range(len(op.v_slice))],
             #                                  export_to_hdf5=True)
-            # adapSolver.add_callback(cb3, 'export')
-            adapSolver.bnd_functions = BCs
+            # adaptive_solver_obj.add_callback(cb3, 'export')
+            adaptive_solver_obj.bnd_functions = BCs
             solver_timer = clock()
-            adapSolver.iterate()
+            adaptive_solver_obj.iterate()
             solver_timer = clock() - solver_timer
             quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
             extract_slice(quantities, direction='h', op=op)
@@ -432,7 +431,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             adapt_solve_timer += adapt_timer + solver_timer
 
             # Extract fields for next solver block
-            tracer_2d = adapSolver.fields.tracer_2d
+            tracer_2d = adaptive_solver_obj.fields.tracer_2d
 
         # Output mesh statistics and solver times
         total_timer = error_timer + adapt_solve_timer
@@ -448,6 +447,6 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
 def advect(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
     regen = kwargs.get('regen')
-    solvers = {'fixedMesh': fixedMesh, 'hessianBased': hessianBased, 'DWP': DWP}
+    solvers = {'FixedMesh': FixedMesh, 'HessianBased': HessianBased, 'DWP': DWP}
 
     return solvers[op.approach](mesh, u0, eta0, b, BCs, source, diffusivity, regen=regen, op=op)

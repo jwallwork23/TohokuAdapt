@@ -15,7 +15,7 @@ date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("t", help="Choose test problem from {'shallow-water', 'rossby-wave'} (default 'tohoku')")
-parser.add_argument("-a", help="Choose adaptive approach from {'hessianBased', 'DWP', 'DWR'} (default 'fixedMesh')")
+parser.add_argument("-a", help="Choose adaptive approach from {'HessianBased', 'DWP', 'DWR'} (default 'FixedMesh')")
 parser.add_argument("-b", help="Intersect metrics with bathymetry")
 parser.add_argument("-f", help="Field for Hessian based adaptation, from {'s', 'f', 'b'}.")
 parser.add_argument("-g", help="Gradate metric")
@@ -27,14 +27,14 @@ parser.add_argument("-low", help="Lower bound for mesh resolution range")
 parser.add_argument("-high", help="Upper bound for mesh resolution range")
 parser.add_argument("-level", help="Single mesh resolution")
 parser.add_argument("-regen", help="Regenerate error estimates from saved data")
-parser.add_argument("-snes_view", help="Use PETSc snes view.")
+parser.add_argument("-snes_view", help="Use PETSc snes sview.")
 args = parser.parse_args()
 
 approach = args.a
 if approach is None:
-    approach = 'fixedMesh'
+    approach = 'FixedMesh'
 else:
-    assert approach in ('fixedMesh', 'hessianBased', 'DWP', 'DWR')
+    assert approach in ('FixedMesh', 'HessianBased', 'DWP', 'DWR')
 if args.t is None:
     mode = 'tohoku'
 else:
@@ -47,7 +47,7 @@ if args.ho:     # TODO: Difference quotient as alternative
     order_increase = True
     filename += '_ho'
 if args.b:
-    assert approach == 'hessianBased'
+    assert approach == 'HessianBased'
     filename += '_b'
 filename += '_' + date
 errorFile = open(filename + '.txt', 'w+')

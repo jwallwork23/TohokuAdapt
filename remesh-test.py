@@ -12,7 +12,7 @@ from utils.setup import problem_domain, RossbyWaveSolution
 from utils.options import RossbyWaveOptions
 
 
-def hessianBased(startRes, **kwargs):
+def HessianBased(startRes, **kwargs):
     op = kwargs.get('op')
 
     # Initialise domain and physical parameters
@@ -131,10 +131,10 @@ for i in range(3):
     outfile = open("outdata/rossby-wave/rmTest_mesh"+str(i)+'_'+date+'.txt', 'w')
     for adaptations in [1, 2, 3, 4]:
         for j in range(len(rm)):
-            op = RossbyWaveOptions(approach='hessianBased')
+            op = RossbyWaveOptions(approach='HessianBased')
             op.timesteps_per_remesh = rm[j]
             op.adaptations = adaptations
-            q = hessianBased(i, op=op)
+            q = HessianBased(i, op=op)
             err = np.abs((op.J - q['J_h'])/op.J)
             timer = q['solver_timer']
             print("Mesh %d: rm = %d, #Elements = %d, J_h = %.4f, error = %.4f, Time = %.2fs"

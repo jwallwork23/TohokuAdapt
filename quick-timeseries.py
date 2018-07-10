@@ -9,7 +9,7 @@ from utils.timeseries import plot_timeseries, compare_timeseries
 
 parser = argparse.ArgumentParser()
 parser.add_argument("t", help="Choose problem from {'tohoku', 'shallow-water', 'rossby-wave', 'kelvin-wave', 'model-verification'}.")
-parser.add_argument("-a", help="Choose from {'fixedMesh', 'hessianBased', 'DWP', 'DWR'}.")
+parser.add_argument("-a", help="Choose from {'FixedMesh', 'HessianBased', 'DWP', 'DWR'}.")
 parser.add_argument("-r", help="Choose Coriolis parameter from {'off', 'f', 'beta', 'sin'}")
 parser.add_argument("-d", help="Specify a date")
 parser.add_argument("-c", help="Compare timeseries")
@@ -31,7 +31,7 @@ elif args.t == 'advection-diffusion':
 if args.t == 'model-verification':
     assert approach is None
 if approach is None and op.mode != 'model-verification':
-    approach = 'fixedMesh'
+    approach = 'FixedMesh'
 if op.mode in ('tohoku', 'model-verification'):
     quantities = ['Integrand', 'P02', 'P06']
 else:

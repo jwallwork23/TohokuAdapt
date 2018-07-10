@@ -6,7 +6,7 @@ from utils.timeseries import integrate_timeseries
 
 parser = argparse.ArgumentParser()
 parser.add_argument("t", help="Choose problem from {'tohoku', 'shallow-water', 'rossby-wave', 'model-verification'}.")
-parser.add_argument("-a", help="Choose from {'fixedMesh', 'hessianBased', 'DWP', 'DWR'}.")
+parser.add_argument("-a", help="Choose from {'FixedMesh', 'HessianBased', 'DWP', 'DWR'}.")
 parser.add_argument("-r", help="Use rotational equations")
 parser.add_argument("-d", help="Specify a date")
 parser.add_argument("-s", help="Consider rossby-wave analytic solution")
@@ -27,7 +27,7 @@ elif mode == 'advection-diffusion':
 if op.mode == 'model-verification':
     assert approach is None
 if approach is None and op.mode != 'model-verification':
-    approach = 'fixedMesh'
+    approach = 'FixedMesh'
 if mode == 'model-verification':
     fileExt = 'rotational='
     fileExt += 'True' if args.r else 'False'

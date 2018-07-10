@@ -15,7 +15,7 @@ now = datetime.datetime.now()
 date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-a", help="Choose adaptive approach from {'hessianBased', 'DWP', 'DWR'} (default 'fixedMesh')")
+parser.add_argument("-a", help="Choose adaptive approach from {'HessianBased', 'DWP', 'DWR'} (default 'FixedMesh')")
 parser.add_argument("-g", help="Gradate metric")
 parser.add_argument("-m", help="Output metric data")
 parser.add_argument("-n", help="Number of mesh adaptation steps")
@@ -29,9 +29,9 @@ args = parser.parse_args()
 
 approach = args.a
 if approach is None:
-    approach = 'fixedMesh'
+    approach = 'FixedMesh'
 else:
-    assert approach in ('fixedMesh', 'hessianBased', 'DWP', 'DWR')
+    assert approach in ('FixedMesh', 'HessianBased', 'DWP', 'DWR')
 errorFile = open('outdata/advection-diffusion/' + approach + '_' + date + '.txt', 'w+')
 
 # Set parameters

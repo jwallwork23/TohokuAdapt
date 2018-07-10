@@ -14,8 +14,8 @@ class AdaptOptions(FrozenConfigurable):
     name = 'Common parameters for TohokuAdapt project'
 
     # Mesh adaptivity parameters
-    approach = Unicode('fixedMesh',
-                       help="Mesh adaptive approach considered, from {'fixedMesh', 'hessianBased', 'DWP', 'DWR'}"
+    approach = Unicode('FixedMesh',
+                       help="Mesh adaptive approach considered, from {'FixedMesh', 'HessianBased', 'DWP', 'DWR'}"
                        ).tag(config=True)
     gradate = Bool(False, help='Toggle metric gradation.').tag(config=True)
     adapt_on_bathymetry = Bool(False, help='Toggle adaptation based on bathymetry field.').tag(config=True)
