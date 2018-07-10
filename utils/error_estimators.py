@@ -24,43 +24,6 @@ def flux_jump_error(q, v):
     return assemble(v * h * (j0 * j0 + j1 * j1 + j2 * j2) * dx)
 
 
-def sw_interior_residual(solver_obj):
-    """
-    Evaluate strong residual on element interiors for shallow water.
-    """
-
-    # Collect fields and parameters
-    nu = solver_obj.fields.get('viscosity_h')
-    Dt = Constant(solver_obj.options.timestep)
-    g = physical_constants['g_grav']
-    uv_old, elev_old = solver_obj.timestepper.solution_old.split()
-    uv_new, elev_new = solver_obj.fields.solution_2d.split()
-    b = solver_obj.fields.bathymetry_2d
-    f = solver_obj.options.coriolis_frequency
-    uv_2d = 0.5 * (uv_old + uv_new)         # Use Crank-Nicolson timestepping so that we isolate errors as being
-    elev_2d = 0.5 * (elev_old + elev_new)   # related only to the spatial discretisation
-    H = b + elev_2d
-
-    # Momentum equation residual on element interiors
-    res_u = (uv_new - uv_old) / Dt + g * grad(elev_2d)
-    if solver_obj.options.use_nonlinear_equations:
-        res_u += dot(uv_2d, nabla_grad(uv_2d))
-    if solver_obj.options.coriolis_frequency is not None:
-        res_u += f * as_vector((-uv_2d[1], uv_2d[0]))
-    if nu is not None:
-        if solver_obj.options.use_grad_depth_viscosity_term:
-            res_u -= dot(nu * grad(H), (grad(uv_2d) + sym(grad(uv_2d))))
-        if solver_obj.options.use_grad_div_viscosity_term:
-            res_u -= div(nu * (grad(uv_2d) + sym(grad(uv_2d))))
-        else:
-            res_u -= div(nu * grad(uv_2d))
-
-    # Continuity equation residual on element interiors
-    res_e = (elev_new - elev_old) / Dt + div(H * uv_2d)
-
-    return res_u, res_e
-
-
 def ad_interior_residual(solver_obj):
     """
     Evaluate strong residual on element interiors for advection diffusion.
@@ -75,7 +38,7 @@ def ad_interior_residual(solver_obj):
     return (tracer_new - tracer_old) / Dt + dot(u, grad(tracer_2d)) - mu * div(grad(tracer_2d))
 
 
-def sw_boundary_residual(solver_obj, dual_new=None, dual_old=None):
+def sw_boundary_residual(solver_obj, dual_new=None, dual_old=None):     # TODO: Account for other timestepping schemes
     """
     Evaluate strong residual across element boundaries for (DG) shallow water. To consider adjoint variables, input
     these as `dual_new` and `dual_old`.
@@ -129,46 +92,6 @@ def ad_boundary_residual(solver_obj, dual_new=None, dual_old=None):
     n = FacetNormal(mesh)
 
     return Function(P0).interpolate(assemble(jump(Constant(-1.) * v * grad(tracer_2d), n=n) * dS))
-
-
-def explicit_error(solver_obj):
-    r"""
-    Estimate error locally using an a posteriori error indicator [Ainsworth & Oden, 1997], given by
-
-    .. math::
-        \|\textbf{R}(\textbf{q}_h)\|_{\mathcal{L}_2(K)}
-            + h_K^{-1}\|\textbf{r}(\textbf{q}_h)\|_{\mathcal{L}_2(\partial K)},
-
-    where
-    :math:`\textbf{q}_h` is the approximation to the PDE solution,
-    :math:`\textbf{R}` denotes the strong residual on element interiors,
-    :math:`\textbf{r}` denotes the strong residual on element boundaries,
-    :math:`h_K` is the size of mesh element `K`.
-
-    :arg solver_obj: Thetis solver object.
-    :return: explicit error estimator. 
-    """
-    mesh = solver_obj.mesh2d
-    P0 = FunctionSpace(mesh, "DG", 0)
-    v = TestFunction(P0)
-    ee = Function(P0)
-    h = CellSize(mesh)
-
-    if solver_obj.options.tracer_only:
-        res = ad_interior_residual(solver_obj)
-        bres = ad_boundary_residual(solver_obj)
-        print("Interior residual norm = %.4e" % norm(res))
-        print("Boundary residual norm = %.4e" % norm(bres))
-        ee.interpolate(assemble(v * (res * res + bres * bres / sqrt(h)) * dx))
-    else:
-        res_u, res_e = sw_interior_residual(solver_obj)
-        bres_u1, bres_u2, bres_e = sw_boundary_residual(solver_obj)
-        print("Interior residual norm = %.4e" % assemble((inner(res_u, res_u) + res_e * res_e) * dx))
-        print("Boundary residual norm = %.4e" % assemble((bres_u1 * bres_u1 + bres_u2 * bres_u2 + res_e * res_e) * dx))
-        ee.interpolate(assemble(v * (inner(res_u, res_u) + res_e * res_e
-                             + (bres_u1 * bres_u1 + bres_u2 * bres_u2 + bres_e * bres_e) / sqrt(h)) * dx))
-
-    return ee
 
 
 def difference_quotient_estimator(solver_obj, explicit_term, dual, dual_):
