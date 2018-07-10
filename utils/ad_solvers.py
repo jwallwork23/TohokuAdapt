@@ -5,7 +5,7 @@ from time import clock
 from utils.adaptivity import *
 from utils.callbacks import AdvectionCallback, ObjectiveAdvectionCallback
 from utils.interpolation import interp, mixed_pair_interp
-from utils.misc import extract_slice
+from utils.misc import extract_slice, index_string
 from utils.setup import problem_domain
 
 
@@ -153,7 +153,7 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         adaptive_options.tracer_source_2d = source
         adaptive_solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d, tracer=tracer_2d)
         adaptive_solver_obj.i_export = int(cnt / op.timesteps_per_export)
-        adaptive_solver_obj.next_export_t = adaptive_solver_obj.i_export * adaptive_solver_obj.options.simulation_export_time
+        adaptive_solver_obj.next_export_t = adaptive_solver_obj.i_export * adaptive_options.simulation_export_time
         adaptive_solver_obj.iteration = cnt
         adaptive_solver_obj.simulation_time = t
         for e in adaptive_solver_obj.exporters.values():
@@ -226,10 +226,11 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
 
     # Initialise domain and physical parameters
     P1 = FunctionSpace(mesh, "CG", 1)
+    P1DG = FunctionSpace(mesh, "DG", 1)
     tracer_2d = Function(P1, name='tracer_2d')
 
     # Define Functions relating to a posteriori DWR error estimator
-    dual = Function(P1, name='adjoint_2d')
+    dual = Function(P1DG, name='adjoint_2d')
     epsilon = Function(P1, name='error_2d')
     epsilon_ = Function(P1)
 
@@ -290,9 +291,9 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         N = len(solve_blocks)
         r = N % op.timesteps_per_export                            # Number of extra tape annotations in setup
         for i in range(N - 1, r - 1, -op.timesteps_per_export):
-            print("Adjoint index %d" % i)
             dual.assign(solve_blocks[i].adj_sol)
-            with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_string(int((i - r) / op.timesteps_per_export)), mode=FILE_CREATE) as sa:
+            index_str = index_string(int((i - r) / op.timesteps_per_export))
+            with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_str, mode=FILE_CREATE) as sa:
                 sa.store(dual)
                 sa.close()
             if op.plot_pvd:
@@ -342,8 +343,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                 with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_str, mode=FILE_READ) as le:
                     le.load(epsilon)
                     le.close()
-                errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(interp(mesh, epsilon))
-                M = isotropic_metric(errEst, invert=False, op=op)
+                estimate = Function(FunctionSpace(mesh, "CG", 1)).interpolate(interp(mesh, epsilon))
+                M = isotropic_metric(estimate, invert=False, op=op)
                 if op.gradate:
                     M_ = isotropic_metric(interp(mesh, H0), bdy=bdy, op=op)  # Initial boundary metric
                     M = metric_intersection(M, M_, bdy=bdy)
@@ -386,7 +387,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             adaptive_options.tracer_source_2d = source
             adaptive_solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d, tracer=tracer_2d)
             adaptive_solver_obj.i_export = int(cnt / op.timesteps_per_export)
-            adaptive_solver_obj.next_export_t = adaptive_solver_obj.i_export * adaptive_solver_obj.options.simulation_export_time
+            adaptive_solver_obj.next_export_t = adaptive_solver_obj.i_export * adaptive_options.simulation_export_time
             adaptive_solver_obj.iteration = cnt
             adaptive_solver_obj.simulation_time = t
             for e in adaptive_solver_obj.exporters.values():

@@ -18,7 +18,7 @@ class SWCallback(AccumulatorCallback):
         """
         from firedrake import assemble
 
-        self.op = TohokuOptions()   # TODO: Make more general
+        self.op = TohokuOptions()
         dt = solver_obj.options.timestep
 
         def objectiveSW():
@@ -52,7 +52,7 @@ class AdvectionCallback(AccumulatorCallback):
         """
         from firedrake import assemble
 
-        self.op = AdvectionOptions()   # TODO: Make more general
+        self.op = AdvectionOptions()
         dt = solver_obj.options.timestep
 
         def objectiveAD():
@@ -85,7 +85,7 @@ class ObjectiveSWCallback(AccumulatorCallback):
         """
         from firedrake_adjoint import assemble
 
-        self.op = TohokuOptions()   # TODO: Make more general
+        self.op = TohokuOptions()
         self.mirror = False
         dt = solver_obj.options.timestep
 
@@ -120,7 +120,7 @@ class ObjectiveAdvectionCallback(AccumulatorCallback):
         """
         from firedrake_adjoint import assemble
 
-        self.op = AdvectionOptions()   # TODO: Make more general
+        self.op = AdvectionOptions()
         dt = solver_obj.options.timestep
 
         def objectiveAD():

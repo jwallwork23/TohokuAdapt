@@ -157,7 +157,7 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                 mFile.write(M, time=t)
 
             elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
-            b, BCs, f, diffusivity = problem_domain(mesh=mesh, op=op)[3:]     # TODO: find a different way to reset these
+            b, BCs, f, diffusivity = problem_domain(mesh=mesh, op=op)[3:]   # TODO: find a different way to reset these
             uv_2d.rename('uv_2d')
             elev_2d.rename('elev_2d')
         adapt_timer = clock() - adapt_timer
@@ -183,7 +183,7 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         adaptive_options.coriolis_frequency = f
         adaptive_solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
         adaptive_solver_obj.i_export = int(cnt / op.timesteps_per_export)
-        adaptive_solver_obj.next_export_t = adaptive_solver_obj.i_export * adaptive_solver_obj.options.simulation_export_time
+        adaptive_solver_obj.next_export_t = adaptive_solver_obj.i_export * adaptive_options.simulation_export_time
         adaptive_solver_obj.iteration = cnt
         adaptive_solver_obj.simulation_time = t
         for e in adaptive_solver_obj.exporters.values():
@@ -336,7 +336,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         for i in range(N - 1, r - 1, -op.timesteps_per_export):
             dual.assign(solve_blocks[i].adj_sol)
             dual_u, dual_e = dual.split()
-            with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_string(int((i - r) / op.timesteps_per_export)), mode=FILE_CREATE) as sa:
+            index_str = index_string(int((i - r) / op.timesteps_per_export))
+            with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_str, mode=FILE_CREATE) as sa:
                 sa.store(dual_u)
                 sa.store(dual_e)
                 sa.close()
@@ -396,8 +397,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                 with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_str, mode=FILE_READ) as le:
                     le.load(epsilon)
                     le.close()
-                errEst = Function(FunctionSpace(mesh, "CG", 1)).interpolate(interp(mesh, epsilon))
-                M = isotropic_metric(errEst, invert=False, op=op)
+                estimate = Function(FunctionSpace(mesh, "CG", 1)).interpolate(interp(mesh, epsilon))
+                M = isotropic_metric(estimate, invert=False, op=op)
                 if op.gradate:
                     M_ = isotropic_metric(interp(mesh, H0), bdy=bdy, op=op)  # Initial boundary metric
                     M = metric_intersection(M, M_, bdy=bdy)
@@ -410,7 +411,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                 M.rename('metric_2d')
                 mFile.write(M, time=t)
             elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
-            b, BCs, f, diffusivity = problem_domain(mesh=mesh, op=op)[3:]             # TODO: find a different way to reset these
+            b, BCs, f, diffusivity = problem_domain(mesh=mesh, op=op)[3:]   # TODO: find a different way to reset these
             uv_2d.rename('uv_2d')
             elev_2d.rename('elev_2d')
             adapt_timer = clock() - adapt_timer
@@ -436,7 +437,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             adaptive_options.coriolis_frequency = f
             adaptive_solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
             adaptive_solver_obj.i_export = int(cnt / op.timesteps_per_export)
-            adaptive_solver_obj.next_export_t = adaptive_solver_obj.i_export * adaptive_solver_obj.options.simulation_export_time
+            adaptive_solver_obj.next_export_t = adaptive_solver_obj.i_export * adaptive_options.simulation_export_time
             adaptive_solver_obj.iteration = cnt
             adaptive_solver_obj.simulation_time = t
             for e in adaptive_solver_obj.exporters.values():
@@ -497,8 +498,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         return quantities
 
 
-def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TODO: Store optimal mesh, 'intersected' over all rm steps
-    op = kwargs.get('op')
+def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
+    op = kwargs.get('op')                                   # TODO: Store optimal mesh 'intersected' over all rm steps
     regen = kwargs.get('regen')
     if op.plot_metric:
         mFile = File(op.directory() + "Metric2d.pvd")
@@ -596,7 +597,8 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
         for i in range(r, N, op.timesteps_per_remesh):        # Iterate r is the first timestep
             dual.assign(solve_blocks[i].adj_sol)
             dual_u, dual_e = dual.split()
-            with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_string(int((i - r) / op.timesteps_per_remesh)),  mode=FILE_CREATE) as sa:
+            index_str = index_string(int((i - r) / op.timesteps_per_remesh))
+            with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_str,  mode=FILE_CREATE) as sa:
                 sa.store(dual_u)
                 sa.store(dual_e)
                 sa.close()
@@ -610,7 +612,8 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
             residuals = []
             error_timer = clock()
             for k in range(0, int(op.final_index() / op.timesteps_per_export)):
-                print('Generating error estimate %d / %d' % (int(k/op.exports_per_remesh()) + 1, int(op.final_index() / op.timesteps_per_remesh)))
+                print('Generating error estimate %d / %d'
+                      % (int(k/op.exports_per_remesh()) + 1, int(op.final_index() / op.timesteps_per_remesh)))
 
                 # Load residuals
                 with DumbCheckpoint(op.directory() + 'hdf5/ExplicitError2d_' + index_string(k), mode=FILE_READ) as lr:
@@ -640,12 +643,13 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                         la.load(dual_u)
                         la.load(dual_e)
                         la.close()
-                    # if op.order_increase:       # TODO: Alternative order increase DWR method
-                    #     duale_u.interpolate(dual_u)
-                    #     duale_e.interpolate(dual_e)
-
-                    # TODO: Get adjoint from previous step
-                    epsilon.interpolate(difference_quotient_estimator(solver_obj, residual_2d, dual, dual))
+                    if op.order_increase:
+                        duale_u.interpolate(dual_u)
+                        duale_e.interpolate(dual_e)
+                        raise NotImplementedError   # TODO: Requires patchwise interpolation
+                    else:
+                        # TODO: Get adjoint from previous step
+                        epsilon.interpolate(difference_quotient_estimator(solver_obj, residual_2d, dual, dual))
                     epsilon = normalise_indicator(epsilon, op=op)         # ^ Would be subtract with no L-inf
                     epsilon.rename("Error indicator")
                     with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_str, mode=FILE_CREATE) as se:
@@ -680,9 +684,9 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                 with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_str, mode=FILE_READ) as le:
                     le.load(epsilon)
                     le.close()
-                errEst = Function(FunctionSpace(mesh, "CG", 1)).assign(interp(mesh, epsilon))
-                # errEst.dat.data *= 1e3
-                M = isotropic_metric(errEst, invert=False, op=op)
+                estimate = Function(FunctionSpace(mesh, "CG", 1)).assign(interp(mesh, epsilon))
+                # estimate.dat.data *= 1e3
+                M = isotropic_metric(estimate, invert=False, op=op)
                 if op.gradate:
                     # br = Function(P1).interpolate(boundary_region(mesh, 200, 5e8))
                     # ass = assemble(interp(mesh, H0) * br / assemble(100 * br * dx))
@@ -703,7 +707,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
                 M.rename('metric_2d')
                 mFile.write(M, time=t)
             elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
-            b, BCs, f, diffusivity = problem_domain(mesh=mesh, op=op)[3:]           # TODO: Find a different way to reset these
+            b, BCs, f, diffusivity = problem_domain(mesh=mesh, op=op)[3:]   # TODO: Find a different way to reset these
             uv_2d.rename('uv_2d')
             elev_2d.rename('elev_2d')
             adapt_timer = clock() - adapt_timer
@@ -729,7 +733,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
             adaptive_options.coriolis_frequency = f
             adaptive_solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
             adaptive_solver_obj.i_export = int(cnt / op.timesteps_per_export)
-            adaptive_solver_obj.next_export_t = adaptive_solver_obj.i_export * adaptive_solver_obj.options.simulation_export_time
+            adaptive_solver_obj.next_export_t = adaptive_solver_obj.i_export * adaptive_options.simulation_export_time
             adaptive_solver_obj.iteration = cnt
             adaptive_solver_obj.simulation_time = t
             for e in adaptive_solver_obj.exporters.values():
