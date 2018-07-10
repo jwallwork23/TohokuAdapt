@@ -1,14 +1,12 @@
 from thetis import *
 
-import numpy as np
 from time import clock
-import h5py
 
 from utils.adaptivity import *
 from utils.callbacks import SWCallback, ObjectiveSWCallback
 from utils.error_estimators import difference_quotient_estimator
 from utils.interpolation import interp, mixedPairInterp
-from utils.misc import index_string, peak_and_distance, boundary_region
+from utils.misc import index_string, peak_and_distance, boundary_region, extract_gauge_data
 from utils.setup import problem_domain, RossbyWaveSolution
 from utils.timeseries import gauge_total_variation
 
@@ -67,10 +65,7 @@ def FixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     solver_timer = clock() - solver_timer
     quantities['J_h'] = cb1.get_val()          # Evaluate objective functional
     if op.mode == 'tohoku':
-        hf = h5py.File(op.directory() + 'diagnostic_timeseries.hdf5', 'r')
-        for g in op.gauges:
-            quantities[g] = np.array(hf.get(g))
-        hf.close()
+        extract_gauge_data(quantities, op=op)
 
     # Measure error using metrics, as in Huang et al.     # TODO: Parallelise this (and above)
     if op.mode == 'rossby-wave':
@@ -214,10 +209,7 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         solver_timer = clock() - solver_timer
         quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
         if op.mode == 'tohoku':
-            hf = h5py.File(op.directory() + 'diagnostic_timeseries.hdf5', 'r')
-            for g in op.gauges:
-                quantities[g] += tuple(hf.get(g))
-            hf.close()
+            extract_gauge_data(quantities, op=op)
 
         # Get mesh stats
         nEle = mesh.num_cells()
@@ -374,7 +366,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                     la.close()
                 epsilon_.interpolate(inner(q, dual))
                 epsilon = pointwise_max(epsilon, epsilon_)
-            epsilon = normaliseIndicator(epsilon, op=op)
+            epsilon = normalise_indicator(epsilon, op=op)
             with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_string(k), mode=FILE_CREATE) as se:
                 se.store(epsilon)
                 se.close()
@@ -470,10 +462,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             solver_timer = clock() - solver_timer
             quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
             if op.mode == 'tohoku':
-                hf = h5py.File(op.directory() + 'diagnostic_timeseries.hdf5', 'r')
-                for g in op.gauges:
-                    quantities[g] += tuple(hf.get(g))
-                hf.close()
+                extract_gauge_data(quantities, op=op)
 
             # Get mesh stats
             nEle = mesh.num_cells()
@@ -657,7 +646,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
 
                     # TODO: Get adjoint from previous step
                     epsilon.interpolate(difference_quotient_estimator(solver_obj, residual_2d, dual, dual))
-                    epsilon = normaliseIndicator(epsilon, op=op)         # ^ Would be subtract with no L-inf
+                    epsilon = normalise_indicator(epsilon, op=op)         # ^ Would be subtract with no L-inf
                     epsilon.rename("Error indicator")
                     with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_str, mode=FILE_CREATE) as se:
                         se.store(epsilon)
@@ -766,10 +755,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):     # TO
             solver_timer = clock() - solver_timer
             quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
             if op.mode == 'tohoku':
-                hf = h5py.File(op.directory() + 'diagnostic_timeseries.hdf5', 'r')
-                for g in op.gauges:
-                    quantities[g] += tuple(hf.get(g))
-                hf.close()
+                extract_gauge_data(quantities, op=op)
 
             # Get mesh stats
             nEle = mesh.num_cells()

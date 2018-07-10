@@ -6,7 +6,7 @@ import h5py
 from .options import TohokuOptions, RossbyWaveOptions, AdvectionOptions
 
 
-__all__ = ["index_string", "peak_and_distance", "boundary_region", "extract_slice"]
+__all__ = ["index_string", "peak_and_distance", "boundary_region", "extract_slice", "extract_gauge_data"]
 
 
 def index_string(index):
@@ -67,4 +67,13 @@ def extract_slice(quantities, direction='h', op=AdvectionOptions()):
             if not tag in quantities.keys():
                 quantities[tag] = []
             quantities[tag].append(vals[i])
+    hf.close()
+
+
+def extract_gauge_data(quantities, op=TohokuOptions()):
+    hf = h5py.File(op.directory() + 'diagnostic_timeseries.hdf5', 'r')
+    for g in op.gauges:
+        if not g in quantities.keys():
+            quantities[g] = ()
+        quantities[g] += tuple(hf.get(g))
     hf.close()
