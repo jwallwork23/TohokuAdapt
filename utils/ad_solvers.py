@@ -7,6 +7,7 @@ import h5py
 from utils.adaptivity import *
 from utils.callbacks import AdvectionCallback, ObjectiveAdvectionCallback
 from utils.interpolation import interp, mixedPairInterp
+from utils.misc import extract_slice
 from utils.setup import problemDomain
 
 
@@ -34,7 +35,7 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs
     options.fields_to_export = ['tracer_2d']
     options.fields_to_export_hdf5 = ['tracer_2d']
     options.solve_tracer = True
-    options.tracer_only = True  # Need use tracer-only branch to use this functionality
+    options.tracer_only = True
     options.horizontal_diffusivity = diffusivity
     options.use_lax_friedrichs_tracer = False                   # TODO: This is a temporary fix
     options.tracer_source_2d = source
@@ -64,24 +65,9 @@ def fixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs
     solver_obj.iterate()
     solverTimer = clock() - solverTimer
     quantities['J_h'] = cb1.get_val()          # Evaluate objective functional
-    hf_h = h5py.File(op.directory() + 'diagnostic_horizontal_slice.hdf5', 'r')
-    for x in ["h_slice{i:d}".format(i=i) for i in range(len(op.h_slice))]:
-        vals = np.array(hf_h.get(x))
-        for i in range(len(vals)):
-            tag = 'h_snapshot_{i:d}'.format(i=i)
-            if not tag in quantities.keys():
-                quantities[tag] = []
-            quantities[tag].append(vals[i])
-    hf_h.close()
-    # hf_v = h5py.File(op.directory() + 'diagnostic_vertical_slice.hdf5', 'r')
-    # for y in ["v_slice{i:d}".format(i=i) for i in range(len(op.v_slice))]:
-    #     vals = np.array(hf_h.get(y))
-    #     for i in range(len(vals)):
-    #         tag = 'v_snapshot_{i:d}'.format(i=i)
-    #         if not tag in quantities.keys():
-    #             quantities[tag] = []
-    #         quantities[tag].append(vals[i])
-    # hf_v.close()
+
+    extract_slice(quantities, direction='h', op=op)
+    # extract_slice(quantities, direction='v', op=op)
 
     # Output mesh statistics and solver times
     quantities['meanElements'] = mesh.num_cells()
@@ -181,11 +167,27 @@ def hessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         if cnt != 0:
             cb1.old_value = quantities['J_h']
         adapSolver.add_callback(cb1, 'timestep')
+        cb2 = callback.DetectorsCallback(adapSolver,
+                                         op.h_slice,
+                                         ['tracer_2d'],
+                                         'horizontal slice',
+                                         ["h_slice{i:d}".format(i=i) for i in range(len(op.h_slice))],
+                                         export_to_hdf5=True)
+        adapSolver.add_callback(cb2, 'export')
+        # cb3 = callback.DetectorsCallback(adapSolver,
+        #                                  op.v_slice,
+        #                                  ['tracer_2d'],
+        #                                  'vertical slice',
+        #                                  ["v_slice{i:d}".format(i=i) for i in range(len(op.v_slice))],
+        #                                  export_to_hdf5=True)
+        # adapSolver.add_callback(cb3, 'export')
         adapSolver.bnd_functions = BCs
         solverTimer = clock()
         adapSolver.iterate()
         solverTimer = clock() - solverTimer
         quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
+        extract_slice(quantities, direction='h', op=op)
+        # extract_slice(quantities, direction='v', op=op)
 
         # Get mesh stats
         nEle = mesh.num_cells()
@@ -260,7 +262,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         options.fields_to_export = ['tracer_2d']
         options.fields_to_export_hdf5 = ['tracer_2d']
         options.solve_tracer = True
-        options.tracer_only = True  # Need use tracer-only branch to use this functionality
+        options.tracer_only = True
         options.horizontal_diffusivity = diffusivity
         options.use_lax_friedrichs_tracer = False  # TODO: This is a temporary fix
         options.tracer_source_2d = source
@@ -398,11 +400,27 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             if cnt != 0:
                 cb1.old_value = quantities['J_h']
             adapSolver.add_callback(cb1, 'timestep')
+            cb2 = callback.DetectorsCallback(adapSolver,
+                                             op.h_slice,
+                                             ['tracer_2d'],
+                                             'horizontal slice',
+                                             ["h_slice{i:d}".format(i=i) for i in range(len(op.h_slice))],
+                                             export_to_hdf5=True)
+            adapSolver.add_callback(cb2, 'export')
+            # cb3 = callback.DetectorsCallback(adapSolver,
+            #                                  op.v_slice,
+            #                                  ['tracer_2d'],
+            #                                  'vertical slice',
+            #                                  ["v_slice{i:d}".format(i=i) for i in range(len(op.v_slice))],
+            #                                  export_to_hdf5=True)
+            # adapSolver.add_callback(cb3, 'export')
             adapSolver.bnd_functions = BCs
             solverTimer = clock()
             adapSolver.iterate()
             solverTimer = clock() - solverTimer
             quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
+            extract_slice(quantities, direction='h', op=op)
+            # extract_slice(quantities, direction='v', op=op)
 
             # Get mesh stats
             nEle = mesh.num_cells()

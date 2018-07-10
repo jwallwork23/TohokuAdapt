@@ -1,11 +1,12 @@
 from firedrake import *
 
 import numpy as np
+import h5py
 
-from .options import TohokuOptions, RossbyWaveOptions
+from .options import TohokuOptions, RossbyWaveOptions, AdvectionOptions
 
 
-__all__ = ["indexString", "peakAndDistance", "bdyRegion"]
+__all__ = ["indexString", "peakAndDistance", "bdyRegion", "extract_slice"]
 
 
 def indexString(index):
@@ -47,3 +48,23 @@ def bdyRegion(mesh, bdyTag, scale, sponge=False):
         expr = Expression(e + " > 1 ? 1 : " + e)
 
     return expr
+
+
+def extract_slice(quantities, direction='h', op=AdvectionOptions()):
+    if direction == 'h':
+        sl = op.h_slice
+        label = 'horizontal'
+    elif direction == 'v':
+        sl = op.v_slice
+        label = 'vertical'
+    else:
+        raise NotImplementedError("Only horizontal and vertical slices are currently implemented.")
+    hf = h5py.File(op.directory() + 'diagnostic_' + label + '_slice.hdf5', 'r')
+    for x in ["{l:s}_slice{i:d}".format(l=direction, i=i) for i in range(len(sl))]:
+        vals = np.array(hf.get(x))
+        for i in range(len(vals)):
+            tag = '{l:s}_snapshot_{i:d}'.format(l=direction, i=i)
+            if not tag in quantities.keys():
+                quantities[tag] = []
+            quantities[tag].append(vals[i])
+    hf.close()
