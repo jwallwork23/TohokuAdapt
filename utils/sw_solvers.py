@@ -499,7 +499,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
 
 
 def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
-    op = kwargs.get('op')                                   # TODO: Store optimal mesh 'intersected' over all rm steps
+    op = kwargs.get('op')
     regen = kwargs.get('regen')
     if op.plot_metric:
         mFile = File(op.directory() + "Metric2d.pvd")
@@ -577,7 +577,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         initTimer = clock() - initTimer
         print('Problem initialised. Setup time: %.3fs' % initTimer)
 
-        primal_timer = 0.
+        primal_timer = clock()
         solver_obj.iterate()
         primal_timer = clock() - primal_timer
         J = cb1.get_val()                        # Assemble objective functional for adjoint computation
