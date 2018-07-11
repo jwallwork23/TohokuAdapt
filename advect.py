@@ -65,8 +65,8 @@ for i in resolutions:
 
     i_end = op.final_export()
     for progress in (0.5, 1):
-        tag = "h_snapshot_"+str(int(i_end*progress))        # TODO: This is for non-diffusive case. Consider steady state
-        if tag in quantities:
+        tag = "h_snapshot_"+str(int(i_end*progress))        # TODO: This is for non-diffusive case
+        if tag in quantities:                               # TODO: Consider steady state for diffusive case
             plt.clf()
             s = quantities[tag]
             sl = op.h_slice

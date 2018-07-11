@@ -292,7 +292,7 @@ class AdvectionOptions(AdaptOptions):
     # Region of importance
     radii = List(trait=Float, default_value=[0.5],
                  help="Radius of indicator function around location of interest.").tag(config=True)
-    loc = List(trait=Float, default_value=[25., 7.5],
+    loc = List(trait=Float, default_value=[40., 7.5],
                help="Important locations, written as a list.").tag(config=True)
     J = Float(0.1871, help="Objective functional value on a fine mesh").tag(config=True)    # On 64,000 elements
 
