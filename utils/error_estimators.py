@@ -37,11 +37,14 @@ def sw_boundary_residual(solver_obj, dual_new=None, dual_old=None):     # TODO: 
     elev_2d = 0.5 * (elev_old + elev_new)   # related only to the spatial discretisation
     H = b + elev_2d
 
-    # Element boundary residual
+    # Create P0 TestFunction, scaled to take value 1 in each cell. This has the effect of conserving mass upon
+    # premultiplying piecewise constant and piecewise linear functions.
     mesh = solver_obj.mesh2d
     P0 = FunctionSpace(mesh, "DG", 0)
-    v = TestFunction(P0)
+    v = Constant(mesh.num_cells()) * TestFunction(P0)  # Scaled to take value 1 in each cell
     n = FacetNormal(mesh)
+
+    # Element boundary residual
     bres_u1 = Function(P0).interpolate(assemble(jump(Constant(0.5) * g * v * elev_2d, n=n[0]) * dS))
     bres_u2 = Function(P0).interpolate(assemble(jump(Constant(0.5) * g * v * elev_2d, n=n[1]) * dS))
     bres_e = Function(P0).interpolate(assemble(jump(Constant(0.5) * v * H * uv_2d, n=n) * dS))
@@ -56,7 +59,6 @@ def ad_boundary_residual(solver_obj, dual_new=None, dual_old=None):     # TODO: 
     """
 
     # Collect fields and parameters
-
     if dual_new is not None and dual_old is not None:
         tracer_new = dual_new
         tracer_old = dual_old
@@ -65,10 +67,11 @@ def ad_boundary_residual(solver_obj, dual_new=None, dual_old=None):     # TODO: 
         tracer_old = solver_obj.timestepper.tracer_old
     tracer_2d = 0.5 * (tracer_old + tracer_new)
 
-    # Element boundary residual
+    # Create P0 TestFunction, scaled to take value 1 in each cell. This has the effect of conserving mass upon
+    # premultiplying piecewise constant and piecewise linear functions.
     mesh = solver_obj.mesh2d
     P0 = FunctionSpace(mesh, "DG", 0)
-    v = TestFunction(P0)
+    v = Constant(mesh.num_cells()) * TestFunction(P0)
     n = FacetNormal(mesh)
 
     return Function(P0).interpolate(assemble(jump(Constant(-1.) * v * grad(tracer_2d), n=n) * dS))
@@ -86,9 +89,11 @@ def difference_quotient_estimator(solver_obj, explicit_term, dual, dual_, divide
     :param divide_by_cell_size: optionally divide estimator by cell size.
     """
 
+    # Create P0 TestFunction, scaled to take value 1 in each cell. This has the effect of conserving mass upon
+    # premultiplying piecewise constant and piecewise linear functions.
     mesh = solver_obj.mesh2d
     P0 = FunctionSpace(mesh, "DG", 0)
-    v = TestFunction(P0)
+    v = Constant(mesh.num_cells()) * TestFunction(P0)
 
     if solver_obj.options.tracer_only:
         b_res = ad_boundary_residual(solver_obj)

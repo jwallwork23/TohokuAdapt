@@ -1,5 +1,6 @@
 from thetis import *
 
+import numpy as np
 from time import clock
 
 from utils.adaptivity import *
@@ -367,7 +368,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                     la.close()
                 epsilon_.interpolate(inner(q, dual))
                 epsilon = pointwise_max(epsilon, epsilon_)
-            epsilon = normalise_indicator(epsilon, op=op)
+            # epsilon = normalise_indicator(epsilon, op=op)
+            epsilon.dat.data[:] = np.abs(epsilon.dat.data)
             with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_string(k), mode=FILE_CREATE) as se:
                 se.store(epsilon)
                 se.close()
@@ -403,7 +405,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                 if op.gradate:
                     M_ = isotropic_metric(interp(mesh, H0), bdy=bdy, op=op)  # Initial boundary metric
                     M = metric_intersection(M, M_, bdy=bdy)
-                    # gradate_metric(M, op=op)
+                    gradate_metric(M, op=op)
 
                 # Adapt mesh and interpolate variables
                 mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
@@ -650,8 +652,9 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                         raise NotImplementedError   # TODO: Requires patchwise interpolation
                     else:
                         # TODO: Get adjoint from previous (/next?) step
-                        epsilon.interpolate(difference_quotient_estimator(solver_obj, residual_2d, dual, dual))
-                    epsilon = normalise_indicator(epsilon, op=op)         # ^ Would be subtract with no L-inf
+                        epsilon.interpolate(difference_quotient_estimator(solver_obj, residual_2d, dual, dual)) # Note: Would be subtract with no L-inf
+                    # epsilon = normalise_indicator(epsilon, op=op)
+                    epsilon.dat.data[:] = np.abs(epsilon.dat.data)
                     epsilon.rename("Error indicator")
                     with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_str, mode=FILE_CREATE) as se:
                         se.store(epsilon)
@@ -687,7 +690,6 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                     le.close()
                 estimate = Function(FunctionSpace(mesh, "CG", 1)).assign(interp(mesh, epsilon))
                 print("#### DEBUG: error estimator norm = %.4e" % norm(estimate))
-                # estimate.dat.data *= 1e3
                 M = isotropic_metric(estimate, invert=False, op=op)
                 if op.gradate:
                     # br = Function(P1).interpolate(boundary_region(mesh, 200, 5e8))
@@ -702,8 +704,6 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
 
                 # Adapt mesh and interpolate variables
                 mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-                # File('plots/tohoku/mesh.pvd').write(mesh.coordinates)
-                # exit(0)
 
             if op.adaptations != 0 and op.plot_metric:
                 M.rename('metric_2d')
