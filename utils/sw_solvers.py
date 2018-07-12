@@ -5,7 +5,7 @@ from time import clock
 from utils.adaptivity import *
 from utils.callbacks import SWCallback, ObjectiveSWCallback
 from utils.error_estimators import difference_quotient_estimator
-from utils.interpolation import interp, mixedPairInterp
+from utils.interpolation import interp
 from utils.misc import index_string, peak_and_distance, boundary_region, extract_gauge_data
 from utils.setup import problem_domain, RossbyWaveSolution
 from utils.timeseries import gauge_total_variation
@@ -389,7 +389,6 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             quantities[g] = ()
         bdy = 200 if op.mode == 'tohoku' else 'on_boundary'
         while cnt < op.final_index():
-            halt = False
             adapt_timer = clock()
             for l in range(op.adaptations):                                  # TODO: Test this functionality
 
@@ -399,10 +398,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                     le.load(epsilon)
                     le.close()
                 estimate = Function(FunctionSpace(mesh, "CG", 1)).interpolate(interp(mesh, epsilon))
-                if norm(estimate) < 1e-8:
-                    print("WARNING: Near zero error estimate, mesh adaptation halted.")
-                    halt = True
-                    break
+                print("#### DEBUG: error estimator norm = %.4e" % norm(estimate))
                 M = isotropic_metric(estimate, invert=False, op=op)
                 if op.gradate:
                     M_ = isotropic_metric(interp(mesh, H0), bdy=bdy, op=op)  # Initial boundary metric
@@ -415,11 +411,10 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             if op.adaptations != 0 and op.plot_metric:
                 M.rename('metric_2d')
                 mFile.write(M, time=t)
-            if not halt:
-                elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
-                b, BCs, f, diffusivity = problem_domain(mesh=mesh, op=op)[3:]   # TODO: find a different way to reset these
-                uv_2d.rename('uv_2d')
-                elev_2d.rename('elev_2d')
+            elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
+            b, BCs, f, diffusivity = problem_domain(mesh=mesh, op=op)[3:]   # TODO: find a different way to reset these
+            uv_2d.rename('uv_2d')
+            elev_2d.rename('elev_2d')
             adapt_timer = clock() - adapt_timer
 
             # Solver object and equations
@@ -654,7 +649,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                         duale_e.interpolate(dual_e)
                         raise NotImplementedError   # TODO: Requires patchwise interpolation
                     else:
-                        # TODO: Get adjoint from previous step
+                        # TODO: Get adjoint from previous (/next?) step
                         epsilon.interpolate(difference_quotient_estimator(solver_obj, residual_2d, dual, dual))
                     epsilon = normalise_indicator(epsilon, op=op)         # ^ Would be subtract with no L-inf
                     epsilon.rename("Error indicator")
@@ -682,7 +677,6 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         bdy = 200 if op.mode == 'tohoku' else 'on_boundary'
         # bdy = 'on_boundary'
         while cnt < op.final_index():
-            halt = False
             adapt_timer = clock()
             for l in range(op.adaptations):                          # TODO: Test this functionality
 
@@ -692,11 +686,8 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                     le.load(epsilon)
                     le.close()
                 estimate = Function(FunctionSpace(mesh, "CG", 1)).assign(interp(mesh, epsilon))
+                print("#### DEBUG: error estimator norm = %.4e" % norm(estimate))
                 # estimate.dat.data *= 1e3
-                if norm(estimate) < 1e-8:
-                    print("WARNING: Near zero error estimate, mesh adaptation halted.")
-                    halt = True
-                    break
                 M = isotropic_metric(estimate, invert=False, op=op)
                 if op.gradate:
                     # br = Function(P1).interpolate(boundary_region(mesh, 200, 5e8))
@@ -717,11 +708,10 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             if op.adaptations != 0 and op.plot_metric:
                 M.rename('metric_2d')
                 mFile.write(M, time=t)
-            if not halt:
-                elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
-                b, BCs, f, diffusivity = problem_domain(mesh=mesh, op=op)[3:]   # TODO: Find a different way to reset these
-                uv_2d.rename('uv_2d')
-                elev_2d.rename('elev_2d')
+            elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
+            b, BCs, f, diffusivity = problem_domain(mesh=mesh, op=op)[3:]   # TODO: Find a different way to reset these
+            uv_2d.rename('uv_2d')
+            elev_2d.rename('elev_2d')
             adapt_timer = clock() - adapt_timer
 
             # Solver object and equations

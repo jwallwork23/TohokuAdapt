@@ -4,7 +4,7 @@ from thetis import *
 __all__ = ["explicit_error", "difference_quotient_estimator"]
 
 
-def ad_interior_residual(solver_obj):
+def ad_interior_residual(solver_obj):   # TODO: Integrate this into Thetis
     """
     Evaluate strong residual on element interiors for advection diffusion.
     """
@@ -49,7 +49,7 @@ def sw_boundary_residual(solver_obj, dual_new=None, dual_old=None):     # TODO: 
     return bres_u1, bres_u2, bres_e
 
 
-def ad_boundary_residual(solver_obj, dual_new=None, dual_old=None):
+def ad_boundary_residual(solver_obj, dual_new=None, dual_old=None):     # TODO: Account for other timestepping schemes
     """
     Evaluate strong residual across element boundaries for (DG) advection diffusion. To consider adjoint variables, 
     input these as `dual_new` and `dual_old`.
@@ -74,10 +74,19 @@ def ad_boundary_residual(solver_obj, dual_new=None, dual_old=None):
     return Function(P0).interpolate(assemble(jump(Constant(-1.) * v * grad(tracer_2d), n=n) * dS))
 
 
-def difference_quotient_estimator(solver_obj, explicit_term, dual, dual_):
+def difference_quotient_estimator(solver_obj, explicit_term, dual, dual_, divide_by_cell_size=False):
+    """
+    Difference quotient approximation to the dual weighted residual as described on pp.41-42 of 
+    [Becker and Rannacher, 2001].
+    
+    :param solver_obj: Thetis solver object.
+    :param explicit_term: explicit error estimator as calculated by `ExplicitErrorCallback`.
+    :param dual: adjoint solution at current timestep.
+    :param dual_: adjoint solution at previous timestep.
+    :param divide_by_cell_size: optionally divide estimator by cell size.
+    """
 
     mesh = solver_obj.mesh2d
-    h = CellSize(mesh)
     P0 = FunctionSpace(mesh, "DG", 0)
     v = TestFunction(P0)
 
@@ -87,8 +96,11 @@ def difference_quotient_estimator(solver_obj, explicit_term, dual, dual_):
     else:
         bres0_a, bres1_a, bres2_a = sw_boundary_residual(solver_obj, dual, dual_)
         adjoint_term = bres0_a * bres0_a + bres1_a * bres1_a + bres2_a * bres2_a
+    estimator_loc = v * explicit_term * adjoint_term
+    if divide_by_cell_size:
+        estimator_loc /= sqrt(CellSize(mesh))
     dq = Function(P0)
-    dq.interpolate(assemble(v * explicit_term * adjoint_term / sqrt(h) * dx))
-    # print("Explicit error esimate = %.4e" % norm(dq))
+    dq.interpolate(assemble(estimator_loc * dx))
+    # print("Difference quotient error esimate = %.4e" % norm(dq))
 
     return dq
