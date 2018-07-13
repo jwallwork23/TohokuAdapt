@@ -286,6 +286,7 @@ class AdvectionOptions(AdaptOptions):
     bell_y0 = Float(5., help="y-coordinate corresponding to tracer source centre").tag(config=True)
     bell_r0 = Float(0.457, help="Radius of tracer source").tag(config=True)
     u_mag = FiredrakeScalarExpression(Constant(1.), help="(Estimate of) maximum advective speed").tag(config=True)
+    tracer_family = Unicode('cg', help="Finite element family for tracer flow, from {'dg', 'dg'}.").tag(config=True)
     solver_parameters = PETScSolverParameters({'ksp_type': 'gmres',
                                                'pc_type': 'sor'}).tag(config=True)
     # solver_parameters = PETScSolverParameters({'ksp_type': 'preonly',

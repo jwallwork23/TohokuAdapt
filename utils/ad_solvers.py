@@ -36,6 +36,9 @@ def FixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs
     options.tracer_only = True
     options.horizontal_diffusivity = diffusivity
     options.use_lax_friedrichs_tracer = False                   # TODO: This is a temporary fix
+    options.tracer_family = op.tracer_family
+    if op.tracer_family == 'cg':
+        options.use_limiter_for_tracers = False
     options.tracer_source_2d = source
     solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
     cb1 = AdvectionCallback(solver_obj)
@@ -148,8 +151,10 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         adaptive_options.solve_tracer = True
         adaptive_options.tracer_only = True  # Need use tracer-only branch to use this functionality
         adaptive_options.horizontal_diffusivity = diffusivity
-        adaptive_options.use_lax_friedrichs_tracer = False                   # TODO: This is a temporary fix
-        # adaptive_options.use_lax_friedrichs_tracer = True
+        adaptive_options.use_lax_friedrichs_tracer = False              # TODO: This is a temporary fix
+        adaptive_options.tracer_family = op.tracer_family
+        if op.tracer_family == 'cg':
+            adaptive_options.use_limiter_for_tracers = False
         adaptive_options.tracer_source_2d = source
         adaptive_solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d, tracer=tracer_2d)
         adaptive_solver_obj.i_export = int(cnt / op.timesteps_per_export)
@@ -264,6 +269,9 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         options.tracer_only = True
         options.horizontal_diffusivity = diffusivity
         options.use_lax_friedrichs_tracer = False  # TODO: This is a temporary fix
+        options.tracer_family = op.tracer_family
+        if op.tracer_family == 'cg':
+            options.use_limiter_for_tracers = False
         options.tracer_source_2d = source
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         cb1 = ObjectiveAdvectionCallback(solver_obj)
@@ -390,6 +398,9 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             adaptive_options.tracer_only = True  # Need use tracer-only branch to use this functionality
             adaptive_options.horizontal_diffusivity = diffusivity
             adaptive_options.use_lax_friedrichs_tracer = False  # TODO: This is a temporary fix
+            adaptive_options.tracer_family = op.tracer_family
+            if op.tracer_family == 'cg':
+                adaptive_options.use_limiter_for_tracers = False
             adaptive_options.tracer_source_2d = source
             adaptive_solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d, tracer=tracer_2d)
             adaptive_solver_obj.i_export = int(cnt / op.timesteps_per_export)
@@ -450,7 +461,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         return quantities
 
 
-def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
+def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
     regen = kwargs.get('regen')
     if op.plot_metric:
@@ -505,6 +516,9 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         options.tracer_only = True
         options.horizontal_diffusivity = diffusivity
         options.use_lax_friedrichs_tracer = False  # TODO: This is a temporary fix
+        options.tracer_family = op.tracer_family
+        if op.tracer_family == 'cg':
+            options.use_limiter_for_tracers = False
         options.tracer_source_2d = source
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         cb1 = ObjectiveAdvectionCallback(solver_obj)
@@ -667,6 +681,9 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             adaptive_options.tracer_only = True  # Need use tracer-only branch to use this functionality
             adaptive_options.horizontal_diffusivity = diffusivity
             adaptive_options.use_lax_friedrichs_tracer = False  # TODO: This is a temporary fix
+            adaptive_options.tracer_family = op.tracer_family
+            if op.tracer_family == 'cg':
+                adaptive_options.use_limiter_for_tracers = False
             adaptive_options.tracer_source_2d = source
             adaptive_solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
             adaptive_solver_obj.i_export = int(cnt / op.timesteps_per_export)

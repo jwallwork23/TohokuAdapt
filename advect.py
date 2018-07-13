@@ -43,18 +43,6 @@ op.adaptations = 1 if args.n is None else int(args.n)
 if bool(args.snes_view):
     op.solver_parameters['snes_view'] = True
 
-
-
-# TODO: TESTING
-# op.solver_parameters['snes_max_it'] = 1000
-# op.solver_parameters = {'ksp_type': 'preonly', 'pc_type': 'bjacobi', 'sub_pc_type': 'ilu'}
-# op.max_anisotropy = 1.
-op.bell_x0 = 5.
-op.diffusivity = 0.
-op.end_time = 36.
-
-
-
 # Get data and save to disk
 if args.low is not None or args.high is not None:
     assert args.level is None
