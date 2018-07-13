@@ -166,7 +166,7 @@ def steady_metric(f, H=None, op=TohokuOptions()):
     return M
 
 
-def normalise_indicator(f, op=TohokuOptions()):     # TODO: way well remove this
+def normalise_indicator(f, op=TohokuOptions()):     # TODO: may well remove this
     """
     Normalise error indicator `f` using procedure defined by `op`.
     

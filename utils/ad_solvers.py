@@ -136,7 +136,6 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         adaptive_options.simulation_export_time = op.timestep * op.timesteps_per_export
         adaptive_options.simulation_end_time = t + op.timestep * (op.timesteps_per_remesh - 0.5)
         adaptive_options.timestepper_type = op.timestepper
-        # op.solver_parameters['snes_max_it'] = 1000
         adaptive_options.timestepper_options.solver_parameters_tracer = op.solver_parameters
         print("Using solver parameters %s" % adaptive_options.timestepper_options.solver_parameters_tracer)
         adaptive_options.timestep = op.timestep
@@ -150,6 +149,7 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         adaptive_options.tracer_only = True  # Need use tracer-only branch to use this functionality
         adaptive_options.horizontal_diffusivity = diffusivity
         adaptive_options.use_lax_friedrichs_tracer = False                   # TODO: This is a temporary fix
+        # adaptive_options.use_lax_friedrichs_tracer = True
         adaptive_options.tracer_source_2d = source
         adaptive_solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d, tracer=tracer_2d)
         adaptive_solver_obj.i_export = int(cnt / op.timesteps_per_export)

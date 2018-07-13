@@ -166,7 +166,7 @@ def problem_domain(level=0, mesh=None, b=None, op=TohokuOptions()):
     :return: associated mesh, initial conditions, bathymetry field, boundary conditions and Coriolis parameter. 
     """
     newmesh = mesh == None
-    if op.mode == 'tohoku':
+    if op.mode == 'Tohoku':
         get_bathymetry = b is None
         if mesh is None:
             # ms = MeshSetup(level, op.wd)
@@ -230,7 +230,7 @@ def problem_domain(level=0, mesh=None, b=None, op=TohokuOptions()):
         # diffusivity = Function(P1).interpolate(boundary_region(mesh, 100, 1e9, sponge=True))
         # File('plots/tohoku/spongy.pvd').write(diffusivity)
 
-    elif op.mode == 'shallow-water':
+    elif op.mode == 'GaussianTest':
         n = pow(2, level)
         lx = 2 * pi
         if mesh is None:
@@ -243,15 +243,15 @@ def problem_domain(level=0, mesh=None, b=None, op=TohokuOptions()):
         BCs = {}
         f = Function(P1)
         diffusivity = None
-    elif op.mode in ('rossby-wave', 'kelvin-wave'):
+    elif op.mode in ('RossbyWave', 'KelvinWave'):
         if mesh is None:
             n = pow(2, level - 1)
             ly = 24
-            if op.approach == 'fixedMesh':
+            if op.approach == 'FixedMesh':
                 lx = 48
                 mesh = PeriodicRectangleMesh(int(lx * n), int(ly * n), lx, ly, direction="x")
             else:
-                lx = 160 if op.mode == 'rossby-wave' else 48
+                lx = 160 if op.mode == 'RossbyWave' else 48
                 mesh = RectangleMesh(int(lx * n), int(ly * n), lx, ly)
             xy = Function(mesh.coordinates)
             xy.dat.data[:, :] -= [lx / 2, ly / 2]
@@ -263,7 +263,7 @@ def problem_domain(level=0, mesh=None, b=None, op=TohokuOptions()):
         BCs = {1: {'uv': Constant(0.)}, 2: {'uv': Constant(0.)}, 3: {'uv': Constant(0.)}, 4: {'uv': Constant(0.)}}
         f = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
         diffusivity = None
-    elif op.mode == 'advection-diffusion':
+    elif op.mode == 'AdvectionDiffusion':
         n = pow(2, level)
         if mesh is None:
             lx = 50
@@ -287,7 +287,7 @@ def problem_domain(level=0, mesh=None, b=None, op=TohokuOptions()):
         PETSc.Sys.Print("  rank %d owns %d elements and can access %d vertices" \
                         % (mesh.comm.rank, mesh.num_cells(), mesh.num_vertices()), comm=COMM_SELF)
 
-    if op.mode == 'advection-diffusion':
+    if op.mode == 'AdvectionDiffusion':
         return mesh, u0, eta0, b, BCs, source, diffusivity
     else:
         return mesh, u0, eta0, b, BCs, f, diffusivity

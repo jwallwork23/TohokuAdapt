@@ -106,7 +106,7 @@ Percent complete  : %4.1f%%    Adapt time : %4.2fs Solver time : %4.2fs
 
 class TohokuOptions(AdaptOptions):
     name = 'Parameters for the Tohoku problem'
-    mode = 'tohoku'
+    mode = 'Tohoku'
 
     # Solver parameters
     timesteps_per_export = NonNegativeInteger(10, help="Timesteps per data dump").tag(config=True)
@@ -165,7 +165,7 @@ class TohokuOptions(AdaptOptions):
 
 class RossbyWaveOptions(AdaptOptions):
     name = 'Parameters for the equatorial Rossby wave test problem'
-    mode = 'rossby-wave'
+    mode = 'RossbyWave'
 
     # Solver parameters
     timesteps_per_export = NonNegativeInteger(12, help="Timesteps per data dump").tag(config=True)
@@ -200,7 +200,7 @@ class RossbyWaveOptions(AdaptOptions):
 
 class KelvinWaveOptions(AdaptOptions):
     name = 'Parameters for the equatorial Kelvin wave test problem'
-    mode = 'kelvin-wave'
+    mode = 'KelvinWave'
 
     # Solver parameters
     timesteps_per_export = NonNegativeInteger(12, help="Timesteps per data dump").tag(config=True)
@@ -234,7 +234,7 @@ class KelvinWaveOptions(AdaptOptions):
 
 class GaussianOptions(AdaptOptions):
     name = 'Parameters for the shallow water test problem with Gaussian initial condition'
-    mode = 'shallow-water'
+    mode = 'GaussianTest'
 
     # Solver parameters
     timesteps_per_export = NonNegativeInteger(6, help="Timesteps per data dump").tag(config=True)
@@ -267,7 +267,7 @@ class GaussianOptions(AdaptOptions):
 
 class AdvectionOptions(AdaptOptions):
     name = 'Parameters for advection diffusion test problem'
-    mode = 'advection-diffusion'
+    mode = 'AdvectionDiffusion'
 
     # Solver parameters
     timesteps_per_export = NonNegativeInteger(10, help="Timesteps per data dump").tag(config=True)
@@ -288,6 +288,9 @@ class AdvectionOptions(AdaptOptions):
     u_mag = FiredrakeScalarExpression(Constant(1.), help="(Estimate of) maximum advective speed").tag(config=True)
     solver_parameters = PETScSolverParameters({'ksp_type': 'gmres',
                                                'pc_type': 'sor'}).tag(config=True)
+    # solver_parameters = PETScSolverParameters({'ksp_type': 'preonly',
+    #                                            'pc_type': 'bjacobi',
+    #                                            'sub_pc_type': 'ilu'}).tag(config=True)
 
     # Region of importance
     radii = List(trait=Float, default_value=[0.5],
