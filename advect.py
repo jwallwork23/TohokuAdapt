@@ -16,6 +16,7 @@ date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-a", help="Choose adaptive approach from {'HessianBased', 'DWP', 'DWR'} (default 'FixedMesh')")
+parser.add_argument("-f", help="Finite element family, from {'dg', 'cg'}")
 parser.add_argument("-g", help="Gradate metric")
 parser.add_argument("-m", help="Output metric data")
 parser.add_argument("-n", help="Number of mesh adaptation steps")
@@ -39,6 +40,7 @@ op = AdvectionOptions(approach=approach)
 op.gradate = bool(args.g)
 op.plot_pvd = bool(args.o)
 op.plot_metric = bool(args.m)
+op.tracer_family = args.f if args.f is not None else 'cg'
 op.adaptations = 1 if args.n is None else int(args.n)
 if bool(args.snes_view):
     op.solver_parameters['snes_view'] = True

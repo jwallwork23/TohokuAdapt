@@ -36,7 +36,7 @@ if approach is None:
 else:
     assert approach in ('FixedMesh', 'HessianBased', 'DWP', 'DWR')
 if args.t is None:
-    mode = 'tohoku'
+    mode = 'Tohoku'
 else:
     mode = args.t
 order_increase = False
@@ -53,20 +53,20 @@ filename += '_' + date
 errorFile = open(filename + '.txt', 'w+')
 files = {}
 extensions = []
-if mode == 'tohoku':
+if mode == 'Tohoku':
     extensions.append('P02')
     extensions.append('P06')
 for e in extensions:
     files[e] = open(filename + e + '.txt', 'w+')
 
 # Set parameters
-if mode == 'tohoku':
+if mode == 'Tohoku':
     op = TohokuOptions(approach=approach)
-elif mode == 'rossby-wave':
+elif mode == 'RossbyWave':
     op = RossbyWaveOptions(approach=approach)
-elif mode == 'kelvin-wave':
+elif mode == 'KelvinWave':
     op = KelvinWaveOptions(approach=approach)
-elif mode == 'shallow-water':
+elif mode == 'GaussianTest':
     op = GaussianOptions(approach=approach)
 else:
     raise NotImplementedError
