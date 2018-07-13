@@ -106,6 +106,6 @@ def difference_quotient_estimator(solver_obj, explicit_term, dual, dual_, divide
         estimator_loc /= sqrt(CellSize(mesh))
     dq = Function(P0)
     dq.interpolate(assemble(v * sqrt(assemble(estimator_loc * dx)) * dx))
-    # print("Difference quotient error esimate = %.4e" % norm(dq))
+    print("Difference quotient error estimate = %.4e" % norm(dq))
 
     return dq
