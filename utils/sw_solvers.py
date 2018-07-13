@@ -298,6 +298,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         # Solve fixed mesh primal problem to get residuals and adjoint solutions
         solver_obj = solver2d.FlowSolver2d(mesh, b)
         options = solver_obj.options
+        options.anisotropic_adaptation = False
+        options.anisotropic_adaptation_metric = "DWP"
         options.element_family = op.family
         options.use_nonlinear_equations = True
         options.horizontal_viscosity = diffusivity
@@ -561,6 +563,8 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         # Solve fixed mesh primal problem to get residuals and adjoint solutions
         solver_obj = solver2d.FlowSolver2d(mesh, b)
         options = solver_obj.options
+        options.anisotropic_adaptation = False
+        options.anisotropic_adaptation_metric = "DWR"
         options.element_family = op.family
         options.use_nonlinear_equations = True
         options.horizontal_viscosity = diffusivity
