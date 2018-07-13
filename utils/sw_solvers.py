@@ -4,7 +4,7 @@ import numpy as np
 from time import clock
 
 from utils.adaptivity import *
-from utils.callbacks import SWCallback, ObjectiveSWCallback
+from utils.callbacks import SWCallback
 from utils.error_estimators import difference_quotient_estimator
 from utils.interpolation import interp
 from utils.misc import index_string, peak_and_distance, boundary_region, extract_gauge_data
@@ -167,6 +167,8 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         # Solver object and equations
         adaptive_solver_obj = solver2d.FlowSolver2d(mesh, b)
         adaptive_options = adaptive_solver_obj.options
+        adaptive_options.anisotropic_adaptation = True
+        adaptive_options.anisotropic_adaptation_metric = "Hessian"
         adaptive_options.element_family = op.family
         adaptive_options.use_nonlinear_equations = True
         if diffusivity is not None:
@@ -312,7 +314,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         options.export_diagnostics = True
         options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
-        cb1 = ObjectiveSWCallback(solver_obj)
+        cb1 = SWCallback(solver_obj)
         cb1.op = op
         solver_obj.add_callback(cb1, 'timestep')
         solver_obj.bnd_functions['shallow_water'] = BCs
@@ -424,6 +426,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             # Solver object and equations
             adaptive_solver_obj = solver2d.FlowSolver2d(mesh, b)
             adaptive_options = adaptive_solver_obj.options
+            adaptive_options.anisotropic_adaptation = True
+            adaptive_options.anisotropic_adaptation_metric = "DWP"
             adaptive_options.element_family = op.family
             adaptive_options.use_nonlinear_equations = True
             if diffusivity is not None:
@@ -573,7 +577,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         options.export_diagnostics = False
         # options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
-        cb1 = ObjectiveSWCallback(solver_obj)
+        cb1 = SWCallback(solver_obj)
         cb1.op = op
         cb2 = callback.ExplicitErrorCallback(solver_obj, export_to_hdf5=True)
         solver_obj.add_callback(cb1, 'timestep')
@@ -720,6 +724,8 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             # Solver object and equations
             adaptive_solver_obj = solver2d.FlowSolver2d(mesh, b)
             adaptive_options = adaptive_solver_obj.options
+            adaptive_options.anisotropic_adaptation = True
+            adaptive_options.anisotropic_adaptation_metric = "DWR"
             adaptive_options.element_family = op.family
             adaptive_options.use_nonlinear_equations = True
             if diffusivity is not None:

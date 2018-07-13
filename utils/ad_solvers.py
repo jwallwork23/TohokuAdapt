@@ -3,7 +3,7 @@ from thetis import *
 from time import clock
 
 from utils.adaptivity import *
-from utils.callbacks import AdvectionCallback, ObjectiveAdvectionCallback
+from utils.callbacks import AdvectionCallback
 from utils.interpolation import interp, mixed_pair_interp
 from utils.misc import extract_slice, index_string
 from utils.setup import problem_domain
@@ -134,6 +134,8 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         # Solver object and equations
         adaptive_solver_obj = solver2d.FlowSolver2d(mesh, b)
         adaptive_options = adaptive_solver_obj.options
+        adaptive_options.anisotropic_adaptation = True
+        adaptive_options.anisotropic_adaptation_metric = "Hessian"
         adaptive_options.element_family = op.family
         adaptive_options.use_nonlinear_equations = True
         adaptive_options.simulation_export_time = op.timestep * op.timesteps_per_export
@@ -254,6 +256,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         # Solve fixed mesh primal problem to get residuals and adjoint solutions
         solver_obj = solver2d.FlowSolver2d(mesh, b)
         options = solver_obj.options
+        adaptive_options.anisotropic_adaptation = False
+        adaptive_options.anisotropic_adaptation_metric = "DWP"
         options.element_family = op.family
         options.use_nonlinear_equations = True
         options.simulation_export_time = op.timestep * op.timesteps_per_remesh
@@ -274,7 +278,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             options.use_limiter_for_tracers = False
         options.tracer_source_2d = source
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
-        cb1 = ObjectiveAdvectionCallback(solver_obj)
+        cb1 = AdvectionCallback(solver_obj)
         cb1.op = op
         solver_obj.add_callback(cb1, 'timestep')
         solver_obj.bnd_functions = BCs
@@ -380,6 +384,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             # Solver object and equations
             adaptive_solver_obj = solver2d.FlowSolver2d(mesh, b)
             adaptive_options = adaptive_solver_obj.options
+            adaptive_options.anisotropic_adaptation = True
+            adaptive_options.anisotropic_adaptation_metric = "DWP"
             adaptive_options.element_family = op.family
             adaptive_options.use_nonlinear_equations = True
             adaptive_options.simulation_export_time = op.timestep * op.timesteps_per_export
@@ -502,6 +508,8 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         # Solve fixed mesh primal problem to get residuals and adjoint solutions
         solver_obj = solver2d.FlowSolver2d(mesh, b)
         options = solver_obj.options
+        adaptive_options.anisotropic_adaptation = False
+        adaptive_options.anisotropic_adaptation_metric = "DWR"
         options.element_family = op.family
         options.use_nonlinear_equations = True
         options.simulation_export_time = op.timestep * op.timesteps_per_export
@@ -521,7 +529,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             options.use_limiter_for_tracers = False
         options.tracer_source_2d = source
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
-        cb1 = ObjectiveAdvectionCallback(solver_obj)
+        cb1 = AdvectionCallback(solver_obj)
         cb1.op = op
         cb2 = callback.ExplicitErrorCallback(solver_obj, export_to_hdf5=True)
         solver_obj.add_callback(cb1, 'timestep')
@@ -665,6 +673,8 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             # Solver object and equations
             adaptive_solver_obj = solver2d.FlowSolver2d(mesh, b)
             adaptive_options = adaptive_solver_obj.options
+            adaptive_options.anisotropic_adaptation = True
+            adaptive_options.anisotropic_adaptation_metric = "DWR"
             adaptive_options.element_family = op.family
             adaptive_options.use_nonlinear_equations = True
             adaptive_options.simulation_export_time = op.timestep * op.timesteps_per_export
@@ -694,7 +704,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                 e.set_next_export_ix(adaptive_solver_obj.i_export)
 
             # Evaluate callbacks and iterate
-            cb1 = SWCallback(adaptive_solver_obj)
+            cb1 = AdvectionCallback(adaptive_solver_obj)
             cb1.op = op
             if cnt != 0:
                 cb1.old_value = quantities['J_h']
