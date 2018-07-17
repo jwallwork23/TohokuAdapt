@@ -234,7 +234,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
     # Initialise domain and physical parameters
     P1 = FunctionSpace(mesh, "CG", 1)
     P1DG = FunctionSpace(mesh, "DG", 1)
-    tracer_space = P1DG if op.tracer_space == 'dg' else P1
+    tracer_space = P1DG if op.tracer_family == 'dg' else P1
     tracer_2d = Function(tracer_space, name='tracer_2d')
 
     # Define Functions relating to a posteriori DWR error estimator
@@ -484,7 +484,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
     P0 = FunctionSpace(mesh, "DG", 0)
     P1 = FunctionSpace(mesh, "CG", 1)
     P1DG = FunctionSpace(mesh, "DG", 1)
-    tracer_space = P1DG if op.tracer_space == 'dg' else P1
+    tracer_space = P1DG if op.tracer_family == 'dg' else P1
     tracer_2d = Function(tracer_space)
 
     # Define Functions relating to a posteriori DWR error estimator
@@ -494,7 +494,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
     residual_2d = Function(P0)
 
     if op.order_increase:
-        duale = Function(FunctionSpace(mesh, "DG", 2))
+        duale = Function(FunctionSpace(mesh, "DG" if op.tracer_family == 'dg' else "CG", 2))
 
     # Initialise parameters and counters
     nEle = mesh.num_cells()
