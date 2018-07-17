@@ -364,8 +364,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                     la.close()
                 epsilon_.interpolate(inner(q, dual))
                 epsilon = pointwise_max(epsilon, epsilon_)
-            # epsilon = normalise_indicator(epsilon, op=op)
-            epsilon.dat.data[:] = np.abs(epsilon.dat.data)
+            epsilon = normalise_indicator(epsilon, op=op)
+            epsilon.rename('error_2d')
             with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_string(k), mode=FILE_CREATE) as se:
                 se.store(epsilon)
                 se.close()
@@ -666,8 +666,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                         raise NotImplementedError   # TODO: Requires patchwise interpolation
                     else:
                         epsilon.interpolate(difference_quotient_estimator(solver_obj, residual_2d, dual, dual_old))
-                    # epsilon = normalise_indicator(epsilon, op=op)
-                    epsilon.dat.data[:] = np.abs(epsilon.dat.data)
+                    epsilon = normalise_indicator(epsilon, op=op)
                     epsilon.rename('error_2d')
                     with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_str, mode=FILE_CREATE) as se:
                         se.store(epsilon)

@@ -166,7 +166,7 @@ def steady_metric(f, H=None, op=TohokuOptions()):
     return M
 
 
-def normalise_indicator(f, op=TohokuOptions()):     # TODO: may well remove this
+def normalise_indicator(f, op=TohokuOptions()):
     """
     Normalise error indicator `f` using procedure defined by `op`.
     
@@ -179,11 +179,12 @@ def normalise_indicator(f, op=TohokuOptions()):     # TODO: may well remove this
         gnorm = max(np.abs(assemble(f * dx)), op.min_norm)           # NOTE this changes in 3D case
     else:
         gnorm = max(assemble(sqrt(inner(f, f)) * dx), op.min_norm)   # Equivalent thresholded metric complexity
-    scaleFactor = min(op.target_vertices / gnorm, op.max_scaling)              # Cap error estimate, also computational cost
-    if scaleFactor == op.max_scaling:
-        print("WARNING: maximum scaling for error estimator reached as %.2e" % (op.target_vertices / gnorm))
+    # scaleFactor = min(op.target_vertices / gnorm, op.max_scaling)    # Cap error estimate, also computational cost
+    scaleFactor = op.target_vertices / gnorm
+    # if scaleFactor == op.max_scaling:
+    #     print("WARNING: maximum scaling for error estimator reached as %.2e" % (op.target_vertices / gnorm))
     # print("#### DEBUG: Complexity = %.4e" % gnorm)
-    f.dat.data[:] = np.abs(f.dat.data) * scaleFactor
+    f.interpolate(Constant(scaleFactor) * abs(f))
 
     return f
 

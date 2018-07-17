@@ -234,10 +234,11 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
     # Initialise domain and physical parameters
     P1 = FunctionSpace(mesh, "CG", 1)
     P1DG = FunctionSpace(mesh, "DG", 1)
-    tracer_2d = Function(P1DG, name='tracer_2d')
+    tracer_space = P1DG if op.tracer_space == 'dg' else P1
+    tracer_2d = Function(tracer_space, name='tracer_2d')
 
     # Define Functions relating to a posteriori DWR error estimator
-    dual = Function(P1DG, name='adjoint_2d')
+    dual = Function(tracer_space, name='adjoint_2d')
     epsilon = Function(P1, name='error_2d')
     epsilon_ = Function(P1)
 
@@ -331,8 +332,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                     la.close()
                 epsilon_.interpolate(tracer_2d * dual)
                 epsilon = pointwise_max(epsilon, epsilon_)
-            # epsilon = normalise_indicator(epsilon, op=op)
-            epsilon.dat.data[:] = np.abs(epsilon.dat.data)
+            epsilon = normalise_indicator(epsilon, op=op)
+            epsilon.rename('error_2d')
             with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_string(k), mode=FILE_CREATE) as se:
                 se.store(epsilon)
                 se.close()
@@ -483,11 +484,12 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
     P0 = FunctionSpace(mesh, "DG", 0)
     P1 = FunctionSpace(mesh, "CG", 1)
     P1DG = FunctionSpace(mesh, "DG", 1)
-    tracer_2d = Function(P1DG)
+    tracer_space = P1DG if op.tracer_space == 'dg' else P1
+    tracer_2d = Function(tracer_space)
 
     # Define Functions relating to a posteriori DWR error estimator
-    dual = Function(P1DG, name='adjoint_2d')        # TODO: This depends on space used
-    dual_old = Function(P1DG, name='adjoint_old')
+    dual = Function(tracer_space, name='adjoint_2d')
+    dual_old = Function(tracer_space, name='adjoint_old')
     epsilon = Function(P1, name='error_2d')
     residual_2d = Function(P0)
 
@@ -618,9 +620,8 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                         raise NotImplementedError   # TODO: Requires patchwise interpolation
                     else:
                         epsilon.interpolate(difference_quotient_estimator(solver_obj, residual_2d, dual, dual_old))
-                    # epsilon = normalise_indicator(epsilon, op=op)
-                    epsilon.dat.data[:] = np.abs(epsilon.dat.data)
-                    epsilon.rename("Error indicator")
+                    epsilon = normalise_indicator(epsilon, op=op)
+                    epsilon.rename('error_2d')
                     with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_str, mode=FILE_CREATE) as se:
                         se.store(epsilon)
                         se.close()

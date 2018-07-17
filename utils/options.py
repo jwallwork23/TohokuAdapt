@@ -30,6 +30,7 @@ class AdaptOptions(FrozenConfigurable):
     timestepper = Unicode('CrankNicolson', help="Time integration scheme used.").tag(config=True)
     norm_order = NonNegativeInteger(2, help="Degree p of Lp norm used.")
     family = Unicode('dg-dg', help="Mixed finite element family, from {'dg-dg', 'dg-cg'}.").tag(config=True)
+    min_norm = PositiveFloat(1e-6).tag(config=True)
 
     def final_index(self):
         return int(np.ceil(self.end_time / self.timestep))  # Final timestep index
@@ -118,7 +119,6 @@ class TohokuOptions(AdaptOptions):
     end_time = PositiveFloat(1800., help="End time of period of interest").tag(config=True)
     h_min = PositiveFloat(10., help="Minimum element size").tag(config=True)
     h_max = PositiveFloat(1e5, help="Maximum element size").tag(config=True)
-    min_norm = PositiveFloat(1.).tag(config=True)    # TODO: Not sure about this
     max_scaling = PositiveFloat(5e5).tag(config=True)  # TODO: Not sure about this
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
     diffusivity = NonNegativeFloat(1e-3, allow_none=True, help="Diffusion coefficient").tag(config=True)
@@ -177,7 +177,6 @@ class RossbyWaveOptions(AdaptOptions):
     end_time = PositiveFloat(120., help="End time of period of interest").tag(config=True)
     h_min = PositiveFloat(1e-3, help="Minimum element size").tag(config=True)
     h_max = PositiveFloat(10., help="Maximum element size").tag(config=True)
-    min_norm = PositiveFloat(1e-4).tag(config=True)  # TODO: Not sure about this
     max_scaling = PositiveFloat(5e5).tag(config=True)  # TODO: Not sure about this
     rescaling = PositiveFloat(0.255, help="Scaling parameter for target number of vertices.").tag(config=True)
     # Here ``rescaling`` is adjusted based on using oversized domain to account for periodicity
@@ -212,7 +211,6 @@ class KelvinWaveOptions(AdaptOptions):
     end_time = PositiveFloat(36., help="End time of period of interest").tag(config=True)
     h_min = PositiveFloat(1e-3, help="Minimum element size").tag(config=True)
     h_max = PositiveFloat(10., help="Maximum element size").tag(config=True)
-    min_norm = PositiveFloat(1e-4).tag(config=True)  # TODO: Not sure about this
     max_scaling = PositiveFloat(5e5).tag(config=True)  # TODO: Not sure about this
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
     solver_parameters = PETScSolverParameters({'ksp_type': 'gmres',
@@ -246,7 +244,6 @@ class GaussianOptions(AdaptOptions):
     end_time = PositiveFloat(3., help="End time of period of interest").tag(config=True)
     h_min = PositiveFloat(1e-4, help="Minimum element size").tag(config=True)
     h_max = PositiveFloat(1., help="Maximum element size").tag(config=True)
-    min_norm = PositiveFloat(1e-6).tag(config=True)      # TODO: Not sure about this
     max_scaling = PositiveFloat(5e9).tag(config=True)    # TODO: Not sure about this
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
     solver_parameters = PETScSolverParameters({'ksp_type': 'gmres',
@@ -278,7 +275,6 @@ class AdvectionOptions(AdaptOptions):
     end_time = PositiveFloat(60., help="End time of period of interest").tag(config=True)
     h_min = PositiveFloat(1e-4, help="Minimum element size").tag(config=True)
     h_max = PositiveFloat(5., help="Maximum element size").tag(config=True)
-    min_norm = PositiveFloat(1e-5).tag(config=True)  # TODO: Not sure about this
     max_scaling = PositiveFloat(5e5).tag(config=True)  # TODO: Not sure about this
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
     diffusivity = NonNegativeFloat(0.1, allow_none=True, help="Diffusion coefficient").tag(config=True)
