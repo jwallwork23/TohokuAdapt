@@ -77,7 +77,7 @@ def ad_boundary_residual(solver_obj, dual_new=None, dual_old=None):     # TODO: 
     return Function(P0).interpolate(assemble(jump(Constant(-1.) * v * grad(tracer_2d), n=n) * dS))
 
 
-def difference_quotient_estimator(solver_obj, explicit_term, dual, dual_, divide_by_cell_size=False):
+def difference_quotient_estimator(solver_obj, explicit_term, dual, dual_old, divide_by_cell_size=True):
     """
     Difference quotient approximation to the dual weighted residual as described on pp.41-42 of 
     [Becker and Rannacher, 2001].
@@ -99,11 +99,11 @@ def difference_quotient_estimator(solver_obj, explicit_term, dual, dual_, divide
         b_res = ad_boundary_residual(solver_obj)
         adjoint_term = b_res * b_res
     else:
-        bres0_a, bres1_a, bres2_a = sw_boundary_residual(solver_obj, dual, dual_)
+        bres0_a, bres1_a, bres2_a = sw_boundary_residual(solver_obj, dual, dual_old)
         adjoint_term = bres0_a * bres0_a + bres1_a * bres1_a + bres2_a * bres2_a
     estimator_loc = v * explicit_term * adjoint_term
     if divide_by_cell_size:
-        estimator_loc /= sqrt(CellSize(mesh))
+        estimator_loc /= CellSize(mesh)
     dq = Function(P0)
     dq.interpolate(assemble(v * sqrt(assemble(estimator_loc * dx)) * dx))
     print("Difference quotient error estimate = %.4e" % norm(dq))

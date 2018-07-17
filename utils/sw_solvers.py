@@ -269,8 +269,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     # Define Functions relating to a posteriori DWR error estimator
     dual = Function(V)
     dual_u, dual_e = dual.split()
-    dual_u.rename("Adjoint velocity")
-    dual_e.rename("Adjoint elevation")
+    dual_u.rename('adjoint_uv_2d')
+    dual_e.rename('adjoint_elev_2d')
     epsilon = Function(P1, name='error_2d')
     epsilon_ = Function(P1)
 
@@ -527,8 +527,12 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     # Define Functions relating to a posteriori DWR error estimator
     dual = Function(V)
     dual_u, dual_e = dual.split()
-    dual_u.rename('Adjoint velocity')
-    dual_e.rename('Adjoint elevation')
+    dual_u.rename('adjoint_uv_2d')
+    dual_e.rename('adjoint_elev_2d')
+    dual_old = Function(V)
+    dual_old_u, dual_old_e = dual_old.split()
+    dual_old_u.rename('adjoint_uv_old')
+    dual_old_e.rename('adjoint_elev_old')
     epsilon = Function(P1, name='error_2d')
     residual_2d = Function(P0)
 
@@ -567,7 +571,6 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         options.timestep = op.timestep
         options.output_directory = op.directory()   # Need this for residual callback
         options.export_diagnostics = False
-        # options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         cb1 = SWCallback(solver_obj)
         cb1.op = op
@@ -603,6 +606,15 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                 sa.store(dual_u)
                 sa.store(dual_e)
                 sa.close()
+            if i == r:
+                dual_old.assign(solve_blocks[i].adj_sol)
+            else:
+                dual_old.assign(solve_blocks[i-1].adj_sol)
+            dual_old_u, dual_old_e = dual_old.split()
+            with DumbCheckpoint(op.directory() + 'hdf5/PreviousAdjoint2d_' + index_str, mode=FILE_CREATE) as so:
+                so.store(dual_old_u)
+                so.store(dual_old_e)
+                so.close()
             if op.plot_pvd:
                 adjoint_file.write(dual_u, dual_e, time=op.timestep * (i - r))
         dual_timer = clock() - dual_timer
@@ -644,16 +656,19 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                         la.load(dual_u)
                         la.load(dual_e)
                         la.close()
+                    with DumbCheckpoint(op.directory() + 'hdf5/PreviousAdjoint2d_' + index_str, mode=FILE_READ) as lo:
+                        lo.load(dual_old_u)
+                        lo.load(dual_old_e)
+                        lo.close()
                     if op.order_increase:
                         duale_u.interpolate(dual_u)
                         duale_e.interpolate(dual_e)
                         raise NotImplementedError   # TODO: Requires patchwise interpolation
                     else:
-                        # TODO: Get adjoint from previous (/next?) step
-                        epsilon.interpolate(difference_quotient_estimator(solver_obj, residual_2d, dual, dual)) # Note: Would be subtract with no L-inf
+                        epsilon.interpolate(difference_quotient_estimator(solver_obj, residual_2d, dual, dual_old))
                     # epsilon = normalise_indicator(epsilon, op=op)
                     epsilon.dat.data[:] = np.abs(epsilon.dat.data)
-                    epsilon.rename("Error indicator")
+                    epsilon.rename('error_2d')
                     with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_str, mode=FILE_CREATE) as se:
                         se.store(epsilon)
                         se.close()

@@ -486,7 +486,8 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
     tracer_2d = Function(P1DG)
 
     # Define Functions relating to a posteriori DWR error estimator
-    dual = Function(P1DG, name='adjoint_2d')
+    dual = Function(P1DG, name='adjoint_2d')        # TODO: This depends on space used
+    dual_old = Function(P1DG, name='adjoint_old')
     epsilon = Function(P1, name='error_2d')
     residual_2d = Function(P0)
 
@@ -562,6 +563,13 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_str,  mode=FILE_CREATE) as sa:
                 sa.store(dual)
                 sa.close()
+            if i == r:
+                dual_old.assign(solve_blocks[i].adj_sol)
+            else:
+                dual_old.assign(solve_blocks[i-1].adj_sol)
+            with DumbCheckpoint(op.directory() + 'hdf5/PreviousAdjoint2d_' + index_str, mode=FILE_CREATE) as so:
+                so.store(dual_old)
+                so.close()
             if op.plot_pvd:
                 adjoint_file.write(dual, time=op.timestep * (i - r))
         dual_timer = clock() - dual_timer
@@ -602,12 +610,14 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                     with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_str, mode=FILE_READ) as la:
                         la.load(dual)
                         la.close()
+                    with DumbCheckpoint(op.directory() + 'hdf5/PreviousAdjoint2d_' + index_str, mode=FILE_READ) as lo:
+                        lo.load(dual_old)
+                        lo.close()
                     if op.order_increase:
                         duale.interpolate(dual)
                         raise NotImplementedError   # TODO: Requires patchwise interpolation
                     else:
-                        # TODO: Get adjoint from previous step
-                        epsilon.interpolate(difference_quotient_estimator(solver_obj, residual_2d, dual, dual)) # Note: Would be subtract with no L-inf
+                        epsilon.interpolate(difference_quotient_estimator(solver_obj, residual_2d, dual, dual_old))
                     # epsilon = normalise_indicator(epsilon, op=op)
                     epsilon.dat.data[:] = np.abs(epsilon.dat.data)
                     epsilon.rename("Error indicator")
