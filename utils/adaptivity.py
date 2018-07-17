@@ -174,17 +174,12 @@ def normalise_indicator(f, op=TohokuOptions()):
     :param op: option parameters object.
     :return: normalised indicator.
     """
-    f.dat.data[:] = np.abs(f.dat.data)
-    if len(f.ufl_element().value_shape()) == 0:
-        gnorm = max(np.abs(assemble(f * dx)), op.min_norm)           # NOTE this changes in 3D case
-    else:
-        gnorm = max(assemble(sqrt(inner(f, f)) * dx), op.min_norm)   # Equivalent thresholded metric complexity
-    # scaleFactor = min(op.target_vertices / gnorm, op.max_scaling)    # Cap error estimate, also computational cost
-    scaleFactor = op.target_vertices / gnorm
-    # if scaleFactor == op.max_scaling:
-    #     print("WARNING: maximum scaling for error estimator reached as %.2e" % (op.target_vertices / gnorm))
-    # print("#### DEBUG: Complexity = %.4e" % gnorm)
-    f.interpolate(Constant(scaleFactor) * abs(f))
+    scale_factor = min(max(norm(f), op.min_norm), op.max_norm)
+    if scale_factor == op.min_norm:
+        print("WARNING: minimum norm attained")
+    elif scale_factor == op.max_norm:
+        print("WARNING: maximum norm attained")
+    f.interpolate(Constant(op.target_vertices / scale_factor) * abs(f))
 
     return f
 
