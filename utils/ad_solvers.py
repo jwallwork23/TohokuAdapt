@@ -105,7 +105,7 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         P1 = FunctionSpace(mesh, "CG", 1)
 
         tracer = Function(P1).interpolate(tracer_2d)
-        for l in range(op.adaptations):                  # TODO: Test this functionality
+        for l in range(op.num_adapt):                  # TODO: Test this functionality
 
             # Construct metric
             if cnt != 0:   # Can't adapt to zero concentration
@@ -114,12 +114,12 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
             # Adapt mesh and interpolate variables
             if cnt != 0:
                 mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-            if l < op.adaptations-1:
+            if l < op.num_adapt-1:
                 tracer = interp(mesh, tracer)
 
         if cnt != 0:
             if op.plot_metric:
-                if op.adaptations == 0:
+                if op.num_adapt == 0:
                     M = steady_metric(tracer, op=op)
                 M.rename('metric_2d')
                 metric_file.write(M, time=t)
@@ -353,7 +353,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         elev_2d.interpolate(eta0)
         while cnt < op.final_index():
             adapt_timer = clock()
-            for l in range(op.adaptations):                                  # TODO: Test this functionality
+            for l in range(op.num_adapt):                                  # TODO: Test this functionality
 
                 # Construct metric
                 index_str = index_string(int(cnt / op.timesteps_per_remesh))
@@ -370,7 +370,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                 # Adapt mesh and interpolate variables
                 mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
 
-            if op.adaptations != 0 and op.plot_metric:
+            if op.num_adapt != 0 and op.plot_metric:
                 M.rename('metric_2d')
                 metric_file.write(M, time=t)
             tracer_2d = interp(mesh, tracer_2d)
@@ -632,7 +632,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         elev_2d.interpolate(eta0)
         while cnt < op.final_index():
             adapt_timer = clock()
-            for l in range(op.adaptations):                          # TODO: Test this functionality
+            for l in range(op.num_adapt):                          # TODO: Test this functionality
 
                 # Construct metric
                 index_str = index_string(int(cnt / op.timesteps_per_remesh))
@@ -658,7 +658,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                 # File('plots/tohoku/mesh.pvd').write(mesh.coordinates)
                 # exit(0)
 
-            if op.adaptations != 0 and op.plot_metric:
+            if op.num_adapt != 0 and op.plot_metric:
                 M.rename('metric_2d')
                 metric_file.write(M, time=t)
             tracer_2d = interp(mesh, tracer_2d)

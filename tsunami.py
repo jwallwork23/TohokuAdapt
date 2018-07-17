@@ -73,7 +73,7 @@ else:
 op.gradate = bool(args.g)
 op.plot_pvd = bool(args.o)
 op.plot_metric = bool(args.m)
-op.adaptations = 1 if args.n is None else int(args.n)
+op.num_adapt = 1 if args.n is None else int(args.n)
 op.order_increase = order_increase
 op.adapt_on_bathymetry = bool(args.b)
 op.adapt_field = args.f if args.f is not None else 's'

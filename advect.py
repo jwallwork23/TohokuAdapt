@@ -41,7 +41,7 @@ op.gradate = bool(args.g)
 op.plot_pvd = bool(args.o)
 op.plot_metric = bool(args.m)
 op.tracer_family = args.f if args.f is not None else 'cg'
-op.adaptations = 1 if args.n is None else int(args.n)
+op.num_adapt = 1 if args.n is None else int(args.n)
 if bool(args.snes_view):
     op.solver_parameters['snes_view'] = True
 

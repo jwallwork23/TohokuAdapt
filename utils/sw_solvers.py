@@ -19,10 +19,7 @@ def FixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
 
     # Initialise domain and physical parameters
-    try:
-        assert float(physical_constants['g_grav'].dat.data) == op.g
-    except:
-        physical_constants['g_grav'].assign(op.g)
+    physical_constants['g_grav'].assign(op.g)
     V = op.mixed_space(mesh)                               # TODO: Parallelise this (and below)
     if op.mode == 'RossbyWave':            # Analytic final-time state
         peak_a, distance_a = peak_and_distance(RossbyWaveSolution(V, op=op).__call__(t=op.end_time).split()[1])
@@ -93,10 +90,7 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         mFile = File(op.directory() + "Metric2d.pvd")
 
     # Initialise domain and physical parameters
-    try:
-        assert float(physical_constants['g_grav'].dat.data) == op.g
-    except:
-        physical_constants['g_grav'].assign(op.g)
+    physical_constants['g_grav'].assign(op.g)
     V = op.mixed_space(mesh)
     uv_2d, elev_2d = Function(V).split()  # Needed to load data into
     elev_2d.interpolate(eta0)
@@ -125,7 +119,7 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             height = Function(P1).interpolate(elev_2d)
         if op.adapt_field != 'f':
             spd = Function(P1).interpolate(sqrt(dot(uv_2d, uv_2d)))
-        for l in range(op.adaptations):                  # TODO: Test this functionality
+        for l in range(op.num_adapt):                  # TODO: Test this functionality
 
             # Construct metric
             if op.adapt_field != 's':
@@ -147,14 +141,14 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             # Adapt mesh and interpolate variables
             if op.adapt_on_bathymetry or cnt != 0 or op.adapt_field == 'f':
                 mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-            if l < op.adaptations-1:
+            if l < op.num_adapt-1:
                 if op.adapt_field != 's':
                     height = interp(mesh, height)
                 if op.adapt_field != 'f':
                     spd = interp(mesh, spd)
 
         if cnt != 0 or op.adapt_field == 'f':
-            if op.adaptations != 0 and op.plot_metric:
+            if op.num_adapt != 0 and op.plot_metric:
                 M.rename('metric_2d')
                 mFile.write(M, time=t)
 
@@ -262,10 +256,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         adjoint_file = File(op.directory() + "Adjoint2d.pvd")
 
     # Initialise domain and physical parameters
-    try:
-        assert (float(physical_constants['g_grav'].dat.data) == op.g)
-    except:
-        physical_constants['g_grav'].assign(op.g)
+    physical_constants['g_grav'].assign(op.g)
     V = op.mixed_space(mesh)
     q = Function(V)
     uv_2d, elev_2d = q.split()  # Needed to load data into
@@ -398,7 +389,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         bdy = 200 if op.mode == 'Tohoku' else 'on_boundary'
         while cnt < op.final_index():
             adapt_timer = clock()
-            for l in range(op.adaptations):                                  # TODO: Test this functionality
+            for l in range(op.num_adapt):                                  # TODO: Test this functionality
 
                 # Construct metric
                 index_str = index_string(int(cnt / op.timesteps_per_remesh))
@@ -416,7 +407,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                 # Adapt mesh and interpolate variables
                 mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
 
-            if op.adaptations != 0 and op.plot_metric:
+            if op.num_adapt != 0 and op.plot_metric:
                 M.rename('metric_2d')
                 mFile.write(M, time=t)
             elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
@@ -522,10 +513,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         adjoint_file = File(op.directory() + "Adjoint2d.pvd")
 
     # Initialise domain and physical parameters
-    try:
-        assert (float(physical_constants['g_grav'].dat.data) == op.g)
-    except:
-        physical_constants['g_grav'].assign(op.g)
+    physical_constants['g_grav'].assign(op.g)
     V = op.mixed_space(mesh)
     q = Function(V)
     uv_2d, elev_2d = q.split()    # Needed to load data into
@@ -692,7 +680,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         # bdy = 'on_boundary'
         while cnt < op.final_index():
             adapt_timer = clock()
-            for l in range(op.adaptations):                          # TODO: Test this functionality
+            for l in range(op.num_adapt):                          # TODO: Test this functionality
 
                 # Construct metric
                 index_str = index_string(int(cnt / op.timesteps_per_remesh))
@@ -716,7 +704,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                 # Adapt mesh and interpolate variables
                 mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
 
-            if op.adaptations != 0 and op.plot_metric:
+            if op.num_adapt != 0 and op.plot_metric:
                 M.rename('metric_2d')
                 mFile.write(M, time=t)
             elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)

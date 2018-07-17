@@ -23,7 +23,7 @@ class AdaptOptions(FrozenConfigurable):
     plot_metric = Bool(False, help='Toggle plotting of metric field.').tag(config=True)
     max_element_growth = PositiveFloat(1.4, help="Metric gradation scaling parameter.").tag(config=True)
     max_anisotropy = PositiveFloat(100., help="Maximum tolerated anisotropy.").tag(config=True)
-    adaptations = NonNegativeInteger(1, help="Number of mesh adaptations per remeshing.").tag(config=True)
+    num_adapt = NonNegativeInteger(1, help="Number of mesh adaptations per remeshing.").tag(config=True)
     order_increase = Bool(False, help="Interpolate adjoint solution into higher order space.").tag(config=True)
     normalisation = Unicode('lp', help="Normalisation approach, from {'lp', 'manual'}.").tag(config=True)
     hessian_recovery = Unicode('dL2', help="Hessian recovery technique, from {'dL2', 'parts'}.").tag(config=True)
