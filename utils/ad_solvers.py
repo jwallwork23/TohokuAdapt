@@ -4,6 +4,7 @@ from time import clock
 
 from utils.adaptivity import *
 from utils.callbacks import AdvectionCallback
+from utils.error_estimators import difference_quotient_estimator, local_norm
 from utils.interpolation import interp, mixed_pair_interp
 from utils.misc import extract_slice, index_string
 from utils.setup import problem_domain
@@ -489,12 +490,14 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
 
     # Define Functions relating to a posteriori DWR error estimator
     dual = Function(tracer_space, name='adjoint_2d')
-    dual_old = Function(tracer_space, name='adjoint_old')
     epsilon = Function(P1, name='error_2d')
-    residual_2d = Function(P0)
 
     if op.order_increase:
         duale = Function(FunctionSpace(mesh, "DG" if op.tracer_family == 'dg' else "CG", 2))
+        residual_2d = Function(tracer_space)
+    else:
+        dual_old = Function(tracer_space, name='adjoint_old')
+        residual_2d = Function(P0)
 
     # Initialise parameters and counters
     nEle = mesh.num_cells()
@@ -565,13 +568,14 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_str,  mode=FILE_CREATE) as sa:
                 sa.store(dual)
                 sa.close()
-            if i == r:
-                dual_old.assign(solve_blocks[i].adj_sol)
-            else:
-                dual_old.assign(solve_blocks[i-1].adj_sol)
-            with DumbCheckpoint(op.directory() + 'hdf5/PreviousAdjoint2d_' + index_str, mode=FILE_CREATE) as so:
-                so.store(dual_old)
-                so.close()
+            if not op.order_increase:
+                if i == r:
+                    dual_old.assign(solve_blocks[i].adj_sol)
+                else:
+                    dual_old.assign(solve_blocks[i-1].adj_sol)
+                with DumbCheckpoint(op.directory() + 'hdf5/PreviousAdjoint2d_' + index_str, mode=FILE_CREATE) as so:
+                    so.store(dual_old)
+                    so.close()
             if op.plot_pvd:
                 adjoint_file.write(dual, time=op.timestep * (i - r))
         dual_timer = clock() - dual_timer
@@ -586,8 +590,12 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                       % (int(k/op.exports_per_remesh()) + 1, int(op.final_index() / op.timesteps_per_remesh)))
 
                 # Load residuals
-                with DumbCheckpoint(op.directory() + 'hdf5/ExplicitError2d_' + index_string(k), mode=FILE_READ) as lr:
-                    lr.load(residual_2d, name="explicit error")
+                tag = 'InteriorResidual2d_' if op.order_increase else 'ExplicitError2d_'
+                with DumbCheckpoint(op.directory() + 'hdf5/' + tag + index_string(k), mode=FILE_READ) as lr:
+                    if op.order_increase:
+                        lr.load(residual_2d, name="residual")
+                    else:
+                        lr.load(residual_2d, name="explicit error")
                     lr.close()
 
                 residuals.append(residual_2d)   # TODO: This is grossly inefficient. Just load from HDF5
@@ -612,13 +620,13 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                     with DumbCheckpoint(op.directory() + 'hdf5/Adjoint2d_' + index_str, mode=FILE_READ) as la:
                         la.load(dual)
                         la.close()
-                    with DumbCheckpoint(op.directory() + 'hdf5/PreviousAdjoint2d_' + index_str, mode=FILE_READ) as lo:
-                        lo.load(dual_old)
-                        lo.close()
-                    if op.order_increase:
+                    if op.order_increase:   # TODO: Requires patchwise interpolation to do properly
                         duale.interpolate(dual)
-                        raise NotImplementedError   # TODO: Requires patchwise interpolation
+                        epsilon.interpolate(residual_2d * duale)
                     else:
+                        with DumbCheckpoint(op.directory() + 'hdf5/PreviousAdjoint2d_' + index_str, mode=FILE_READ) as lo:
+                            lo.load(dual_old)
+                            lo.close()
                         epsilon.interpolate(difference_quotient_estimator(solver_obj, residual_2d, dual, dual_old))
                     epsilon = normalise_indicator(epsilon, op=op)
                     epsilon.rename('error_2d')

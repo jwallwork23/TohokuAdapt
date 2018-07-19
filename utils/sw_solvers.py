@@ -1,6 +1,5 @@
 from thetis import *
 
-import numpy as np
 from time import clock
 
 from utils.adaptivity import *
@@ -529,10 +528,6 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     dual_u, dual_e = dual.split()
     dual_u.rename('adjoint_uv_2d')
     dual_e.rename('adjoint_elev_2d')
-    dual_old = Function(V)
-    dual_old_u, dual_old_e = dual_old.split()
-    dual_old_u.rename('adjoint_uv_old')
-    dual_old_e.rename('adjoint_elev_old')
     epsilon = Function(P1, name='error_2d')
 
     if op.order_increase:
@@ -541,6 +536,10 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         residual_2d = Function(V)
         res_u, res_e = residual_2d.split()
     else:
+        dual_old = Function(V)
+        dual_old_u, dual_old_e = dual_old.split()
+        dual_old_u.rename('adjoint_uv_old')
+        dual_old_e.rename('adjoint_elev_old')
         residual_2d = Function(P0)
 
     # Initialise parameters and counters
@@ -677,16 +676,15 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                         la.load(dual_u)
                         la.load(dual_e)
                         la.close()
-                    if not op.order_increase:
-                        with DumbCheckpoint(op.directory() + 'hdf5/PreviousAdjoint2d_' + index_str, mode=FILE_READ) as lo:
-                            lo.load(dual_old_u)
-                            lo.load(dual_old_e)
-                            lo.close()
                     if op.order_increase:   # TODO: Requires patchwise interpolation to do properly
                         duale_u.interpolate(dual_u)
                         duale_e.interpolate(dual_e)
                         epsilon.interpolate(inner(res_u, duale_u) + res_e * duale_e)
                     else:
+                        with DumbCheckpoint(op.directory() + 'hdf5/PreviousAdjoint2d_' + index_str, mode=FILE_READ) as lo:
+                            lo.load(dual_old_u)
+                            lo.load(dual_old_e)
+                            lo.close()
                         # epsilon.interpolate(difference_quotient_estimator(solver_obj, residual_2d, dual, dual_old))
                         epsilon.interpolate(residual_2d * local_norm(dual))
                     # print("#### DEBUG: min/max eps value = %.4e / %.4e" % (min(epsilon.dat.data), max(epsilon.dat.data)))
