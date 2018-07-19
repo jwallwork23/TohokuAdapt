@@ -115,6 +115,7 @@ def steady_metric(f, H=None, op=TohokuOptions()):
             lam2 = max(lam2, ia2 * lam_max)
             if (lam[0] >= 0.9999 * ih_min2) or (lam[1] >= 0.9999 * ih_min2):
                 print("WARNING: minimum element size reached as %.2e" % np.sqrt(min(1./lam[0], 1./lam[1])))
+                exit(0)     # TODO: Remove this
 
             # Reconstruct edited Hessian
             M.dat.data[i][0, 0] = lam1 * v1[0] * v1[0] + lam2 * v2[0] * v2[0]
@@ -157,6 +158,7 @@ def steady_metric(f, H=None, op=TohokuOptions()):
             lam2 = max(lam2, ia2 * lam_max)
             if (lam[0] >= 0.9999 * ih_min2) or (lam[1] >= 0.9999 * ih_min2):
                 print("WARNING: minimum element size reached as %.2e" % np.sqrt(min(1./lam[0], 1./lam[1])))
+                exit(0)     # TODO: Remove this
 
             # Reconstruct edited Hessian
             M.dat.data[i][0, 0] = lam1 * v1[0] * v1[0] + lam2 * v2[0] * v2[0]
@@ -428,15 +430,20 @@ def pointwise_max(f, g):
     """
     Take the pointwise maximum (in modulus) of arrays `f` and `g`.
     """
+    fu = f.ufl_element()
+    gu = g.ufl_element()
     try:
         assert(len(f.dat.data) == len(g.dat.data))
     except:
-        fu = f.function_space().ufl_element()
-        gu = g.function_space().ufl_element()
         raise ValueError("Function space mismatch: ", fu.family(), fu.degree(), " vs. ", gu.family(), gu.degree())
     for i in range(len(f.dat.data)):
-        if np.abs(g.dat.data[i]) > np.abs(f.dat.data[i]):
-            f.dat.data[i] = g.dat.data[i]
+        if fu.value_size() == 1:
+            if np.abs(g.dat.data[i]) > np.abs(f.dat.data[i]):
+                f.dat.data[i] = g.dat.data[i]
+        else:
+            for j in range(fu.value_size()):
+                if np.abs(g.dat.data[i, j]) > np.abs(f.dat.data[i, j]):
+                    f.dat.data[i, j] = g.dat.data[i, j]
     return f
 
 

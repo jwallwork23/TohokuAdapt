@@ -1,7 +1,7 @@
 from thetis import *
 
 
-__all__ = ["explicit_error", "difference_quotient_estimator"]
+__all__ = ["explicit_error", "local_norm", "difference_quotient_estimator"]
 
 
 def ad_interior_residual(solver_obj):   # TODO: Integrate this into Thetis
@@ -75,6 +75,22 @@ def ad_boundary_residual(solver_obj, dual_new=None, dual_old=None):     # TODO: 
     n = FacetNormal(mesh)
 
     return Function(P0).interpolate(assemble(jump(Constant(-1.) * v * grad(tracer_2d), n=n) * dS))
+
+
+def local_norm(f, norm_type='L2'):
+    """
+    Calculate the `norm_type`-norm of `f` separately on each element of the mesh.
+    """
+
+    mesh = f.function_space().mesh()
+    v = Constant(mesh.num_cells()) * TestFunction(FunctionSpace(mesh, "DG", 0))
+
+    if isinstance(f, FiredrakeFunction):
+        if norm_type == 'L2':   # TODO: Account for different norms
+            return sqrt(assemble(v * inner(f, f) * dx))
+    else:
+        if norm_type == 'L2':
+            return sqrt(assemble(v * sum(inner(fi, fi) for fi in f) * dx))
 
 
 def difference_quotient_estimator(solver_obj, explicit_term, dual, dual_old, divide_by_cell_size=True):
