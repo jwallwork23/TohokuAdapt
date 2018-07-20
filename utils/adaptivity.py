@@ -114,7 +114,7 @@ def steady_metric(f, H=None, op=TohokuOptions()):
             lam1 = max(lam1, ia2 * lam_max)
             lam2 = max(lam2, ia2 * lam_max)
             if (lam[0] >= 0.9999 * ih_min2) or (lam[1] >= 0.9999 * ih_min2):
-                print("WARNING: minimum element size reached as %.2e" % np.sqrt(min(1./lam[0], 1./lam[1])))
+                print("WARNING: minimum element size reached as {m:.2e}".format(m=np.sqrt(min(1./lam[0], 1./lam[1]))))
                 exit(0)     # TODO: Remove this
 
             # Reconstruct edited Hessian
@@ -157,7 +157,7 @@ def steady_metric(f, H=None, op=TohokuOptions()):
             lam1 = max(lam1, ia2 * lam_max)
             lam2 = max(lam2, ia2 * lam_max)
             if (lam[0] >= 0.9999 * ih_min2) or (lam[1] >= 0.9999 * ih_min2):
-                print("WARNING: minimum element size reached as %.2e" % np.sqrt(min(1./lam[0], 1./lam[1])))
+                print("WARNING: minimum element size reached as {m:.2e}".format(m=np.sqrt(min(1. / lam[0], 1. / lam[1]))))
                 exit(0)     # TODO: Remove this
 
             # Reconstruct edited Hessian
@@ -227,7 +227,7 @@ def isotropic_metric(f, bdy=None, invert=True, op=TohokuOptions()):
         M.dat.data[i][1, 1] = beta
 
         if (alpha >= 0.9999 / h_min2) or (beta >= 0.9999 / h_min2):
-            print("WARNING: minimum element size reached as %.2e" % np.sqrt(min(1./alpha, 1./beta)))
+            print("WARNING: minimum element size reached as {m:.2e}".format(m=np.sqrt(min(min(1./alpha, 1./beta)))))
 
     return M
 
@@ -435,7 +435,10 @@ def pointwise_max(f, g):
     try:
         assert(len(f.dat.data) == len(g.dat.data))
     except:
-        raise ValueError("Function space mismatch: ", fu.family(), fu.degree(), " vs. ", gu.family(), gu.degree())
+        raise ValueError("Function space mismatch: {f1:s} {d1:d} vs. {f2:s} {d2:d}".format(f1=fu.family(),
+                                                                                           d1=fu.degree(),
+                                                                                           f2=gu.family(),
+                                                                                           d2=gu.degree()))
     for i in range(len(f.dat.data)):
         if fu.value_size() == 1:
             if np.abs(g.dat.data[i]) > np.abs(f.dat.data[i]):

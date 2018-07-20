@@ -58,11 +58,15 @@ class AdaptOptions(FrozenConfigurable):
                               x0=self.loc[0], y0=self.loc[1], r=pow(self.radii[0], 2), eps=1e-10)
         elif np.shape(self.radii)[0] > 1:
             assert len(self.loc)/2 == len(self.radii)
-            e = "(pow(x[0] - %f, 2) + pow(x[1] - %f, 2) < %f + %f)" \
-                % (self.loc[0], self.loc[1], pow(self.radii[0], 2), 1e-10)
-            for i in range(1, len(self.radii)):     # TODO: Should be an OR operator here
-                e += "|| (pow(x[0] - %f, 2) + pow(x[1] - %f, 2) < %f + %f)" \
-                     % (self.loc[2*i], self.loc[2*i+1], pow(self.radii[i], 2), 1e-10)
+            e = "(pow(x[0] - {x0:f}, 2) + pow(x[1] - {y0:f}, 2) < {r:f} + {eps:f})".format(x0=self.loc[0],
+                                                                                           y0=self.loc[1],
+                                                                                           r=pow(self.radii[0], 2),
+                                                                                           eps=1e-10)
+            for i in range(1, len(self.radii)):
+                e += "|| (pow(x[0] - {x0:f}, 2) + pow(x[1] - {y0:f}, 2) < {r:f} + {eps:f})".format(x0=self.loc[2*i],
+                                                                                                   y0=self.loc[2*i+1],
+                                                                                                   r=pow(self.radii[i], 2),
+                                                                                                   eps=1e-10)
             expr = Expression(e)
         else:
             raise ValueError("Indicator function radii input not recognised.")

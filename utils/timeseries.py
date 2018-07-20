@@ -206,7 +206,7 @@ def integrate_timeseries(fileExt, date, op=TohokuOptions()):
         #     if j % (op.timesteps_per_remesh+2) in (op.timesteps_per_remesh,op.timesteps_per_remesh+1):
         #         del separated[j]
         dat = [float(d) for d in separated[:-1]]
-        print("#### DEBUG: Number of timesteps stored = ", len(dat))
+        print("#### DEBUG: Number of timesteps stored = {n:d}".format(n=len(dat)))
         I = 0
         dt = op.timestep
         for i in range(1, len(dat)):
@@ -226,7 +226,7 @@ def compare_timeseries(date, run, quantity='Integrand', op=TohokuOptions()):
     for approach in approaches:
         if date is None:
             try:
-                dates[approach] = input("Date to use for %s approach: " % approach)
+                dates[approach] = input("Date to use for {a:s} approach: ".format(a=approach))
             except:
                 dates[approach] = today
         else:
@@ -304,7 +304,7 @@ def error_vs_elements(mode='tohoku',
     dates = []
     for n in range(len(names)):
         if date is None:
-            dates.append(input("Date to use for %s approach: " % labels[n]))
+            dates.append(input("Date to use for {a:s} approach: ".format(labels[n])))
         else:
             dates.append(date)
 

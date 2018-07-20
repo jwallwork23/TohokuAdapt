@@ -38,9 +38,9 @@ def boundary_region(mesh, bdyTag, scale, sponge=False):
     for i in bc.nodes:
         xy.append(coords[i])
 
-    e = "exp(-(pow(x[0] - %f, 2) + pow(x[1] - %f, 2)) / %f)" % (xy[0][0], xy[0][1], scale)
+    e = "exp(-(pow(x[0] - {x0:f}, 2) + pow(x[1] - {y0:f}, 2)) / {a:f})".format(x0=xy[0][0], y0=xy[0][1], a=scale)
     for i in range(1, len(xy)):
-        e += "+ exp(-(pow(x[0] - %f, 2) + pow(x[1] - %f, 2)) / %f)" % (xy[i][0], xy[i][1], scale)
+        e += "+ exp(-(pow(x[0] - {x0:f}, 2) + pow(x[1] - {y0:f}, 2)) / {a:f})".format(x0=xy[i][0], y0=xy[i][1], a=scale)
     # f = "sqrt(pow(x[0] - %f, 2) + pow(x[1] - %f, 2)) / %f)" % (xy[0][0], xy[0][1], scale)
     if sponge:
         expr = Expression(e + " < 1e-3 ? 1e-3 : abs (" + e + ")")   # TODO: Needs redoing

@@ -283,9 +283,11 @@ def problem_domain(level=0, mesh=None, b=None, op=TohokuOptions()):
         diffusivity = Function(P1).assign(op.diffusivity)
 
     if newmesh:
-        PETSc.Sys.Print("Setting up mesh across %d processes" % COMM_WORLD.size)
-        PETSc.Sys.Print("  rank %d owns %d elements and can access %d vertices" \
-                        % (mesh.comm.rank, mesh.num_cells(), mesh.num_vertices()), comm=COMM_SELF)
+        PETSc.Sys.Print("Setting up mesh across {p:d} processes".format(p=COMM_WORLD.size))
+        PETSc.Sys.Print("  rank {r:d} owns {e:d} elements and can access {v:d} vertices".format(r=mesh.comm.rank,
+                                                                                                e=mesh.num_cells(),
+                                                                                                v=mesh.num_vertices()),
+                        comm=COMM_SELF)
 
     if op.mode == 'AdvectionDiffusion':
         return mesh, u0, eta0, b, BCs, source, diffusivity
@@ -457,7 +459,7 @@ class RossbyWaveSolution:
             u, eta = q.split()
             u.rename("Depth averaged velocity")
             eta.rename("Elevation")
-            print("t = %.4f, |u| = %.4f, |eta| = %.4f" % (t,u.dat.norm, eta.dat.norm))
+            print("t = {t:.4f}, |u| = {u:.4f}, |eta| = {e:.4f}".format(t=t,u=u.dat.norm, e=eta.dat.norm))
             outFile.write(u, eta, time=t)
 
     def integrate(self, mirror=False):
