@@ -43,7 +43,7 @@ order_increase = False
 
 # Establish filenames
 filename = 'outdata/' + mode + '/' + approach
-if args.ho:     # TODO: Difference quotient as alternative
+if args.ho:
     order_increase = True
     filename += '_ho'
 if args.b:

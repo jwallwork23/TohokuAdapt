@@ -177,11 +177,14 @@ def normalise_indicator(f, op=TohokuOptions()):
     :return: normalised indicator.
     """
     scale_factor = min(max(norm(f), op.min_norm), op.max_norm)
+    print("#### DEBUG: error indicator norm BEFORE normalisation = {:.4e}".format(scale_factor))
     if scale_factor == op.min_norm:
         print("WARNING: minimum norm attained")
     elif scale_factor == op.max_norm:
         print("WARNING: maximum norm attained")
+    # scale_factor *= assemble(Constant(1., domain=f.function_space().mesh()) * dx)   # Scale by domain size
     f.interpolate(Constant(op.target_vertices / scale_factor) * abs(f))
+    print("#### DEBUG: error indicator norm AFTER normalisation = {:.4e}".format(norm(f)))
 
     return f
 
@@ -192,7 +195,7 @@ def isotropic_metric(f, bdy=None, invert=True, op=TohokuOptions()):
     
     :arg f: function to adapt to.
     :param bdy: specify domain boundary to compute metric on.
-    :param invert: when True, the inverse square of field `f` is considered, as in anisotropic mesh adaptivity.
+    :param invert: when True, the inverse square of field `f` is considered.
     :param op: TohokuOptions class object providing min/max cell size values.
     :return: isotropic metric corresponding to `f`.
     """
@@ -227,7 +230,7 @@ def isotropic_metric(f, bdy=None, invert=True, op=TohokuOptions()):
         M.dat.data[i][1, 1] = beta
 
         if (alpha >= 0.9999 / h_min2) or (beta >= 0.9999 / h_min2):
-            print("WARNING: minimum element size reached as {m:.2e}".format(m=np.sqrt(min(min(1./alpha, 1./beta)))))
+            print("WARNING: minimum element size reached as {m:.2e}".format(m=np.sqrt(min(1./alpha, 1./beta))))
 
     return M
 

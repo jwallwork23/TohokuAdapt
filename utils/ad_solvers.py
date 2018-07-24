@@ -355,32 +355,33 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         elev_2d.interpolate(eta0)
         while cnt < op.final_index():
             adapt_timer = clock()
-            for l in range(op.num_adapt):                                  # TODO: Test this functionality
+            if cnt != 0:    # Do not adapt to initial zero concentration
+                for l in range(op.num_adapt):                                  # TODO: Test this functionality
 
-                # Construct metric
-                index_str = index_string(int(cnt / op.timesteps_per_remesh))
-                with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_str, mode=FILE_READ) as le:
-                    le.load(epsilon)
-                    le.close()
-                estimate = Function(FunctionSpace(mesh, "CG", 1)).assign(interp(mesh, epsilon))
-                M = isotropic_metric(estimate, invert=False, op=op)
-                if op.gradate:
-                    M_ = isotropic_metric(interp(mesh, H0), bdy=bdy, op=op)  # Initial boundary metric
-                    M = metric_intersection(M, M_, bdy=bdy)
-                    gradate_metric(M, op=op)
+                    # Construct metric
+                    index_str = index_string(int(cnt / op.timesteps_per_remesh))
+                    with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_str, mode=FILE_READ) as le:
+                        le.load(epsilon)
+                        le.close()
+                    estimate = Function(FunctionSpace(mesh, "CG", 1)).assign(interp(mesh, epsilon))
+                    M = isotropic_metric(estimate, invert=False, op=op)
+                    if op.gradate:
+                        M_ = isotropic_metric(interp(mesh, H0), bdy=bdy, op=op)  # Initial boundary metric
+                        M = metric_intersection(M, M_, bdy=bdy)
+                        gradate_metric(M, op=op)
 
-                # Adapt mesh and interpolate variables
-                mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
+                    # Adapt mesh and interpolate variables
+                    mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
 
-            if op.num_adapt != 0 and op.plot_metric:
-                M.rename('metric_2d')
-                metric_file.write(M, time=t)
-            tracer_2d = interp(mesh, tracer_2d)
-            tracer_2d.rename('tracer_2d')
-            u0, eta0, b, BCs, source, diffusivity = problem_domain(mesh=mesh, op=op)[1:] # TODO: find a different way to reset these
-            uv_2d, elev_2d = Function(op.mixed_space(mesh)).split()
-            elev_2d.interpolate(elev_2d)
-            uv_2d.interpolate(uv_2d)
+                if op.num_adapt != 0 and op.plot_metric:
+                    M.rename('metric_2d')
+                    metric_file.write(M, time=t)
+                tracer_2d = interp(mesh, tracer_2d)
+                tracer_2d.rename('tracer_2d')
+                u0, eta0, b, BCs, source, diffusivity = problem_domain(mesh=mesh, op=op)[1:] # TODO: find a different way to reset these
+                uv_2d, elev_2d = Function(op.mixed_space(mesh)).split()
+                elev_2d.interpolate(elev_2d)
+                uv_2d.interpolate(uv_2d)
             adapt_timer = clock() - adapt_timer
 
             # Solver object and equations
@@ -651,42 +652,43 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         elev_2d.interpolate(eta0)
         while cnt < op.final_index():
             adapt_timer = clock()
-            for l in range(op.num_adapt):                          # TODO: Test this functionality
+            if cnt != 0:    # Don't adapt to initial zero concentration
+                for l in range(op.num_adapt):                          # TODO: Test this functionality
 
-                # Construct metric
-                index_str = index_string(int(cnt / op.timesteps_per_remesh))
-                with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_str, mode=FILE_READ) as le:
-                    le.load(epsilon)
-                    le.close()
-                estimate = Function(FunctionSpace(mesh, "CG", 1)).assign(interp(mesh, epsilon))
-                # estimate.dat.data *= 1e3
-                M = isotropic_metric(estimate, invert=False, op=op)
-                if op.gradate:
-                    # br = Function(P1).interpolate(boundary_region(mesh, 200, 5e8))
-                    # ass = assemble(interp(mesh, H0) * br / assemble(100 * br * dx))
-                    # File('plots/tohoku/boundary_region.pvd').write(ass)
-                    # M_ = isotropic_metric(ass, op=op)
-                    # M = metric_intersection(M, M_)
+                    # Construct metric
+                    index_str = index_string(int(cnt / op.timesteps_per_remesh))
+                    with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_str, mode=FILE_READ) as le:
+                        le.load(epsilon)
+                        le.close()
+                    estimate = Function(FunctionSpace(mesh, "CG", 1)).assign(interp(mesh, epsilon))
+                    # estimate.dat.data *= 1e3
+                    M = isotropic_metric(estimate, invert=False, op=op)
+                    if op.gradate:
+                        # br = Function(P1).interpolate(boundary_region(mesh, 200, 5e8))
+                        # ass = assemble(interp(mesh, H0) * br / assemble(100 * br * dx))
+                        # File('plots/tohoku/boundary_region.pvd').write(ass)
+                        # M_ = isotropic_metric(ass, op=op)
+                        # M = metric_intersection(M, M_)
 
-                    M_ = isotropic_metric(interp(mesh, H0), bdy=bdy, op=op)   # Initial boundary metric
-                    M = metric_intersection(M, M_, bdy=bdy)
-                    M = gradate_metric(M, op=op)
+                        M_ = isotropic_metric(interp(mesh, H0), bdy=bdy, op=op)   # Initial boundary metric
+                        M = metric_intersection(M, M_, bdy=bdy)
+                        M = gradate_metric(M, op=op)
 
-                # Adapt mesh and interpolate variables
-                mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-                # File('plots/tohoku/mesh.pvd').write(mesh.coordinates)
-                # exit(0)
+                    # Adapt mesh and interpolate variables
+                    mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
+                    # File('plots/tohoku/mesh.pvd').write(mesh.coordinates)
+                    # exit(0)
 
-            if op.num_adapt != 0 and op.plot_metric:
-                M.rename('metric_2d')
-                metric_file.write(M, time=t)
-            tracer_2d = interp(mesh, tracer_2d)
-            tracer_2d.rename('tracer_2d')
-            u0, eta0, b, BCs, source, diffusivity = problem_domain(mesh=mesh, op=op)[1:]  # TODO: find a different way to reset these
-            V = op.mixed_space(mesh)
-            uv_2d, elev_2d = Function(V).split()
-            elev_2d.interpolate(eta0)
-            uv_2d.interpolate(u0)
+                if op.num_adapt != 0 and op.plot_metric:
+                    M.rename('metric_2d')
+                    metric_file.write(M, time=t)
+                tracer_2d = interp(mesh, tracer_2d)
+                tracer_2d.rename('tracer_2d')
+                u0, eta0, b, BCs, source, diffusivity = problem_domain(mesh=mesh, op=op)[1:]  # TODO: find a different way to reset these
+                V = op.mixed_space(mesh)
+                uv_2d, elev_2d = Function(V).split()
+                elev_2d.interpolate(eta0)
+                uv_2d.interpolate(u0)
             adapt_timer = clock() - adapt_timer
 
             # Solver object and equations

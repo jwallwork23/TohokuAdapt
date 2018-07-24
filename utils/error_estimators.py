@@ -41,7 +41,8 @@ def sw_boundary_residual(solver_obj, dual_new=None, dual_old=None):     # TODO: 
     # premultiplying piecewise constant and piecewise linear functions.
     mesh = solver_obj.mesh2d
     P0 = FunctionSpace(mesh, "DG", 0)
-    v = Constant(mesh.num_cells()) * TestFunction(P0)  # Scaled to take value 1 in each cell
+    # v = Constant(mesh.num_cells()) * TestFunction(P0)  # Scaled to take value 1 in each cell
+    v = TestFunction(P0)
     n = FacetNormal(mesh)
 
     # Element boundary residual
@@ -71,7 +72,8 @@ def ad_boundary_residual(solver_obj, dual_new=None, dual_old=None):     # TODO: 
     # premultiplying piecewise constant and piecewise linear functions.
     mesh = solver_obj.mesh2d
     P0 = FunctionSpace(mesh, "DG", 0)
-    v = Constant(mesh.num_cells()) * TestFunction(P0)
+    # v = Constant(mesh.num_cells()) * TestFunction(P0)
+    v = TestFunction(P0)
     n = FacetNormal(mesh)
 
     return Function(P0).interpolate(assemble(jump(Constant(-1.) * v * grad(tracer_2d), n=n) * dS))
@@ -83,7 +85,8 @@ def local_norm(f, norm_type='L2'):
     """
 
     mesh = f.function_space().mesh()
-    v = Constant(mesh.num_cells()) * TestFunction(FunctionSpace(mesh, "DG", 0))
+    # v = Constant(mesh.num_cells()) * TestFunction(FunctionSpace(mesh, "DG", 0))
+    v = TestFunction(FunctionSpace(mesh, "DG", 0))
 
     if isinstance(f, FiredrakeFunction):
         if norm_type == 'L2':   # TODO: Account for different norms
@@ -109,7 +112,8 @@ def difference_quotient_estimator(solver_obj, explicit_term, dual, dual_old, div
     # premultiplying piecewise constant and piecewise linear functions.
     mesh = solver_obj.mesh2d
     P0 = FunctionSpace(mesh, "DG", 0)
-    v = Constant(mesh.num_cells()) * TestFunction(P0)
+    # v = Constant(mesh.num_cells()) * TestFunction(P0)
+    v = TestFunction(P0)
 
     if solver_obj.options.tracer_only:
         b_res = ad_boundary_residual(solver_obj)
