@@ -3,7 +3,7 @@ from thetis_adjoint import *
 from utils.conversion import from_latlon
 from utils.options import TohokuOptions
 from utils.setup import problem_domain
-from utils.solvers import tsunami
+from utils.sw_solvers import tsunami
 
 # Set up problem
 op = TohokuOptions(approach='DWR')

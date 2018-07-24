@@ -4,28 +4,13 @@ from thetis import *
 __all__ = ["explicit_error", "local_norm", "difference_quotient_estimator"]
 
 
-def ad_interior_residual(solver_obj):   # TODO: Integrate this into Thetis
+def sw_boundary_residual(solver_obj, dual_new=None, dual_old=None):     # TODO: Generalise to other BCs and timesteps
     """
-    Evaluate strong residual on element interiors for advection diffusion.
-    """
-    mu = solver_obj.fields.get('diffusion_h')
-    Dt = Constant(solver_obj.options.timestep)
-    tracer_old = solver_obj.timestepper.tracer_old.split()
-    tracer_new = solver_obj.fields.tracer_2d.split()
-    tracer_2d = 0.5 * (tracer_old + tracer_new)
-    u = solver_obj.fields.uv_2d
-
-    return (tracer_new - tracer_old) / Dt + dot(u, grad(tracer_2d)) - mu * div(grad(tracer_2d))
-
-
-def sw_boundary_residual(solver_obj, dual_new=None, dual_old=None):     # TODO: Account for other timestepping schemes
-    """
-    Evaluate strong residual across element boundaries for (DG) shallow water. To consider adjoint variables, input
-    these as `dual_new` and `dual_old`.
+    Evaluate strong residual across element boundaries for (DG) shallow water for the tsunami application (where free
+    slip boundaries are considered). To consider adjoint variables, input these as `dual_new` and `dual_old`.
     """
 
     # Collect fields and parameters
-    g = physical_constants['g_grav']
     if dual_new is not None and dual_old is not None:
         uv_new, elev_new = dual_new.split()
         uv_old, elev_old = dual_old.split()
@@ -45,15 +30,17 @@ def sw_boundary_residual(solver_obj, dual_new=None, dual_old=None):     # TODO: 
     v = TestFunction(P0)
     n = FacetNormal(mesh)
 
-    # Element boundary residual
-    bres_u1 = Function(P0).interpolate(assemble(jump(Constant(0.5) * g * v * elev_2d, n=n[0]) * dS))
-    bres_u2 = Function(P0).interpolate(assemble(jump(Constant(0.5) * g * v * elev_2d, n=n[1]) * dS))
-    bres_e = Function(P0).interpolate(assemble(jump(Constant(0.5) * v * H * uv_2d, n=n) * dS))
+    # Construct residuals across edges
+    bres_u1 = Function(P0)	# No contribution
+    bres_u2 = Function(P0)	# No contribution
+    edge_contribution = jump(Constant(0.5) * v * H * uv_2d, n=n) * dS
+    boundary_contribution = v * dot(H * uv_2d, n) * ds
+    bres_e = Function(P0).interpolate(assemble(edge_contribution + boundary_contribution))
 
     return bres_u1, bres_u2, bres_e
 
 
-def ad_boundary_residual(solver_obj, dual_new=None, dual_old=None):     # TODO: Account for other timestepping schemes
+def ad_boundary_residual(solver_obj, dual_new=None, dual_old=None):     # TODO: Generalise to other BCs and timesteps
     """
     Evaluate strong residual across element boundaries for (DG) advection diffusion. To consider adjoint variables, 
     input these as `dual_new` and `dual_old`.
@@ -76,7 +63,11 @@ def ad_boundary_residual(solver_obj, dual_new=None, dual_old=None):     # TODO: 
     v = TestFunction(P0)
     n = FacetNormal(mesh)
 
-    return Function(P0).interpolate(assemble(jump(Constant(-1.) * v * grad(tracer_2d), n=n) * dS))
+    # Construct residuals across edges
+    edge_contribution = jump(Constant(0.5) * v * grad(tracer_2d), n=n) * dS
+    boundary_contribution = v * dot(grad(tracer_2d), n) * ds	# TODO: This is not applied on all boundaries
+
+    return Function(P0).interpolate(assemble(edge_contribution + boundary_contribution))
 
 
 def local_norm(f, norm_type='L2'):
