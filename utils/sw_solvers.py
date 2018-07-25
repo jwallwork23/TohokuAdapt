@@ -1,4 +1,5 @@
 from thetis import *
+from firedrake.petsc import PETSc
 
 from time import clock
 
@@ -6,9 +7,8 @@ from utils.adaptivity import *
 from utils.callbacks import SWCallback
 from utils.error_estimators import difference_quotient_estimator, local_norm
 from utils.interpolation import interp
-from utils.misc import index_string, peak_and_distance, boundary_region, extract_gauge_data
+from utils.misc import index_string, peak_and_distance, boundary_region, extract_gauge_data, gauge_total_variation
 from utils.setup import problem_domain, RossbyWaveSolution
-from utils.timeseries import gauge_total_variation
 
 
 __all__ = ["tsunami"]
@@ -36,7 +36,7 @@ def FixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     options.simulation_end_time = op.end_time - 0.5 * op.timestep
     options.timestepper_type = op.timestepper
     options.timestepper_options.solver_parameters = op.solver_parameters
-    print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
+    PETSc.Sys.Print("Using solver parameters {:s}".format(options.timestepper_options.solver_parameters))
     options.timestep = op.timestep
     options.output_directory = op.directory()
     if not op.plot_pvd:
@@ -172,7 +172,7 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         adaptive_options.simulation_end_time = t + op.timestep * (op.timesteps_per_remesh - 0.5)
         adaptive_options.timestepper_type = op.timestepper
         adaptive_options.timestepper_options.solver_parameters = op.solver_parameters
-        print("Using solver parameters %s" % adaptive_options.timestepper_options.solver_parameters)
+        PETSc.Sys.Print("Using solver parameters {:s}".format(adaptive_options.timestepper_options.solver_parameters))
         adaptive_options.timestep = op.timestep
         adaptive_options.output_directory = op.directory()
         if not op.plot_pvd:
@@ -300,7 +300,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         options.simulation_end_time = op.end_time - 0.5 * op.timestep
         options.timestepper_type = op.timestepper
         options.timestepper_options.solver_parameters = op.solver_parameters
-        print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
+        PETSc.Sys.Print("Using solver parameters {:s}".format(options.timestepper_options.solver_parameters))
         options.timestep = op.timestep
         options.output_directory = op.directory()
         options.export_diagnostics = True
@@ -430,7 +430,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             adaptive_options.simulation_end_time = t + (op.timesteps_per_remesh - 0.5) * op.timestep
             adaptive_options.timestepper_type = op.timestepper
             adaptive_options.timestepper_options.solver_parameters = op.solver_parameters
-            print("Using solver parameters %s" % adaptive_options.timestepper_options.solver_parameters)
+            PETSc.Sys.Print("Using solver parameters {:s}".format(adaptive_options.timestepper_options.solver_parameters))
             adaptive_options.timestep = op.timestep
             adaptive_options.output_directory = op.directory()
             if not op.plot_pvd:
@@ -569,7 +569,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         options.simulation_end_time = op.end_time - 0.5 * op.timestep
         options.timestepper_type = op.timestepper
         options.timestepper_options.solver_parameters_tracer = op.solver_parameters
-        print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
+        PETSc.Sys.Print("Using solver parameters {:s}".format(options.timestepper_options.solver_parameters))
         options.timestep = op.timestep
         options.output_directory = op.directory()   # Need this for residual callback
         options.export_diagnostics = False
@@ -768,7 +768,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             adaptive_options.simulation_end_time = t + (op.timesteps_per_remesh - 0.5) * op.timestep
             adaptive_options.timestepper_type = op.timestepper
             adaptive_options.timestepper_options.solver_parameters = op.solver_parameters
-            print("Using solver parameters %s" % adaptive_options.timestepper_options.solver_parameters)
+            PETSc.Sys.Print("Using solver parameters {:s}".format(adaptive_options.timestepper_options.solver_parameters))
             adaptive_options.timestep = op.timestep
             adaptive_options.output_directory = op.directory()
             if not op.plot_pvd:
