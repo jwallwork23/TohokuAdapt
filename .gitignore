@@ -11,6 +11,8 @@
 *.log
 *.patch
 *.txt
+*.h5
+*.hdf5
 
 ## Directories to be ignored:
 

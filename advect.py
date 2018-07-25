@@ -4,7 +4,6 @@ from firedrake.petsc import PETSc
 import argparse
 import datetime
 import numpy as np
-import matplotlib.pyplot as plt
 
 from utils.options import AdvectionOptions
 from utils.setup import problem_domain
@@ -33,7 +32,7 @@ if approach is None:
     approach = 'FixedMesh'
 else:
     assert approach in ('FixedMesh', 'HessianBased', 'DWP', 'DWR')
-errorFile = open('outdata/advection-diffusion/' + approach + '_' + date + '.txt', 'w+')
+errorFile = open('outdata/AdvectionDiffusion/' + approach + '_' + date + '.txt', 'w+')
 
 # Set parameters
 op = AdvectionOptions(approach=approach)
@@ -65,31 +64,34 @@ for i in resolutions:
             errorFile.write(", %.4e" % quantities[tag])
     errorFile.write(", %.1f, %.4e\n" % (quantities['solver_timer'], quantities['J_h']))
 
-    i_end = op.final_export()
-    for progress in (0.5, 1):
-        tag = "h_snapshot_"+str(int(i_end*progress))        # TODO: This is for non-diffusive case
-        if tag in quantities:                               # TODO: Consider steady state for diffusive case
-            plt.clf()
-            s = quantities[tag]
-            sl = op.h_slice
-            x = np.linspace(sl[0][0], sl[-1][0], len(sl))
-            plt.plot(x, s)
-            plt.title("Tracer concentration at time %.1fs" % (op.end_time * progress))
-            plt.xlabel("Abcissa (m)")
-            plt.ylabel("Tracer concentraton (g/L)")
-            plt.savefig('outdata/advection-diffusion/'+ tag + '.pdf')
-    for progress in (0.5, 1):
-        tag = "v_snapshot_"+str(int(i_end*progress))
-        if tag in quantities:
-            plt.clf()
-            s = quantities[tag]
-            sl = op.v_slice
-            x = np.linspace(sl[0][0], sl[0][-1], len(sl))
-            plt.plot(x, s)
-            plt.title("Tracer concentration at time %.1fs" % (op.end_time * progress))
-            plt.xlabel("Ordinate (m)")
-            plt.ylabel("Tracer concentration (g/L)")
-            plt.savefig('outdata/advection-diffusion/' + tag + '.pdf')
+    if op.plot_cross_section:
+        import matplotlib.pyplot as plt
+
+        i_end = op.final_export()
+        for progress in (0.5, 1):
+            tag = "h_snapshot_"+str(int(i_end*progress))        # TODO: This is for non-diffusive case
+            if tag in quantities:                               # TODO: Consider steady state for diffusive case
+                plt.clf()
+                s = quantities[tag]
+                sl = op.h_slice
+                x = np.linspace(sl[0][0], sl[-1][0], len(sl))
+                plt.plot(x, s)
+                plt.title("Tracer concentration at time %.1fs" % (op.end_time * progress))
+                plt.xlabel("Abcissa (m)")
+                plt.ylabel("Tracer concentraton (g/L)")
+                plt.savefig('outdata/AdvectionDiffusion/'+ tag + '.pdf')
+        for progress in (0.5, 1):
+            tag = "v_snapshot_"+str(int(i_end*progress))
+            if tag in quantities:
+                plt.clf()
+                s = quantities[tag]
+                sl = op.v_slice
+                x = np.linspace(sl[0][0], sl[0][-1], len(sl))
+                plt.plot(x, s)
+                plt.title("Tracer concentration at time %.1fs" % (op.end_time * progress))
+                plt.xlabel("Ordinate (m)")
+                plt.ylabel("Tracer concentration (g/L)")
+                plt.savefig('outdata/AdvectionDiffusion/' + tag + '.pdf')
     if approach in ("DWP", "DWR"):
         PETSc.Sys.Print("Time for final run: %.1fs" % quantities['adapt_solve_timer'], comm=COMM_WORLD)
 errorFile.close()
