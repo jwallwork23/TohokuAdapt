@@ -1,4 +1,5 @@
 from thetis_adjoint import *
+from firedrake.petsc import PETSc
 
 from utils.conversion import from_latlon
 from utils.options import TohokuOptions
@@ -28,5 +29,5 @@ op.radii = [50e3]
 
 # Solve
 q = tsunami(mesh, u0, eta0, b, BCs=BCs, f=f, nu=nu, op=op)
-print("Objective functional value = %.4e" % q['J_h'])
-print("CPU time = %.2f" % q['solverTime'])
+PETSc.Sys.Print("Objective functional value = %.4e" % q['J_h'])
+PETSc.Sys.Print("CPU time = %.2f" % q['solverTime'])
