@@ -7,7 +7,7 @@ from .options import TohokuOptions, RossbyWaveOptions, AdvectionOptions
 
 
 __all__ = ["index_string", "peak_and_distance", "boundary_region", "extract_slice", "extract_gauge_data",
-           "gauge_total_variation"]
+           "gauge_total_variation", "local_edge_norm"]
 
 
 def index_string(index):
@@ -115,13 +115,14 @@ def gauge_total_variation(data, gauge="P02"):
     return total_variation(errors) / total_variation([spline(times[i]) for i in range(N)])
 
 
-def edge_norm(f):
-
+def local_edge_norm(f):
+    """
+    Integrates `f` over all interior edges elementwise, giving a P0 field. 
+    """
     mesh = f.function_space().mesh()
     P0 = FunctionSpace(mesh, 'DG', 0)
-    edge_lengths = assemble(Constant(1., domain=mesh) * dS)             #  Total interior edge lengths
-    edge_function = Function(P0)                                        # Integrates to 1 with dx
-    v = Constant(mesh.num_cells() / edge_lengths) * TestFunction(P0)
-    edge_function.interpolate(assemble(Constant(0.5) * (v('+') + v('-')) * dS))
+    edge_function = Function(P0)
+    v = TestFunction(P0)
+    edge_function.interpolate(assemble((f('+') * v('+') + f('-') * v('-')) * dS))
 
-    # TODO: Not sure if this is at all useful, or even the right thing to do
+    return edge_function

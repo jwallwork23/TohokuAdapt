@@ -45,6 +45,7 @@ if bool(args.snes_view):
     op.solver_parameters['snes_view'] = True
 op.order_increase = True    # TODO: difference quotient option
 
+
 # Get data and save to disk
 if args.low is not None or args.high is not None:
     assert args.level is None

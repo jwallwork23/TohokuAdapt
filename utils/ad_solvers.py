@@ -381,8 +381,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                 tracer_2d.rename('tracer_2d')
                 u0, eta0, b, BCs, source, diffusivity = problem_domain(mesh=mesh, op=op)[1:] # TODO: find a different way to reset these
                 uv_2d, elev_2d = Function(op.mixed_space(mesh)).split()
-                elev_2d.interpolate(elev_2d)
-                uv_2d.interpolate(uv_2d)
+                elev_2d.interpolate(eta0)
+                uv_2d.interpolate(u0)
             adapt_timer = clock() - adapt_timer
 
             # Solver object and equations
