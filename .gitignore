@@ -10,18 +10,19 @@
 *.vtu
 *.log
 *.patch
+*.txt
+*.h5
+*.hdf5
 
 ## Directories to be ignored:
 
 
 .eggs/
 .idea/
-plots/
 resources/meshes/
 resources/GMT/
 resources/channel/
 utils/.idea/
-outdata/
 
 
 ## Files to be ignored:

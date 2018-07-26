@@ -43,13 +43,8 @@ order_increase = False
 
 # Establish filenames
 filename = 'outdata/' + mode + '/' + approach
-if args.ho:
-    order_increase = True
-    filename += '_ho'
-if args.b:
-    assert approach == 'HessianBased'
-    filename += '_b'
-filename += '_' + date
+field_for_adaptation = args.f if args.f is not None else 's'
+filename += field_for_adaptation + '_' + date
 errorFile = open(filename + '.txt', 'w+')
 files = {}
 extensions = []
@@ -76,7 +71,7 @@ op.plot_metric = bool(args.m)
 op.num_adapt = 1 if args.n is None else int(args.n)
 op.order_increase = order_increase
 op.adapt_on_bathymetry = bool(args.b)
-op.adapt_field = args.f if args.f is not None else 's'
+op.adapt_field = field_for_adaptation
 if bool(args.snes_view):
     op.solver_parameters['snes_view'] = True
 

@@ -297,6 +297,7 @@ class AdvectionOptions(AdaptOptions):
     J = Float(0.1871, help="Objective functional value on a fine mesh").tag(config=True)    # On 64,000 elements
 
     # Cross sections
+    plot_cross_section = Bool(False, help="Plot horizontal and vertical slices through profile.").tag(config=True)
     h_slice = List(trait=Tuple, default_value=[(x, 5.) for x in np.linspace(0.01, 49.99, 101)],
                    help="List of coordinates corresponding to a horizontal slice of the domain").tag(config=True)
     v_slice = List(trait=Tuple, default_value=[(30., y) for y in np.linspace(0.002, 9.998, 101)],

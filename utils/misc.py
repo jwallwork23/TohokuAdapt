@@ -6,7 +6,8 @@ import h5py
 from .options import TohokuOptions, RossbyWaveOptions, AdvectionOptions
 
 
-__all__ = ["index_string", "peak_and_distance", "boundary_region", "extract_slice", "extract_gauge_data"]
+__all__ = ["index_string", "peak_and_distance", "boundary_region", "extract_slice", "extract_gauge_data",
+           "gauge_total_variation"]
 
 
 def index_string(index):
@@ -77,3 +78,50 @@ def extract_gauge_data(quantities, op=TohokuOptions()):
             quantities[g] = ()
         quantities[g] += tuple(hf.get(g))
     hf.close()
+
+def total_variation(data):
+    """
+    :arg data: (one-dimensional) timeseries record.
+    :return: total variation thereof.
+    """
+    TV = 0
+    iStart = 0
+    for i in range(len(data)):
+        if i == 1:
+            sign = (data[i] - data[i-1]) / np.abs(data[i] - data[i-1])
+        elif i > 1:
+            sign_ = sign
+            sign = (data[i] - data[i - 1]) / np.abs(data[i] - data[i - 1])
+            if sign != sign_:
+                TV += np.abs(data[i-1] - data[iStart])
+                iStart = i-1
+                if i == len(data)-1:
+                    TV += np.abs(data[i] - data[i-1])
+            elif i == len(data)-1:
+                TV += np.abs(data[i] - data[iStart])
+    return TV
+
+
+def gauge_total_variation(data, gauge="P02"):
+    """
+    :param data: timeseries to calculate error of.
+    :param gauge: gauge considered.
+    :return: total variation.
+    """
+    N = len(data)
+    spline = extract_spline(gauge)
+    times = np.linspace(0., 25., N)
+    errors = [data[i] - spline(times[i]) for i in range(N)]
+    return total_variation(errors) / total_variation([spline(times[i]) for i in range(N)])
+
+
+def edge_norm(f):
+
+    mesh = f.function_space().mesh()
+    P0 = FunctionSpace(mesh, 'DG', 0)
+    edge_lengths = assemble(Constant(1., domain=mesh) * dS)             #  Total interior edge lengths
+    edge_function = Function(P0)                                        # Integrates to 1 with dx
+    v = Constant(mesh.num_cells() / edge_lengths) * TestFunction(P0)
+    edge_function.interpolate(assemble(Constant(0.5) * (v('+') + v('-')) * dS))
+
+    # TODO: Not sure if this is at all useful, or even the right thing to do

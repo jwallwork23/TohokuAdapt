@@ -1,4 +1,5 @@
 from thetis import *
+from firedrake.petsc import PETSc
 
 from time import clock
 
@@ -6,9 +7,8 @@ from utils.adaptivity import *
 from utils.callbacks import SWCallback
 from utils.error_estimators import difference_quotient_estimator, local_norm
 from utils.interpolation import interp
-from utils.misc import index_string, peak_and_distance, boundary_region, extract_gauge_data
+from utils.misc import index_string, peak_and_distance, boundary_region, extract_gauge_data, gauge_total_variation
 from utils.setup import problem_domain, RossbyWaveSolution
-from utils.timeseries import gauge_total_variation
 
 
 __all__ = ["tsunami"]
@@ -36,7 +36,7 @@ def FixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     options.simulation_end_time = op.end_time - 0.5 * op.timestep
     options.timestepper_type = op.timestepper
     options.timestepper_options.solver_parameters = op.solver_parameters
-    print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
+    PETSc.Sys.Print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
     options.timestep = op.timestep
     options.output_directory = op.directory()
     if not op.plot_pvd:
@@ -131,7 +131,7 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                     try:
                         M = metric_intersection(M, M2)
                     except:
-                        print("WARNING: null fluid speed metric")
+                        PETSc.Sys.Print("WARNING: null fluid speed metric")
                         M = metric_intersection(M2, M)
             if op.adapt_on_bathymetry and not (op.adapt_field != 'f' and cnt == 0):
                 M2 = steady_metric(b, op=op)
@@ -172,7 +172,7 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         adaptive_options.simulation_end_time = t + op.timestep * (op.timesteps_per_remesh - 0.5)
         adaptive_options.timestepper_type = op.timestepper
         adaptive_options.timestepper_options.solver_parameters = op.solver_parameters
-        print("Using solver parameters %s" % adaptive_options.timestepper_options.solver_parameters)
+        PETSc.Sys.Print("Using solver parameters %s" % adaptive_options.timestepper_options.solver_parameters)
         adaptive_options.timestep = op.timestep
         adaptive_options.output_directory = op.directory()
         if not op.plot_pvd:
@@ -300,7 +300,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         options.simulation_end_time = op.end_time - 0.5 * op.timestep
         options.timestepper_type = op.timestepper
         options.timestepper_options.solver_parameters = op.solver_parameters
-        print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
+        PETSc.Sys.Print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
         options.timestep = op.timestep
         options.output_directory = op.directory()
         options.export_diagnostics = True
@@ -311,12 +311,12 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         solver_obj.add_callback(cb1, 'timestep')
         solver_obj.bnd_functions['shallow_water'] = BCs
         initTimer = clock() - initTimer
-        print('Problem initialised. Setup time: %.3fs' % initTimer)
+        PETSc.Sys.Print('Problem initialised. Setup time: %.3fs' % initTimer)
         primal_timer = clock()
         solver_obj.iterate()
         primal_timer = clock() - primal_timer
         J = cb1.get_val()                        # Assemble objective functional for adjoint computation
-        print('Primal run complete. Solver time: %.3fs' % primal_timer)
+        PETSc.Sys.Print('Primal run complete. Solver time: %.3fs' % primal_timer)
 
         # Compute gradient
         gradient_timer = clock()
@@ -340,13 +340,13 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             if op.plot_pvd:
                 adjoint_file.write(dual_u, dual_e, time=op.timestep * (i - r))
         dual_timer = clock() - dual_timer
-        print('Dual run complete. Run time: %.3fs' % dual_timer)
+        PETSc.Sys.Print('Dual run complete. Run time: %.3fs' % dual_timer)
 
     with pyadjoint.stop_annotating():
 
         error_timer = clock()
         for k in range(0, op.final_mesh_index()):  # Loop back over times to generate error estimators
-            print('Generating error estimate %d / %d' % (k + 1, op.final_mesh_index()))
+            PETSc.Sys.Print('Generating error estimate %d / %d' % (k + 1, op.final_mesh_index()))
             with DumbCheckpoint(op.directory() + 'hdf5/Velocity2d_' + index_string(k), mode=FILE_READ) as lv:
                 lv.load(uv_2d)
                 lv.close()
@@ -371,7 +371,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             if op.plot_pvd:
                 error_file.write(epsilon, time=float(k))
         error_timer = clock() - error_timer
-        print('Errors estimated. Run time: %.3fs' % error_timer)
+        PETSc.Sys.Print('Errors estimated. Run time: %.3fs' % error_timer)
 
         # Run adaptive primal run
         cnt = 0
@@ -396,7 +396,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                     le.load(epsilon)
                     le.close()
                 estimate = Function(FunctionSpace(mesh, "CG", 1)).interpolate(interp(mesh, epsilon))
-                print("#### DEBUG: error estimator norm = %.4e" % norm(estimate))
+                PETSc.Sys.Print("#### DEBUG: error estimator norm = %.4e" % norm(estimate))
                 M = isotropic_metric(estimate, invert=False, op=op)
                 if op.gradate:
                     M_ = isotropic_metric(interp(mesh, H0), bdy=bdy, op=op)  # Initial boundary metric
@@ -430,7 +430,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             adaptive_options.simulation_end_time = t + (op.timesteps_per_remesh - 0.5) * op.timestep
             adaptive_options.timestepper_type = op.timestepper
             adaptive_options.timestepper_options.solver_parameters = op.solver_parameters
-            print("Using solver parameters %s" % adaptive_options.timestepper_options.solver_parameters)
+            PETSc.Sys.Print("Using solver parameters %s" % adaptive_options.timestepper_options.solver_parameters)
             adaptive_options.timestep = op.timestep
             adaptive_options.output_directory = op.directory()
             if not op.plot_pvd:
@@ -569,7 +569,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         options.simulation_end_time = op.end_time - 0.5 * op.timestep
         options.timestepper_type = op.timestepper
         options.timestepper_options.solver_parameters_tracer = op.solver_parameters
-        print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
+        PETSc.Sys.Print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
         options.timestep = op.timestep
         options.output_directory = op.directory()   # Need this for residual callback
         options.export_diagnostics = False
@@ -584,13 +584,13 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         solver_obj.add_callback(cb2, 'export')
         solver_obj.bnd_functions['shallow_water'] = BCs
         initTimer = clock() - initTimer
-        print('Problem initialised. Setup time: %.3fs' % initTimer)
+        PETSc.Sys.Print('Problem initialised. Setup time: %.3fs' % initTimer)
 
         primal_timer = clock()
         solver_obj.iterate()
         primal_timer = clock() - primal_timer
         J = cb1.get_val()                        # Assemble objective functional for adjoint computation
-        print('Primal run complete. Solver time: %.3fs' % primal_timer)
+        PETSc.Sys.Print('Primal run complete. Solver time: %.3fs' % primal_timer)
 
         # Compute gradient
         gradient_timer = clock()
@@ -624,14 +624,14 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             if op.plot_pvd:
                 adjoint_file.write(dual_u, dual_e, time=op.timestep * (i - r))
         dual_timer = clock() - dual_timer
-        print('Dual run complete. Run time: %.3fs' % dual_timer)
+        PETSc.Sys.Print('Dual run complete. Run time: %.3fs' % dual_timer)
 
         with pyadjoint.stop_annotating():
 
             residuals = []
             error_timer = clock()
             for k in range(0, int(op.final_index() / op.timesteps_per_export)):
-                print('Generating error estimate %d / %d'
+                PETSc.Sys.Print('Generating error estimate %d / %d'
                       % (int(k/op.exports_per_remesh()) + 1, int(op.final_index() / op.timesteps_per_remesh)))
 
                 # Load residuals
@@ -687,11 +687,11 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                             lo.close()
                         # epsilon.interpolate(difference_quotient_estimator(solver_obj, residual_2d, dual, dual_old))
                         epsilon.interpolate(residual_2d * local_norm(dual))
-                    # print("#### DEBUG: min/max eps value = %.4e / %.4e" % (min(epsilon.dat.data), max(epsilon.dat.data)))
-                    # print("#### DEBUG: eps integral = %.4e" % norm(epsilon))
+                    # PETSc.Sys.Print("#### DEBUG: min/max eps value = %.4e / %.4e" % (min(epsilon.dat.data), max(epsilon.dat.data)))
+                    # PETSc.Sys.Print("#### DEBUG: eps integral = %.4e" % norm(epsilon))
                     epsilon = normalise_indicator(epsilon, op=op)
-                    # print("#### DEBUG: target number of vertices = %.4e" % op.target_vertices)
-                    # print(
+                    # PETSc.Sys.Print("#### DEBUG: target number of vertices = %.4e" % op.target_vertices)
+                    # PETSc.Sys.Print(
                     # "#### DEBUG: min/max normalised eps value = %.4e / %.4e" % (min(epsilon.dat.data), max(epsilon.dat.data)))
                     epsilon.rename('error_2d')
                     with DumbCheckpoint(op.directory() + 'hdf5/ErrorIndicator2d_' + index_str, mode=FILE_CREATE) as se:
@@ -700,7 +700,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                     if op.plot_pvd:
                         error_file.write(epsilon, time=float(op.timestep * op.timesteps_per_remesh * k))
             error_timer = clock() - error_timer
-            print('Errors estimated. Run time: %.3fs' % error_timer)
+            PETSc.Sys.Print('Errors estimated. Run time: %.3fs' % error_timer)
 
     with pyadjoint.stop_annotating():
 
@@ -728,7 +728,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                     le.load(epsilon)
                     le.close()
                 estimate = Function(FunctionSpace(mesh, "CG", 1)).assign(interp(mesh, epsilon))
-                print("#### DEBUG: error estimator norm = %.4e" % norm(estimate))
+                PETSc.Sys.Print("#### DEBUG: error estimator norm = %.4e" % norm(estimate))
                 M = isotropic_metric(estimate, invert=False, op=op)
                 if op.gradate:
                     # br = Function(P1).interpolate(boundary_region(mesh, 200, 5e8))
@@ -768,7 +768,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             adaptive_options.simulation_end_time = t + (op.timesteps_per_remesh - 0.5) * op.timestep
             adaptive_options.timestepper_type = op.timestepper
             adaptive_options.timestepper_options.solver_parameters = op.solver_parameters
-            print("Using solver parameters %s" % adaptive_options.timestepper_options.solver_parameters)
+            PETSc.Sys.Print("Using solver parameters %s" % adaptive_options.timestepper_options.solver_parameters)
             adaptive_options.timestep = op.timestep
             adaptive_options.output_directory = op.directory()
             if not op.plot_pvd:

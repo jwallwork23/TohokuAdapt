@@ -8,49 +8,12 @@ import datetime
 from .options import TohokuOptions
 
 
-__all__ = ["error_vs_elements", "plot_timeseries", "compare_timeseries", "timeseries_difference",
-           "gauge_total_variation", "integrate_timeseries"]
+__all__ = ["error_vs_elements", "plot_timeseries", "compare_timeseries", "timeseries_difference", "integrate_timeseries"]
 
 
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 plt.rc('legend', fontsize='x-large')
-
-
-def total_variation(data):
-    """
-    :arg data: (one-dimensional) timeseries record.
-    :return: total variation thereof.
-    """
-    TV = 0
-    iStart = 0
-    for i in range(len(data)):
-        if i == 1:
-            sign = (data[i] - data[i-1]) / np.abs(data[i] - data[i-1])
-        elif i > 1:
-            sign_ = sign
-            sign = (data[i] - data[i - 1]) / np.abs(data[i] - data[i - 1])
-            if sign != sign_:
-                TV += np.abs(data[i-1] - data[iStart])
-                iStart = i-1
-                if i == len(data)-1:
-                    TV += np.abs(data[i] - data[i-1])
-            elif i == len(data)-1:
-                TV += np.abs(data[i] - data[iStart])
-    return TV
-
-
-def gauge_total_variation(data, gauge="P02"):
-    """
-    :param data: timeseries to calculate error of.
-    :param gauge: gauge considered.
-    :return: total variation. 
-    """
-    N = len(data)
-    spline = extract_spline(gauge)
-    times = np.linspace(0., 25., N)
-    errors = [data[i] - spline(times[i]) for i in range(N)]
-    return total_variation(errors) / total_variation([spline(times[i]) for i in range(N)])
 
 
 def read_errors(date, approach, mode='tohoku', bootstrapping=False):
