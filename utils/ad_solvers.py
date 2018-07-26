@@ -538,7 +538,10 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
         cb1 = AdvectionCallback(solver_obj)
         cb1.op = op
-        cb2 = callback.ExplicitErrorCallback(solver_obj, export_to_hdf5=True)
+        if op.order_increase:
+            cb2 = callback.InteriorResidualCallback(solver_obj, export_to_hdf5=True)
+        else:
+            cb2 = callback.ExplicitErrorCallback(solver_obj, export_to_hdf5=True)
         solver_obj.add_callback(cb1, 'timestep')
         solver_obj.add_callback(cb2, 'export')
         solver_obj.bnd_functions = BCs

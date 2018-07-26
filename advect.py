@@ -44,6 +44,7 @@ op.tracer_family = args.f if args.f is not None else 'cg'
 op.num_adapt = 1 if args.n is None else int(args.n)
 if bool(args.snes_view):
     op.solver_parameters['snes_view'] = True
+op.order_increase = True    # TODO: difference quotient option
 
 # Get data and save to disk
 if args.low is not None or args.high is not None:
