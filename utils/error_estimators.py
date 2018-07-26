@@ -4,6 +4,32 @@ from thetis import *
 __all__ = ["explicit_error", "local_norm", "difference_quotient_estimator"]
 
 
+def local_edge_norm(f):
+    """
+    Integrates `f` over all interior edges elementwise, giving a P0 field. 
+    """
+    mesh = f.function_space().mesh()
+    P0 = FunctionSpace(mesh, 'DG', 0)
+    edge_function = Function(P0)
+    v = TestFunction(P0)
+    edge_function.interpolate(assemble((f('+') * v('+') + f('-') * v('-')) * dS))
+
+    return edge_function
+
+
+def local_boundary_norm(f):
+    """
+    Integrates `f` over all exterior edges elementwise, giving a P0 field. 
+    """
+    mesh = f.function_space().mesh()
+    P0 = FunctionSpace(mesh, 'DG', 0)
+    boundary_function = Function(P0)
+    v = TestFunction(P0)
+    boundary_function.interpolate(assemble(f * v * ds))
+
+    return boundary_function
+
+
 def sw_boundary_residual(solver_obj, dual_new=None, dual_old=None):     # TODO: Generalise to other BCs and timesteps
     """
     Evaluate strong residual across element boundaries for (DG) shallow water for the tsunami application (where free
