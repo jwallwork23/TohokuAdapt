@@ -4,24 +4,30 @@ from thetis import *
 __all__ = ["explicit_error", "local_norm", "difference_quotient_estimator"]
 
 
-def local_edge_norm(f):
+def local_edge_norm(f, mesh=None, flux_jump=False):
     """
     Integrates `f` over all interior edges elementwise, giving a P0 field. 
     """
-    mesh = f.function_space().mesh()
+    if mesh is None:
+        mesh = f.function_space().mesh()
     P0 = FunctionSpace(mesh, 'DG', 0)
     edge_function = Function(P0)
     v = TestFunction(P0)
-    edge_function.interpolate(assemble((f('+') * v('+') + f('-') * v('-')) * dS))
+    if flux_jump:
+        n = FacetNormal(mesh)
+        edge_function.interpolate(assemble(jump(f, n) * (v('+') + v('-')) * dS))
+    else:
+        edge_function.interpolate(assemble((f('+') * v('+') + f('-') * v('-')) * dS))
 
     return edge_function
 
 
-def local_boundary_norm(f):
+def local_boundary_norm(f, mesh=None):
     """
     Integrates `f` over all exterior edges elementwise, giving a P0 field. 
     """
-    mesh = f.function_space().mesh()
+    if mesh is None:
+        mesh = f.function_space().mesh()
     P0 = FunctionSpace(mesh, 'DG', 0)
     boundary_function = Function(P0)
     v = TestFunction(P0)
