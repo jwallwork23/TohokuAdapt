@@ -113,3 +113,15 @@ def gauge_total_variation(data, gauge="P02"):
     times = np.linspace(0., 25., N)
     errors = [data[i] - spline(times[i]) for i in range(N)]
     return total_variation(errors) / total_variation([spline(times[i]) for i in range(N)])
+
+
+def edge_norm(f):
+
+    mesh = f.function_space().mesh()
+    P0 = FunctionSpace(mesh, 'DG', 0)
+    edge_lengths = assemble(Constant(1., domain=mesh) * dS)             #  Total interior edge lengths
+    edge_function = Function(P0)                                        # Integrates to 1 with dx
+    v = Constant(mesh.num_cells() / edge_lengths) * TestFunction(P0)
+    edge_function.interpolate(assemble(Constant(0.5) * (v('+') + v('-')) * dS))
+
+    # TODO: Not sure if this is at all useful, or even the right thing to do
