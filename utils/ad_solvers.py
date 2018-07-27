@@ -665,23 +665,14 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                         le.load(epsilon)
                         le.close()
                     estimate = Function(FunctionSpace(mesh, "CG", 1)).assign(interp(mesh, epsilon))
-                    # estimate.dat.data *= 1e3
                     M = isotropic_metric(estimate, invert=False, op=op)
-                    if op.gradate:
-                        # br = Function(P1).interpolate(boundary_region(mesh, 200, 5e8))
-                        # ass = assemble(interp(mesh, H0) * br / assemble(100 * br * dx))
-                        # File('plots/tohoku/boundary_region.pvd').write(ass)
-                        # M_ = isotropic_metric(ass, op=op)
-                        # M = metric_intersection(M, M_)
-
+                    if op.gradate
                         M_ = isotropic_metric(interp(mesh, H0), bdy=bdy, op=op)   # Initial boundary metric
                         M = metric_intersection(M, M_, bdy=bdy)
                         M = gradate_metric(M, op=op)
 
                     # Adapt mesh and interpolate variables
                     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
-                    # File('plots/tohoku/mesh.pvd').write(mesh.coordinates)
-                    # exit(0)
 
                 if op.num_adapt != 0 and op.plot_metric:
                     M.rename('metric_2d')
@@ -720,7 +711,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             if op.tracer_family == 'cg':
                 adaptive_options.use_limiter_for_tracers = False
             adaptive_options.tracer_source_2d = source
-            adaptive_solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d)
+            adaptive_solver_obj.assign_initial_conditions(elev=elev_2d, uv=uv_2d, tracer=tracer_2d)
             adaptive_solver_obj.i_export = int(cnt / op.timesteps_per_export)
             adaptive_solver_obj.next_export_t = adaptive_solver_obj.i_export * adaptive_options.simulation_export_time
             adaptive_solver_obj.iteration = cnt

@@ -268,8 +268,8 @@ class AdvectionOptions(AdaptOptions):
     mode = 'AdvectionDiffusion'
 
     # Solver parameters
-    timesteps_per_export = NonNegativeInteger(10, help="Timesteps per data dump").tag(config=True)
-    timesteps_per_remesh = NonNegativeInteger(20, help="Timesteps per mesh adaptation").tag(config=True)
+    timesteps_per_export = NonNegativeInteger(20, help="Timesteps per data dump").tag(config=True)
+    timesteps_per_remesh = NonNegativeInteger(40, help="Timesteps per mesh adaptation").tag(config=True)
     target_vertices = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
     timestep = PositiveFloat(0.1, help="Timestep").tag(config=True)
     start_time = PositiveFloat(10., help="Start time of period of interest").tag(config=True)
