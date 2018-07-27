@@ -31,8 +31,9 @@ def FixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs
     options.output_directory = op.directory()
     if not op.plot_pvd:
         options.no_exports = True
+    else:
+        options.fields_to_export = ['tracer_2d']
     options.horizontal_velocity_scale = op.u_mag
-    options.fields_to_export = ['tracer_2d']
     options.fields_to_export_hdf5 = ['tracer_2d']
     options.solve_tracer = True
     options.tracer_only = True
@@ -149,8 +150,9 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         adaptive_options.output_directory = op.directory()
         if not op.plot_pvd:
             adaptive_options.no_exports = True
+        else:
+            adaptive_options.fields_to_export = ['tracer_2d']
         adaptive_options.horizontal_velocity_scale = op.u_mag
-        adaptive_options.fields_to_export = ['tracer_2d']
         adaptive_options.fields_to_export_hdf5 = ['tracer_2d']
         adaptive_options.solve_tracer = True
         adaptive_options.tracer_only = True  # Need use tracer-only branch to use this functionality
@@ -401,6 +403,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             adaptive_options.output_directory = op.directory()
             if not op.plot_pvd:
                 adaptive_options.no_exports = True
+            else:
+                adaptive_options.fields_to_export = ['tracer_2d']
             adaptive_options.horizontal_velocity_scale = op.u_mag
             adaptive_options.fields_to_export = ['tracer_2d']
             adaptive_options.fields_to_export_hdf5 = ['tracer_2d']
@@ -702,6 +706,8 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             adaptive_options.output_directory = op.directory()
             if not op.plot_pvd:
                 adaptive_options.no_exports = True
+            else:
+                adaptive_options.fields_to_export = ['tracer_2d']
             adaptive_options.horizontal_velocity_scale = op.u_mag
             adaptive_options.solve_tracer = True
             adaptive_options.tracer_only = True  # Need use tracer-only branch to use this functionality
