@@ -4,6 +4,39 @@ from thetis import *
 __all__ = ["explicit_error", "local_norm", "difference_quotient_estimator"]
 
 
+def local_norm(f, norm_type='L2'):
+    """
+    Calculate the `norm_type`-norm of `f` separately on each element of the mesh.
+    """
+    typ = norm_type.lower()
+    mesh = f.function_space().mesh()
+    v = TestFunction(FunctionSpace(mesh, "DG", 0))
+
+    if isinstance(f, FiredrakeFunction):
+        if typ == 'l2':
+            form = v * inner(f, f) * dx
+        elif typ == 'h1':
+            form = v * (inner(f, f) * dx + inner(grad(f), grad(f))) * dx
+        elif typ == "hdiv":
+            form = v * (inner(f, f) * dx + div(f) * div(f)) * dx
+        elif typ == "hcurl":
+            form = v * (inner(f, f) * dx + inner(curl(f), curl(f))) * dx
+        else:
+            raise RuntimeError("Unknown norm type '%s'" % norm_type)
+    else:
+        if typ == 'l2':
+            form = v * sum(inner(fi, fi) for fi in f) * dx
+        elif typ == 'h1':
+            form = v * sum(inner(fi, fi) * dx + inner(grad(fi), grad(fi)) for fi in f) * dx
+        elif typ == "hdiv":
+            form = v * sum(inner(fi, fi) * dx + div(fi) * div(fi) for fi in f) * dx
+        elif typ == "hcurl":
+            form = v * sum(inner(fi, fi) * dx + inner(curl(fi), curl(fi)) for fi in f) * dx
+        else:
+            raise RuntimeError("Unknown norm type '%s'" % norm_type)
+    return sqrt(assemble(form))
+
+
 def local_edge_norm(f, mesh=None, flux_jump=False):
     """
     Integrates `f` over all interior edges elementwise, giving a P0 field. 
@@ -100,23 +133,6 @@ def ad_boundary_residual(solver_obj, dual_new=None, dual_old=None):     # TODO: 
     boundary_contribution = v * dot(grad(tracer_2d), n) * ds	# TODO: This is not applied on all boundaries
 
     return Function(P0).interpolate(assemble(edge_contribution + boundary_contribution))
-
-
-def local_norm(f, norm_type='L2'):
-    """
-    Calculate the `norm_type`-norm of `f` separately on each element of the mesh.
-    """
-
-    mesh = f.function_space().mesh()
-    # v = Constant(mesh.num_cells()) * TestFunction(FunctionSpace(mesh, "DG", 0))
-    v = TestFunction(FunctionSpace(mesh, "DG", 0))
-
-    if isinstance(f, FiredrakeFunction):
-        if norm_type == 'L2':   # TODO: Account for different norms
-            return sqrt(assemble(v * inner(f, f) * dx))
-    else:
-        if norm_type == 'L2':
-            return sqrt(assemble(v * sum(inner(fi, fi) for fi in f) * dx))
 
 
 def difference_quotient_estimator(solver_obj, explicit_term, dual, dual_old, divide_by_cell_size=True):
