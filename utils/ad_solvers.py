@@ -540,7 +540,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         cb1 = AdvectionCallback(solver_obj)
         cb1.op = op
         if op.order_increase:
-            cb2 = callback.InteriorResidualCallback(solver_obj, export_to_hdf5=True)
+            cb2 = callback.CellResidualCallback(solver_obj, export_to_hdf5=True)
         else:
             cb2 = callback.ExplicitErrorCallback(solver_obj, export_to_hdf5=True)
         solver_obj.add_callback(cb1, 'timestep')
@@ -595,7 +595,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                       % (int(k/op.exports_per_remesh()) + 1, int(op.final_index() / op.timesteps_per_remesh)))
 
                 # Load residuals
-                tag = 'InteriorResidual2d_' if op.order_increase else 'ExplicitError2d_'
+                tag = 'CellResidual2d_' if op.order_increase else 'ExplicitError2d_'
                 with DumbCheckpoint(op.directory() + 'hdf5/' + tag + index_string(k), mode=FILE_READ) as lr:
                     if op.order_increase:
                         lr.load(residual_2d, name="residual")
@@ -666,7 +666,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                         le.close()
                     estimate = Function(FunctionSpace(mesh, "CG", 1)).assign(interp(mesh, epsilon))
                     M = isotropic_metric(estimate, invert=False, op=op)
-                    if op.gradate
+                    if op.gradate:
                         M_ = isotropic_metric(interp(mesh, H0), bdy=bdy, op=op)   # Initial boundary metric
                         M = metric_intersection(M, M_, bdy=bdy)
                         M = gradate_metric(M, op=op)

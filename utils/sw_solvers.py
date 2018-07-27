@@ -577,7 +577,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         cb1 = SWCallback(solver_obj)
         cb1.op = op
         if op.order_increase:
-            cb2 = callback.InteriorResidualCallback(solver_obj, export_to_hdf5=True)
+            cb2 = callback.CellResidualCallback(solver_obj, export_to_hdf5=True)
         else:
             cb2 = callback.ExplicitErrorCallback(solver_obj, export_to_hdf5=True)
         solver_obj.add_callback(cb1, 'timestep')
@@ -635,7 +635,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                       % (int(k/op.exports_per_remesh()) + 1, int(op.final_index() / op.timesteps_per_remesh)))
 
                 # Load residuals
-                tag = 'InteriorResidual2d_' if op.order_increase else 'ExplicitError2d_'
+                tag = 'CellResidual2d_' if op.order_increase else 'ExplicitError2d_'
                 with DumbCheckpoint(op.directory() + 'hdf5/' + tag + index_string(k), mode=FILE_READ) as lr:
                     if op.order_increase:
                         lr.load(res_u, name="momentum residual")
