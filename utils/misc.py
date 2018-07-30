@@ -79,6 +79,7 @@ def extract_gauge_data(quantities, op=TohokuOptions()):
         quantities[g] += tuple(hf.get(g))
     hf.close()
 
+
 def total_variation(data):
     """
     :arg data: (one-dimensional) timeseries record.

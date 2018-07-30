@@ -34,22 +34,28 @@ class AdaptOptions(FrozenConfigurable):
     max_norm = PositiveFloat(1e9).tag(config=True)
 
     def final_index(self):
-        return int(np.ceil(self.end_time / self.timestep))  # Final timestep index
+        """Final timestep index"""
+        return int(np.ceil(self.end_time / self.timestep))
 
     def first_export(self):
-        return int(self.start_time / (self.timesteps_per_export * self.timestep))  # First exported timestep of period of interest
+        """First exported timestep of period of interest"""
+        return int(self.start_time / (self.timesteps_per_export * self.timestep))
 
     def final_export(self):
-        return int(self.final_index() / self.timesteps_per_export)  # Final exported timestep of period of interest
+        """Final exported timestep of period of interest"""
+        return int(self.final_index() / self.timesteps_per_export)
 
     def final_mesh_index(self):
-        return int(self.final_index() / self.timesteps_per_remesh)  # Final mesh index
+        """Final mesh index"""
+        return int(self.final_index() / self.timesteps_per_remesh)
 
     def exports_per_remesh(self):
+        """Number of exports per mesh adaptation"""
         assert self.timesteps_per_remesh % self.timesteps_per_export == 0
         return int(self.timesteps_per_remesh / self.timesteps_per_export)
 
     def indicator(self, mesh):
+        """Indicator function associated with region(s) of interest"""
         P1 = FunctionSpace(mesh, "DG", 1)
         iA = Function(P1, name="Region of interest")
 
