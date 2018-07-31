@@ -13,6 +13,8 @@
 *.txt
 *.h5
 *.hdf5
+*.py.swp
+*.txt~
 
 ## Directories to be ignored:
 

@@ -45,6 +45,9 @@ if bool(args.snes_view):
     op.solver_parameters['snes_view'] = True
 op.order_increase = True    # TODO: difference quotient option
 
+# TODO: continue testing
+if op.approach in ("DWP", "DWR"):
+    op.rescaling = 0.1
 
 # Get data and save to disk
 if args.low is not None or args.high is not None:

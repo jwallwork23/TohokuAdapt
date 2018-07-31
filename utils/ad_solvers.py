@@ -120,10 +120,8 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
             if l < op.num_adapt-1:
                 tracer = interp(mesh, tracer)
 
-        if cnt != 0:
+        if (cnt != 0) and (op.num_adapt != 0):
             if op.plot_metric:
-                if op.num_adapt == 0:
-                    M = steady_metric(tracer, op=op)
                 M.rename('metric_2d')
                 metric_file.write(M, time=t)
 
@@ -174,7 +172,8 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         cb1 = AdvectionCallback(adaptive_solver_obj)
         cb1.op = op
         if cnt != 0:
-            cb1.old_value = quantities['J_h']
+            cb1.integrant = quantities['J_h']
+            cb1.old_value = old_val
         adaptive_solver_obj.add_callback(cb1, 'timestep')
         cb2 = callback.DetectorsCallback(adaptive_solver_obj,
                                          op.h_slice,
@@ -195,6 +194,7 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         adaptive_solver_obj.iterate()
         solver_timer = clock() - solver_timer
         quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
+        old_val = cb1.old_value
         extract_slice(quantities, direction='h', op=op)
         # extract_slice(quantities, direction='v', op=op)
 
@@ -376,15 +376,16 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                     # Adapt mesh and interpolate variables
                     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
 
-                if op.num_adapt != 0 and op.plot_metric:
-                    M.rename('metric_2d')
-                    metric_file.write(M, time=t)
-                tracer_2d = interp(mesh, tracer_2d)
-                tracer_2d.rename('tracer_2d')
-                u0, eta0, b, BCs, source, diffusivity = problem_domain(mesh=mesh, op=op)[1:] # TODO: find a different way to reset these
-                uv_2d, elev_2d = Function(op.mixed_space(mesh)).split()
-                elev_2d.interpolate(eta0)
-                uv_2d.interpolate(u0)
+                if op.num_adapt != 0:
+                    if op.plot_metric:
+                        M.rename('metric_2d')
+                        metric_file.write(M, time=t)
+               	    tracer_2d = interp(mesh, tracer_2d)
+                    tracer_2d.rename('tracer_2d')
+                    u0, eta0, b, BCs, source, diffusivity = problem_domain(mesh=mesh, op=op)[1:] # TODO: find a different way to reset these
+                    uv_2d, elev_2d = Function(op.mixed_space(mesh)).split()
+                    elev_2d.interpolate(eta0)
+                    uv_2d.interpolate(u0)
             adapt_timer = clock() - adapt_timer
 
             # Solver object and equations
@@ -428,7 +429,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             cb1 = AdvectionCallback(adaptive_solver_obj)
             cb1.op = op
             if cnt != 0:
-                cb1.old_value = quantities['J_h']
+                cb1.integrant = quantities['J_h']
+                cb1.old_value = old_val
             adaptive_solver_obj.add_callback(cb1, 'timestep')
             cb2 = callback.DetectorsCallback(adaptive_solver_obj,
                                              op.h_slice,
@@ -449,6 +451,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             adaptive_solver_obj.iterate()
             solver_timer = clock() - solver_timer
             quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
+            old_val = cb1.old_value
             extract_slice(quantities, direction='h', op=op)
             # extract_slice(quantities, direction='v', op=op)
 
@@ -678,16 +681,17 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                     # Adapt mesh and interpolate variables
                     mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
 
-                if op.num_adapt != 0 and op.plot_metric:
-                    M.rename('metric_2d')
-                    metric_file.write(M, time=t)
-                tracer_2d = interp(mesh, tracer_2d)
-                tracer_2d.rename('tracer_2d')
-                u0, eta0, b, BCs, source, diffusivity = problem_domain(mesh=mesh, op=op)[1:]  # TODO: find a different way to reset these
-                V = op.mixed_space(mesh)
-                uv_2d, elev_2d = Function(V).split()
-                elev_2d.interpolate(eta0)
-                uv_2d.interpolate(u0)
+                if op.num_adapt != 0:
+                    if op.plot_metric:
+                        M.rename('metric_2d')
+                        metric_file.write(M, time=t)
+                        tracer_2d = interp(mesh, tracer_2d)
+                        tracer_2d.rename('tracer_2d')
+                        u0, eta0, b, BCs, source, diffusivity = problem_domain(mesh=mesh, op=op)[1:]  # TODO: find a different way to reset these
+                        V = op.mixed_space(mesh)
+                        uv_2d, elev_2d = Function(V).split()
+                        elev_2d.interpolate(eta0)
+                        uv_2d.interpolate(u0)
             adapt_timer = clock() - adapt_timer
 
             # Solver object and equations
@@ -729,7 +733,8 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             cb1 = AdvectionCallback(adaptive_solver_obj)
             cb1.op = op
             if cnt != 0:
-                cb1.old_value = quantities['J_h']
+                cb1.integrant = quantities['J_h']
+                cb1.old_value = old_val
             adaptive_solver_obj.add_callback(cb1, 'timestep')
             cb2 = callback.DetectorsCallback(adaptive_solver_obj,
                                              op.h_slice,
@@ -750,6 +755,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             adaptive_solver_obj.iterate()
             solver_timer = clock() - solver_timer
             quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
+            old_val = cb1.old_value
             extract_slice(quantities, direction='h', op=op)
             # extract_slice(quantities, direction='v', op=op)
 

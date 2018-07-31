@@ -75,6 +75,10 @@ op.adapt_field = field_for_adaptation
 if bool(args.snes_view):
     op.solver_parameters['snes_view'] = True
 
+# TODO: continue testing
+if op.approach in ("DWP", "DWR"):
+    op.rescaling = 0.1
+
 # Get data and save to disk
 if args.low is not None or args.high is not None:
     assert args.level is None

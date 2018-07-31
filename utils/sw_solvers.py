@@ -190,7 +190,8 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         cb1 = SWCallback(adaptive_solver_obj)
         cb1.op = op
         if cnt != 0:
-            cb1.old_value = quantities['J_h']
+            cb1.integrant = quantities['J_h']
+            cb1.old_value = old_val
         adaptive_solver_obj.add_callback(cb1, 'timestep')
         if op.mode == 'Tohoku':
             cb2 = callback.DetectorsCallback(adaptive_solver_obj,
@@ -205,6 +206,7 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         adaptive_solver_obj.iterate()
         solver_timer = clock() - solver_timer
         quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
+        old_val = cb1.old_value
         if op.mode == 'Tohoku':
             extract_gauge_data(quantities, op=op)
 
@@ -448,7 +450,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             cb1 = SWCallback(adaptive_solver_obj)
             cb1.op = op
             if cnt != 0:
-                cb1.old_value = quantities['J_h']
+                cb1.integrant = quantities['J_h']
+                cb1.old_value = old_val
             adaptive_solver_obj.add_callback(cb1, 'timestep')
             if op.mode == 'Tohoku':
                 cb2 = callback.DetectorsCallback(adaptive_solver_obj,
@@ -463,6 +466,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             adaptive_solver_obj.iterate()
             solver_timer = clock() - solver_timer
             quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
+            old_val = cb1.old_value
             if op.mode == 'Tohoku':
                 extract_gauge_data(quantities, op=op)
 
@@ -786,7 +790,8 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             cb1 = SWCallback(adaptive_solver_obj)
             cb1.op = op
             if cnt != 0:
-                cb1.old_value = quantities['J_h']
+                cb1.integrant = quantities['J_h']
+                cb1.old_value = old_val
             adaptive_solver_obj.add_callback(cb1, 'timestep')
             if op.mode == 'Tohoku':
                 cb2 = callback.DetectorsCallback(adaptive_solver_obj,
@@ -801,6 +806,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             adaptive_solver_obj.iterate()
             solver_timer = clock() - solver_timer
             quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
+            old_val = cb1.old_value
             if op.mode == 'Tohoku':
                 extract_gauge_data(quantities, op=op)
 
