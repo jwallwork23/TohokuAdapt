@@ -344,6 +344,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         dual_timer = clock() - dual_timer
         PETSc.Sys.Print('Dual run complete. Run time: %.3fs' % dual_timer)
 
+    tape.clear_tape()
     with pyadjoint.stop_annotating():
 
         error_timer = clock()
@@ -630,6 +631,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         dual_timer = clock() - dual_timer
         PETSc.Sys.Print('Dual run complete. Run time: %.3fs' % dual_timer)
 
+        tape.clear_tape()
         with pyadjoint.stop_annotating():
 
             residuals = []

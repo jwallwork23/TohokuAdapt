@@ -319,6 +319,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         dual_timer = clock() - dual_timer
         PETSc.Sys.Print('Dual run complete. Run time: %.3fs' % dual_timer)
 
+    tape.clear_tape()
     with pyadjoint.stop_annotating():
 
         error_timer = clock()
@@ -593,6 +594,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         dual_timer = clock() - dual_timer
         PETSc.Sys.Print('Dual run complete. Run time: %.3fs' % dual_timer)
 
+        tape.clear_tape()
         with pyadjoint.stop_annotating():
 
             residuals = []
@@ -779,9 +781,6 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         quantities['mean_elements'] = av
         quantities['solver_timer'] = total_timer
         quantities['adapt_solve_timer'] = adapt_solve_timer
-        if op.mode == 'tohoku':
-            for g in op.gauges:
-                quantities["TV " + g] = gauge_total_variation(quantities[g], gauge=g)
 
         return quantities
 
