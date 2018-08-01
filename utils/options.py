@@ -35,7 +35,7 @@ class AdaptOptions(FrozenConfigurable):
 
     def final_index(self):
         """Final timestep index"""
-        return int(np.ceil(self.end_time / self.timestep))
+        return int(np.ceil(self.simulation_end_time / self.timestep))
 
     def first_export(self):
         """First exported timestep of period of interest"""
@@ -109,7 +109,7 @@ class AdaptOptions(FrozenConfigurable):
         print("""\n************************** Adaption step %d ****************************
 Percent complete  : %4.1f%%    Adapt time : %4.2fs Solver time : %4.2fs     
 #Elements... Current : %d  Mean : %d  Minimum : %s  Maximum : %s\n""" %
-              (mn, 100 * t / self.end_time, adaptTimer, solverTime, nEle, av, mM[0], mM[1]))
+              (mn, 100 * t / self.simulation_end_time, adaptTimer, solverTime, nEle, av, mM[0], mM[1]))
         return av
 
     def directory(self):
@@ -123,6 +123,7 @@ class TohokuOptions(AdaptOptions):
     # Solver parameters
     timesteps_per_export = NonNegativeInteger(10, help="Timesteps per data dump").tag(config=True)
     timesteps_per_remesh = NonNegativeInteger(30, help="Timesteps per mesh adaptation").tag(config=True)
+    simulation_end_time = PositiveFloat(1800.).tag(config=True)
     target_vertices = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
     adapt_field = Unicode('s', help="Adaptation field of interest, from {'s', 'f', 'b'}.").tag(config=True)
     timestep = PositiveFloat(5., help="Timestep").tag(config=True)
@@ -180,6 +181,7 @@ class RossbyWaveOptions(AdaptOptions):
     # Solver parameters
     timesteps_per_export = NonNegativeInteger(12, help="Timesteps per data dump").tag(config=True)
     timesteps_per_remesh = NonNegativeInteger(48, help="Timesteps per mesh adaptation").tag(config=True)
+    simulation_end_time = PositiveFloat(120.).tag(config=True)
     target_vertices = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
     adapt_field = Unicode('s', help="Adaptation field of interest, from {'s', 'f', 'b'}.").tag(config=True)
     timestep = PositiveFloat(0.05, help="Timestep").tag(config=True)
@@ -213,6 +215,7 @@ class KelvinWaveOptions(AdaptOptions):
     # Solver parameters
     timesteps_per_export = NonNegativeInteger(12, help="Timesteps per data dump").tag(config=True)
     timesteps_per_remesh = NonNegativeInteger(48, help="Timesteps per mesh adaptation").tag(config=True)
+    simulation_end_time = PositiveFloat(36.).tag(config=True)
     target_vertices = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
     adapt_field = Unicode('s', help="Adaptation field of interest, from {'s', 'f', 'b'}.").tag(config=True)
     timestep = PositiveFloat(0.05, help="Timestep").tag(config=True)
@@ -245,6 +248,7 @@ class GaussianOptions(AdaptOptions):
     # Solver parameters
     timesteps_per_export = NonNegativeInteger(6, help="Timesteps per data dump").tag(config=True)
     timesteps_per_remesh = NonNegativeInteger(12, help="Timesteps per mesh adaptation").tag(config=True)
+    simulation_end_time = PositiveFloat(3.).tag(config=True)
     target_vertices = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
     adapt_field = Unicode('s', help="Adaptation field of interest, from {'s', 'f', 'b'}.").tag(config=True)
     timestep = PositiveFloat(0.05, help="Timestep").tag(config=True)
@@ -276,10 +280,11 @@ class AdvectionOptions(AdaptOptions):
     # Solver parameters
     timesteps_per_export = NonNegativeInteger(20, help="Timesteps per data dump").tag(config=True)
     timesteps_per_remesh = NonNegativeInteger(40, help="Timesteps per mesh adaptation").tag(config=True)
+    simulation_end_time = PositiveFloat(50.).tag(config=True)
     target_vertices = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
     timestep = PositiveFloat(0.1, help="Timestep").tag(config=True)
-    start_time = PositiveFloat(10., help="Start time of period of interest").tag(config=True)
-    end_time = PositiveFloat(60., help="End time of period of interest").tag(config=True)
+    start_time = PositiveFloat(20., help="Start time of period of interest").tag(config=True)
+    end_time = PositiveFloat(50., help="End time of period of interest").tag(config=True)
     h_min = PositiveFloat(1e-4, help="Minimum element size").tag(config=True)
     h_max = PositiveFloat(5., help="Maximum element size").tag(config=True)
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)

@@ -266,7 +266,8 @@ def problem_domain(level=0, mesh=None, b=None, op=TohokuOptions()):
     elif op.mode == 'AdvectionDiffusion':
         n = pow(2, level)
         if mesh is None:
-            mesh = RectangleMesh(25 * n, 5 * n, 50, 10)
+            # mesh = RectangleMesh(25 * n, 5 * n, 50, 10)
+            mesh = RectangleMesh(30 * n, 5 * n, 60, 10)
         x, y = SpatialCoordinate(mesh)
         P1 = FunctionSpace(mesh, "CG", 1)
         bell = conditional(

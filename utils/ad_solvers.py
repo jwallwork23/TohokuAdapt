@@ -23,7 +23,7 @@ def FixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs
     options.element_family = op.family
     options.use_nonlinear_equations = True
     options.simulation_export_time = op.timestep * op.timesteps_per_export
-    options.simulation_end_time = op.end_time - 0.5 * op.timestep
+    options.simulation_end_time = op.simulation_end_time - 0.5 * op.timestep
     options.timestepper_type = op.timestepper
     options.timestepper_options.solver_parameters_tracer = op.solver_parameters
     PETSc.Sys.Print("Using solver parameters %s" % options.timestepper_options.solver_parameters_tracer)
@@ -266,7 +266,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         options.element_family = op.family
         options.use_nonlinear_equations = True
         options.simulation_export_time = op.timestep * op.timesteps_per_remesh
-        options.simulation_end_time = op.end_time - 0.5 * op.timestep
+        options.simulation_end_time = op.simulation_end_time - 0.5 * op.timestep
         options.timestepper_type = op.timestepper
         options.timestepper_options.solver_parameters_tracer = op.solver_parameters
         PETSc.Sys.Print("Using solver parameters %s" % options.timestepper_options.solver_parameters_tracer)
@@ -529,7 +529,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         options.element_family = op.family
         options.use_nonlinear_equations = True
         options.simulation_export_time = op.timestep * op.timesteps_per_export
-        options.simulation_end_time = op.end_time - 0.5 * op.timestep
+        options.simulation_end_time = op.simulation_end_time - 0.5 * op.timestep
         options.timestepper_type = op.timestepper
         options.timestepper_options.solver_parameters_tracer = op.solver_parameters
         PETSc.Sys.Print("Using solver parameters %s" % options.timestepper_options.solver_parameters)
