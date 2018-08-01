@@ -134,8 +134,6 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
         # Solver object and equations
         adaptive_solver_obj = solver2d.FlowSolver2d(mesh, b)
         adaptive_options = adaptive_solver_obj.options
-        adaptive_options.anisotropic_adaptation = True
-        adaptive_options.anisotropic_adaptation_metric = "Hessian"
         adaptive_options.element_family = op.family
         adaptive_options.use_nonlinear_equations = True
         adaptive_options.simulation_export_time = op.timestep * op.timesteps_per_export
@@ -259,8 +257,6 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         # Solve fixed mesh primal problem to get residuals and adjoint solutions
         solver_obj = solver2d.FlowSolver2d(mesh, b)
         options = solver_obj.options
-        options.anisotropic_adaptation = False
-        options.anisotropic_adaptation_metric = "DWP"
         options.element_family = op.family
         options.use_nonlinear_equations = True
         options.simulation_export_time = op.timestep * op.timesteps_per_remesh
@@ -389,8 +385,6 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             # Solver object and equations
             adaptive_solver_obj = solver2d.FlowSolver2d(mesh, b)
             adaptive_options = adaptive_solver_obj.options
-            adaptive_options.anisotropic_adaptation = True
-            adaptive_options.anisotropic_adaptation_metric = "DWP"
             adaptive_options.element_family = op.family
             adaptive_options.use_nonlinear_equations = True
             adaptive_options.simulation_export_time = op.timestep * op.timesteps_per_export
@@ -520,8 +514,6 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         # Solve fixed mesh primal problem to get residuals and adjoint solutions
         solver_obj = solver2d.FlowSolver2d(mesh, b)
         options = solver_obj.options
-        options.anisotropic_adaptation = False
-        options.anisotropic_adaptation_metric = "DWR"
         options.element_family = op.family
         options.use_nonlinear_equations = True
         options.simulation_export_time = op.timestep * op.timesteps_per_export
@@ -694,8 +686,6 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             # Solver object and equations
             adaptive_solver_obj = solver2d.FlowSolver2d(mesh, b)
             adaptive_options = adaptive_solver_obj.options
-            adaptive_options.anisotropic_adaptation = True
-            adaptive_options.anisotropic_adaptation_metric = "DWR"
             adaptive_options.element_family = op.family
             adaptive_options.use_nonlinear_equations = True
             adaptive_options.simulation_export_time = op.timestep * op.timesteps_per_export

@@ -15,16 +15,14 @@ class SWCallback(callback.AccumulatorCallback):
         :arg solver_obj: Thetis solver object
         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
         """
-        if solver_obj.options.anisotropic_adaptation_metric in ("DWP", "DWR") \
-                and not solver_obj.options.anisotropic_adaptation:
+        if parameters is None:
+            self.parameters = TohokuOptions()
+        else:
+            self.parameters = parameters
+        if self.parameters.approach in ("DWP", "DWR"):
             from firedrake_adjoint import assemble
         else:
             from firedrake import assemble
-
-        if parameters is None:
-            self.parameters = AdvectionOptions()
-        else:
-            self.parameters = parameters
         self.outfile = File(self.parameters.directory() + "indicator.pvd")
         
         def objectiveSW():
@@ -67,16 +65,14 @@ class AdvectionCallback(callback.AccumulatorCallback):
         :arg solver_obj: Thetis solver object
         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
         """
-        if solver_obj.options.anisotropic_adaptation_metric in ("DWP", "DWR") \
-                and not solver_obj.options.anisotropic_adaptation:
-            from firedrake_adjoint import assemble
-        else:
-            from firedrake import assemble
-
         if parameters is None:
             self.parameters = AdvectionOptions()
         else:
             self.parameters = parameters
+        if self.parameters.approach in ("DWP", "DWR"):
+            from firedrake_adjoint import assemble
+        else:
+            from firedrake import assemble
         self.outfile = File(self.parameters.directory() + "indicator.pvd")
 
         def objectiveAD():
