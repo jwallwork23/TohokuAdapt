@@ -98,8 +98,8 @@ def sw_boundary_residual(solver_obj, dual_new=None, dual_old=None):     # TODO: 
     # Construct residuals across edges
     bres_u1 = Function(P0)	# No contribution
     bres_u2 = Function(P0)	# No contribution
-    edge_contribution = jump(Constant(0.5) * v * H * uv_2d, n=n) * dS
-    boundary_contribution = v * dot(H * uv_2d, n) * ds
+    edge_contribution = Constant(0.5) * jump(-H * uv_2d, n=n) * (v('+') + v('-')) * dS
+    boundary_contribution = -dot(H * uv_2d, n) * v * ds
     bres_e = Function(P0).interpolate(assemble(edge_contribution + boundary_contribution))
 
     return bres_u1, bres_u2, bres_e
@@ -129,8 +129,8 @@ def ad_boundary_residual(solver_obj, dual_new=None, dual_old=None):     # TODO: 
     n = FacetNormal(mesh)
 
     # Construct residuals across edges
-    edge_contribution = jump(Constant(0.5) * v * grad(tracer_2d), n=n) * dS
-    boundary_contribution = v * dot(grad(tracer_2d), n) * ds	# TODO: This is not applied on all boundaries
+    edge_contribution = Constant(0.5) * jump(-grad(tracer_2d), n=n) * (v('+') + v('-')) * dS
+    boundary_contribution = -dot(grad(tracer_2d), n) * v * ds	# TODO: This is not applied on all boundaries
 
     return Function(P0).interpolate(assemble(edge_contribution + boundary_contribution))
 

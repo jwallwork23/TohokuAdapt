@@ -33,7 +33,7 @@ class SWCallback(callback.AccumulatorCallback):
             mesh = solver_obj.fields.solution_2d.function_space().mesh()
             ks = Function(VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1))
             k0, k1 = ks.split()
-            iA = self.paramters.indicator(mesh)
+            iA = self.parameters.indicator(mesh)
             t = solver_obj.simulation_time
             dt = solver_obj.options.timestep
             if self.parameters.plot_pvd and solver_obj.iteration % self.parameters.timesteps_per_export == 0:

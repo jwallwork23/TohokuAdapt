@@ -674,13 +674,13 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                     if op.plot_metric:
                         M.rename('metric_2d')
                         metric_file.write(M, time=t)
-                        tracer_2d = interp(mesh, tracer_2d)
-                        tracer_2d.rename('tracer_2d')
-                        u0, eta0, b, BCs, source, diffusivity = problem_domain(mesh=mesh, op=op)[1:]  # TODO: find a different way to reset these
-                        V = op.mixed_space(mesh)
-                        uv_2d, elev_2d = Function(V).split()
-                        elev_2d.interpolate(eta0)
-                        uv_2d.interpolate(u0)
+                    tracer_2d = interp(mesh, tracer_2d)
+                    tracer_2d.rename('tracer_2d')
+                    u0, eta0, b, BCs, source, diffusivity = problem_domain(mesh=mesh, op=op)[1:]  # TODO: find a different way to reset these
+                    V = op.mixed_space(mesh)
+                    uv_2d, elev_2d = Function(V).split()
+                    elev_2d.interpolate(eta0)
+                    uv_2d.interpolate(u0)
             adapt_timer = clock() - adapt_timer
 
             # Solver object and equations
