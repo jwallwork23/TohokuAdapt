@@ -44,8 +44,7 @@ def FixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs
         options.use_limiter_for_tracers = False
     options.tracer_source_2d = source
     solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
-    cb1 = AdvectionCallback(solver_obj)
-    cb1.op = op
+    cb1 = AdvectionCallback(solver_obj, parameters=op)
     solver_obj.add_callback(cb1, 'timestep')
     cb2 = callback.DetectorsCallback(solver_obj,
                                      op.h_slice,
@@ -169,8 +168,7 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwa
             e.set_next_export_ix(adaptive_solver_obj.i_export)
 
         # Establish callbacks and iterate
-        cb1 = AdvectionCallback(adaptive_solver_obj)
-        cb1.op = op
+        cb1 = AdvectionCallback(adaptive_solver_obj, parameters=op)
         if cnt != 0:
             cb1.integrant = quantities['J_h']
             cb1.old_value = old_val
@@ -283,8 +281,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             options.use_limiter_for_tracers = False
         options.tracer_source_2d = source
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
-        cb1 = AdvectionCallback(solver_obj)
-        cb1.op = op
+        cb1 = AdvectionCallback(solver_obj, parameters=op)
         solver_obj.add_callback(cb1, 'timestep')
         solver_obj.bnd_functions = BCs
         init_timer = clock() - init_timer
@@ -427,8 +424,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                 e.set_next_export_ix(adaptive_solver_obj.i_export)
 
             # Evaluate callbacks and iterate
-            cb1 = AdvectionCallback(adaptive_solver_obj)
-            cb1.op = op
+            cb1 = AdvectionCallback(adaptive_solver_obj, parameters=op)
             if cnt != 0:
                 cb1.integrant = quantities['J_h']
                 cb1.old_value = old_val
@@ -545,8 +541,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
             options.use_limiter_for_tracers = False
         options.tracer_source_2d = source
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
-        cb1 = AdvectionCallback(solver_obj)
-        cb1.op = op
+        cb1 = AdvectionCallback(solver_obj, parameters=op)
         if op.order_increase:
             cb2 = callback.CellResidualCallback(solver_obj, export_to_hdf5=True)
         else:
@@ -732,8 +727,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                 e.set_next_export_ix(adaptive_solver_obj.i_export)
 
             # Evaluate callbacks and iterate
-            cb1 = AdvectionCallback(adaptive_solver_obj)
-            cb1.op = op
+            cb1 = AdvectionCallback(adaptive_solver_obj, parameters=op)
             if cnt != 0:
                 cb1.integrant = quantities['J_h']
                 cb1.old_value = old_val

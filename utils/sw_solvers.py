@@ -42,8 +42,7 @@ def FixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     if not op.plot_pvd:
         options.no_exports = True
     solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
-    cb1 = SWCallback(solver_obj)
-    cb1.op = op
+    cb1 = SWCallback(solver_obj, parameters=op)
     if op.mode == 'Tohoku':
         cb2 = callback.DetectorsCallback(solver_obj,
                                          [op.gauge_coordinates(g) for g in op.gauges],
@@ -187,8 +186,7 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             e.set_next_export_ix(adaptive_solver_obj.i_export)
 
         # Establish callbacks and iterate
-        cb1 = SWCallback(adaptive_solver_obj)
-        cb1.op = op
+        cb1 = SWCallback(adaptive_solver_obj, parameters=op)
         if cnt != 0:
             cb1.integrant = quantities['J_h']
             cb1.old_value = old_val
@@ -308,8 +306,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         options.export_diagnostics = True
         options.fields_to_export_hdf5 = ['elev_2d', 'uv_2d']
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
-        cb1 = SWCallback(solver_obj)
-        cb1.op = op
+        cb1 = SWCallback(solver_obj, parameters=op)
         solver_obj.add_callback(cb1, 'timestep')
         solver_obj.bnd_functions['shallow_water'] = BCs
         initTimer = clock() - initTimer
@@ -448,8 +445,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                 e.set_next_export_ix(adaptive_solver_obj.i_export)
 
             # Evaluate callbacks and iterate
-            cb1 = SWCallback(adaptive_solver_obj)
-            cb1.op = op
+            cb1 = SWCallback(adaptive_solver_obj, parameters=op)
             if cnt != 0:
                 cb1.integrant = quantities['J_h']
                 cb1.old_value = old_val
@@ -579,8 +575,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         options.output_directory = op.directory()   # Need this for residual callback
         options.export_diagnostics = False
         solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
-        cb1 = SWCallback(solver_obj)
-        cb1.op = op
+        cb1 = SWCallback(solver_obj, parameters=op)
         if op.order_increase:
             cb2 = callback.CellResidualCallback(solver_obj, export_to_hdf5=True)
         else:
@@ -789,8 +784,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                 e.set_next_export_ix(adaptive_solver_obj.i_export)
 
             # Evaluate callbacks and iterate
-            cb1 = SWCallback(adaptive_solver_obj)
-            cb1.op = op
+            cb1 = SWCallback(adaptive_solver_obj, parameters=op)
             if cnt != 0:
                 cb1.integrant = quantities['J_h']
                 cb1.old_value = old_val
