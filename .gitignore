@@ -15,6 +15,7 @@
 *.hdf5
 *.py.swp
 *.txt~
+*.png
 
 ## Directories to be ignored:
 
