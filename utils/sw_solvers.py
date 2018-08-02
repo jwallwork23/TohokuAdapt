@@ -384,7 +384,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         bdy = 200 if op.mode == 'Tohoku' else 'on_boundary'
         while cnt < op.final_index():
             adapt_timer = clock()
-            for l in range(op.num_adapt):                                  # TODO: Test this functionality
+            for l in range(op.num_adapt):
 
                 # Construct metric
                 index_str = index_string(int(cnt / op.timesteps_per_remesh))
@@ -530,12 +530,15 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         duale_u, duale_e = duale.split()
         residual_2d = Function(V)
         res_u, res_e = residual_2d.split()
+        residual_old = Function(V)
+        res_u_old, res_e_old = residual_old.split()
     else:
         dual_old = Function(V)
         dual_old_u, dual_old_e = dual_old.split()
         dual_old_u.rename('adjoint_uv_old')
         dual_old_e.rename('adjoint_elev_old')
         residual_2d = Function(P0)
+        residual_old = Function(P0)
 
     # Initialise parameters and counters
     nEle = mesh.num_cells()
@@ -621,7 +624,6 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         tape.clear_tape()
         with pyadjoint.stop_annotating():
 
-            residuals = []
             error_timer = clock()
             for k in range(0, int(op.final_index() / op.timesteps_per_export)):
                 PETSc.Sys.Print('Generating error estimate %d / %d'
@@ -633,29 +635,25 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                     if op.order_increase:
                         lr.load(res_u, name="momentum residual")
                         lr.load(res_e, name="continuity residual")
-                        residuals.append([res_u, res_e])
                     else:
                         lr.load(residual_2d, name="explicit error")
-                        residuals.append(residual_2d)  # TODO: This is grossly inefficient. Just load from HDF5
                     lr.close()
+
+                if k % op.exports_per_remesh() == 0:	# Reset for next time frame
+                    residual_old.assign(0.)
+
+                # L-inf
+                if op.order_increase:
+                    res_u = pointwise_max(res_u, res_u_old)
+                    res_e = pointwise_max(res_e, res_e_old)
+                else:
+                    residual_2d = pointwise_max(residual_2d, residual_old)
+
+                # TODO: L1
+                # TODO: Time integrate over current 'window'
 
                 if k % op.exports_per_remesh() == op.exports_per_remesh()-1:
 
-                    # L-inf
-                    for i in range(1, len(residuals)):
-                        if op.order_increase:
-                            res_u = pointwise_max(res_u, residuals[i][0])
-                            res_e = pointwise_max(res_e, residuals[i][1])
-                        else:
-                            residual_2d = pointwise_max(residual_2d, residuals[i])
-
-                    # # L1
-                    # residual_2d.interpolate(op.timestep * sum(abs(residuals[i] + residuals[i-1]) for i in range(1, op.exports_per_remesh())))
-
-                    # # Time integrate residual over current 'window'
-                    # residual_2d.interpolate(op.timestep * sum(residuals[i] + residuals[i-1] for i in range(1, op.exports_per_remesh())))
-
-                    residuals = []
                     if op.plot_pvd:
                         t = float(op.timestep * op.timesteps_per_remesh * (k + 1))
                         if op.order_increase:
@@ -713,7 +711,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         # bdy = 'on_boundary'
         while cnt < op.final_index():
             adapt_timer = clock()
-            for l in range(op.num_adapt):                          # TODO: Test this functionality
+            for l in range(op.num_adapt):
 
                 # Construct metric
                 index_str = index_string(int(cnt / op.timesteps_per_remesh))

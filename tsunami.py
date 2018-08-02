@@ -39,12 +39,14 @@ if args.t is None:
     mode = 'Tohoku'
 else:
     mode = args.t
-order_increase = False
+order_increase = True	# TODO: difference quotient option
 
 # Establish filenames
 filename = 'outdata/' + mode + '/' + approach
-field_for_adaptation = args.f if args.f is not None else 's'
-filename += field_for_adaptation + '_' + date
+if approach == 'HessianBased':
+    field_for_adaptation = args.f if args.f is not None else 's'
+    filename += '_' + field_for_adaptation 
+filename += '_' +  date
 errorFile = open(filename + '.txt', 'w+')
 files = {}
 extensions = []
@@ -71,7 +73,8 @@ op.plot_metric = bool(args.m)
 op.num_adapt = 1 if args.n is None else int(args.n)
 op.order_increase = order_increase
 op.adapt_on_bathymetry = bool(args.b)
-op.adapt_field = field_for_adaptation
+if approach == 'HessianBased':
+    op.adapt_field = field_for_adaptation
 if bool(args.snes_view):
     op.solver_parameters['snes_view'] = True
 
