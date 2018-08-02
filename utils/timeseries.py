@@ -73,19 +73,6 @@ def read_errors(date, approach, mode='tohoku', bootstrapping=False):
     return nEls, err, tim
 
 
-def extract_spline(gauge):
-    measuredFile = open('resources/gauges/'+gauge+'data_25mins.txt', 'r')
-    x = []
-    y = []
-    for line in measuredFile:
-        xy = line.split()
-        x.append(float(xy[0]))
-        y.append(float(xy[1]))
-    spline = si.interp1d(x, y, kind=1)
-    measuredFile.close()
-    return spline
-
-
 def extract_data(gauge):
     if gauge in ("P02", "P06"):
         measuredFile = open('resources/gauges/' + gauge + 'data_25mins.txt', 'r')

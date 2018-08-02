@@ -1,5 +1,6 @@
 from firedrake import *
 
+import scipy.interpolate as si
 import numpy as np
 import h5py
 
@@ -78,6 +79,19 @@ def extract_gauge_data(quantities, op=TohokuOptions()):
             quantities[g] = ()
         quantities[g] += tuple(hf.get(g))
     hf.close()
+
+
+def extract_spline(gauge):
+    measured_file = open('resources/gauges/'+gauge+'data_25mins.txt', 'r')
+    x = []
+    y = []
+    for line in measured_file:
+        xy = line.split()
+        x.append(float(xy[0]))
+        y.append(float(xy[1]))
+    spline = si.interp1d(x, y, kind=1)
+    measured_file.close()
+    return spline
 
 
 def total_variation(data):
