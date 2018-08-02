@@ -22,7 +22,6 @@
 
 .eggs/
 .idea/
-resources/meshes/
 resources/GMT/
 resources/channel/
 utils/.idea/
