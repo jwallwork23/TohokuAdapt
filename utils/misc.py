@@ -1,14 +1,17 @@
 from firedrake import *
 
+import scipy.interpolate as si
 import numpy as np
+import h5py
 
-from .options import Options
-
-
-__all__ = ["indexString", "peakAndDistance", "indicator", "bdyRegion"]
+from .options import TohokuOptions, RossbyWaveOptions, AdvectionOptions
 
 
-def indexString(index):
+__all__ = ["index_string", "peak_and_distance", "boundary_region", "extract_slice", "extract_gauge_data",
+           "gauge_total_variation"]
+
+
+def index_string(index):
     """
     :arg index: integer form of index.
     :return: five-digit string form of index.
@@ -16,7 +19,7 @@ def indexString(index):
     return (5 - len(str(index))) * '0' + str(index)
 
 
-def peakAndDistance(f, op=Options()):
+def peak_and_distance(f, op=RossbyWaveOptions()):
     mesh = f.function_space().mesh()
     with f.dat.vec_ro as fv:
         peak_i, peak = fv.max()
@@ -28,51 +31,7 @@ def peakAndDistance(f, op=Options()):
     return peak, val
 
 
-def indicator(mesh, xy=None, mirror=False, radii=None, op=Options()):       # TODO: Update AD and remove this
-    """
-    :arg mesh: mesh to use.
-    :arg xy: Custom selection for indicator region.
-    :param mirror: consider 'mirror image' indicator region.
-    :param radii: consider disc of radius `radius`, as opposed to rectangle.
-    :param op: options parameter class.
-    :return: ('Smoothened') indicator function for region A.
-    """
-
-    # Define extent of region A
-    if xy is None:
-        xy = op.xy2 if mirror else op.xy
-    iA = Function(FunctionSpace(mesh, "DG", 1), name="Region of interest")
-
-    if radii is not None:
-        if len(np.shape(radii)) == 0:
-            expr = Expression("pow(x[0] - x0, 2) + pow(x[1] - y0, 2) < r + eps ? 1 : 0",
-                              x0=xy[0], y0=xy[1], r=pow(radii, 2), eps=1e-10)
-        elif len(np.shape(radii)) == 1:
-            assert len(xy) == len(radii)
-            e = "(pow(x[0] - %f, 2) + pow(x[1] - %f, 2) < %f + %f)" % (xy[0][0], xy[0][1], pow(radii[0], 2), 1e-10)
-            for i in range(1, len(radii)):
-                e += "&& (pow(x[0] - %f, 2) + pow(x[1] - %f, 2) < %f + %f)" \
-                     % (xy[i][0], xy[i][1], pow(radii[i], 2), 1e-10)
-            expr = Expression(e)
-        else:
-            raise ValueError("Indicator function radii input not recognised.")
-    else:
-        if op.mode == 'tohoku':
-            xd = (xy[1] - xy[0]) / 2
-            yd = (xy[3] - xy[2]) / 2
-            expr = Expression("(x[0] > %f - eps) && (x[0] < %f + eps) && (x[1] > %f - eps) && (x[1] < %f) + eps ? "
-                              "exp(1. / (pow(x[0] - %f, 2) - pow(%f, 2))) * exp(1. / (pow(x[1] - %f, 2) - pow(%f, 2))) "
-                              ": 0." % (xy[0], xy[1], xy[2], xy[3], xy[0] + xd, xd, xy[2] + yd, yd), eps=1e-10)
-        else:
-            expr = Expression(
-                "(x[0] > %f - eps) && (x[0] < %f + eps) && (x[1] > %f - eps) && (x[1] < %f + eps)"
-                % (xy[0], xy[1], xy[2], xy[3]), eps=1e-10)
-    iA.interpolate(expr)
-
-    return iA
-
-
-def bdyRegion(mesh, bdyTag, scale, sponge=False):
+def boundary_region(mesh, bdyTag, scale, sponge=False):
 
     bc = DirichletBC(FunctionSpace(mesh, "CG", 1), 0, bdyTag)
     coords = mesh.coordinates.dat.data
@@ -81,9 +40,9 @@ def bdyRegion(mesh, bdyTag, scale, sponge=False):
     for i in bc.nodes:
         xy.append(coords[i])
 
-    e = "exp(-(pow(x[0] - %f, 2) + pow(x[1] - %f, 2)) / %f)" % (xy[0][0], xy[0][1], scale)
+    e = "exp(-(pow(x[0] - {x0:f}, 2) + pow(x[1] - {y0:f}, 2)) / {a:f})".format(x0=xy[0][0], y0=xy[0][1], a=scale)
     for i in range(1, len(xy)):
-        e += "+ exp(-(pow(x[0] - %f, 2) + pow(x[1] - %f, 2)) / %f)" % (xy[i][0], xy[i][1], scale)
+        e += "+ exp(-(pow(x[0] - {x0:f}, 2) + pow(x[1] - {y0:f}, 2)) / {a:f})".format(x0=xy[i][0], y0=xy[i][1], a=scale)
     # f = "sqrt(pow(x[0] - %f, 2) + pow(x[1] - %f, 2)) / %f)" % (xy[0][0], xy[0][1], scale)
     if sponge:
         expr = Expression(e + " < 1e-3 ? 1e-3 : abs (" + e + ")")   # TODO: Needs redoing
@@ -92,3 +51,80 @@ def bdyRegion(mesh, bdyTag, scale, sponge=False):
 
     return expr
 
+
+def extract_slice(quantities, direction='h', op=AdvectionOptions()):
+    if direction == 'h':
+        sl = op.h_slice
+        label = 'horizontal'
+    elif direction == 'v':
+        sl = op.v_slice
+        label = 'vertical'
+    else:
+        raise NotImplementedError("Only horizontal and vertical slices are currently implemented.")
+    hf = h5py.File(op.directory() + 'diagnostic_' + label + '_slice.hdf5', 'r')
+    for x in ["{l:s}_slice{i:d}".format(l=direction, i=i) for i in range(len(sl))]:
+        vals = np.array(hf.get(x))
+        for i in range(len(vals)):
+            tag = '{l:s}_snapshot_{i:d}'.format(l=direction, i=i)
+            if not tag in quantities.keys():
+                quantities[tag] = []
+            quantities[tag].append(vals[i])
+    hf.close()
+
+
+def extract_gauge_data(quantities, op=TohokuOptions()):
+    hf = h5py.File(op.directory() + 'diagnostic_timeseries.hdf5', 'r')
+    for g in op.gauges:
+        if not g in quantities.keys():
+            quantities[g] = ()
+        quantities[g] += tuple(hf.get(g))
+    hf.close()
+
+
+def extract_spline(gauge):
+    measured_file = open('resources/gauges/'+gauge+'data_25mins.txt', 'r')
+    x = []
+    y = []
+    for line in measured_file:
+        xy = line.split()
+        x.append(float(xy[0]))
+        y.append(float(xy[1]))
+    spline = si.interp1d(x, y, kind=1)
+    measured_file.close()
+    return spline
+
+
+def total_variation(data):
+    """
+    :arg data: (one-dimensional) timeseries record.
+    :return: total variation thereof.
+    """
+    TV = 0
+    iStart = 0
+    for i in range(len(data)):
+        if i == 1:
+            sign = (data[i] - data[i-1]) / np.abs(data[i] - data[i-1])
+        elif i > 1:
+            sign_ = sign
+            sign = (data[i] - data[i - 1]) / np.abs(data[i] - data[i - 1])
+            if sign != sign_:
+                TV += np.abs(data[i-1] - data[iStart])
+                iStart = i-1
+                if i == len(data)-1:
+                    TV += np.abs(data[i] - data[i-1])
+            elif i == len(data)-1:
+                TV += np.abs(data[i] - data[iStart])
+    return TV
+
+
+def gauge_total_variation(data, gauge="P02"):
+    """
+    :param data: timeseries to calculate error of.
+    :param gauge: gauge considered.
+    :return: total variation.
+    """
+    N = len(data)
+    spline = extract_spline(gauge)
+    times = np.linspace(0., 25., N)
+    errors = [data[i] - spline(times[i]) for i in range(N)]
+    return total_variation(errors) / total_variation([spline(times[i]) for i in range(N)])

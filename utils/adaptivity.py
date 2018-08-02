@@ -5,15 +5,15 @@ import numpy
 from numpy import linalg as la
 from scipy import linalg as sla
 
-from .options import Options
+from .options import TohokuOptions
 
 
-__all__ = ["constructGradient", "constructHessian", "steadyMetric", "isotropicMetric", "isoP2", "anisoRefine",
-           "metricGradation", "localMetricIntersection", "metricIntersection", "metricConvexCombination",
-           "symmetricProduct", "pointwiseMax", "metricComplexity", "normaliseIndicator"]
+__all__ = ["construct_gradient", "construct_hessian", "steady_metric", "isotropic_metric", "iso_P2", "pointwise_max",
+           "anisotropic_refinement", "gradate_metric", "local_metric_intersection", "metric_intersection",
+           "metric_convex_combination", "symmetric_product", "metric_complexity", "normalise_indicator"]
 
 
-def constructGradient(f):
+def construct_gradient(f):
     """
     Assuming the function `f` is P1 (piecewise linear and continuous), direct differentiation will give a gradient which
     is P0 (piecewise constant and discontinuous). Since we would prefer a smooth gradient, an L2 projection gradient 
@@ -33,7 +33,7 @@ def constructGradient(f):
     return g
 
 
-def constructHessian(f, g=None, op=Options()):
+def construct_hessian(f, g=None, op=TohokuOptions()):
     """
     Assuming the smooth solution field has been approximated by a function `f` which is P1, all second derivative
     information has been lost. As such, the Hessian of `f` cannot be directly computed. We provide two means of
@@ -48,7 +48,7 @@ def constructHessian(f, g=None, op=Options()):
 
     :arg f: P1 solution field.
     :kwarg g: gradient (if already computed).
-    :param op: Options class object providing min/max cell size values.
+    :param op: TohokuOptions class object providing min/max cell size values.
     :return: reconstructed Hessian associated with ``f``.
     """
     mesh = f.function_space().mesh()
@@ -56,13 +56,13 @@ def constructHessian(f, g=None, op=Options()):
     H = Function(V)
     tau = TestFunction(V)
     nhat = FacetNormal(mesh)  # Normal vector
-    if op.hessMeth == 'parts':
+    if op.hessian_recovery == 'parts':
         Lh = (inner(tau, H) + inner(div(tau), grad(f))) * dx
         Lh -= (tau[0, 1] * nhat[1] * f.dx(0) + tau[1, 0] * nhat[0] * f.dx(1)) * ds
         Lh -= (tau[0, 0] * nhat[1] * f.dx(0) + tau[1, 1] * nhat[0] * f.dx(1)) * ds  # Term not in Firedrake tutorial
-    elif op.hessMeth == 'dL2':
+    elif op.hessian_recovery == 'dL2':
         if g is None:
-            g = constructGradient(f)
+            g = construct_gradient(f)
         Lh = (inner(tau, H) + inner(div(tau), g)) * dx
         Lh -= (tau[0, 1] * nhat[1] * g[0] + tau[1, 0] * nhat[0] * g[1]) * ds
         Lh -= (tau[0, 0] * nhat[1] * g[0] + tau[1, 1] * nhat[0] * g[1]) * ds
@@ -74,24 +74,24 @@ def constructHessian(f, g=None, op=Options()):
     return H
 
 
-def steadyMetric(f, H=None, op=Options()):
+def steady_metric(f, H=None, op=TohokuOptions()):
     """
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function ``computeSteadyMetric``, from 
     ``adapt.py``, 2016.
 
     :arg f: P1 solution field.
     :arg H: reconstructed Hessian associated with `f` (if already computed).
-    :param op: Options class object providing min/max cell size values.
+    :param op: TohokuOptions class object providing min/max cell size values.
     :return: steady metric associated with Hessian H.
     """
     if H is None:
-        H = constructHessian(f, op=op)
+        H = construct_hessian(f, op=op)
     V = H.function_space()
     mesh = V.mesh()
 
-    ia2 = 1. / pow(op.maxAnisotropy, 2)     # Inverse square max aspect ratio
-    ihmin2 = 1. / pow(op.hmin, 2)           # Inverse square minimal side-length
-    ihmax2 = 1. / pow(op.hmax, 2)           # Inverse square maximal side-length
+    ia2 = 1. / pow(op.max_anisotropy, 2)     # Inverse square max aspect ratio
+    ih_min2 = 1. / pow(op.h_min, 2)           # Inverse square minimal side-length
+    ih_max2 = 1. / pow(op.h_max, 2)           # Inverse square maximal side-length
     M = Function(V)
 
     if op.normalisation == 'manual':
@@ -100,7 +100,7 @@ def steadyMetric(f, H=None, op=Options()):
         for i in range(mesh.topology.num_vertices()):
 
             # Generate local Hessian
-            H_loc = H.dat.data[i] * op.nVerT / max(np.sqrt(assemble(f * f * dx)), f_min)    # Avoid round-off error
+            H_loc = H.dat.data[i] * op.target_vertices / max(np.sqrt(assemble(f * f * dx)), f_min)    # Avoid round-off error
             mean_diag = 0.5 * (H_loc[0][1] + H_loc[1][0])
             H_loc[0][1] = mean_diag
             H_loc[1][0] = mean_diag
@@ -108,13 +108,14 @@ def steadyMetric(f, H=None, op=Options()):
             # Find eigenpairs and truncate eigenvalues
             lam, v = la.eig(H_loc)
             v1, v2 = v[0], v[1]
-            lam1 = min(ihmin2, max(ihmax2, abs(lam[0])))
-            lam2 = min(ihmin2, max(ihmax2, abs(lam[1])))
+            lam1 = min(ih_min2, max(ih_max2, abs(lam[0])))
+            lam2 = min(ih_min2, max(ih_max2, abs(lam[1])))
             lam_max = max(lam1, lam2)
             lam1 = max(lam1, ia2 * lam_max)
             lam2 = max(lam2, ia2 * lam_max)
-            if (lam[0] >= 0.9999 * ihmin2) or (lam[1] >= 0.9999 * ihmin2):
-                print("WARNING: minimum element size reached as %.2e" % np.sqrt(min(1./lam[0], 1./lam[1])))
+            if (lam[0] >= 0.9999 * ih_min2) or (lam[1] >= 0.9999 * ih_min2):
+                print("WARNING: minimum element size reached as {m:.2e}".format(m=np.sqrt(min(1./lam[0], 1./lam[1]))))
+                exit(0)     # TODO: Remove this
 
             # Reconstruct edited Hessian
             M.dat.data[i][0, 0] = lam1 * v1[0] * v1[0] + lam2 * v2[0] * v2[0]
@@ -142,21 +143,22 @@ def steadyMetric(f, H=None, op=Options()):
             M.dat.data[i][0, 1] = lam1 * v1[0] * v1[1] + lam2 * v2[0] * v2[1]
             M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
             M.dat.data[i][1, 1] = lam1 * v1[1] * v1[1] + lam2 * v2[1] * v2[1]
-            M.dat.data[i] *= pow(det, -1. / (2 * op.normOrder + 2))
-            detH.dat.data[i] = pow(det, op.normOrder / (2. * op.normOrder + 2))
+            M.dat.data[i] *= pow(det, -1. / (2 * op.norm_order + 2))
+            detH.dat.data[i] = pow(det, op.norm_order / (2. * op.norm_order + 2))
 
-        M *= op.nVerT / assemble(detH * dx)    # Scale by the target number of vertices and Hessian complexity
+        M *= op.target_vertices / assemble(detH * dx)    # Scale by the target number of vertices and Hessian complexity
         for i in range(mesh.topology.num_vertices()):
             # Find eigenpairs of metric and truncate eigenvalues
             lam, v = la.eig(M.dat.data[i])
             v1, v2 = v[0], v[1]
-            lam1 = min(ihmin2, max(ihmax2, abs(lam[0])))
-            lam2 = min(ihmin2, max(ihmax2, abs(lam[1])))
+            lam1 = min(ih_min2, max(ih_max2, abs(lam[0])))
+            lam2 = min(ih_min2, max(ih_max2, abs(lam[1])))
             lam_max = max(lam1, lam2)
             lam1 = max(lam1, ia2 * lam_max)
             lam2 = max(lam2, ia2 * lam_max)
-            if (lam[0] >= 0.9999 * ihmin2) or (lam[1] >= 0.9999 * ihmin2):
-                print("WARNING: minimum element size reached as %.2e" % np.sqrt(min(1./lam[0], 1./lam[1])))
+            if (lam[0] >= 0.9999 * ih_min2) or (lam[1] >= 0.9999 * ih_min2):
+                print("WARNING: minimum element size reached as {m:.2e}".format(m=np.sqrt(min(1. / lam[0], 1. / lam[1]))))
+                exit(0)     # TODO: Remove this
 
             # Reconstruct edited Hessian
             M.dat.data[i][0, 0] = lam1 * v1[0] * v1[0] + lam2 * v2[0] * v2[0]
@@ -166,7 +168,7 @@ def steadyMetric(f, H=None, op=Options()):
     return M
 
 
-def normaliseIndicator(f, op=Options()):
+def normalise_indicator(f, op=TohokuOptions()):
     """
     Normalise error indicator `f` using procedure defined by `op`.
     
@@ -174,32 +176,31 @@ def normaliseIndicator(f, op=Options()):
     :param op: option parameters object.
     :return: normalised indicator.
     """
-    f.dat.data[:] = np.abs(f.dat.data)
-    if len(f.ufl_element().value_shape()) == 0:
-        gnorm = max(np.abs(assemble(f * dx)), op.minNorm)           # NOTE this changes in 3D case
-    else:
-        gnorm = max(assemble(sqrt(inner(f, f)) * dx), op.minNorm)   # Equivalent thresholded metric complexity
-    scaleFactor = min(op.nVerT / gnorm, op.maxScaling)              # Cap error estimate, also computational cost
-    if scaleFactor == op.maxScaling:
-        print("WARNING: maximum scaling for error estimator reached as %.2e" % (op.nVerT / gnorm))
-    # print("#### DEBUG: Complexity = %.4e" % gnorm)
-    f.dat.data[:] = np.abs(f.dat.data) * scaleFactor
+    scale_factor = min(max(norm(f), op.min_norm), op.max_norm)
+    print("#### DEBUG: error indicator norm BEFORE normalisation = {:.4e}".format(scale_factor))
+    if scale_factor == op.min_norm:
+        print("WARNING: minimum norm attained")
+    elif scale_factor == op.max_norm:
+        print("WARNING: maximum norm attained")
+    # scale_factor *= assemble(Constant(1., domain=f.function_space().mesh()) * dx)   # Scale by domain size
+    f.interpolate(Constant(op.target_vertices / scale_factor) * abs(f))
+    print("#### DEBUG: error indicator norm AFTER normalisation = {:.4e}".format(norm(f)))
 
     return f
 
 
-def isotropicMetric(f, bdy=None, invert=True, op=Options()):
+def isotropic_metric(f, bdy=None, invert=True, op=TohokuOptions()):
     """
     Given a scalar error indicator field `f`, construct an associated isotropic metric field.
     
     :arg f: function to adapt to.
     :param bdy: specify domain boundary to compute metric on.
-    :param invert: when True, the inverse square of field `f` is considered, as in anisotropic mesh adaptivity.
-    :param op: Options class object providing min/max cell size values.
+    :param invert: when True, the inverse square of field `f` is considered.
+    :param op: TohokuOptions class object providing min/max cell size values.
     :return: isotropic metric corresponding to `f`.
     """
-    hmin2 = pow(op.hmin, 2)
-    hmax2 = pow(op.hmax, 2)
+    h_min2 = pow(op.h_min, 2)
+    h_max2 = pow(op.h_max, 2)
     scalar = len(f.ufl_element().value_shape()) == 0
     mesh = f.function_space().mesh()
     g = Function(FunctionSpace(mesh, "CG", 1) if scalar else VectorFunctionSpace(mesh, "CG", 1))
@@ -214,27 +215,27 @@ def isotropicMetric(f, bdy=None, invert=True, op=Options()):
     for i in DirichletBC(V, 0, bdy).nodes if bdy is not None else range(len(g.dat.data)):
         if scalar:
             if invert:
-                alpha = 1. / max(hmin2, min(pow(g.dat.data[i], 2), hmax2))
+                alpha = 1. / max(h_min2, min(pow(g.dat.data[i], 2), h_max2))
             else:
-                alpha = max(1. / hmax2, min(g.dat.data[i], 1. / hmin2))
+                alpha = max(1. / h_max2, min(g.dat.data[i], 1. / h_min2))
             beta = alpha
         else:
             if invert:
-                alpha = 1. / max(hmin2, min(pow(g.dat.data[i, 0], 2), hmax2))
-                beta = 1. / max(hmin2, min(pow(g.dat.data[i, 1], 2), hmax2))
+                alpha = 1. / max(h_min2, min(pow(g.dat.data[i, 0], 2), h_max2))
+                beta = 1. / max(h_min2, min(pow(g.dat.data[i, 1], 2), h_max2))
             else:
-                alpha = max(1. / hmax2, min(g.dat.data[i, 0], 1. / hmin2))
-                beta = max(1. / hmax2, min(g.dat.data[i, 1], 1. / hmin2))
+                alpha = max(1. / h_max2, min(g.dat.data[i, 0], 1. / h_min2))
+                beta = max(1. / h_max2, min(g.dat.data[i, 1], 1. / h_min2))
         M.dat.data[i][0, 0] = alpha
         M.dat.data[i][1, 1] = beta
 
-        if (alpha >= 0.9999 / hmin2) or (beta >= 0.9999 / hmin2):
-            print("WARNING: minimum element size reached as %.2e" % np.sqrt(min(1./alpha, 1./beta)))
+        if (alpha >= 0.9999 / h_min2) or (beta >= 0.9999 / h_min2):
+            print("WARNING: minimum element size reached as {m:.2e}".format(m=np.sqrt(min(1./alpha, 1./beta))))
 
     return M
 
 
-def isoP2(mesh):
+def iso_P2(mesh):
     """
     Uniformly refine a mesh (in each canonical direction) using an iso-P2 refinement. That is, nodes of a quadratic 
     element on the initial mesh become vertices of the new mesh.
@@ -242,7 +243,7 @@ def isoP2(mesh):
     return MeshHierarchy(mesh, 1).__getitem__(1)
 
 
-def anisoRefine(M, direction=0):
+def anisotropic_refinement(M, direction=0):
     """
     (Anisotropically) refine a mesh (or, more precisely, the metric field `M` associated with a mesh) in such a way as 
     to approximately half the element size in a canonical direction (x- or y-), by scaling of the corresponding 
@@ -263,20 +264,22 @@ def anisoRefine(M, direction=0):
     return M
 
 
-def metricGradation(M, op=Options()):   # TODO: Implement this in pyop2
+def gradate_metric(M, iso=False, op=TohokuOptions()):   # TODO: Implement this in pyop2
     """
     Perform anisotropic metric gradation in the method described in Alauzet 2010, using linear interpolation. Python
     code found here is based on the C code of Nicolas Barral's function ``DMPlexMetricGradation2d_Internal``, found in 
     ``plex-metGradation.c``, 2017.
 
     :arg M: metric to be gradated.
-    :param op: Options class object providing parameter values.
+    :param op: TohokuOptions class object providing parameter values.
     :return: gradated metric.
     """
-    ln_beta = np.log(op.maxGrowth)
+    ln_beta = np.log(op.max_element_growth)
 
     # Get vertices and edges of mesh
-    mesh = M.function_space().mesh()
+    V = M.function_space()
+    M_grad = Function(V).assign(M)
+    mesh = V.mesh()
     plex = mesh._plex
     vStart, vEnd = plex.getDepthStratum(0)  # Vertices
     eStart, eEnd = plex.getDepthStratum(1)  # Edges
@@ -303,69 +306,72 @@ def metricGradation(M, op=Options()):   # TODO: Implement this in pyop2
                 continue
 
             # Assemble local metrics and calculate edge lengths
-            met1 = M.dat.data[iVer1]
-            met2 = M.dat.data[iVer2]
+            met1 = M_grad.dat.data[iVer1]
+            met2 = M_grad.dat.data[iVer2]
             v12[0] = xy[iVer2][0] - xy[iVer1][0]
             v12[1] = xy[iVer2][1] - xy[iVer1][1]
             v21[0] = - v12[0]
             v21[1] = - v12[1]
 
-            # if op.iso:
-            #     eta2_12 = 1. / pow(1 + (v12[0] * v12[0] + v12[1] * v12[1]) * ln_beta / met1[0, 0], 2)
-            #     eta2_21 = 1. / pow(1 + (v21[0] * v21[0] + v21[1] * v21[1]) * ln_beta / met2[0, 0], 2)
-            #     # print('#### metricGradation DEBUG: 1,1 entries ', met1[0, 0], met2[0, 0])
-            #     print('#### metricGradation DEBUG: scale factors', eta2_12, eta2_21)
-            #     redMet1 = eta2_21 * met2
-            #     redMet2 = eta2_12 * met1
-            # else:
+            if iso:     # TODO: This does not currently work
+                eta2_12 = 1. / pow(1 + (v12[0] * v12[0] + v12[1] * v12[1]) * ln_beta / met1[0, 0], 2)
+                eta2_21 = 1. / pow(1 + (v21[0] * v21[0] + v21[1] * v21[1]) * ln_beta / met2[0, 0], 2)
+                # print('#### gradate_metric DEBUG: 1,1 entries ', met1[0, 0], met2[0, 0])
+                # print('#### gradate_metric DEBUG: scale factors', eta2_12, eta2_21)
+                redMet1 = eta2_21 * met2
+                redMet2 = eta2_12 * met1
+            else:
 
-            # Intersect metric with a scaled 'grown' metric to get reduced metric
-            eta2_12 = 1. / pow(1 + symmetricProduct(met1, v12) * ln_beta, 2)
-            eta2_21 = 1. / pow(1 + symmetricProduct(met2, v21) * ln_beta, 2)
-            # print('#### metricGradation DEBUG: scale factors', eta2_12, eta2_21)
-            # print('#### metricGradation DEBUG: determinants', la.det(met1), la.det(met2))
-            redMet1 = localMetricIntersection(met1, eta2_21 * met2)
-            redMet2 = localMetricIntersection(met2, eta2_12 * met1)
+                # Intersect metric with a scaled 'grown' metric to get reduced metric
+                eta2_12 = 1. / pow(1 + symmetric_product(met1, v12) * ln_beta, 2)
+                eta2_21 = 1. / pow(1 + symmetric_product(met2, v21) * ln_beta, 2)
+                # print('#### gradate_metric DEBUG: scale factors', eta2_12, eta2_21)
+                # print('#### gradate_metric DEBUG: determinants', la.det(met1), la.det(met2))
+                redMet1 = local_metric_intersection(met1, eta2_21 * met2)
+                redMet2 = local_metric_intersection(met2, eta2_12 * met1)
 
             # Calculate difference in order to ascertain whether the metric is modified
-            diff = np.abs(met1[0, 0] - redMet1[0, 0]) + np.abs(met1[0, 1] - redMet1[0, 1]) \
-                   + np.abs(met1[1, 1] - redMet1[1, 1])
+            diff = np.abs(met1[0, 0] - redMet1[0, 0])
+            diff += np.abs(met1[0, 1] - redMet1[0, 1])
+            diff += np.abs(met1[1, 1] - redMet1[1, 1])
             diff /= (np.abs(met1[0, 0]) + np.abs(met1[0, 1]) + np.abs(met1[1, 1]))
             if diff > 1e-3:
-                M.dat.data[iVer1][0, 0] = redMet1[0, 0]
-                M.dat.data[iVer1][0, 1] = redMet1[0, 1]
-                M.dat.data[iVer1][1, 0] = redMet1[1, 0]
-                M.dat.data[iVer1][1, 1] = redMet1[1, 1]
+                M_grad.dat.data[iVer1][0, 0] = redMet1[0, 0]
+                M_grad.dat.data[iVer1][0, 1] = redMet1[0, 1]
+                M_grad.dat.data[iVer1][1, 0] = redMet1[1, 0]
+                M_grad.dat.data[iVer1][1, 1] = redMet1[1, 1]
                 verTag[iVer1] = i+1
                 correction = True
 
             # Repeat above process using other reduced metric
-            diff = np.abs(met2[0, 0] - redMet2[0, 0]) + np.abs(met2[0, 1] - redMet2[0, 1]) \
-                   + np.abs(met2[1, 1] - redMet2[1, 1])
+            diff = np.abs(met2[0, 0] - redMet2[0, 0])
+            diff += np.abs(met2[0, 1] - redMet2[0, 1])
+            diff += np.abs(met2[1, 1] - redMet2[1, 1])
             diff /= (np.abs(met2[0, 0]) + np.abs(met2[0, 1]) + np.abs(met2[1, 1]))
             if diff > 1e-3:
-                M.dat.data[iVer2][0, 0] = redMet2[0, 0]
-                M.dat.data[iVer2][0, 1] = redMet2[0, 1]
-                M.dat.data[iVer2][1, 0] = redMet2[1, 0]
-                M.dat.data[iVer2][1, 1] = redMet2[1, 1]
+                M_grad.dat.data[iVer2][0, 0] = redMet2[0, 0]
+                M_grad.dat.data[iVer2][0, 1] = redMet2[0, 1]
+                M_grad.dat.data[iVer2][1, 0] = redMet2[1, 0]
+                M_grad.dat.data[iVer2][1, 1] = redMet2[1, 1]
                 verTag[iVer2] = i+1
                 correction = True
 
-    return M
+    return M_grad
 
 
-def localMetricIntersection(M1, M2):
+def local_metric_intersection(M1, M2):
     """
     Intersect two metrics `M1` and `M2` defined at a particular point in space.
     """
-    # print('#### localMetricIntersection DEBUG: attempting to compute sqrtm of matrix with determinant ', la.det(M1))
+    # print('#### local_metric_intersection DEBUG: attempting to compute sqrtm of matrix with determinant ', la.det(M1))
     sqM1 = sla.sqrtm(M1)
     sqiM1 = la.inv(sqM1)    # Note inverse and square root commute whenever both are defined
-    lam, v = la.eig(np.transpose(sqiM1) * M2 * sqiM1)
-    return np.transpose(sqM1) * v * [[max(lam[0], 1), 0], [0, max(lam[1], 1)]] * np.transpose(v) * sqM1
+    lam, v = la.eig(np.dot(np.transpose(sqiM1), np.dot(M2, sqiM1)))
+    M12 = np.dot(v, np.dot([[max(lam[0], 1), 0], [0, max(lam[1], 1)]], np.transpose(v)))
+    return np.dot(np.transpose(sqM1), np.dot(M12, sqM1))
 
 
-def metricIntersection(M1, M2, bdy=None):
+def metric_intersection(M1, M2, bdy=None):
     """
     Intersect a metric field, i.e. intersect (globally) over all local metrics.
     
@@ -377,14 +383,13 @@ def metricIntersection(M1, M2, bdy=None):
     V = M1.function_space()
     assert V == M2.function_space()
     M = Function(V).assign(M1)
-    mesh = V.mesh()
-    for i in DirichletBC(V, 0, bdy).nodes if bdy is not None else range(mesh.topology.num_vertices()):
-        M.dat.data[i] = localMetricIntersection(M1.dat.data[i], M2.dat.data[i])
-        # print('#### metricIntersection DEBUG: det(Mi) = ', la.det(M1.dat.data[i]))
+    for i in DirichletBC(V, 0, bdy).nodes if bdy is not None else range(V.mesh().num_vertices()):
+        M.dat.data[i] = local_metric_intersection(M1.dat.data[i], M2.dat.data[i])
+        # print('#### metric_intersection DEBUG: det(Mi) = ', la.det(M1.dat.data[i]))
     return M
 
 
-def metricConvexCombination(M1, M2, alpha=0.5):
+def metric_convex_combination(M1, M2, alpha=0.5):
     """
     Alternatively to intersection, pointwise metric information may be combined using a convex combination. Whilst this
     method does not have as clear an interpretation as metric intersection, it has the benefit that the combination may 
@@ -402,7 +407,7 @@ def metricConvexCombination(M1, M2, alpha=0.5):
     return M
 
 
-def symmetricProduct(A, b):
+def symmetric_product(A, b):
     """
     Compute the product of 2-vector `b` with itself, under the scalar product $b^T A b$ defined by the 2x2 matrix `A`.
     """
@@ -424,23 +429,31 @@ def symmetricProduct(A, b):
             return [bAb(A.dat.data[i], b.dat.data[i]) for i in range(len(A.dat.data))]
 
 
-def pointwiseMax(f, g):
+def pointwise_max(f, g):
     """
     Take the pointwise maximum (in modulus) of arrays `f` and `g`.
     """
+    fu = f.ufl_element()
+    gu = g.ufl_element()
     try:
         assert(len(f.dat.data) == len(g.dat.data))
     except:
-        fu = f.function_space().ufl_element()
-        gu = g.function_space().ufl_element()
-        raise ValueError("Function space mismatch: ", fu.family(), fu.degree(), " vs. ", gu.family(), gu.degree())
+        raise ValueError("Function space mismatch: {f1:s} {d1:d} vs. {f2:s} {d2:d}".format(f1=fu.family(),
+                                                                                           d1=fu.degree(),
+                                                                                           f2=gu.family(),
+                                                                                           d2=gu.degree()))
     for i in range(len(f.dat.data)):
-        if np.abs(g.dat.data[i]) > np.abs(f.dat.data[i]):
-            f.dat.data[i] = g.dat.data[i]
+        if fu.value_size() == 1:
+            if np.abs(g.dat.data[i]) > np.abs(f.dat.data[i]):
+                f.dat.data[i] = g.dat.data[i]
+        else:
+            for j in range(fu.value_size()):
+                if np.abs(g.dat.data[i, j]) > np.abs(f.dat.data[i, j]):
+                    f.dat.data[i, j] = g.dat.data[i, j]
     return f
 
 
-def metricComplexity(M):
+def metric_complexity(M):
     """
     Compute the complexity of a metric, which approximates the number of vertices in a mesh adapted based thereupon.
     """

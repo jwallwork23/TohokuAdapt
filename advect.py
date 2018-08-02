@@ -5,21 +5,18 @@ import argparse
 import datetime
 import numpy as np
 
-from utils.options import TohokuOptions, GaussianOptions, RossbyWaveOptions, KelvinWaveOptions
+from utils.options import AdvectionOptions
 from utils.setup import problem_domain
-from utils.sw_solvers import tsunami
+from utils.ad_solvers import advect
 
 
 now = datetime.datetime.now()
 date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
 parser = argparse.ArgumentParser()
-parser.add_argument("t", help="Choose test problem from {'shallow-water', 'rossby-wave'} (default 'tohoku')")
 parser.add_argument("-a", help="Choose adaptive approach from {'HessianBased', 'DWP', 'DWR'} (default 'FixedMesh')")
-parser.add_argument("-b", help="Intersect metrics with bathymetry")
-parser.add_argument("-f", help="Field for Hessian based adaptation, from {'s', 'f', 'b'}.")
+parser.add_argument("-f", help="Finite element family, from {'dg', 'cg'}")
 parser.add_argument("-g", help="Gradate metric")
-parser.add_argument("-ho", help="Compute errors and residuals in a higher order space")
 parser.add_argument("-m", help="Output metric data")
 parser.add_argument("-n", help="Number of mesh adaptation steps")
 parser.add_argument("-o", help="Output data")
@@ -27,7 +24,7 @@ parser.add_argument("-low", help="Lower bound for mesh resolution range")
 parser.add_argument("-high", help="Upper bound for mesh resolution range")
 parser.add_argument("-level", help="Single mesh resolution")
 parser.add_argument("-regen", help="Regenerate error estimates from saved data")
-parser.add_argument("-snes_view", help="Use PETSc snes sview.")
+parser.add_argument("-snes_view", help="Use PETSc snes view.")
 args = parser.parse_args()
 
 approach = args.a
@@ -35,45 +32,18 @@ if approach is None:
     approach = 'FixedMesh'
 else:
     assert approach in ('FixedMesh', 'HessianBased', 'DWP', 'DWR')
-if args.t is None:
-    mode = 'Tohoku'
-else:
-    mode = args.t
-order_increase = False
-
-# Establish filenames
-filename = 'outdata/' + mode + '/' + approach
-field_for_adaptation = args.f if args.f is not None else 's'
-filename += field_for_adaptation + '_' + date
-errorFile = open(filename + '.txt', 'w+')
-files = {}
-extensions = []
-if mode == 'Tohoku':
-    extensions.append('P02')
-    extensions.append('P06')
-for e in extensions:
-    files[e] = open(filename + e + '.txt', 'w+')
+errorFile = open('outdata/AdvectionDiffusion/' + approach + '_' + date + '.txt', 'w+')
 
 # Set parameters
-if mode == 'Tohoku':
-    op = TohokuOptions(approach=approach)
-elif mode == 'RossbyWave':
-    op = RossbyWaveOptions(approach=approach)
-elif mode == 'KelvinWave':
-    op = KelvinWaveOptions(approach=approach)
-elif mode == 'GaussianTest':
-    op = GaussianOptions(approach=approach)
-else:
-    raise NotImplementedError
+op = AdvectionOptions(approach=approach)
 op.gradate = bool(args.g)
 op.plot_pvd = bool(args.o)
 op.plot_metric = bool(args.m)
+op.tracer_family = args.f if args.f is not None else 'cg'
 op.num_adapt = 1 if args.n is None else int(args.n)
-op.order_increase = order_increase
-op.adapt_on_bathymetry = bool(args.b)
-op.adapt_field = field_for_adaptation
 if bool(args.snes_view):
     op.solver_parameters['snes_view'] = True
+op.order_increase = True    # TODO: difference quotient option
 
 # TODO: continue testing
 if op.approach in ("DWP", "DWR"):
@@ -87,9 +57,9 @@ else:
     resolutions = [0 if args.level is None else int(args.level)]
 Jlist = np.zeros(len(resolutions))
 for i in resolutions:
-    mesh, u0, eta0, b, BCs, f, diffusivity = problem_domain(i, op=op)
-    quantities = tsunami(mesh, u0, eta0, b, BCs=BCs, f=f, diffusivity=diffusivity, regen=bool(args.regen), op=op)
-    PETSc.Sys.Print("Mode: %s Approach: %s. Run: %d" % (mode, approach, i), comm=COMM_WORLD)
+    mesh, u0, eta0, b, BCs, source, diffusivity = problem_domain(i, op=op)
+    quantities = advect(mesh, u0, eta0, b, BCs=BCs, source=source, diffusivity=diffusivity, regen=bool(args.regen), op=op)
+    PETSc.Sys.Print("Mode: %s Approach: %s. Run: %d" % ('advection-diffusion', approach, i), comm=COMM_WORLD)
     rel = np.abs(op.J - quantities['J_h']) / np.abs(op.J)
     PETSc.Sys.Print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs OF error: %.4e"
           % (i, quantities['mean_elements'], quantities['J_h'], quantities['solver_timer'], rel), comm=COMM_WORLD)
@@ -98,11 +68,35 @@ for i in resolutions:
         if tag in quantities:
             errorFile.write(", %.4e" % quantities[tag])
     errorFile.write(", %.1f, %.4e\n" % (quantities['solver_timer'], quantities['J_h']))
-    for tag in files:
-        files[tag].writelines(["%s," % val for val in quantities[tag]])
-        files[tag].write("\n")
+
+    if op.plot_cross_section:
+        import matplotlib.pyplot as plt
+
+        i_end = op.final_export()
+        for progress in (0.5, 1):
+            tag = "h_snapshot_"+str(int(i_end*progress))        # TODO: This is for non-diffusive case
+            if tag in quantities:                               # TODO: Consider steady state for diffusive case
+                plt.clf()
+                s = quantities[tag]
+                sl = op.h_slice
+                x = np.linspace(sl[0][0], sl[-1][0], len(sl))
+                plt.plot(x, s)
+                plt.title("Tracer concentration at time %.1fs" % (op.end_time * progress))
+                plt.xlabel("Abcissa (m)")
+                plt.ylabel("Tracer concentraton (g/L)")
+                plt.savefig('outdata/AdvectionDiffusion/'+ tag + '.pdf')
+        for progress in (0.5, 1):
+            tag = "v_snapshot_"+str(int(i_end*progress))
+            if tag in quantities:
+                plt.clf()
+                s = quantities[tag]
+                sl = op.v_slice
+                x = np.linspace(sl[0][0], sl[0][-1], len(sl))
+                plt.plot(x, s)
+                plt.title("Tracer concentration at time %.1fs" % (op.end_time * progress))
+                plt.xlabel("Ordinate (m)")
+                plt.ylabel("Tracer concentration (g/L)")
+                plt.savefig('outdata/AdvectionDiffusion/' + tag + '.pdf')
     if approach in ("DWP", "DWR"):
         PETSc.Sys.Print("Time for final run: %.1fs" % quantities['adapt_solve_timer'], comm=COMM_WORLD)
-for tag in files:
-    files[tag].close()
 errorFile.close()

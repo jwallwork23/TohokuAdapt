@@ -10,17 +10,21 @@
 *.vtu
 *.log
 *.patch
+*.txt
+*.h5
+*.hdf5
+*.py.swp
+*.txt~
 
 ## Directories to be ignored:
 
 
 .eggs/
 .idea/
-plots/
 resources/meshes/
 resources/GMT/
+resources/channel/
 utils/.idea/
-outdata/
 
 
 ## Files to be ignored:
@@ -28,9 +32,7 @@ outdata/
 
 .README.md.swp
 
-# Old form compilers
-utils/forms.py
-
 # Test scripts
-paralleltest.py
 dt_test.py
+advection-test.py
+pure-advection.py

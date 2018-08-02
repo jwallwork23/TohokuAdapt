@@ -1,7 +1,7 @@
 import numpy as np
 
 
-__all__ = ["MeshSetup", "problemDomain", "RossbyWaveSolution", "__main__"]
+__all__ = ["MeshSetup", "problem_domain", "RossbyWaveSolution", "__main__"]
 
 
 class MeshSetup:
@@ -143,6 +143,7 @@ else:
     from thetis import *
     from thetis_adjoint import *
     from firedrake.petsc import PETSc
+    from firedrake import Expression
 
     import scipy.interpolate as si
     from scipy.io.netcdf import NetCDFFile
@@ -150,35 +151,32 @@ else:
 
     from .conversion import earth_radius, to_latlon, vectorlonlat_to_utm
     from .interpolation import interp
-    from .misc import indicator, bdyRegion
-    from .options import Options
+    from .misc import boundary_region
+    from .options import RossbyWaveOptions, TohokuOptions
 
 
-def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='tohoku')):
+def problem_domain(level=0, mesh=None, b=None, op=TohokuOptions()):
     """
     Set up problem domain.
     
     :arg level: refinement level, where 0 is coarsest.
     :param mesh: user specified mesh, if already generated.
     :param b: user specified bathymetry, if already generated.
-    :param hierarchy: extract 5 level MeshHierarchy.
     :param op: options parameter object.
     :return: associated mesh, initial conditions, bathymetry field, boundary conditions and Coriolis parameter. 
     """
     newmesh = mesh == None
-    if op.mode == 'tohoku':
-        getBathy = b is None
+    if op.mode == 'Tohoku':
+        get_bathymetry = b is None
         if mesh is None:
             # ms = MeshSetup(level, op.wd)
             ms = MeshSetup(level, False)
             mesh = Mesh(ms.dirName + ms.meshName + '.msh')
-        if hierarchy:
-            mh = MeshHierarchy(mesh, 5)
-        meshCoords = mesh.coordinates.dat.data
+        mesh_coords = mesh.coordinates.dat.data
         P1 = FunctionSpace(mesh, 'CG', 1)
-        eta0 = Function(P1, name='Initial free surface displacement')
+        eta0 = Function(P1)
         u0 = Function(VectorFunctionSpace(mesh, "CG", 1))
-        if getBathy:
+        if get_bathymetry:
             b = Function(P1, name='Bathymetry profile')
 
         # Read and interpolate initial surface data (courtesy of Saito)
@@ -187,9 +185,9 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
         lat1 = nc1.variables['lat'][:]
         x1, y1 = vectorlonlat_to_utm(lat1, lon1, force_zone_number=54)      # Our mesh mainly resides in UTM zone 54
         elev1 = nc1.variables['z'][:, :]
-        interpolatorSurf = si.RectBivariateSpline(y1, x1, elev1)
+        surf_interpolator = si.RectBivariateSpline(y1, x1, elev1)
         eta0vec = eta0.dat.data
-        assert meshCoords.shape[0] == eta0vec.shape[0]
+        assert mesh_coords.shape[0] == eta0vec.shape[0]
 
         # Read and interpolate bathymetry data (courtesy of GEBCO)
         nc2 = NetCDFFile('resources/bathymetry/tohoku.nc', mmap=False)
@@ -197,19 +195,19 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
         lat2 = nc2.variables['lat'][:-1]
         x2, y2 = vectorlonlat_to_utm(lat2, lon2, force_zone_number=54)
         elev2 = nc2.variables['elevation'][:-1, :]
-        if getBathy:
-            interpolatorBath = si.RectBivariateSpline(y2, x2, elev2)
+        if get_bathymetry:
+            bath_interpolator = si.RectBivariateSpline(y2, x2, elev2)
         b_vec = b.dat.data
         try:
-            assert meshCoords.shape[0] == b_vec.shape[0]
+            assert mesh_coords.shape[0] == b_vec.shape[0]
         except:
             b = interp(mesh, b)
 
         # Interpolate data onto initial surface and bathymetry profiles
-        for i, p in enumerate(meshCoords):
-            eta0vec[i] = interpolatorSurf(p[1], p[0])
-            if getBathy:
-                depth = - eta0vec[i] - interpolatorBath(p[1], p[0])
+        for i, p in enumerate(mesh_coords):
+            eta0vec[i] = surf_interpolator(p[1], p[0])
+            if get_bathymetry:
+                depth = - eta0vec[i] - bath_interpolator(p[1], p[0])
                 # b_vec[i] = depth if op.wd else max(depth, 30)
                 b_vec[i] = max(depth, 30)   # Post-process the bathymetry to have a minimum depth of 30m
         BCs = {200: {'un': 0}}
@@ -228,11 +226,11 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
                 beta = 2 * op.Omega * np.cos(np.radians(op.latFukushima)) / earth_radius(op.latFukushima)
                 for i, v in zip(range(len(mesh.coordinates.dat.data)), mesh.coordinates.dat.data):
                     f.dat.data[i] = f0 + beta * v[1]
-        nu = Function(P1).assign(1e-3)
-        # nu = Function(P1).interpolate(bdyRegion(mesh, 100, 1e9, sponge=True))
-        # File('plots/tohoku/spongy.pvd').write(nu)
+        diffusivity = Function(P1).assign(op.diffusivity)
+        # diffusivity = Function(P1).interpolate(boundary_region(mesh, 100, 1e9, sponge=True))
+        # File('plots/tohoku/spongy.pvd').write(diffusivity)
 
-    elif op.mode == 'shallow-water':
+    elif op.mode == 'GaussianTest':
         n = pow(2, level)
         lx = 2 * pi
         if mesh is None:
@@ -244,16 +242,16 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
         b = Function(P1).assign(0.1)
         BCs = {}
         f = Function(P1)
-        nu = None
-    elif op.mode == 'rossby-wave':
+        diffusivity = None
+    elif op.mode in ('RossbyWave', 'KelvinWave'):
         if mesh is None:
             n = pow(2, level - 1)
             ly = 24
-            if op.approach == 'fixedMesh':
+            if op.approach == 'FixedMesh':
                 lx = 48
                 mesh = PeriodicRectangleMesh(int(lx * n), int(ly * n), lx, ly, direction="x")
             else:
-                lx = 160
+                lx = 160 if op.mode == 'RossbyWave' else 48
                 mesh = RectangleMesh(int(lx * n), int(ly * n), lx, ly)
             xy = Function(mesh.coordinates)
             xy.dat.data[:, :] -= [lx / 2, ly / 2]
@@ -264,27 +262,36 @@ def problemDomain(level=0, mesh=None, b=None, hierarchy=False, op=Options(mode='
         u0, eta0 = q.split()
         BCs = {1: {'uv': Constant(0.)}, 2: {'uv': Constant(0.)}, 3: {'uv': Constant(0.)}, 4: {'uv': Constant(0.)}}
         f = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
-        nu = None
-    elif op.mode == 'advection-diffusion':
+        diffusivity = None
+    elif op.mode == 'AdvectionDiffusion':
+        n = pow(2, level)
         if mesh is None:
-            mesh = RectangleMesh(4 * level, level, 4, 1)
+            # mesh = RectangleMesh(25 * n, 5 * n, 50, 10)
+            mesh = RectangleMesh(30 * n, 5 * n, 60, 10)
         x, y = SpatialCoordinate(mesh)
         P1 = FunctionSpace(mesh, "CG", 1)
-        phi0 = Function(P1).interpolate(exp(- (pow(x - 0.5, 2) + pow(y - 0.5, 2)) / 0.04))
-        BCs = DirichletBC(P1, 0, 'on_boundary')
-        w = Function(VectorFunctionSpace(mesh, "CG", 1), name='Wind field').interpolate(Expression([1, 0]))
+        bell = conditional(
+            ge((1 + cos(pi * min_value(sqrt(pow(x - op.bell_x0, 2) + pow(y - op.bell_y0, 2)) / op.bell_r0, 1.0))), 0.),
+            (1 + cos(pi * min_value(sqrt(pow(x - op.bell_x0, 2) + pow(y - op.bell_y0, 2)) / op.bell_r0, 1.0))),
+            0.)
+        source = Function(P1).interpolate(0. + bell)  # Tracer source function
+        b = Function(P1).assign(1.)
+        u0 = Function(VectorFunctionSpace(mesh, "CG", 1)).interpolate(Expression([1., 0.]))
+        eta0 = Function(P1)
+        BCs = {'shallow water': {}, 'tracer': {1: {'value': Constant(0.)}}}
+        diffusivity = Function(P1).assign(op.diffusivity)
 
     if newmesh:
-        PETSc.Sys.Print("Setting up mesh across %d processes" % COMM_WORLD.size)
-        PETSc.Sys.Print("  rank %d owns %d elements and can access %d vertices" \
-                        % (mesh.comm.rank, mesh.num_cells(), mesh.num_vertices()), comm=COMM_SELF)
+        PETSc.Sys.Print("Setting up mesh across {p:d} processes".format(p=COMM_WORLD.size))
+        PETSc.Sys.Print("  rank {r:d} owns {e:d} elements and can access {v:d} vertices".format(r=mesh.comm.rank,
+                                                                                                e=mesh.num_cells(),
+                                                                                                v=mesh.num_vertices()),
+                        comm=COMM_SELF)
 
-    if hierarchy:
-        return mesh, u0, eta0, b, BCs, f, nu, mh
-    elif op.mode == 'advection-diffusion':
-        return mesh, phi0, BCs, w
+    if op.mode == 'AdvectionDiffusion':
+        return mesh, u0, eta0, b, BCs, source, diffusivity
     else:
-        return mesh, u0, eta0, b, BCs, f, nu
+        return mesh, u0, eta0, b, BCs, f, diffusivity
 
 
 class RossbyWaveSolution:
@@ -293,7 +300,7 @@ class RossbyWaveSolution:
     
     Hermite polynomials taken from the Matlab code found at https://marine.rutgers.edu/po/tests/soliton/hermite.txt
     """
-    def __init__(self, function_space, order=1, op=Options(mode='rossby-wave')):
+    def __init__(self, function_space, order=1, op=RossbyWaveOptions()):
         """
         :arg function_space: mixed FunctionSpace in which to construct the Hermite polynomials.
         """
@@ -308,10 +315,10 @@ class RossbyWaveSolution:
         except:
             raise NotImplementedError("Only zeroth and first order analytic solutions considered for this problem.")
         try:
-            assert op.mode == 'rossby-wave'
+            assert op.mode in ('rossby-wave', 'kelvin-wave')
             self.op = op
         except:
-            raise ValueError("Analyic solution only available for 'rossby-wave' test case.")
+            raise ValueError("Analytic solution only available for 'rossby-wave' and 'kelvin-wave' test cases.")
 
     def coeffs(self):
         """
@@ -414,7 +421,7 @@ class RossbyWaveSolution:
         """
         return exp(-0.5 * self.y * self.y)
 
-    def zerothOrderTerms(self, t=0.):
+    def zeroth_order_terms(self, t=0.):
         """
         :arg t: current time.
         :return: zeroth order analytic solution for test problem of Huang.
@@ -423,7 +430,7 @@ class RossbyWaveSolution:
                 'v': 2 * self.y * self.dphidx(t) * self.psi(),
                 'eta': self.phi(t) * 0.25 * (3 + 6 * self.y * self.y) * self.psi()}
 
-    def firstOrderTerms(self, t=0.):
+    def first_order_terms(self, t=0.):
         """
         :arg t: current time.
         :return: first order analytic solution for test problem of Huang.
@@ -432,7 +439,7 @@ class RossbyWaveSolution:
         phi = self.phi(t)
         coeffs = self.coeffs()
         polys = self.polynomials()
-        terms = self.zerothOrderTerms(t)
+        terms = self.zeroth_order_terms(t)
         terms['u'] += C * phi * 0.5625 * (3 + 2 * self.y * self.y) * self.psi()     # NOTE: This last psi is not included
         terms['u'] += phi * phi * self.psi() * sum(coeffs['u'][i] * polys[i] for i in range(28))
         terms['v'] += self.dphidx(t) * phi * self.psi() * sum(coeffs['v'][i] * polys[i] for i in range(28))
@@ -451,7 +458,7 @@ class RossbyWaveSolution:
             u, eta = q.split()
             u.rename("Depth averaged velocity")
             eta.rename("Elevation")
-            print("t = %.4f, |u| = %.4f, |eta| = %.4f" % (t,u.dat.norm, eta.dat.norm))
+            print("t = {t:.4f}, |u| = {u:.4f}, |eta| = {e:.4f}".format(t=t,u=u.dat.norm, e=eta.dat.norm))
             outFile.write(u, eta, time=t)
 
     def integrate(self, mirror=False):
@@ -466,7 +473,7 @@ class RossbyWaveSolution:
         mesh = self.function_space.mesh()
         ks = Function(VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1))
         k0, k1 = ks.split()
-        k1.assign(indicator(mesh, mirror=mirror, radii=self.op.radius, op=self.op))
+        k1.assign(self.op.indicator(mesh, mirror=mirror))
         kt = Constant(0.)
 
         # Time integrate
@@ -489,7 +496,7 @@ class RossbyWaveSolution:
         :arg t: current time.
         :return: semi-analytic solution for Rossby wave test case of Huang.
         """
-        terms = self.zerothOrderTerms(t) if self.order == 0 else self.firstOrderTerms(t)
+        terms = self.zeroth_order_terms(t) if self.order == 0 else self.first_order_terms(t)
 
         q = Function(self.function_space)
         u, eta = q.split()

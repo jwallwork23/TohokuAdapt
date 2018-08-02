@@ -4,18 +4,18 @@ from firedrake.petsc import PETSc
 import math
 
 from utils.callbacks import SWCallback
-from utils.setup import problemDomain
-from utils.options import Options
+from utils.setup import problem_domain
+from utils.options import TohokuOptions
 
 
-def getObjective(level=0, mesh=None, b=None, op=Options()):
+def get_objective(level=0, mesh=None, b=None, op=TohokuOptions()):
 
     # Initialise domain and physical parameters
     try:
         assert float(physical_constants['g_grav'].dat.data) == op.g
     except:
         physical_constants['g_grav'].assign(op.g)
-    mesh, u0, eta0, b, BCs, f = problemDomain(level, mesh=mesh, b=b, op=op)
+    mesh, u0, eta0, b, BCs, f = problem_domain(level, mesh=mesh, b=b, op=op)
     for i in range(len(b.dat.data)):
         if math.isnan(b.dat.data[i]):
             b.dat.data[i] = 30.
@@ -28,10 +28,10 @@ def getObjective(level=0, mesh=None, b=None, op=Options()):
     options.use_grad_div_viscosity_term = True      # Symmetric viscous stress
     options.use_lax_friedrichs_velocity = False     # TODO: This is a temporary fix
     options.coriolis_frequency = f
-    options.simulation_export_time = op.dt * op.ndump
-    options.simulation_end_time = op.Tend
+    options.simulation_export_time = op.timestep * op.timesteps_per_export
+    options.simulation_end_time = op.end_time
     options.timestepper_type = op.timestepper
-    options.timestep = op.dt
+    options.timestep = op.timestep
     options.output_directory = op.di
     # options.no_exports = True
     options.no_exports = False
@@ -45,7 +45,6 @@ def getObjective(level=0, mesh=None, b=None, op=Options()):
     quantities = {}
     solver_obj.iterate()
     quantities['J_h'] = cb1.quadrature()  # Evaluate objective functional
-    quantities['Integrand'] = cb1.getVals()
     quantities['Element count'] = mesh.num_cells()
 
     return quantities, b
@@ -53,15 +52,15 @@ def getObjective(level=0, mesh=None, b=None, op=Options()):
 
 if __name__ == "__main__":
 
-    op = Options(mode='tohoku')
+    op = TohokuOptions()
     mesh = Mesh("resources/meshes/wd_Tohoku0.msh")
-    # coarse_bathy = problemDomain(mesh=mesh, op=op)[3]
+    # coarse_bathy = problem_domain(mesh=mesh, op=op)[3]
     coarse_bathy = Function(FunctionSpace(mesh, "CG", 1)).assign(3000.)
     OF = []
     nEls = []
 
     for level in range(11):
-        q = getObjective(level=level, b=coarse_bathy, op=op)[0]
+        q = get_objective(level=level, b=coarse_bathy, op=op)[0]
         OF.append(q['J_h'])
         nEls.append(q['Element count'])
         PETSc.Sys.Print("Run %d" % level)

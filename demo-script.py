@@ -1,13 +1,14 @@
 from thetis_adjoint import *
+from firedrake.petsc import PETSc
 
 from utils.conversion import from_latlon
 from utils.options import TohokuOptions
-from utils.setup import problemDomain
-from utils.solvers import tsunami
+from utils.setup import problem_domain
+from utils.sw_solvers import tsunami
 
 # Set up problem
 op = TohokuOptions(approach='DWR')
-mesh, u0, eta0, b, BCs, f, nu = problemDomain(8, op=op)
+mesh, u0, eta0, b, BCs, f, nu = problem_domain(8, op=op)
 
 # Option 1: a delicate and potentially hazardous piece of infrastructure
 op.loc = from_latlon(op.lat("Fukushima Daiichi"), op.lon("Fukushima Daiichi"))
@@ -28,5 +29,5 @@ op.radii = [50e3]
 
 # Solve
 q = tsunami(mesh, u0, eta0, b, BCs=BCs, f=f, nu=nu, op=op)
-print("Objective functional value = %.4e" % q['J_h'])
-print("CPU time = %.2f" % q['solverTime'])
+PETSc.Sys.Print("Objective functional value = %.4e" % q['J_h'])
+PETSc.Sys.Print("CPU time = %.2f" % q['solverTime'])

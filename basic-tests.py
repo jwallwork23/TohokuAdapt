@@ -8,7 +8,7 @@ import numpy as np
 from utils.adaptivity import *
 from utils.interpolation import interp
 from utils.misc import indicator
-from utils.options import Options
+from utils.options import Options   # TODO: Remove this old version
 
 
 now = datetime.datetime.now()
@@ -62,7 +62,7 @@ def hessian(subset, space):
         plt.xlabel("Element count")
         plt.ylabel("L2 error in Hessian")
         for hessMeth in ('dL2', 'parts'):
-            op = Options(mode=None,
+            op = Options(mode=None,    # TODO: Remove this old version
                          approach='hessianBased')
             op.hessMeth = hessMeth
             op.di = 'plots/adapt-tests/'
@@ -134,7 +134,7 @@ def adapts(scale, space, indy):
         r = 0.8
     elif indy == 'uncentred':
         raise NotImplementedError               # Test 4: an uncentred disc     TODO
-    op = Options(mode=None, approach='hessianBased')
+    op = Options(mode=None, approach='hessianBased')       # TODO: Remove this old version
     op.hmin = 1e-10
     op.hmax = 1
     # op.normalisation = 'manual'             # TODO: Make this selectable
@@ -170,7 +170,7 @@ def adapts(scale, space, indy):
                     # Adapt mesh
                     temp = Function(Vs).assign(f)
                     for k in range(nAdapt):
-                        M = steadyMetric(f, op=op)
+                        M = steady_metric(f, op=op)
                         mesh = AnisotropicAdaptation(mesh, M).adapted_mesh
                         if k < nAdapt -1:
                             f = interp(mesh, f)
@@ -204,15 +204,15 @@ def adapts(scale, space, indy):
         plt.clf()
 
 
-def directionalRefine(eps=1e-4):
+def directional_refinement(eps=1e-4):
     for j in range(8):
         for dir in (0, 1):
             n = pow(2, j)
             mesh = UnitSquareMesh(n, n)
-            op = Options(mode=None, hmin=1e-8, hmax=1)
+            op = Options(mode=None, hmin=1e-8, hmax=1)   # TODO: Remove this old version
             op.nVerT = mesh.num_vertices() * op.rescaling
-            M_ = isotropicMetric(Function(FunctionSpace(mesh, space, 1)).interpolate(CellSize(mesh)), op=op)
-            M = anisoRefine(M_, direction=dir)
+            M_ = isotropic_metric(Function(FunctionSpace(mesh, space, 1)).interpolate(CellSize(mesh)), op=op)
+            M = anisotropic_refinement(M_, direction=dir)
             coords = AnisotropicAdaptation(mesh, M).adapted_mesh.coordinates.dat.data
             x = 0
             y = 0
@@ -245,6 +245,6 @@ if __name__ == "__main__":
     if args.test == 'Hessian':
         hessian(subset, space)
     elif args.test == 'dirRefine':
-        directionalRefine()
+        directional_refinement()
     elif args.test == 'nAdapt':
         adapts(scale, space, indy)

@@ -5,11 +5,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import datetime
 
-from .options import Options, TohokuOptions
+from .options import TohokuOptions
 
 
-__all__ = ["errorVsElements", "__main__", "plotTimeseries", "compareTimeseries", "timeseriesDifference",
-           "totalVariation", "gaugeTV", "integrateTimeseries"]
+__all__ = ["error_vs_elements", "plot_timeseries", "compare_timeseries", "timeseries_difference", "integrate_timeseries"]
 
 
 plt.rc('text', usetex=True)
@@ -17,43 +16,7 @@ plt.rc('font', family='serif')
 plt.rc('legend', fontsize='x-large')
 
 
-def totalVariation(data):
-    """
-    :arg data: (one-dimensional) timeseries record.
-    :return: total variation thereof.
-    """
-    TV = 0
-    iStart = 0
-    for i in range(len(data)):
-        if i == 1:
-            sign = (data[i] - data[i-1]) / np.abs(data[i] - data[i-1])
-        elif i > 1:
-            sign_ = sign
-            sign = (data[i] - data[i - 1]) / np.abs(data[i] - data[i - 1])
-            if sign != sign_:
-                TV += np.abs(data[i-1] - data[iStart])
-                iStart = i-1
-                if i == len(data)-1:
-                    TV += np.abs(data[i] - data[i-1])
-            elif i == len(data)-1:
-                TV += np.abs(data[i] - data[iStart])
-    return TV
-
-
-def gaugeTV(data, gauge="P02"):
-    """
-    :param data: timeseries to calculate error of.
-    :param gauge: gauge considered.
-    :return: total variation. 
-    """
-    N = len(data)
-    spline = extractSpline(gauge)
-    times = np.linspace(0., 25., N)
-    errors = [data[i] - spline(times[i]) for i in range(N)]
-    return totalVariation(errors) / totalVariation([spline(times[i]) for i in range(N)])
-
-
-def readErrors(date, approach, mode='tohoku', bootstrapping=False):
+def read_errors(date, approach, mode='tohoku', bootstrapping=False):
     """
     :arg date: date simulation was run.
     :arg approach: mesh adaptive approach.
@@ -86,7 +49,7 @@ def readErrors(date, approach, mode='tohoku', bootstrapping=False):
             timing = quantities[-2]
             J_h = quantities[-1]
         if mode == 'model-verification':
-            fixedMeshes = Options().meshSizes
+            fixedMeshes = TohokuOptions().meshSizes
             nEle, J_h, gP02, gP06, timing = line.split(',')
             nEls.append(fixedMeshes[i])
         else:
@@ -110,20 +73,7 @@ def readErrors(date, approach, mode='tohoku', bootstrapping=False):
     return nEls, err, tim
 
 
-def extractSpline(gauge):
-    measuredFile = open('resources/gauges/'+gauge+'data_25mins.txt', 'r')
-    x = []
-    y = []
-    for line in measuredFile:
-        xy = line.split()
-        x.append(float(xy[0]))
-        y.append(float(xy[1]))
-    spline = si.interp1d(x, y, kind=1)
-    measuredFile.close()
-    return spline
-
-
-def extractData(gauge):
+def extract_data(gauge):
     if gauge in ("P02", "P06"):
         measuredFile = open('resources/gauges/' + gauge + 'data_25mins.txt', 'r')
         x = []
@@ -143,7 +93,7 @@ def extractData(gauge):
         return range(len(xy)-1), [float(i) for i in xy[:-1]]
 
 
-def plotTimeseries(fileExt, date, quantity='Integrand', realData=False, op=Options()):
+def plot_timeseries(fileExt, date, quantity='Integrand', realData=False, op=TohokuOptions()):
     assert quantity in ('Integrand', 'Integrand-mirrored', 'P02', 'P06')
     filename = 'outdata/' + op.mode + '/' + fileExt + '_' + date + quantity + '.txt'
     filename2 = 'outdata/' + op.mode + '/' + fileExt + '_' + date + '.txt'
@@ -154,7 +104,7 @@ def plotTimeseries(fileExt, date, quantity='Integrand', realData=False, op=Optio
     for line in f:
         separated = line.split(',')
         dat = [float(d) for d in separated[:-1]]    # Ignore carriage return
-        tim = np.linspace(0, op.Tend, len(dat))
+        tim = np.linspace(0, op.end_time, len(dat))
         if op.mode != 'shallow-water':
             plt.plot(tim[::5], dat[::5], label=g.readline().split(',')[0])
         else:
@@ -164,9 +114,9 @@ def plotTimeseries(fileExt, date, quantity='Integrand', realData=False, op=Optio
     g.close()
     if realData:
         if (op.mode == 'tohoku' and quantity in ('P02', 'P06')) or op.mode == 'rossby-wave':
-            x, y = extractData(quantity)
+            x, y = extract_data(quantity)
             me = 10 if op.mode == 'rossby-wave' else 1
-            plt.plot(np.linspace(0, op.Tend, len(x)), y, label='Gauge data', marker='*', markevery=me, color='black')
+            plt.plot(np.linspace(0, op.end_time, len(x)), y, label='Gauge data', marker='*', markevery=me, color='black')
     plt.xlabel('Time (s)')
     plt.ylabel(quantity+' value')
     plt.legend(loc=2, bbox_to_anchor=(1.05, 1))
@@ -174,7 +124,7 @@ def plotTimeseries(fileExt, date, quantity='Integrand', realData=False, op=Optio
     plt.clf()
 
 
-def timeseriesDifference(fileExt1, date1, fileExt2, date2, quantity='Integrand', op=Options()):
+def timeseries_difference(fileExt1, date1, fileExt2, date2, quantity='Integrand', op=TohokuOptions()):
     assert quantity in ('Integrand', 'P02', 'P06')
     filename1 = 'outdata/' + op.mode + '/' + fileExt1 + '_' + date1 + quantity + '.txt'
     filename2 = 'outdata/' + op.mode + '/' + fileExt2 + '_' + date2 + quantity + '.txt'
@@ -188,13 +138,13 @@ def timeseriesDifference(fileExt1, date1, fileExt2, date2, quantity='Integrand',
         dat2 = [float(d) for d in separated[:-1]]
         try:
             assert np.shape(dat1) == np.shape(dat2)
-            errs.append(totalVariation(np.asarray(dat1) - np.asarray(dat2)))
+            errs.append(total_variation(np.asarray(dat1) - np.asarray(dat2)))
         except:
             pass
     return ['%.4e' % i for i in errs]
 
 
-def integrateTimeseries(fileExt, date, op=Options()):
+def integrate_timeseries(fileExt, date, op=TohokuOptions()):
     if date is None:
         date = ''
     filename = 'outdata/' + op.mode + '/' + fileExt + '_' + date + 'Integrand.txt'
@@ -203,19 +153,19 @@ def integrateTimeseries(fileExt, date, op=Options()):
     for line in f:
         separated = line.split(',')
         # for j in range(len(separated), 0, -1):
-        #     if j % (op.rm+2) in (op.rm,op.rm+1):
+        #     if j % (op.timesteps_per_remesh+2) in (op.timesteps_per_remesh,op.timesteps_per_remesh+1):
         #         del separated[j]
         dat = [float(d) for d in separated[:-1]]
-        print("#### DEBUG: Number of timesteps stored = ", len(dat))
+        print("#### DEBUG: Number of timesteps stored = {n:d}".format(n=len(dat)))
         I = 0
-        dt = op.dt
+        dt = op.timestep
         for i in range(1, len(dat)):
             I += 0.5 * (dat[i] + dat[i-1]) * dt
         integrals.append(I)
     return ['%.4e' % i for i in integrals]
 
 
-def compareTimeseries(date, run, quantity='Integrand', op=Options()):
+def compare_timeseries(date, run, quantity='Integrand', op=TohokuOptions()):
     assert quantity in ('Integrand', 'P02', 'P06')
     approaches = ("fixedMesh", "hessianBased", "DWP", "DWR")
 
@@ -226,7 +176,7 @@ def compareTimeseries(date, run, quantity='Integrand', op=Options()):
     for approach in approaches:
         if date is None:
             try:
-                dates[approach] = input("Date to use for %s approach: " % approach)
+                dates[approach] = input("Date to use for {a:s} approach: ".format(a=approach))
             except:
                 dates[approach] = today
         else:
@@ -240,7 +190,7 @@ def compareTimeseries(date, run, quantity='Integrand', op=Options()):
                 f.readline()
             separated = f.readline().split(',')
             dat = [float(d) for d in separated[:-1]]  # Ignore carriage return
-            tim = np.linspace(0, op.Tend, len(dat))
+            tim = np.linspace(0, op.end_time, len(dat))
             plt.plot(tim[::5], dat[::5], label=approach)
         except:
             pass
@@ -251,7 +201,7 @@ def compareTimeseries(date, run, quantity='Integrand', op=Options()):
     plt.clf()
 
 
-def errorVsElements(mode='tohoku',
+def error_vs_elements(mode='tohoku',
                     bootstrapping=False,
                     noTinyMeshes=False,
                     date=None,
@@ -304,14 +254,14 @@ def errorVsElements(mode='tohoku',
     dates = []
     for n in range(len(names)):
         if date is None:
-            dates.append(input("Date to use for %s approach: " % labels[n]))
+            dates.append(input("Date to use for {a:s} approach: ".format(labels[n])))
         else:
             dates.append(date)
 
     for m in range(errortypes):
         for n in range(len(names)):
             try:
-                av, errors, timing = readErrors(dates[n], names[n], mode, bootstrapping=bootstrapping)
+                av, errors, timing = read_errors(dates[n], names[n], mode, bootstrapping=bootstrapping)
                 rel = []
                 for i in errors:
                     rel.append(errors[i][m])
@@ -344,7 +294,7 @@ def errorVsElements(mode='tohoku',
                 plt.hlines(op.J, 4e3, 2e5, colors='k', linestyles='solid', label=r'681,616 elements')
                 plt.axhspan(op.J-5e10, op.J+5e10, alpha=0.5, color='gray')
 
-        plt.legend(loc=1)
+        plt.legend(loc=4)
         plt.xlabel(r'Mean element count')
         plt.ylabel(errorlabels[m])
         plt.savefig(di + errornames[m] + 'VsElements' + today + '.pdf', bbox_inches='tight')
@@ -360,7 +310,7 @@ def errorVsElements(mode='tohoku',
                 plt.hlines(op.J, 8e1, 2e3, colors='k', linestyles='solid', label=r'681,616 elements')
                 plt.axhspan(op.J-5e10, op.J+5e10, alpha=0.5, color='gray')
         plt.gcf()
-        plt.legend(loc=1)
+        plt.legend(loc=4)
         plt.xlabel(r'CPU time (s)')
         plt.ylabel(errorlabels[m])
         plt.savefig(di + errornames[m] + 'VsTimings' + today + '.pdf', bbox_inches='tight')
