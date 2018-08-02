@@ -25,6 +25,8 @@ resources/meshes/
 resources/GMT/
 resources/channel/
 utils/.idea/
+plots/tohoku/
+plots/rossby-wave/
 
 
 ## Files to be ignored:
