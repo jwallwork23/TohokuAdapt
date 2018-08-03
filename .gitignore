@@ -16,6 +16,7 @@
 *.py.swp
 *.txt~
 *.png
+*log
 
 ## Directories to be ignored:
 
