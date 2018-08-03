@@ -23,6 +23,7 @@
 .eggs/
 .idea/
 resources/GMT/
+resources/meshes/
 resources/channel/
 utils/.idea/
 plots/tohoku/
