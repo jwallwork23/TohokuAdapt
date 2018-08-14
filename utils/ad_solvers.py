@@ -248,9 +248,9 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
     mM = [nEle, nEle]  # Min/max #Elements
     Sn = nEle
 
-    # Get initial boundary metric
-    if op.gradate:
-        H0 = Function(P1).interpolate(CellSize(mesh))
+    # # Get initial boundary metric
+    # if op.gradate:
+    #     H0 = Function(P1).interpolate(CellSize(mesh))
 
     if not regen:
 
@@ -346,7 +346,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         t = 0.
         tracer_2d.assign(0.)
         quantities = {}
-        bdy = 'on_boundary'
+        # bdy = 'on_boundary'
         uv_2d, elev_2d = Function(op.mixed_space(mesh)).split()
         uv_2d.interpolate(u0)
         elev_2d.interpolate(eta0)
@@ -363,8 +363,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                     estimate = Function(FunctionSpace(mesh, "CG", 1)).assign(interp(mesh, epsilon))
                     M = isotropic_metric(estimate, invert=False, op=op)
                     if op.gradate:
-                        M_ = isotropic_metric(interp(mesh, H0), bdy=bdy, op=op)  # Initial boundary metric
-                        M = metric_intersection(M, M_, bdy=bdy)
+                        # M_ = isotropic_metric(interp(mesh, H0), bdy=bdy, op=op)  # Initial boundary metric
+                        # M = metric_intersection(M, M_, bdy=bdy)
                         gradate_metric(M, op=op)
 
                     # Adapt mesh and interpolate variables
@@ -374,7 +374,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                     if op.plot_metric:
                         M.rename('metric_2d')
                         metric_file.write(M, time=t)
-               	    tracer_2d = interp(mesh, tracer_2d)
+                    tracer_2d = interp(mesh, tracer_2d)
                     tracer_2d.rename('tracer_2d')
                     u0, eta0, b, BCs, source, diffusivity = problem_domain(mesh=mesh, op=op)[1:] # TODO: find a different way to reset these
                     uv_2d, elev_2d = Function(op.mixed_space(mesh)).split()
@@ -505,9 +505,9 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
     mM = [nEle, nEle]  # Min/max #Elements
     Sn = nEle
 
-    # Get initial boundary metric
-    if op.gradate:
-        H0 = Function(P1).interpolate(CellSize(mesh))
+    # # Get initial boundary metric
+    # if op.gradate:
+    #     H0 = Function(P1).interpolate(CellSize(mesh))
 
     if not regen:
 
@@ -646,7 +646,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         adapt_solve_timer = 0.
         t = 0.
         quantities = {}
-        bdy = 'on_boundary'
+        # bdy = 'on_boundary'
         uv_2d, elev_2d = Function(op.mixed_space(mesh)).split()
         uv_2d.interpolate(u0)
         elev_2d.interpolate(eta0)
@@ -663,8 +663,8 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
                     estimate = Function(FunctionSpace(mesh, "CG", 1)).assign(interp(mesh, epsilon))
                     M = isotropic_metric(estimate, invert=False, op=op)
                     if op.gradate:
-                        M_ = isotropic_metric(interp(mesh, H0), bdy=bdy, op=op)   # Initial boundary metric
-                        M = metric_intersection(M, M_, bdy=bdy)
+                        # M_ = isotropic_metric(interp(mesh, H0), bdy=bdy, op=op)   # Initial boundary metric
+                        # M = metric_intersection(M, M_, bdy=bdy)
                         M = gradate_metric(M, op=op)
 
                     # Adapt mesh and interpolate variables
