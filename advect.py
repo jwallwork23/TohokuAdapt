@@ -57,46 +57,49 @@ else:
     resolutions = [0 if args.level is None else int(args.level)]
 Jlist = np.zeros(len(resolutions))
 for i in resolutions:
-    mesh, u0, eta0, b, BCs, source, diffusivity = problem_domain(i, op=op)
-    quantities = advect(mesh, u0, eta0, b, BCs=BCs, source=source, diffusivity=diffusivity, regen=bool(args.regen), op=op)
-    PETSc.Sys.Print("Mode: %s Approach: %s. Run: %d" % ('advection-diffusion', approach, i), comm=COMM_WORLD)
-    rel = np.abs(op.J - quantities['J_h']) / np.abs(op.J)
-    PETSc.Sys.Print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs OF error: %.4e"
-          % (i, quantities['mean_elements'], quantities['J_h'], quantities['solver_timer'], rel), comm=COMM_WORLD)
-    errorFile.write('%d, %.4e' % (quantities['mean_elements'], rel))
-    for tag in ("peak", "dist", "spd", "TV P02", "TV P06"):
-        if tag in quantities:
-            errorFile.write(", %.4e" % quantities[tag])
-    errorFile.write(", %.1f, %.4e\n" % (quantities['solver_timer'], quantities['J_h']))
-
-    if op.plot_cross_section:
-        import matplotlib.pyplot as plt
-
-        i_end = op.final_export()
-        for progress in (0.5, 1):
-            tag = "h_snapshot_"+str(int(i_end*progress))        # TODO: This is for non-diffusive case
-            if tag in quantities:                               # TODO: Consider steady state for diffusive case
-                plt.clf()
-                s = quantities[tag]
-                sl = op.h_slice
-                x = np.linspace(sl[0][0], sl[-1][0], len(sl))
-                plt.plot(x, s)
-                plt.title("Tracer concentration at time %.1fs" % (op.end_time * progress))
-                plt.xlabel("Abcissa (m)")
-                plt.ylabel("Tracer concentraton (g/L)")
-                plt.savefig('outdata/AdvectionDiffusion/'+ tag + '.pdf')
-        for progress in (0.5, 1):
-            tag = "v_snapshot_"+str(int(i_end*progress))
+    try:
+        mesh, u0, eta0, b, BCs, source, diffusivity = problem_domain(i, op=op)
+        quantities = advect(mesh, u0, eta0, b, BCs=BCs, source=source, diffusivity=diffusivity, regen=bool(args.regen), op=op)
+        PETSc.Sys.Print("Mode: %s Approach: %s. Run: %d" % ('advection-diffusion', approach, i), comm=COMM_WORLD)
+        rel = np.abs(op.J - quantities['J_h']) / np.abs(op.J)
+        PETSc.Sys.Print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs OF error: %.4e"
+              % (i, quantities['mean_elements'], quantities['J_h'], quantities['solver_timer'], rel), comm=COMM_WORLD)
+        errorFile.write('%d, %.4e' % (quantities['mean_elements'], rel))
+        for tag in ("peak", "dist", "spd", "TV P02", "TV P06"):
             if tag in quantities:
-                plt.clf()
-                s = quantities[tag]
-                sl = op.v_slice
-                x = np.linspace(sl[0][0], sl[0][-1], len(sl))
-                plt.plot(x, s)
-                plt.title("Tracer concentration at time %.1fs" % (op.end_time * progress))
-                plt.xlabel("Ordinate (m)")
-                plt.ylabel("Tracer concentration (g/L)")
-                plt.savefig('outdata/AdvectionDiffusion/' + tag + '.pdf')
+                errorFile.write(", %.4e" % quantities[tag])
+        errorFile.write(", %.1f, %.4e\n" % (quantities['solver_timer'], quantities['J_h']))
+
+        if op.plot_cross_section:
+            import matplotlib.pyplot as plt
+
+            i_end = op.final_export()
+            for progress in (0.5, 1):
+                tag = "h_snapshot_"+str(int(i_end*progress))        # TODO: This is for non-diffusive case
+                if tag in quantities:                               # TODO: Consider steady state for diffusive case
+                    plt.clf()
+                    s = quantities[tag]
+                    sl = op.h_slice
+                    x = np.linspace(sl[0][0], sl[-1][0], len(sl))
+                    plt.plot(x, s)
+                    plt.title("Tracer concentration at time %.1fs" % (op.end_time * progress))
+                    plt.xlabel("Abcissa (m)")
+                    plt.ylabel("Tracer concentraton (g/L)")
+                    plt.savefig('outdata/AdvectionDiffusion/'+ tag + '.pdf')
+            for progress in (0.5, 1):
+                tag = "v_snapshot_"+str(int(i_end*progress))
+                if tag in quantities:
+                    plt.clf()
+                    s = quantities[tag]
+                    sl = op.v_slice
+                    x = np.linspace(sl[0][0], sl[0][-1], len(sl))
+                    plt.plot(x, s)
+                    plt.title("Tracer concentration at time %.1fs" % (op.end_time * progress))
+                    plt.xlabel("Ordinate (m)")
+                    plt.ylabel("Tracer concentration (g/L)")
+                    plt.savefig('outdata/AdvectionDiffusion/' + tag + '.pdf')
+    except:
+        PETSc.Sys.Print("WARNING: %s run %d failed!" % (op.approach, i), comm=COMM_WORLD)
     if approach in ("DWP", "DWR"):
         PETSc.Sys.Print("Time for final run: %.1fs" % quantities['adapt_solve_timer'], comm=COMM_WORLD)
 errorFile.close()
