@@ -25,16 +25,19 @@ parser.add_argument("-high", help="Upper bound for mesh resolution range")
 parser.add_argument("-level", help="Single mesh resolution")
 parser.add_argument("-regen", help="Regenerate error estimates from saved data")
 parser.add_argument("-snes_view", help="Use PETSc snes view.")
+parser.add_argument("-nodebug", help="Hide error messages.")
 args = parser.parse_args()
 
 approach = args.a
 if args.a is None:
-    approaches = ('FixedMesh')
+    approaches = ['FixedMesh']
 elif args.a == 'all':
-    approaches = ('FixedMesh', 'HessianBased', 'DWP', 'DWR')
+    approaches = ['FixedMesh', 'HessianBased', 'DWP', 'DWR']
 else:
-    assert args.a in ('FixedMesh', 'HessianBased', 'DWP', 'DWR')
-    approaches = args.a
+    assert args.a in ('FixedMesh', 'HessianBased', 'DWP', 'DWR']
+    approaches = [args.a]
+failures = []
+nodebug = False if args.nodebug is None else bool(args.nodebug)
 
 for approach in approaches:
     errorFile = open('outdata/AdvectionDiffusion/' + approach + '_' + date + '.txt', 'w+')
@@ -62,13 +65,16 @@ for approach in approaches:
         resolutions = [0 if args.level is None else int(args.level)]
     Jlist = np.zeros(len(resolutions))
     for i in resolutions:
-        try:
+
+        def run_model():
             mesh, u0, eta0, b, BCs, source, diffusivity = problem_domain(i, op=op)
-            quantities = advect(mesh, u0, eta0, b, BCs=BCs, source=source, diffusivity=diffusivity, regen=bool(args.regen), op=op)
+            quantities = advect(mesh, u0, eta0, b, BCs=BCs, source=source, diffusivity=diffusivity,
+                                regen=bool(args.regen), op=op)
             PETSc.Sys.Print("Mode: %s Approach: %s. Run: %d" % ('advection-diffusion', approach, i), comm=COMM_WORLD)
             rel = np.abs(op.J - quantities['J_h']) / np.abs(op.J)
             PETSc.Sys.Print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs OF error: %.4e"
-                  % (i, quantities['mean_elements'], quantities['J_h'], quantities['solver_timer'], rel), comm=COMM_WORLD)
+                            % (i, quantities['mean_elements'], quantities['J_h'], quantities['solver_timer'], rel),
+                            comm=COMM_WORLD)
             errorFile.write('%d, %.4e' % (quantities['mean_elements'], rel))
             for tag in ("peak", "dist", "spd", "TV P02", "TV P06"):
                 if tag in quantities:
@@ -80,8 +86,8 @@ for approach in approaches:
 
                 i_end = op.final_export()
                 for progress in (0.5, 1):
-                    tag = "h_snapshot_"+str(int(i_end*progress))        # TODO: This is for non-diffusive case
-                    if tag in quantities:                               # TODO: Consider steady state for diffusive case
+                    tag = "h_snapshot_" + str(int(i_end * progress))  # TODO: This is for non-diffusive case
+                    if tag in quantities:  # TODO: Consider steady state for diffusive case
                         plt.clf()
                         s = quantities[tag]
                         sl = op.h_slice
@@ -90,9 +96,9 @@ for approach in approaches:
                         plt.title("Tracer concentration at time %.1fs" % (op.end_time * progress))
                         plt.xlabel("Abcissa (m)")
                         plt.ylabel("Tracer concentraton (g/L)")
-                        plt.savefig('outdata/AdvectionDiffusion/'+ tag + '.pdf')
+                        plt.savefig('outdata/AdvectionDiffusion/' + tag + '.pdf')
                 for progress in (0.5, 1):
-                    tag = "v_snapshot_"+str(int(i_end*progress))
+                    tag = "v_snapshot_" + str(int(i_end * progress))
                     if tag in quantities:
                         plt.clf()
                         s = quantities[tag]
@@ -103,8 +109,20 @@ for approach in approaches:
                         plt.xlabel("Ordinate (m)")
                         plt.ylabel("Tracer concentration (g/L)")
                         plt.savefig('outdata/AdvectionDiffusion/' + tag + '.pdf')
-        except:
-            PETSc.Sys.Print("WARNING: %s run %d failed!" % (op.approach, i), comm=COMM_WORLD)
-        if approach in ("DWP", "DWR"):
-            PETSc.Sys.Print("Time for final run: %.1fs" % quantities['adapt_solve_timer'], comm=COMM_WORLD)
+            if approach in ("DWP", "DWR"):
+                PETSc.Sys.Print("Time for final run: %.1fs" % quantities['adapt_solve_timer'], comm=COMM_WORLD)
+
+        if nodebug:
+            try:
+                run_model()
+            except:
+                PETSc.Sys.Print("WARNING: %s run %d failed!" % (op.approach, i), comm=COMM_WORLD)
+                failures.append("{a:s} run {r:d}".format(a=approach, r=i))
+        else:
+            run_model()
     errorFile.close()
+
+if failures != []:
+    print("Failure summary:")
+    for f in failures:
+        print(f)

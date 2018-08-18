@@ -28,6 +28,7 @@ parser.add_argument("-high", help="Upper bound for mesh resolution range")
 parser.add_argument("-level", help="Single mesh resolution")
 parser.add_argument("-regen", help="Regenerate error estimates from saved data")
 parser.add_argument("-snes_view", help="Use PETSc snes sview.")
+parser.add_argument("-nodebug", help="Hide error messages.")
 args = parser.parse_args()
 
 if args.t is None:
@@ -36,12 +37,14 @@ else:
     mode = args.t
 order_increase = True  # TODO: difference quotient option
 if args.a is None:
-    approaches = ('FixedMesh')
+    approaches = ['FixedMesh']
 elif args.a == 'all':
-    approaches = ('FixedMesh', 'HessianBased', 'DWP', 'DWR')
+    approaches = ['FixedMesh', 'HessianBased', 'DWP', 'DWR']
 else:
-    assert args.a in ('FixedMesh', 'HessianBased', 'DWP', 'DWR')
-    approaches = args.a
+    assert args.a in ['FixedMesh', 'HessianBased', 'DWP', 'DWR']
+    approaches = [args.a]
+failures = []
+nodebug = False if args.nodebug is None else bool(args.nodebug)
 
 for approach in approaches:
 
@@ -94,7 +97,8 @@ for approach in approaches:
         resolutions = [0 if args.level is None else int(args.level)]
     Jlist = np.zeros(len(resolutions))
     for i in resolutions:
-        try:
+
+        def run_model():
             mesh, u0, eta0, b, BCs, f, diffusivity = problem_domain(i, op=op)
             quantities = tsunami(mesh, u0, eta0, b, BCs=BCs, f=f, diffusivity=diffusivity, regen=bool(args.regen), op=op)
             PETSc.Sys.Print("Mode: %s Approach: %s. Run: %d" % (mode, approach, i), comm=COMM_WORLD)
@@ -111,8 +115,20 @@ for approach in approaches:
                 files[tag].write("\n")
             if approach in ("DWP", "DWR"):
                 PETSc.Sys.Print("Time for final run: %.1fs" % quantities['adapt_solve_timer'], comm=COMM_WORLD)
-        except:
-            PETSc.Sys.Print("WARNING: %s run %d failed!" % (op.approach, i), comm=COMM_WORLD)
+
+        if nodebug:
+            try:
+                run_model()
+            except:
+                PETSc.Sys.Print("WARNING: %s run %d failed!" % (op.approach, i), comm=COMM_WORLD)
+                failures.append("{a:s} run {r:d}".format(a=approach, r=i))
+        else:
+            run_model()
     for tag in files:
         files[tag].close()
     errorFile.close()
+
+if failures != []:
+    print("Failure summary:")
+    for f in failures:
+        print(f)
