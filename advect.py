@@ -34,7 +34,7 @@ if args.a is None:
 elif args.a == 'all':
     approaches = ['FixedMesh', 'HessianBased', 'DWP', 'DWR']
 else:
-    assert args.a in ('FixedMesh', 'HessianBased', 'DWP', 'DWR']
+    assert args.a in ['FixedMesh', 'HessianBased', 'DWP', 'DWR']
     approaches = [args.a]
 failures = []
 nodebug = False if args.nodebug is None else bool(args.nodebug)
