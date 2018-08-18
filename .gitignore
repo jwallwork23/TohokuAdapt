@@ -40,3 +40,4 @@ plots/rossby-wave/
 dt_test.py
 advection-test.py
 pure-advection.py
+gradation_test.py

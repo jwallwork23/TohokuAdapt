@@ -40,7 +40,9 @@ failures = []
 nodebug = False if args.nodebug is None else bool(args.nodebug)
 
 for approach in approaches:
-    errorFile = open('outdata/AdvectionDiffusion/' + approach + '_' + date + '.txt', 'w+')
+    filename = 'outdata/AdvectionDiffusion/' + approach + '_' + date
+    errorFile = open(filename + '.txt', 'w+')   # Initialise file
+    errorFile.close()
 
     # Set parameters
     op = AdvectionOptions(approach=approach)
@@ -67,6 +69,7 @@ for approach in approaches:
     for i in resolutions:
 
         def run_model():
+            errorFile = open(filename + '.txt', 'a+')  # Append mode ensures against crashes
             mesh, u0, eta0, b, BCs, source, diffusivity = problem_domain(i, op=op)
             quantities = advect(mesh, u0, eta0, b, BCs=BCs, source=source, diffusivity=diffusivity,
                                 regen=bool(args.regen), op=op)
@@ -111,6 +114,7 @@ for approach in approaches:
                         plt.savefig('outdata/AdvectionDiffusion/' + tag + '.pdf')
             if approach in ("DWP", "DWR"):
                 PETSc.Sys.Print("Time for final run: %.1fs" % quantities['adapt_solve_timer'], comm=COMM_WORLD)
+            errorFile.close()
 
         if nodebug:
             try:
@@ -120,7 +124,6 @@ for approach in approaches:
                 failures.append("{a:s} run {r:d}".format(a=approach, r=i))
         else:
             run_model()
-    errorFile.close()
 
 if failures != []:
     print("Failure summary:")

@@ -54,7 +54,8 @@ for approach in approaches:
         field_for_adaptation = args.f if args.f is not None else 's'
         filename += '_' + field_for_adaptation
     filename += '_' + date
-    errorFile = open(filename + '.txt', 'w+')
+    errorFile = open(filename + '.txt', 'w+')   # Initialise file for data storage
+    errorFile.close()
     files = {}
     extensions = []
     if mode == 'Tohoku':
@@ -99,6 +100,7 @@ for approach in approaches:
     for i in resolutions:
 
         def run_model():
+            errorFile = open(filename + '.txt', 'a+')   # Append mode ensures against crashes
             mesh, u0, eta0, b, BCs, f, diffusivity = problem_domain(i, op=op)
             quantities = tsunami(mesh, u0, eta0, b, BCs=BCs, f=f, diffusivity=diffusivity, regen=bool(args.regen), op=op)
             PETSc.Sys.Print("Mode: %s Approach: %s. Run: %d" % (mode, approach, i), comm=COMM_WORLD)
@@ -115,6 +117,7 @@ for approach in approaches:
                 files[tag].write("\n")
             if approach in ("DWP", "DWR"):
                 PETSc.Sys.Print("Time for final run: %.1fs" % quantities['adapt_solve_timer'], comm=COMM_WORLD)
+            errorFile.close()
 
         if nodebug:
             try:
@@ -126,7 +129,6 @@ for approach in approaches:
             run_model()
     for tag in files:
         files[tag].close()
-    errorFile.close()
 
 if failures != []:
     print("Failure summary:")
