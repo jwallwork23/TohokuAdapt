@@ -10,40 +10,6 @@ from utils.setup import problem_domain
 from utils.options import AdvectionOptions
 
 
-now = datetime.datetime.now()
-date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
-
-parser = argparse.ArgumentParser()
-parser.add_argument("-f", help="Finite element family, from {'dg', 'cg'}")
-parser.add_argument("-o", help="Output data")
-parser.add_argument("-level", help="Single mesh resolution")
-parser.add_argument("-snes_view", help="Use PETSc snes view.")
-args = parser.parse_args()
-
-approach = 'FixedMesh'
-
-filename = 'outdata/AdvectionDiffusion/' + approach + '_' + date
-errorFile = open(filename + '.txt', 'w+')   # Initialise file
-errorFile.close()
-
-# Set parameters
-op = AdvectionOptions(approach=approach)
-op.plot_pvd = bool(args.o)
-op.tracer_family = args.f if args.f is not None else 'cg'
-if bool(args.snes_view):
-    op.solver_parameters['snes_view'] = True
-level = int(args.level)
-
-# Get data and save to disk
-errorFile = open(filename + '.txt', 'a+')  # Append mode ensures against crashes
-mesh, u0, eta0, b, BCs, source, diffusivity = problem_domain(level, op=op)
-quantities = FixedMesh(mesh, u0, eta0, b, BCs=BCs, source=source, diffusivity=diffusivity, op=op)
-PETSc.Sys.Print("Mode: %s Approach: %s. Run: %d" % ('advection-diffusion', approach, level), comm=COMM_WORLD)
-PETSc.Sys.Print("Run %d: Mean element count: %6d Timing %.1fs Objective: %.4e" % (level, quantities['mean_elements'], quantities['solver_timer'], quantities['J_h']), comm=COMM_WORLD)
-errorFile.write('%d, %.1f, %.4e\n' % (quantities['mean_elements'], quantities['solver_timer'], quantities['J_h']))
-errorFile.close()
-
-
 def FixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
     op = kwargs.get('op')
 
@@ -90,3 +56,35 @@ def FixedMesh(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs
     quantities['solver_timer'] = solver_timer
 
     return quantities
+
+
+now = datetime.datetime.now()
+date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-f", help="Finite element family, from {'dg', 'cg'}")
+parser.add_argument("-o", help="Output data")
+parser.add_argument("-level", help="Single mesh resolution")
+parser.add_argument("-snes_view", help="Use PETSc snes view.")
+args = parser.parse_args()
+approach = 'FixedMesh'
+
+# Set parameters
+op = AdvectionOptions(approach=approach)
+op.plot_pvd = bool(args.o)
+op.tracer_family = args.f if args.f is not None else 'cg'
+if bool(args.snes_view):
+    op.solver_parameters['snes_view'] = True
+level = int(args.level)
+
+# Get data
+mesh, u0, eta0, b, BCs, source, diffusivity = problem_domain(level, op=op)
+quantities = FixedMesh(mesh, u0, eta0, b, BCs=BCs, source=source, diffusivity=diffusivity, op=op)
+PETSc.Sys.Print("Mode: %s Approach: %s. Run: %d" % ('advection-diffusion', approach, level), comm=COMM_WORLD)
+PETSc.Sys.Print("Run %d: Mean element count: %6d Timing %.1fs Objective: %.4e" % (level, quantities['mean_elements'], quantities['solver_timer'], quantities['J_h']), comm=COMM_WORLD)
+
+# Save to disk
+filename = 'outdata/AdvectionDiffusion/' + approach + '_' + date
+errorFile = open(filename + '.txt', 'a+')   # Initialise file
+errorFile.write('run %d: %d, %.1f, %.4e\n' % (level, quantities['mean_elements'], quantities['solver_timer'], quantities['J_h']))
+errorFile.close()
