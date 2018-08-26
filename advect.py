@@ -28,7 +28,6 @@ parser.add_argument("-snes_view", help="Use PETSc snes view.")
 parser.add_argument("-nodebug", help="Hide error messages.")
 args = parser.parse_args()
 
-approach = args.a
 if args.a is None:
     approaches = ['FixedMesh']
 elif args.a == 'all':
