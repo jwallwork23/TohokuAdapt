@@ -246,7 +246,8 @@ def problem_domain(level=0, mesh=None, b=None, op=TohokuOptions()):
         u0 = Function(VectorFunctionSpace(mesh, "CG", 1)).interpolate(Expression([1., 0.]))
         eta0 = Function(P1)
         BCs = {'shallow water': {}, 'tracer': {1: {'value': Constant(0.)}}}
-        # diffusivity = Function(P1).assign(op.diffusivity)
+
+        # Artificial 'sponge' boundary condition
         l = 0.1     # Scaling parameter for quadratic sponge to RH boundary
         x0 = 50.    # Start location of sponge
         diffusivity = Function(P1).interpolate(op.diffusivity + l * pow(max_value(0, x - x0), 2))
