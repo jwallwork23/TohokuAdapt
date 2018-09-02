@@ -54,7 +54,6 @@ for approach in approaches:
         op.solver_parameters['snes_view'] = True
     op.order_increase = True    # TODO: difference quotient option
 
-    # TODO: continue testing
     if op.approach in ("DWP", "DWR"):
         op.rescaling = 0.1
 
@@ -68,20 +67,12 @@ for approach in approaches:
     for i in resolutions:
 
         def run_model():
-            errorFile = open(filename + '.txt', 'a+')  # Append mode ensures against crashes
+            errorFile = open(filename + '.txt', 'a+')  # Append mode ensures against crashes meaning losing all data
             mesh, u0, eta0, b, BCs, source, diffusivity = problem_domain(i, op=op)
-            quantities = advect(mesh, u0, eta0, b, BCs=BCs, source=source, diffusivity=diffusivity,
-                                regen=bool(args.regen), op=op)
-            PETSc.Sys.Print("Mode: %s Approach: %s. Run: %d" % ('advection-diffusion', approach, i), comm=COMM_WORLD)
-            rel = np.abs(op.J - quantities['J_h']) / np.abs(op.J)
-            PETSc.Sys.Print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs OF error: %.4e"
-                            % (i, quantities['mean_elements'], quantities['J_h'], quantities['solver_timer'], rel),
-                            comm=COMM_WORLD)
-            errorFile.write('%d, %.4e' % (quantities['mean_elements'], rel))
-            for tag in ("peak", "dist", "spd", "TV P02", "TV P06"):
-                if tag in quantities:
-                    errorFile.write(", %.4e" % quantities[tag])
-            errorFile.write(", %.1f, %.4e\n" % (quantities['solver_timer'], quantities['J_h']))
+            quantities = advect(mesh, u0, eta0, b, BCs=BCs, source=source, diffusivity=diffusivity, regen=bool(args.regen), op=op)
+            PETSc.Sys.Print("Mode: AdvectionDiffusion Approach: %s. Run: %d" % (approach, i), comm=COMM_WORLD)
+            PETSc.Sys.Print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs" % (i, quantities['mean_elements'], quantities['J_h'], quantities['solver_timer']), comm=COMM_WORLD)
+            errorFile.write('%d,%.1f,%.4e\n' % (quantities['mean_elements'],quantities['solver_timer'],quantities['J_h']))
 
             if op.plot_cross_section:
                 import matplotlib.pyplot as plt

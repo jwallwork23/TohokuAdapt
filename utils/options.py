@@ -7,16 +7,14 @@ import numpy as np
 
 from .conversion import from_latlon
 
-__all__ = ["TohokuOptions", "RossbyWaveOptions", "KelvinWaveOptions", "GaussianOptions", "AdvectionOptions"]
+__all__ = ["TohokuOptions", "AdvectionOptions"]
 
 
 class AdaptOptions(FrozenConfigurable):
     name = 'Common parameters for TohokuAdapt project'
 
     # Mesh adaptivity parameters
-    approach = Unicode('FixedMesh',
-                       help="Mesh adaptive approach considered, from {'FixedMesh', 'HessianBased', 'DWP', 'DWR'}"
-                       ).tag(config=True)
+    approach = Unicode('FixedMesh', help="Mesh adaptive approach considered, from {'FixedMesh', 'HessianBased', 'DWP', 'DWR'}").tag(config=True)
     gradate = Bool(False, help='Toggle metric gradation.').tag(config=True)
     adapt_on_bathymetry = Bool(False, help='Toggle adaptation based on bathymetry field.').tag(config=True)
     plot_pvd = Bool(False, help='Toggle plotting of fields.').tag(config=True)
@@ -174,105 +172,6 @@ class TohokuOptions(AdaptOptions):
     J = Float(1.3347e+12, help="Objective functional value on a fine mesh").tag(config=True)
 
 
-class RossbyWaveOptions(AdaptOptions):
-    name = 'Parameters for the equatorial Rossby wave test problem'
-    mode = 'RossbyWave'
-
-    # Solver parameters
-    timesteps_per_export = NonNegativeInteger(12, help="Timesteps per data dump").tag(config=True)
-    timesteps_per_remesh = NonNegativeInteger(48, help="Timesteps per mesh adaptation").tag(config=True)
-    simulation_end_time = PositiveFloat(120.).tag(config=True)
-    target_vertices = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
-    adapt_field = Unicode('s', help="Adaptation field of interest, from {'s', 'f', 'b'}.").tag(config=True)
-    timestep = PositiveFloat(0.05, help="Timestep").tag(config=True)
-    start_time = PositiveFloat(30., help="Start time of period of interest").tag(config=True)
-    end_time = PositiveFloat(120., help="End time of period of interest").tag(config=True)
-    h_min = PositiveFloat(1e-3, help="Minimum element size").tag(config=True)
-    h_max = PositiveFloat(10., help="Maximum element size").tag(config=True)
-    rescaling = PositiveFloat(0.255, help="Scaling parameter for target number of vertices.").tag(config=True)
-    # Here ``rescaling`` is adjusted based on using oversized domain to account for periodicity
-    solver_parameters = PETScSolverParameters({'ksp_type': 'gmres',
-                                               'pc_type': 'fieldsplit',
-                                               'pc_fieldsplit_type': 'multiplicative'}).tag(config=True)
-
-    # Physical parameters
-    coriolis = Unicode('beta', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
-    g = PositiveFloat(1., help="Gravitational acceleration").tag(config=True)
-
-    # Region of importance
-    radii = List(trait=Float, default_value=[np.sqrt(3), np.sqrt(3)],
-                 help="Radius of indicator function around location of interest.").tag(config=True)
-    loc = List(trait=Float, default_value=[0., 0., -48., 0.],
-               help="Important locations, written as a list.").tag(config=True)
-    J = Float(5.3333, help="Objective functional value on a fine mesh").tag(config=True)
-    J_mirror = Float(5.3333, help="Objective functional value for mirrored problem on a fine mesh").tag(config=True)
-
-
-class KelvinWaveOptions(AdaptOptions):
-    name = 'Parameters for the equatorial Kelvin wave test problem'
-    mode = 'KelvinWave'
-
-    # Solver parameters
-    timesteps_per_export = NonNegativeInteger(12, help="Timesteps per data dump").tag(config=True)
-    timesteps_per_remesh = NonNegativeInteger(48, help="Timesteps per mesh adaptation").tag(config=True)
-    simulation_end_time = PositiveFloat(36.).tag(config=True)
-    target_vertices = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
-    adapt_field = Unicode('s', help="Adaptation field of interest, from {'s', 'f', 'b'}.").tag(config=True)
-    timestep = PositiveFloat(0.05, help="Timestep").tag(config=True)
-    start_time = PositiveFloat(10., help="Start time of period of interest").tag(config=True)
-    end_time = PositiveFloat(36., help="End time of period of interest").tag(config=True)
-    h_min = PositiveFloat(1e-3, help="Minimum element size").tag(config=True)
-    h_max = PositiveFloat(10., help="Maximum element size").tag(config=True)
-    rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
-    solver_parameters = PETScSolverParameters({'ksp_type': 'gmres',
-                                               'pc_type': 'fieldsplit',
-                                               'pc_fieldsplit_type': 'multiplicative'}).tag(config=True)
-
-    # Physical parameters
-    coriolis = Unicode('beta', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
-    g = PositiveFloat(1., help="Gravitational acceleration").tag(config=True)
-
-    # Region of importance
-    radii = List(trait=Float, default_value=[np.sqrt(3)],
-                 help="Radius of indicator function around location of interest.").tag(config=True)
-    loc = List(trait=Float, default_value=[15., 0.],
-               help="Important locations, written as a list.").tag(config=True)
-    J = Float(5.3333, help="Objective functional value on a fine mesh").tag(config=True)
-    J_mirror = Float(5.3333, help="Objective functional value for mirrored problem on a fine mesh").tag(config=True)
-
-
-class GaussianOptions(AdaptOptions):
-    name = 'Parameters for the shallow water test problem with Gaussian initial condition'
-    mode = 'GaussianTest'
-
-    # Solver parameters
-    timesteps_per_export = NonNegativeInteger(6, help="Timesteps per data dump").tag(config=True)
-    timesteps_per_remesh = NonNegativeInteger(12, help="Timesteps per mesh adaptation").tag(config=True)
-    simulation_end_time = PositiveFloat(3.).tag(config=True)
-    target_vertices = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
-    adapt_field = Unicode('s', help="Adaptation field of interest, from {'s', 'f', 'b'}.").tag(config=True)
-    timestep = PositiveFloat(0.05, help="Timestep").tag(config=True)
-    start_time = PositiveFloat(0.6, help="Start time of period of interest").tag(config=True)
-    end_time = PositiveFloat(3., help="End time of period of interest").tag(config=True)
-    h_min = PositiveFloat(1e-4, help="Minimum element size").tag(config=True)
-    h_max = PositiveFloat(1., help="Maximum element size").tag(config=True)
-    rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
-    solver_parameters = PETScSolverParameters({'ksp_type': 'gmres',
-                                               'pc_type': 'fieldsplit',
-                                               'pc_fieldsplit_type': 'multiplicative'}).tag(config=True)
-
-    # Physical parameters
-    coriolis = Unicode('beta', help="Type of Coriolis parameter, from {'sin', 'beta', 'f', 'off'}.").tag(config=True)
-    g = PositiveFloat(9.81, help="Gravitational acceleration").tag(config=True)
-
-    # Region of importance
-    radii = List(trait=Float, default_value=[np.sqrt(0.3)],
-                 help="Radius of indicator function around location of interest.").tag(config=True)
-    loc = List(trait=Float, default_value=[0., np.pi],
-               help="Important locations, written as a list.").tag(config=True)
-    J = Float(1.6160e-4, help="Objective functional value on a fine mesh").tag(config=True)
-
-
 class AdvectionOptions(AdaptOptions):
     name = 'Parameters for advection diffusion test problem'
     mode = 'AdvectionDiffusion'
@@ -313,3 +212,4 @@ class AdvectionOptions(AdaptOptions):
                    help="List of coordinates corresponding to a horizontal slice of the domain").tag(config=True)
     v_slice = List(trait=Tuple, default_value=[(30., y) for y in np.linspace(0.002, 9.998, 101)],
                    help="List of coordinates corresponding to a vertical slice of the domain").tag(config=True)
+

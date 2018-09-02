@@ -7,8 +7,8 @@ from utils.adaptivity import *
 from utils.callbacks import SWCallback
 from utils.error_estimators import difference_quotient_estimator, local_norm
 from utils.interpolation import interp
-from utils.misc import index_string, peak_and_distance, boundary_region, extract_gauge_data, gauge_total_variation
-from utils.setup import problem_domain, RossbyWaveSolution
+from utils.misc import index_string, boundary_region, extract_gauge_data, gauge_total_variation
+from utils.setup import problem_domain
 
 
 __all__ = ["tsunami"]
@@ -20,8 +20,6 @@ def FixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     # Initialise domain and physical parameters
     physical_constants['g_grav'].assign(op.g)
     V = op.mixed_space(mesh)                               # TODO: Parallelise this (and below)
-    if op.mode == 'RossbyWave':            # Analytic final-time state
-        peak_a, distance_a = peak_and_distance(RossbyWaveSolution(V, op=op).__call__(t=op.end_time).split()[1])
 
     # Initialise solver
     solver_obj = solver2d.FlowSolver2d(mesh, b)
@@ -43,15 +41,14 @@ def FixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         options.no_exports = True
     solver_obj.assign_initial_conditions(elev=eta0, uv=u0)
     cb1 = SWCallback(solver_obj, parameters=op)
-    if op.mode == 'Tohoku':
-        cb2 = callback.DetectorsCallback(solver_obj,
-                                         [op.gauge_coordinates(g) for g in op.gauges],
-                                         ['elev_2d'],
-                                         'timeseries',
-                                         op.gauges,
-                                         export_to_hdf5=True)
-        solver_obj.add_callback(cb2, 'timestep')
+    cb2 = callback.DetectorsCallback(solver_obj,
+                                     [op.gauge_coordinates(g) for g in op.gauges],
+                                     ['elev_2d'],
+                                     'timeseries',
+                                     op.gauges,
+                                     export_to_hdf5=True)
     solver_obj.add_callback(cb1, 'timestep')
+    solver_obj.add_callback(cb2, 'timestep')
     solver_obj.bnd_functions['shallow_water'] = BCs
 
     # Solve and extract timeseries / functionals
@@ -60,24 +57,14 @@ def FixedMesh(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     solver_obj.iterate()
     solver_timer = clock() - solver_timer
     quantities['J_h'] = cb1.get_val()          # Evaluate objective functional
-    if op.mode == 'Tohoku':
-        extract_gauge_data(quantities, op=op)
-
-    # Measure error using metrics, as in Huang et al.     # TODO: Parallelise this (and above)
-    if op.mode == 'RossbyWave':
-        peak, distance = peak_and_distance(solver_obj.fields.solution_2d.split()[1], op=op)
-        distance += 48. # Account for periodic domain
-        quantities['peak'] = peak/peak_a
-        quantities['dist'] = distance/distance_a
-        quantities['spd'] = distance /(op.end_time * 0.4)
+    extract_gauge_data(quantities, op=op)
 
     # Output mesh statistics and solver times
     quantities['mean_elements'] = mesh.num_cells()
     quantities['solver_timer'] = solver_timer
     quantities['adapt_solve_timer'] = 0.
-    if op.mode == 'Tohoku':
-        for g in op.gauges:
-            quantities["TV "+g] = gauge_total_variation(quantities[g], gauge=g)
+    for g in op.gauges:
+       quantities["TV "+g] = gauge_total_variation(quantities[g], gauge=g)
 
     return quantities
 
@@ -93,8 +80,6 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     uv_2d, elev_2d = Function(V).split()  # Needed to load data into
     elev_2d.interpolate(eta0)
     uv_2d.interpolate(u0)
-    if op.mode == 'RossbyWave':    # Analytic final-time state
-        peak_a, distance_a = peak_and_distance(RossbyWaveSolution(V, op=op).__call__(t=op.end_time).split()[1])
 
     # Initialise parameters and counters
     nEle = mesh.num_cells()
@@ -106,9 +91,8 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
 
     adapt_solve_timer = 0.
     quantities = {}
-    if op.mode == 'Tohoku':
-        for g in op.gauges:
-            quantities[g] = ()
+    for g in op.gauges:
+        quantities[g] = ()
     while cnt < op.final_index():
         adapt_timer = clock()
         P1 = FunctionSpace(mesh, "CG", 1)
@@ -189,22 +173,20 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             cb1.integrant = quantities['J_h']
             cb1.old_value = old_val
         adaptive_solver_obj.add_callback(cb1, 'timestep')
-        if op.mode == 'Tohoku':
-            cb2 = callback.DetectorsCallback(adaptive_solver_obj,
-                                             [op.gauge_coordinates(g) for g in op.gauges],
-                                             ['elev_2d'],
-                                             'timeseries',
-                                             op.gauges,
-                                             export_to_hdf5=True)
-            adaptive_solver_obj.add_callback(cb2, 'timestep')
+        cb2 = callback.DetectorsCallback(adaptive_solver_obj,
+                                         [op.gauge_coordinates(g) for g in op.gauges],
+                                         ['elev_2d'],
+                                         'timeseries',
+                                         op.gauges,
+                                         export_to_hdf5=True)
+        adaptive_solver_obj.add_callback(cb2, 'timestep')
         adaptive_solver_obj.bnd_functions['shallow_water'] = BCs
         solver_timer = clock()
         adaptive_solver_obj.iterate()
         solver_timer = clock() - solver_timer
         quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
         old_val = cb1.old_value
-        if op.mode == 'Tohoku':
-            extract_gauge_data(quantities, op=op)
+        extract_gauge_data(quantities, op=op)
 
         # Get mesh stats
         nEle = mesh.num_cells()
@@ -218,20 +200,12 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         # Extract fields for next step
         uv_2d, elev_2d = adaptive_solver_obj.fields.solution_2d.split()
 
-    # Measure error using metrics, as in Huang et al.
-    if op.mode == 'RossbyWave':
-        peak, distance = peak_and_distance(elev_2d, op=op)
-        quantities['peak'] = peak / peak_a
-        quantities['dist'] = distance / distance_a
-        quantities['spd'] = distance / (op.end_time * 0.4)
-
     # Output mesh statistics and solver times
     quantities['mean_elements'] = av
     quantities['solver_timer'] = adapt_solve_timer
     quantities['adapt_solve_timer'] = adapt_solve_timer
-    if op.mode == 'Tohoku':
-        for g in op.gauges:
-            quantities["TV "+g] = gauge_total_variation(quantities[g], gauge=g)
+    for g in op.gauges:
+        quantities["TV "+g] = gauge_total_variation(quantities[g], gauge=g)
 
     return quantities
 
@@ -260,8 +234,6 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     uv_2d.rename('uv_2d')
     elev_2d.rename('elev_2d')
     P1 = FunctionSpace(mesh, "CG", 1)
-    if op.mode == 'RossbyWave':    # Analytic final-time state
-        peak_a, distance_a = peak_and_distance(RossbyWaveSolution(V, op=op).__call__(t=op.end_time).split()[1])
 
     # Define Functions relating to a posteriori DWR error estimator
     dual = Function(V)
@@ -378,10 +350,9 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         elev_2d.interpolate(eta0)
         uv_2d.interpolate(u0)
         quantities = {}
-        if op.mode == 'Tohoku':
-            for g in op.gauges:
-                quantities[g] = ()
-        bdy = 200 if op.mode == 'Tohoku' else 'on_boundary'
+        for g in op.gauges:
+            quantities[g] = ()
+        bdy = 200   # Coastal ID tag
         while cnt < op.final_index():
             adapt_timer = clock()
             for l in range(op.num_adapt):
@@ -444,22 +415,20 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                 cb1.integrant = quantities['J_h']
                 cb1.old_value = old_val
             adaptive_solver_obj.add_callback(cb1, 'timestep')
-            if op.mode == 'Tohoku':
-                cb2 = callback.DetectorsCallback(adaptive_solver_obj,
-                                                 [op.gauge_coordinates(g) for g in op.gauges],
-                                                 ['elev_2d'],
-                                                 'timeseries',
-                                                 op.gauges,
-                                                 export_to_hdf5=True)
-                adaptive_solver_obj.add_callback(cb2, 'timestep')
+            cb2 = callback.DetectorsCallback(adaptive_solver_obj,
+                                             [op.gauge_coordinates(g) for g in op.gauges],
+                                             ['elev_2d'],
+                                             'timeseries',
+                                             op.gauges,
+                                             export_to_hdf5=True)
+            adaptive_solver_obj.add_callback(cb2, 'timestep')
             adaptive_solver_obj.bnd_functions['shallow_water'] = BCs
             solver_timer = clock()
             adaptive_solver_obj.iterate()
             solver_timer = clock() - solver_timer
             quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
             old_val = cb1.old_value
-            if op.mode == 'Tohoku':
-                extract_gauge_data(quantities, op=op)
+            extract_gauge_data(quantities, op=op)
 
             # Get mesh stats
             nEle = mesh.num_cells()
@@ -473,13 +442,6 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             # Extract fields for next solver block
             uv_2d, elev_2d = adaptive_solver_obj.fields.solution_2d.split()
 
-            # Measure error using metrics, as in Huang et al.
-        if op.mode == 'RossbyWave':
-            peak, distance = peak_and_distance(elev_2d, op=op)
-            quantities['peak'] = peak / peak_a
-            quantities['dist'] = distance / distance_a
-            quantities['spd'] = distance / (op.end_time * 0.4)
-
         # Output mesh statistics and solver times
         total_timer = error_timer + adapt_solve_timer
         if not regen:
@@ -487,9 +449,8 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         quantities['mean_elements'] = av
         quantities['solver_timer'] = total_timer
         quantities['adapt_solve_timer'] = adapt_solve_timer
-        if op.mode == 'Tohoku':
-            for g in op.gauges:
-                quantities["TV " + g] = gauge_total_variation(quantities[g], gauge=g)
+        for g in op.gauges:
+            quantities["TV " + g] = gauge_total_variation(quantities[g], gauge=g)
 
         return quantities
 
@@ -515,8 +476,6 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
     elev_2d.rename('elev_2d')
     P0 = FunctionSpace(mesh, "DG", 0)
     P1 = FunctionSpace(mesh, "CG", 1)
-    if op.mode == 'RossbyWave':    # Analytic final-time state
-        peak_a, distance_a = peak_and_distance(RossbyWaveSolution(V, op=op).__call__(t=op.end_time).split()[1])
 
     # Define Functions relating to a posteriori DWR error estimator
     dual = Function(V)
@@ -704,10 +663,9 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         elev_2d.interpolate(eta0)
         uv_2d.interpolate(u0)
         quantities = {}
-        if op.mode == 'Tohoku':
-            for g in op.gauges:
-                quantities[g] = ()
-        bdy = 200 if op.mode == 'Tohoku' else 'on_boundary'
+        for g in op.gauges:
+            quantities[g] = ()
+        bdy = 200    # Coastal ID tag
         # bdy = 'on_boundary'
         while cnt < op.final_index():
             adapt_timer = clock()
@@ -777,22 +735,20 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                 cb1.integrant = quantities['J_h']
                 cb1.old_value = old_val
             adaptive_solver_obj.add_callback(cb1, 'timestep')
-            if op.mode == 'Tohoku':
-                cb2 = callback.DetectorsCallback(adaptive_solver_obj,
-                                                 [op.gauge_coordinates(g) for g in op.gauges],
-                                                 ['elev_2d'],
-                                                 'timeseries',
-                                                 op.gauges,
-                                                 export_to_hdf5=True)
-                adaptive_solver_obj.add_callback(cb2, 'timestep')
+            cb2 = callback.DetectorsCallback(adaptive_solver_obj,
+                                             [op.gauge_coordinates(g) for g in op.gauges],
+                                             ['elev_2d'],
+                                             'timeseries',
+                                             op.gauges,
+                                             export_to_hdf5=True)
+            adaptive_solver_obj.add_callback(cb2, 'timestep')
             adaptive_solver_obj.bnd_functions['shallow_water'] = BCs
             solver_timer = clock()
             adaptive_solver_obj.iterate()
             solver_timer = clock() - solver_timer
             quantities['J_h'] = cb1.get_val()  # Evaluate objective functional
             old_val = cb1.old_value
-            if op.mode == 'Tohoku':
-                extract_gauge_data(quantities, op=op)
+            extract_gauge_data(quantities, op=op)
 
             # Get mesh stats
             nEle = mesh.num_cells()
@@ -806,13 +762,6 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
             # Extract fields for next solver block
             uv_2d, elev_2d = adaptive_solver_obj.fields.solution_2d.split()
 
-            # Measure error using metrics, as in Huang et al.
-        if op.mode == 'RossbyWave':
-            peak, distance = peak_and_distance(elev_2d, op=op)
-            quantities['peak'] = peak / peak_a
-            quantities['dist'] = distance / distance_a
-            quantities['spd'] = distance / (op.end_time * 0.4)
-
             # Output mesh statistics and solver times
         total_timer = error_timer + adapt_solve_timer
         if not regen:
@@ -820,9 +769,8 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         quantities['mean_elements'] = av
         quantities['solver_timer'] = total_timer
         quantities['adapt_solve_timer'] = adapt_solve_timer
-        if op.mode == 'Tohoku':
-            for g in op.gauges:
-                quantities["TV " + g] = gauge_total_variation(quantities[g], gauge=g)
+        for g in op.gauges:
+            quantities["TV " + g] = gauge_total_variation(quantities[g], gauge=g)
 
         return quantities
 

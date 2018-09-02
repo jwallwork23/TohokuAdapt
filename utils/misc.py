@@ -4,7 +4,7 @@ import scipy.interpolate as si
 import numpy as np
 import h5py
 
-from .options import TohokuOptions, RossbyWaveOptions, AdvectionOptions
+from .options import TohokuOptions, AdvectionOptions
 
 
 __all__ = ["index_string", "peak_and_distance", "boundary_region", "extract_slice", "extract_gauge_data",
@@ -17,18 +17,6 @@ def index_string(index):
     :return: five-digit string form of index.
     """
     return (5 - len(str(index))) * '0' + str(index)
-
-
-def peak_and_distance(f, op=RossbyWaveOptions()):
-    mesh = f.function_space().mesh()
-    with f.dat.vec_ro as fv:
-        peak_i, peak = fv.max()
-    dgCoords = Function(FunctionSpace(mesh, 'DG' if op.family == 'dg-dg' else 'CG',  1 if op.family == 'dg-dg' else 2))
-    dgCoords.interpolate(mesh.coordinates[0])
-    with dgCoords.dat.vec_ro as dv:         # TODO: I think an error may be occurring here-ish in parallel
-        val = np.abs(dv.getValue(peak_i))
-
-    return peak, val
 
 
 def boundary_region(mesh, bdyTag, scale, sponge=False):

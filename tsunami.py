@@ -5,7 +5,7 @@ import argparse
 import datetime
 import numpy as np
 
-from utils.options import TohokuOptions, GaussianOptions, RossbyWaveOptions, KelvinWaveOptions
+from utils.options import TohokuOptions
 from utils.setup import problem_domain
 from utils.sw_solvers import tsunami
 
@@ -14,7 +14,6 @@ now = datetime.datetime.now()
 date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
 parser = argparse.ArgumentParser()
-parser.add_argument("t", help="Choose test problem from {'shallow-water', 'rossby-wave'} (default 'tohoku')")
 parser.add_argument("-a", help="Choose adaptive approach from {'HessianBased', 'DWP', 'DWR'} (default 'FixedMesh')")
 parser.add_argument("-b", help="Intersect metrics with bathymetry")
 parser.add_argument("-f", help="Field for Hessian based adaptation, from {'s', 'f', 'b'}.")
@@ -31,10 +30,6 @@ parser.add_argument("-snes_view", help="Use PETSc snes sview.")
 parser.add_argument("-nodebug", help="Hide error messages.")
 args = parser.parse_args()
 
-if args.t is None:
-    mode = 'Tohoku'
-else:
-    mode = args.t
 order_increase = True  # TODO: difference quotient option
 if args.a is None:
     approaches = ['FixedMesh']
@@ -49,7 +44,7 @@ nodebug = False if args.nodebug is None else bool(args.nodebug)
 for approach in approaches:
 
     # Establish filenames
-    filename = 'outdata/' + mode + '/' + approach
+    filename = 'outdata/Tohoku/' + approach
     if approach == 'HessianBased':
         field_for_adaptation = args.f if args.f is not None else 's'
         filename += '_' + field_for_adaptation
@@ -57,24 +52,12 @@ for approach in approaches:
     errorFile = open(filename + '.txt', 'w+')   # Initialise file for data storage
     errorFile.close()
     files = {}
-    extensions = []
-    if mode == 'Tohoku':
-        extensions.append('P02')
-        extensions.append('P06')
+    extensions = ['P02', 'P06']
     for e in extensions:
         files[e] = open(filename + e + '.txt', 'w+')
 
     # Set parameters
-    if mode == 'Tohoku':
-        op = TohokuOptions(approach=approach)
-    elif mode == 'RossbyWave':
-        op = RossbyWaveOptions(approach=approach)
-    elif mode == 'KelvinWave':
-        op = KelvinWaveOptions(approach=approach)
-    elif mode == 'GaussianTest':
-        op = GaussianOptions(approach=approach)
-    else:
-        raise NotImplementedError
+    op = TohokuOptions(approach=approach)
     op.gradate = bool(args.g)
     op.plot_pvd = bool(args.o)
     op.plot_metric = bool(args.m)
@@ -100,18 +83,17 @@ for approach in approaches:
     for i in resolutions:
 
         def run_model():
-            errorFile = open(filename + '.txt', 'a+')   # Append mode ensures against crashes
+            errorFile = open(filename + '.txt', 'a+')   # Append mode ensures against crashes meaning losing all data
             mesh, u0, eta0, b, BCs, f, diffusivity = problem_domain(i, op=op)
             quantities = tsunami(mesh, u0, eta0, b, BCs=BCs, f=f, diffusivity=diffusivity, regen=bool(args.regen), op=op)
-            PETSc.Sys.Print("Mode: %s Approach: %s. Run: %d" % (mode, approach, i), comm=COMM_WORLD)
-            rel = np.abs(op.J - quantities['J_h']) / np.abs(op.J)
-            PETSc.Sys.Print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs OF error: %.4e"
-                  % (i, quantities['mean_elements'], quantities['J_h'], quantities['solver_timer'], rel), comm=COMM_WORLD)
-            errorFile.write('%d, %.4e' % (quantities['mean_elements'], rel))
-            for tag in ("peak", "dist", "spd", "TV P02", "TV P06"):
+            PETSc.Sys.Print("Mode: Tohoku Approach: %s. Run: %d" % (approach, i), comm=COMM_WORLD)
+            PETSc.Sys.Print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs"
+                  % (i, quantities['mean_elements'], quantities['J_h'], quantities['solver_timer']), comm=COMM_WORLD)
+            errorFile.write('%d,%.1f,%.4e' % (quantities['mean_elements'],quantities['solver_timer'],quantities['J_h']))
+            for tag in ("TV P02", "TV P06"):
                 if tag in quantities:
                     errorFile.write(", %.4e" % quantities[tag])
-            errorFile.write(", %.1f, %.4e\n" % (quantities['solver_timer'], quantities['J_h']))
+            errorFile.write("\n")
             for tag in files:
                 files[tag].writelines(["%s," % val for val in quantities[tag]])
                 files[tag].write("\n")

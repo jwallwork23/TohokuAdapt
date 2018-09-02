@@ -1,7 +1,7 @@
 import numpy as np
 
 
-__all__ = ["MeshSetup", "problem_domain", "RossbyWaveSolution", "__main__"]
+__all__ = ["MeshSetup", "problem_domain", "__main__"]
 
 
 class MeshSetup:
@@ -152,7 +152,7 @@ else:
     from .conversion import earth_radius, to_latlon, vectorlonlat_to_utm
     from .interpolation import interp
     from .misc import boundary_region
-    from .options import RossbyWaveOptions, TohokuOptions
+    from .options import TohokuOptions
 
 
 def problem_domain(level=0, mesh=None, b=None, op=TohokuOptions()):
@@ -230,39 +230,6 @@ def problem_domain(level=0, mesh=None, b=None, op=TohokuOptions()):
         # diffusivity = Function(P1).interpolate(boundary_region(mesh, 100, 1e9, sponge=True))
         # File('plots/tohoku/spongy.pvd').write(diffusivity)
 
-    elif op.mode == 'GaussianTest':
-        n = pow(2, level)
-        lx = 2 * pi
-        if mesh is None:
-            mesh = SquareMesh(n, n, lx, lx)
-        P1 = FunctionSpace(mesh, "CG", 1)
-        x, y = SpatialCoordinate(mesh)
-        eta0 = Function(P1).interpolate(1e-3 * exp(-(pow(x - np.pi, 2) + pow(y - np.pi, 2))))
-        u0 = Function(VectorFunctionSpace(mesh, "CG", 1))
-        b = Function(P1).assign(0.1)
-        BCs = {}
-        f = Function(P1)
-        diffusivity = None
-    elif op.mode in ('RossbyWave', 'KelvinWave'):
-        if mesh is None:
-            n = pow(2, level - 1)
-            ly = 24
-            if op.approach == 'FixedMesh':
-                lx = 48
-                mesh = PeriodicRectangleMesh(int(lx * n), int(ly * n), lx, ly, direction="x")
-            else:
-                lx = 160 if op.mode == 'RossbyWave' else 48
-                mesh = RectangleMesh(int(lx * n), int(ly * n), lx, ly)
-            xy = Function(mesh.coordinates)
-            xy.dat.data[:, :] -= [lx / 2, ly / 2]
-            mesh.coordinates.assign(xy)
-        P1 = FunctionSpace(mesh, "CG", 1)
-        b = Function(P1).assign(1.)
-        q = RossbyWaveSolution(op.mixedSpace(mesh), order=1, op=op).__call__()
-        u0, eta0 = q.split()
-        BCs = {1: {'uv': Constant(0.)}, 2: {'uv': Constant(0.)}, 3: {'uv': Constant(0.)}, 4: {'uv': Constant(0.)}}
-        f = Function(P1).interpolate(SpatialCoordinate(mesh)[1])
-        diffusivity = None
     elif op.mode == 'AdvectionDiffusion':
         n = pow(2, level)
         if mesh is None:
@@ -286,232 +253,10 @@ def problem_domain(level=0, mesh=None, b=None, op=TohokuOptions()):
 
     if newmesh:
         PETSc.Sys.Print("Setting up mesh across {p:d} processes".format(p=COMM_WORLD.size))
-        PETSc.Sys.Print("  rank {r:d} owns {e:d} elements and can access {v:d} vertices".format(r=mesh.comm.rank,
-                                                                                                e=mesh.num_cells(),
-                                                                                                v=mesh.num_vertices()),
-                        comm=COMM_SELF)
+        PETSc.Sys.Print("  rank {r:d} owns {e:d} elements and can access {v:d} vertices".format(r=mesh.comm.rank, e=mesh.num_cells(), v=mesh.num_vertices()), comm=COMM_SELF)
 
     if op.mode == 'AdvectionDiffusion':
         return mesh, u0, eta0, b, BCs, source, diffusivity
     else:
         return mesh, u0, eta0, b, BCs, f, diffusivity
 
-
-class RossbyWaveSolution:
-    """
-    Class for constructing the analytic solution of the Rossby wave test case on a given FunctionSpace.
-    
-    Hermite polynomials taken from the Matlab code found at https://marine.rutgers.edu/po/tests/soliton/hermite.txt
-    """
-    def __init__(self, function_space, order=1, op=RossbyWaveOptions()):
-        """
-        :arg function_space: mixed FunctionSpace in which to construct the Hermite polynomials.
-        """
-        try:
-            assert order in (0, 1)
-            self.order = order
-            self.function_space = function_space
-            self.soliton_amplitude = 0.395
-            x, y = SpatialCoordinate(self.function_space.mesh())
-            self.x = x
-            self.y = y
-        except:
-            raise NotImplementedError("Only zeroth and first order analytic solutions considered for this problem.")
-        try:
-            assert op.mode in ('rossby-wave', 'kelvin-wave')
-            self.op = op
-        except:
-            raise ValueError("Analytic solution only available for 'rossby-wave' and 'kelvin-wave' test cases.")
-
-    def coeffs(self):
-        """
-        Initialise Hermite coefficients.
-        """
-        u = np.zeros(28)
-        v = np.zeros(28)
-        eta = np.zeros(28)
-
-        #  Hermite series coefficients for u:
-        u[0] = 1.789276
-        u[2] = 0.1164146
-        u[4] = -0.3266961e-3
-        u[6] = -0.1274022e-2
-        u[8] = 0.4762876e-4
-        u[10] = -0.1120652e-5
-        u[12] = 0.1996333e-7
-        u[14] = -0.2891698e-9
-        u[16] = 0.3543594e-11
-        u[18] = -0.3770130e-13
-        u[20] = 0.3547600e-15
-        u[22] = -0.2994113e-17
-        u[24] = 0.2291658e-19
-        u[26] = -0.1178252e-21
-
-        #  Hermite series coefficients for v:
-        v[3] = -0.6697824e-1
-        v[5] = -0.2266569e-2
-        v[7] = 0.9228703e-4
-        v[9] = -0.1954691e-5
-        v[11] = 0.2925271e-7
-        v[13] = -0.3332983e-9
-        v[15] = 0.2916586e-11
-        v[17] = -0.1824357e-13
-        v[19] = 0.4920951e-16
-        v[21] = 0.6302640e-18
-        v[23] = -0.1289167e-19
-        v[25] = 0.1471189e-21
-
-        #  Hermite series coefficients for eta:
-        eta[0] = -3.071430
-        eta[2] = -0.3508384e-1
-        eta[4] = -0.1861060e-1
-        eta[6] = -0.2496364e-3
-        eta[8] = 0.1639537e-4
-        eta[10] = -0.4410177e-6
-        eta[12] = 0.8354759e-9
-        eta[14] = -0.1254222e-9
-        eta[16] = 0.1573519e-11
-        eta[18] = -0.1702300e-13
-        eta[20] = 0.1621976e-15
-        eta[22] = -0.1382304e-17
-        eta[24] = 0.1066277e-19
-        eta[26] = -0.1178252e-21
-
-        return {'u': u, 'v': v, 'eta': eta}
-
-    def polynomials(self):
-        """
-        Get Hermite polynomials
-        """
-        polys = [Constant(1.), 2 * self.y]
-        for i in range(2, 28):
-            polys.append(2 * self.y * polys[i - 1] - 2 * (i - 1) * polys[i - 2])
-
-        return polys
-
-    def xi(self, t=0.):
-        """
-        :arg t: current time.
-        :return: time shifted x-coordinate.
-        """
-        c = -1./3.
-        if self.order == 1:
-            c -= 0.395 * self.soliton_amplitude * self.soliton_amplitude
-        return self.x - c * t
-
-    def phi(self, t=0.):
-        """
-        :arg t: current time.
-        :return: sech^2 term.
-        """
-        B = self.soliton_amplitude
-        A = 0.771 * B * B
-
-        return A * (1 / (cosh(B * self.xi(t)) ** 2))
-
-    def dphidx(self, t=0.):
-        """
-        :arg t: current time. 
-        :return: tanh * phi term.
-        """
-        B = self.soliton_amplitude
-        return -2 * B * self.phi(t) * tanh(B * self.xi(t))
-
-    def psi(self):
-        """
-        :arg t: current time. 
-        :return: exp term.
-        """
-        return exp(-0.5 * self.y * self.y)
-
-    def zeroth_order_terms(self, t=0.):
-        """
-        :arg t: current time.
-        :return: zeroth order analytic solution for test problem of Huang.
-        """
-        return {'u' : self.phi(t) * 0.25 * (-9 + 6 *  self.y * self.y) * self.psi(),
-                'v': 2 * self.y * self.dphidx(t) * self.psi(),
-                'eta': self.phi(t) * 0.25 * (3 + 6 * self.y * self.y) * self.psi()}
-
-    def first_order_terms(self, t=0.):
-        """
-        :arg t: current time.
-        :return: first order analytic solution for test problem of Huang.
-        """
-        C = - 0.395 * self.soliton_amplitude * self.soliton_amplitude
-        phi = self.phi(t)
-        coeffs = self.coeffs()
-        polys = self.polynomials()
-        terms = self.zeroth_order_terms(t)
-        terms['u'] += C * phi * 0.5625 * (3 + 2 * self.y * self.y) * self.psi()     # NOTE: This last psi is not included
-        terms['u'] += phi * phi * self.psi() * sum(coeffs['u'][i] * polys[i] for i in range(28))
-        terms['v'] += self.dphidx(t) * phi * self.psi() * sum(coeffs['v'][i] * polys[i] for i in range(28))
-        terms['eta'] += C * phi * 0.5625 * (-5 + 2 * self.y * self.y) * self.psi()
-        terms['eta'] += phi * phi * self.psi() * sum(coeffs['eta'][i] * polys[i] for i in range(28))
-
-        return terms
-
-    def plot(self):
-        """
-        Plot initial condition and final state.
-        """
-        outFile = File("plots/rossby-wave/analytic/analytic.pvd")
-        for t in (0., self.op.Tend):
-            q = self.__call__(t)
-            u, eta = q.split()
-            u.rename("Depth averaged velocity")
-            eta.rename("Elevation")
-            print("t = {t:.4f}, |u| = {u:.4f}, |eta| = {e:.4f}".format(t=t,u=u.dat.norm, e=eta.dat.norm))
-            outFile.write(u, eta, time=t)
-
-    def integrate(self, mirror=False):
-        """
-        :return: list containing time integrand values at each timestep.
-        """
-        t = 0.
-        cnt = 0
-        vals = []
-
-        # Set up spatial and temporal kernel functions
-        mesh = self.function_space.mesh()
-        ks = Function(VectorFunctionSpace(mesh, "DG", 1) * FunctionSpace(mesh, "DG", 1))
-        k0, k1 = ks.split()
-        k1.assign(self.op.indicator(mesh, mirror=mirror))
-        kt = Constant(0.)
-
-        # Time integrate
-        tic = clock()
-        while t < self.op.Tend + 0.5 * self.op.dt:
-            q = self.__call__(t)
-            if t > self.op.Tstart - 0.5 * self.op.dt:  # Slightly smoothed transition
-                kt.assign(1. if t > self.op.Tstart + 0.5 * self.op.dt else 0.5)
-            vals.append(assemble(kt * inner(ks, q) * dx))
-            if cnt % self.op.ndump == 0:
-                tic = clock() - tic
-                print("t = %.2fs, CPU time: %.2fs" % (t, tic))
-                tic = clock()
-            t += self.op.dt
-            cnt += 1
-        return vals
-
-    def __call__(self, t=0.):
-        """
-        :arg t: current time.
-        :return: semi-analytic solution for Rossby wave test case of Huang.
-        """
-        terms = self.zeroth_order_terms(t) if self.order == 0 else self.first_order_terms(t)
-
-        q = Function(self.function_space)
-        u, eta = q.split()
-        u.rename("Depth averaged velocity")
-        eta.rename("Elevation")
-
-        W = FunctionSpace(self.function_space.mesh(), self.function_space.sub(0).ufl_element().family(),
-                          self.function_space.sub(0).ufl_element().degree())
-        u0 = Function(W).interpolate(terms['u'])
-        u1 = Function(W).interpolate(terms['v'])
-        u.dat.data[:, 0] = u0.dat.data  # TODO: This is perhaps not such a good idea in parallel
-        u.dat.data[:, 1] = u1.dat.data
-        eta.interpolate(terms['eta'])
-
-        return q
