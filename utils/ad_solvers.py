@@ -298,7 +298,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         dual_timer = clock()
         tape = get_working_tape()
         # tape.visualise(open_in_browser=True)
-        solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
+        solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock) and block.adj_sol is not None]
         N = len(solve_blocks)
         r = N % op.timesteps_per_export                            # Number of extra tape annotations in setup
         for i in range(N - 1, r - 1, -op.timesteps_per_export):
@@ -559,7 +559,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, source=None, diffusivity=None, **kwargs):
         dual_timer = clock()
         tape = get_working_tape()
         # tape.visualise(open_in_browser=True)
-        solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)]
+        solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock) and block.adj_sol is not None]
         N = len(solve_blocks)
         r = N % op.timesteps_per_remesh                       # Number of extra tape annotations in setup
         for i in range(r, N, op.timesteps_per_remesh):        # Iterate r is the first timestep

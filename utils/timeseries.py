@@ -16,57 +16,44 @@ plt.rc('font', family='serif')
 plt.rc('legend', fontsize='x-large')
 
 
-def read_errors(date, approach, mode='tohoku', bootstrapping=False):
+def read_errors(date, approach, mode='Tohoku'):
     """
     :arg date: date simulation was run.
     :arg approach: mesh adaptive approach.
     :param mode: problem considered.
-    :param bootstrapping: toggle use of bootstrapping.
     :return: mean element count, (some aspect of) error and CPU time.
     """
     filename = 'outdata/'+mode+'/'+approach+'_'+date
     textfile = open(filename+'.txt', 'r')
-    if mode == 'model-verification':
-        bootstrapping = True
     nEls = []
     err = {}
     tim = []
     i = 0
     for line in textfile:
-        if mode == 'tohoku':
+        if mode == 'Tohoku':
             av, rel, gP02, gP06, timing, J_h = line.split(',')
-        elif mode == 'shallow-water':
+        elif mode == 'GaussianTest':
             quantities = line.split(',')
             av = quantities[0]
             rel = quantities[1]
             timing = quantities[-2]
             J_h = quantities[-1]
-        elif mode == 'rossby-wave':
+        elif mode == 'RossbyWave':
             # av, rel, peak, dis, spd, timing, J_h = line.split(',')   # TODO: update for generalised framework
             quantities = line.split(',')
             av = quantities[0]
             rel = quantities[1]
             timing = quantities[-2]
             J_h = quantities[-1]
-        if mode == 'model-verification':
-            fixedMeshes = TohokuOptions().meshSizes
-            nEle, J_h, gP02, gP06, timing = line.split(',')
-            nEls.append(fixedMeshes[i])
         else:
             nEls.append(int(av))
-        if bootstrapping:
-            if mode == 'model-verification':
-                err[i] = [float(J_h), float(gP02), float(gP06)]
-            else:
-                err[i] = [float(J_h)]
-        else:
-            if mode == 'tohoku':
-                err[i] = [float(rel), float(gP02), float(gP06)]
-            elif mode == 'shallow-water':
-                err[i] = [float(rel)]
-            elif mode == 'rossby-wave':
-                # err[i] = [float(rel), float(peak), float(dis), float(spd)]
-                err[i] = [float(rel)]
+        if mode == 'Tohoku':
+            err[i] = [float(rel), float(gP02), float(gP06)]
+        elif mode == 'GaussianTest':
+            err[i] = [float(rel)]
+        elif mode == 'RossbyWave':
+            # err[i] = [float(rel), float(peak), float(dis), float(spd)]
+            err[i] = [float(rel)]
         tim.append(float(timing))
         i += 1
     textfile.close()
@@ -84,8 +71,8 @@ def extract_data(gauge):
             y.append(float(xy[1]))
 
         return x, y
-    elif gauge in ("Integrand", "Integrand-mirrored"):
-        measuredFile = open('outdata/rossby-wave/analytic_'+gauge+'.txt', 'r')
+    elif gauge == "Integrand":
+        measuredFile = open('outdata/RossbyWave/analytic_'+gauge+'.txt', 'r')
         dat = measuredFile.readline()
         xy = dat.split(",")
         measuredFile.close()
@@ -94,7 +81,7 @@ def extract_data(gauge):
 
 
 def plot_timeseries(fileExt, date, quantity='Integrand', realData=False, op=TohokuOptions()):
-    assert quantity in ('Integrand', 'Integrand-mirrored', 'P02', 'P06')
+    assert quantity in ('Integrand', 'P02', 'P06')
     filename = 'outdata/' + op.mode + '/' + fileExt + '_' + date + quantity + '.txt'
     filename2 = 'outdata/' + op.mode + '/' + fileExt + '_' + date + '.txt'
     f = open(filename, 'r')
@@ -105,7 +92,7 @@ def plot_timeseries(fileExt, date, quantity='Integrand', realData=False, op=Toho
         separated = line.split(',')
         dat = [float(d) for d in separated[:-1]]    # Ignore carriage return
         tim = np.linspace(0, op.end_time, len(dat))
-        if op.mode != 'shallow-water':
+        if op.mode != 'GaussianTest':
             plt.plot(tim[::5], dat[::5], label=g.readline().split(',')[0])
         else:
             plt.plot(tim, dat, label=g.readline().split(',')[0])
@@ -113,9 +100,9 @@ def plot_timeseries(fileExt, date, quantity='Integrand', realData=False, op=Toho
     f.close()
     g.close()
     if realData:
-        if (op.mode == 'tohoku' and quantity in ('P02', 'P06')) or op.mode == 'rossby-wave':
+        if (op.mode == 'Tohoku' and quantity in ('P02', 'P06')) or op.mode == 'RossbyWave':
             x, y = extract_data(quantity)
-            me = 10 if op.mode == 'rossby-wave' else 1
+            me = 10 if op.mode == 'RossbyWave' else 1
             plt.plot(np.linspace(0, op.end_time, len(x)), y, label='Gauge data', marker='*', markevery=me, color='black')
     plt.xlabel('Time (s)')
     plt.ylabel(quantity+' value')
@@ -167,7 +154,7 @@ def integrate_timeseries(fileExt, date, op=TohokuOptions()):
 
 def compare_timeseries(date, run, quantity='Integrand', op=TohokuOptions()):
     assert quantity in ('Integrand', 'P02', 'P06')
-    approaches = ("fixedMesh", "hessianBased", "DWP", "DWR")
+    approaches = ("FixedMesh", "HessianBased", "DWP", "DWR")
 
     # Get dates (if necessary)
     dates = {}
@@ -201,7 +188,7 @@ def compare_timeseries(date, run, quantity='Integrand', op=TohokuOptions()):
     plt.clf()
 
 
-def error_vs_elements(mode='tohoku',
+def error_vs_elements(mode='Tohoku',
                     bootstrapping=False,
                     noTinyMeshes=False,
                     date=None,
@@ -215,11 +202,8 @@ def error_vs_elements(mode='tohoku',
         names = ("rotational=off", "rotational=f", "rotational=beta", "rotational=sin")
     else:
         labels = ("Fixed mesh", "Hessian based", "DWP", "DWR", "Higher order DWR", "Refined DWR")
-        names = ("fixedMesh", "hessianBased", "DWP", "DWR", "DWR_ho", "DWR_r")
+        names = ("FixedMesh", "HessianBased", "DWP", "DWR", "DWR_ho", "DWR_r")
     styles = {labels[0]: 's', labels[1]: '^', labels[2]: 'x', labels[3]: 'o'}
-    if mode != 'model-verification':
-        styles[labels[4]] = '*'
-        styles[labels[5]] = 'h'
     err = {}
     nEls = {}
     tim = {}
@@ -238,9 +222,9 @@ def error_vs_elements(mode='tohoku',
         errorlabels.append('Relative total variation at gauge P06')
         errornames.append('P02')
         errornames.append('P06')
-    elif mode == 'shallow-water':
+    elif mode == 'GaussianTest':
         errortypes = 1
-    elif mode == 'rossby-wave':
+    elif mode == 'RossbyWave':
         # errortypes = 4
         # errorlabels.append('Relative error in solition peak')
         # errorlabels.append('Relative error in distance travelled')
@@ -288,9 +272,9 @@ def error_vs_elements(mode='tohoku',
             else:
                 plt.loglog(nEls[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
         if bootstrapping:
-            if mode == 'rossby-wave':
+            if mode == 'RossbyWave':
                 plt.hlines(op.J, 1e2, 1e6, colors='k', linestyles='solid', label=r'$1^{st}$ order asymptotic solution')
-            elif mode == 'tohoku':
+            elif mode == 'Tohoku':
                 plt.hlines(op.J, 4e3, 2e5, colors='k', linestyles='solid', label=r'681,616 elements')
                 plt.axhspan(op.J-5e10, op.J+5e10, alpha=0.5, color='gray')
 
@@ -304,9 +288,9 @@ def error_vs_elements(mode='tohoku',
         for mesh in err:
             plt.loglog(tim[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
         if bootstrapping:
-            if mode == 'rossby-wave':
+            if mode == 'RossbyWave':
                 plt.hlines(op.J, 1e2, 1e6, colors='k', linestyles='solid', label=r'$1^{st}$ order asymptotic solution')
-            elif mode == 'tohoku':
+            elif mode == 'Tohoku':
                 plt.hlines(op.J, 8e1, 2e3, colors='k', linestyles='solid', label=r'681,616 elements')
                 plt.axhspan(op.J-5e10, op.J+5e10, alpha=0.5, color='gray')
         plt.gcf()
