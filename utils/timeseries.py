@@ -23,21 +23,24 @@ def read_errors(date, approach, mode='Tohoku'):
     :param mode: problem considered.
     :return: mean element count, (some aspects of) error and CPU time.
     """
-    filename = 'outdata/'+mode+'/'+approach+'_'+date
-    textfile = open(filename+'.txt', 'r')
+    textfile = open('outdata/'+mode+'/'+approach+'_'+date+'.txt', 'r')
     nEls = []
-    err = {}
     tim = []
+    err = {}
     i = 0
     for line in textfile:
+
+        # Extract data from file
         if mode == 'Tohoku':
             av, timing, J_h, gP02, gP06 = line.split(',')
         elif mode == 'AdvectionDiffusion':
             av, timing, J_h = line.split(',')
+
+        # Add to list
         nEls.append(int(av))
+        tim.append(float(timing))
         if mode == 'Tohoku':
             err[i] = [float(gP02), float(gP06)]
-        tim.append(float(timing))
         i += 1
     textfile.close()
     return nEls, err, tim
@@ -58,69 +61,32 @@ def extract_data(gauge):
         raise NotImplementedError
 
 
-def plot_timeseries(fileExt, date, realData=False, op=TohokuOptions()):
-    assert quantity in ('P02', 'P06')
-    filename = 'outdata/' + op.mode + '/' + fileExt + '_' + date + quantity + '.txt'
-    filename2 = 'outdata/' + op.mode + '/' + fileExt + '_' + date + '.txt'
-    f = open(filename, 'r')
-    g = open(filename2, 'r')
+def plot_timeseries(mode, approach, gauge, end_time, date, realData=False):
+    assert gauge in ('P02', 'P06')
+
+    f = open('outdata/' + mode + '/' + approach + '_' + date + gauge + '.txt', 'r')   # File including timeseries
+    g = open('outdata/' + mode + '/' + approach + '_' + date + '.txt', 'r')           # File including element count
     plt.gcf()
     i = 0
     for line in f:
         separated = line.split(',')
         dat = [float(d) for d in separated[:-1]]    # Ignore carriage return
-        tim = np.linspace(0, op.end_time, len(dat))
+        tim = np.linspace(0, end_time, len(dat))
         plt.plot(tim, dat, label=g.readline().split(',')[0])
         i += 1
     f.close()
     g.close()
     if realData:
-        x, y = extract_data(quantity)
-        plt.plot(np.linspace(0, op.end_time, len(x)), y, label='Gauge data', marker='*', markevery=1, color='black')
+        x, y = extract_data(gauge)
+        plt.plot(np.linspace(0, end_time, len(x)), y, label='Gauge data', marker='*', markevery=1, color='black')
     plt.xlabel('Time (s)')
-    plt.ylabel(quantity+' value')
+    plt.ylabel(gauge+' value')
     plt.legend(loc=2, bbox_to_anchor=(1.05, 1))
-    plt.savefig('outdata/' + op.mode + '/' + fileExt + '_' + quantity + date + '.pdf', bbox_inches='tight')
+    plt.savefig('outdata/' + mode + '/' + approach + '_' + gauge + date + '.pdf', bbox_inches='tight')
     plt.clf()
 
 
-def compare_timeseries(date, run, quantity, op=TohokuOptions()):
-    assert quantity in ('P02', 'P06')
-    approaches = ("FixedMesh", "HessianBased", "DWP", "DWR")
-
-    # Get dates (if necessary)
-    dates = {}
-    now = datetime.datetime.now()
-    today = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
-    for approach in approaches:
-        if date is None:
-            try:
-                dates[approach] = input("Date to use for {a:s} approach: ".format(a=approach))
-            except:
-                dates[approach] = today
-        else:
-            dates[approach] = date
-    plt.gcf()
-    for approach in approaches:
-        try:
-            filename = 'outdata/' + op.mode + '/' + approach + '_' + dates[approach] + quantity + '.txt'
-            f = open(filename, 'r')
-            for i in range(run):
-                f.readline()
-            separated = f.readline().split(',')
-            dat = [float(d) for d in separated[:-1]]  # Ignore carriage return
-            tim = np.linspace(0, op.end_time, len(dat))
-            plt.plot(tim[::5], dat[::5], label=approach)
-        except:
-            pass
-    plt.xlabel('Time (s)')
-    plt.ylabel(quantity + ' value')
-    plt.legend(loc=2)
-    plt.savefig('outdata/' + op.mode + '/' + quantity + today + '_' +  str(run) + '.pdf', bbox_inches='tight')
-    plt.clf()
-
-
-def error_vs_elements(mode='Tohoku', noTinyMeshes=False, date=None, op=TohokuOptions()):
+def error_vs_elements(mode='Tohoku', date=None, op=TohokuOptions()):
     now = datetime.datetime.now()
     today = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
     di = 'outdata/' + mode + '/'
@@ -148,18 +114,13 @@ def error_vs_elements(mode='Tohoku', noTinyMeshes=False, date=None, op=TohokuOpt
         else:
             dates.append(date)
 
-    for m in range(errortypes):
+    for m in range(errortypes):    # TODO: need account for objective alone
         for n in range(len(names)):
             try:
                 av, errors, timing = read_errors(dates[n], names[n], mode)
                 rel = []
                 for i in errors:
                     rel.append(errors[i][m])
-
-                if noTinyMeshes:  # Remove results on meshes with very few elements
-                    del av[0], av[1]
-                    del rel[0], rel[1]
-                    del timing[0], timing[1]
 
                 err[labels[n]] = rel
                 nEls[labels[n]] = av
@@ -187,10 +148,9 @@ def error_vs_elements(mode='Tohoku', noTinyMeshes=False, date=None, op=TohokuOpt
         # Plot errors vs. timings
         for mesh in err:
             plt.loglog(tim[mesh], err[mesh], label=mesh, marker=styles[mesh], linewidth=1.)
-        if bootstrapping:
-            if mode == 'Tohoku':
-                plt.hlines(op.J, 8e1, 2e3, colors='k', linestyles='solid', label=r'681,616 elements')
-                plt.axhspan(op.J-5e10, op.J+5e10, alpha=0.5, color='gray')
+        if mode == 'Tohoku':
+            plt.hlines(op.J, 8e1, 2e3, colors='k', linestyles='solid', label=r'681,616 elements')
+            plt.axhspan(op.J-5e10, op.J+5e10, alpha=0.5, color='gray')  # TODO
         plt.gcf()
         plt.legend(loc=4)
         plt.xlabel(r'CPU time (s)')

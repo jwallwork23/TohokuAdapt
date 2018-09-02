@@ -1,6 +1,5 @@
 ## File types to be ignored:
 
-
 *.DS_Store
 *.log
 *.msh
@@ -20,7 +19,6 @@
 
 ## Directories to be ignored:
 
-
 .eggs/
 .idea/
 resources/GMT/
@@ -29,10 +27,10 @@ resources/channel/
 utils/.idea/
 plots/tohoku/
 plots/rossby-wave/
-
+outdata/
+outdata_old/
 
 ## Files to be ignored:
-
 
 .README.md.swp
 
