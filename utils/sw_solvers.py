@@ -364,6 +364,7 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                     le.close()
                 estimate = Function(FunctionSpace(mesh, "CG", 1)).interpolate(interp(mesh, epsilon))
                 PETSc.Sys.Print("#### DEBUG: error estimator norm = %.4e" % norm(estimate))
+
                 M = isotropic_metric(estimate, invert=False, op=op)
                 if op.gradate:
                     M_ = isotropic_metric(interp(mesh, H0), bdy=bdy, op=op)  # Initial boundary metric
@@ -677,7 +678,11 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                     le.load(epsilon)
                     le.close()
                 estimate = Function(FunctionSpace(mesh, "CG", 1)).assign(interp(mesh, epsilon))
+
+                # TODO: Remove this hack TEMPORARY
+                estimate.dat.data[:] *= 1e-5
                 PETSc.Sys.Print("#### DEBUG: error estimator norm = %.4e" % norm(estimate))
+
                 M = isotropic_metric(estimate, invert=False, op=op)
                 if op.gradate:
                     # br = Function(P1).interpolate(boundary_region(mesh, 200, 5e8))

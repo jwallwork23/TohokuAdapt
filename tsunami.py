@@ -89,7 +89,7 @@ for approach in approaches:
             PETSc.Sys.Print("Mode: Tohoku Approach: %s. Run: %d" % (approach, i), comm=COMM_WORLD)
             PETSc.Sys.Print("Run %d: Mean element count: %6d Objective: %.4e Timing %.1fs"
                   % (i, quantities['mean_elements'], quantities['J_h'], quantities['solver_timer']), comm=COMM_WORLD)
-            errorFile.write('%d,%.1f,%.4e' % (quantities['mean_elements'],quantities['solver_timer'],quantities['J_h']))
+            errorFile.write('%d,%.1f,%.4e' % (quantities['mean_elements'], quantities['solver_timer'],quantities['J_h']))
             for tag in ("TV P02", "TV P06"):
                 if tag in quantities:
                     errorFile.write(", %.4e" % quantities[tag])
