@@ -16,6 +16,7 @@ op.max_element_growth = 1.001
 
 P1 = FunctionSpace(mesh, "CG", 1)
 op.nVerT = mesh.num_vertices()
+x = SpatialCoordinate(mesh)
 
 h = Function(P1).interpolate(CellSize(mesh))
 # print("min = ", min(h.dat.data))
@@ -24,7 +25,7 @@ h = Function(P1).interpolate(CellSize(mesh))
 
 f = Function(P1)
 if mode == 0:
-    f.interpolate(Expression("pow(x[0], 2) + pow(x[1], 2) < 0.4 ? 1000. : 5."))
+    f.interpolate(conditional(lt(pow(x[0], 2) + pow(x[1], 2), 0.4), 1000., 5.))
 elif mode == 1:
     f.assign(100.)
 elif mode == 2:
@@ -37,7 +38,7 @@ File('plots/metric_f.pvd').write(M_f)
 
 g = Function(P1)
 if mode == 0:
-    g.interpolate(Expression("pow(x[0] - 1., 2) + pow(x[1] - 1., 2) < 0.4 ? 1000. : 5."))
+    g.interpolate(conditional(lt(pow(x[0] - 1., 2) + pow(x[1] - 1., 2), 0.4), 1000., 5.))
 elif mode == 1:
     g.assign(10000.)
 elif mode == 2:

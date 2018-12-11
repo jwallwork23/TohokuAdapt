@@ -143,7 +143,6 @@ else:
     from thetis import *
     from thetis_adjoint import *
     from firedrake.petsc import PETSc
-    from firedrake import Expression
 
     import scipy.interpolate as si
     from scipy.io.netcdf import NetCDFFile
@@ -241,9 +240,9 @@ def problem_domain(level=0, mesh=None, b=None, op=TohokuOptions()):
             ge((1 + cos(pi * min_value(sqrt(pow(x - op.bell_x0, 2) + pow(y - op.bell_y0, 2)) / op.bell_r0, 1.0))), 0.),
             (1 + cos(pi * min_value(sqrt(pow(x - op.bell_x0, 2) + pow(y - op.bell_y0, 2)) / op.bell_r0, 1.0))),
             0.)
-        source = Function(P1).interpolate(0. + bell)  # Tracer source function
+        source = Function(P1).interpolate(bell)  # Tracer source function
         b = Function(P1).assign(1.)
-        u0 = Function(VectorFunctionSpace(mesh, "CG", 1)).interpolate(Expression([1., 0.]))
+        u0 = Function(VectorFunctionSpace(mesh, "CG", 1)).interpolate(as_vector([1., 0.]))
         eta0 = Function(P1)
         BCs = {'shallow water': {}, 'tracer': {1: {'value': Constant(0.)}}}
 

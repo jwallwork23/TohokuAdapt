@@ -1,7 +1,7 @@
 from thetis import *
 from thetis import FiredrakeConstant as Constant
 from thetis.configuration import *
-from firedrake import Expression
+#from firedrake import Expression
 
 import numpy as np
 
@@ -56,22 +56,30 @@ class AdaptOptions(FrozenConfigurable):
         """Indicator function associated with region(s) of interest"""
         P1 = FunctionSpace(mesh, "DG", 1)
         iA = Function(P1, name="Region of interest")
-
+        x = SpatialCoordinate(mesh)
+        eps = 1e-10
         if np.shape(self.radii)[0] == 1:
-            expr = Expression("pow(x[0] - x0, 2) + pow(x[1] - y0, 2) < r + eps ? 1 : 0",
-                              x0=self.loc[0], y0=self.loc[1], r=pow(self.radii[0], 2), eps=1e-10)
+            expr = conditional(lt(pow(x[0]-self.loc[0], 2) + pow(x[1]-self.loc[1], 2), pow(self.radii[0], 2) + eps), 1, 0)
+            #expr = Expression("pow(x[0] - x0, 2) + pow(x[1] - y0, 2) < r + eps ? 1 : 0",
+            #                  x0=self.loc[0], y0=self.loc[1], r=pow(self.radii[0], 2), eps=1e-10)
         elif np.shape(self.radii)[0] > 1:
             assert len(self.loc)/2 == len(self.radii)
-            e = "(pow(x[0] - {x0:f}, 2) + pow(x[1] - {y0:f}, 2) < {r:f} + {eps:f})".format(x0=self.loc[0],
-                                                                                           y0=self.loc[1],
-                                                                                           r=pow(self.radii[0], 2),
-                                                                                           eps=1e-10)
+            #e0 = lt(pow(x[0] - self.loc[0], 2) + pow(x[1] - self.loc[1], 2), pow(self.radii[0], 2) + eps)
+            #e = "(pow(x[0] - {x0:f}, 2) + pow(x[1] - {y0:f}, 2) < {r:f} + {eps:f})".format(x0=self.loc[0],
+            #                                                                               y0=self.loc[1],
+            #                                                                               r=pow(self.radii[0], 2),
+            #                                                                               eps=1e-10)
             for i in range(1, len(self.radii)):
-                e += "|| (pow(x[0] - {x0:f}, 2) + pow(x[1] - {y0:f}, 2) < {r:f} + {eps:f})".format(x0=self.loc[2*i],
-                                                                                                   y0=self.loc[2*i+1],
-                                                                                                   r=pow(self.radii[i], 2),
-                                                                                                   eps=1e-10)
-            expr = Expression(e)
+                e = lt(pow(x[0] - self.loc[2*i], 2) + pow(x[1] - self.loc[2*i+1], 2), pow(self.radii[i], 2) + eps)
+                if (i == 1):
+                    expr = e
+                else:
+                    expr = And(expr, e)
+                #e += "|| (pow(x[0] - {x0:f}, 2) + pow(x[1] - {y0:f}, 2) < {r:f} + {eps:f})".format(x0=self.loc[2*i],
+                #                                                                                   y0=self.loc[2*i+1],
+                #                                                                                   r=pow(self.radii[i], 2),
+                #                                                                                   eps=1e-10)
+            #expr = Expression(e)
         else:
             raise ValueError("Indicator function radii input not recognised.")
 

@@ -10,10 +10,12 @@ f.assign(1.)
 def indicator(mesh):
 
     P0 = FunctionSpace(mesh, "DG", 0)
+    x = SpatialCoordinate(mesh)
     iA = Function(P0, name="Region of interest")
-    iA.interpolate(Expression(
-        '(x[0] > %f - eps) && (x[0] < %f + eps) && (x[1] > %f - eps) && (x[1] < %f + eps) ? 1. : 0.' % (0., 2., 4., 6.),
-        eps=1e-10))
+    eps = 1e-10
+    cond_x = And(gt(x[0], 0. - eps), lt(x[0], 2. + eps))
+    cond_y = And(gt(x[1], 4. - eps), lt(x[1], 6. + eps))
+    iA.interpolate(conditional(And(cond_x, cond_y), 1, 0))
 
     return iA
 

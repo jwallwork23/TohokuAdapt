@@ -33,7 +33,7 @@ def boundary_region(mesh, bdyTag, scale, sponge=False):
         e += "+ exp(-(pow(x[0] - {x0:f}, 2) + pow(x[1] - {y0:f}, 2)) / {a:f})".format(x0=xy[i][0], y0=xy[i][1], a=scale)
     # f = "sqrt(pow(x[0] - %f, 2) + pow(x[1] - %f, 2)) / %f)" % (xy[0][0], xy[0][1], scale)
     if sponge:
-        expr = Expression(e + " < 1e-3 ? 1e-3 : abs (" + e + ")")   # TODO: Needs redoing
+        expr = Expression(e + " < 1e-3 ? 1e-3 : abs (" + e + ")")   # TODO: Needs redoing. Also needs to avoid C-strings
     else:
         expr = Expression(e + " > 1 ? 1 : " + e)
 
