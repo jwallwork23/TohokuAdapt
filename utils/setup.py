@@ -230,7 +230,7 @@ def problem_domain(level=0, mesh=None, b=None, op=TohokuOptions()):
         # File('plots/tohoku/spongy.pvd').write(diffusivity)
 
     elif op.mode == 'AdvectionDiffusion':
-        n = pow(2, level)
+        n = pow(2, level+2) # Coarser meshes cannot resolve source
         if mesh is None:
             # mesh = RectangleMesh(25 * n, 5 * n, 50, 10)
             mesh = RectangleMesh(30 * n, 5 * n, 60, 10)
@@ -240,7 +240,7 @@ def problem_domain(level=0, mesh=None, b=None, op=TohokuOptions()):
             ge((1 + cos(pi * min_value(sqrt(pow(x - op.bell_x0, 2) + pow(y - op.bell_y0, 2)) / op.bell_r0, 1.0))), 0.),
             (1 + cos(pi * min_value(sqrt(pow(x - op.bell_x0, 2) + pow(y - op.bell_y0, 2)) / op.bell_r0, 1.0))),
             0.)
-        source = Function(P1).interpolate(bell)  # Tracer source function
+        source = Function(P1).interpolate(0. + bell)  # Tracer source function
         b = Function(P1).assign(1.)
         u0 = Function(VectorFunctionSpace(mesh, "CG", 1)).interpolate(as_vector([1., 0.]))
         eta0 = Function(P1)

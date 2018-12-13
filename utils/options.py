@@ -200,12 +200,13 @@ class AdvectionOptions(AdaptOptions):
     bell_y0 = Float(5., help="y-coordinate corresponding to tracer source centre").tag(config=True)
     bell_r0 = Float(0.457, help="Radius of tracer source").tag(config=True)
     u_mag = FiredrakeScalarExpression(Constant(1.), help="(Estimate of) maximum advective speed").tag(config=True)
-    tracer_family = Unicode('cg', help="Finite element family for tracer flow, from {'dg', 'dg'}.").tag(config=True)
+    tracer_family = Unicode('dg', help="Finite element family for tracer flow, from {'dg', 'dg'}.").tag(config=True)
     solver_parameters = PETScSolverParameters({'ksp_type': 'gmres',
                                                'pc_type': 'sor'}).tag(config=True)
     # solver_parameters = PETScSolverParameters({'ksp_type': 'preonly',
     #                                            'pc_type': 'bjacobi',
     #                                            'sub_pc_type': 'ilu'}).tag(config=True)
+    supg = Bool(False, help="Stablise using SUPG").tag(config=True) # NOTE: In development
 
     # Region of importance
     radii = List(trait=Float, default_value=[0.5],
