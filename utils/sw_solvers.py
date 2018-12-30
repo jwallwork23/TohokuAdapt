@@ -136,8 +136,6 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
 
             elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
             b, BCs, f, diffusivity = problem_domain(mesh=mesh, op=op)[3:]   # TODO: find a different way to reset these
-            uv_2d.rename('uv_2d')
-            elev_2d.rename('elev_2d')
         adapt_timer = clock() - adapt_timer
 
         # Solver object and equations
@@ -212,7 +210,7 @@ def HessianBased(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
 
 from thetis_adjoint import *
 import pyadjoint
-from fenics_adjoint.solving import SolveBlock                                       # For extracting adjoint solutions
+from fenics_adjoint.solving import SolveBlock # For extracting adjoint solutions
 
 
 def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
@@ -379,8 +377,6 @@ def DWP(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                 mFile.write(M, time=t)
             elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
             b, BCs, f, diffusivity = problem_domain(mesh=mesh, op=op)[3:]   # TODO: find a different way to reset these
-            uv_2d.rename('uv_2d')
-            elev_2d.rename('elev_2d')
             adapt_timer = clock() - adapt_timer
 
             # Solver object and equations
@@ -703,8 +699,6 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
                 mFile.write(M, time=t)
             elev_2d, uv_2d = interp(mesh, elev_2d, uv_2d)
             b, BCs, f, diffusivity = problem_domain(mesh=mesh, op=op)[3:]   # TODO: Find a different way to reset these
-            uv_2d.rename('uv_2d')
-            elev_2d.rename('elev_2d')
             adapt_timer = clock() - adapt_timer
 
             # Solver object and equations

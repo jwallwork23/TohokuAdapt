@@ -49,8 +49,6 @@ for approach in approaches:
         field_for_adaptation = args.f if args.f is not None else 's'
         filename += '_' + field_for_adaptation
     filename += '_' + date
-    errorFile = open(filename + '.txt', 'w+')   # Initialise file for data storage
-    errorFile.close()
     files = {}
     extensions = ['P02', 'P06']
     for e in extensions:

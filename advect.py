@@ -40,8 +40,6 @@ nodebug = False if args.nodebug is None else bool(args.nodebug)
 
 for approach in approaches:
     filename = 'outdata/AdvectionDiffusion/' + approach + '_' + date
-    errorFile = open(filename + '.txt', 'w+')   # Initialise file
-    errorFile.close()
 
     # Set parameters
     op = AdvectionOptions(approach=approach)
