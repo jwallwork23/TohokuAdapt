@@ -11,6 +11,7 @@ outdirs:
 	@mkdir outdata/AdvectionDiffusion/HessianBased
 	@mkdir outdata/AdvectionDiffusion/DWP
 	@mkdir outdata/AdvectionDiffusion/DWR
+	@mkdir resources/meshes
 
 clean:
 	rm -Rf outdata
