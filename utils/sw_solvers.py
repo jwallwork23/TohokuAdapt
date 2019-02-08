@@ -659,6 +659,7 @@ def DWR(mesh, u0, eta0, b, BCs={}, f=None, diffusivity=None, **kwargs):
         uv_2d, elev_2d = q.split()
         elev_2d.interpolate(eta0)
         uv_2d.interpolate(u0)
+        # q = project(q0, V)  TODO throughout
         quantities = {}
         for g in op.gauges:
             quantities[g] = ()
